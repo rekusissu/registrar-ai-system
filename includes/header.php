@@ -1,0 +1,66 @@
+<?php
+// ============================================================
+//  HEADER.PHP  (includes/)
+//  Reusable page header with meta tags, CSS, and loader.
+//  Include this at the top of every page after session config.
+//
+//  Usage:
+//    $page_title = 'Dashboard';  // Optional - sets page title
+//    $page_description = '...';  // Optional - sets meta description
+//    include 'includes/header.php';
+// ============================================================
+
+// Set default values if not defined
+$page_title = $page_title ?? 'BCP Registrar System';
+$page_description = $page_description ?? 'AI-Powered Registrar Management System';
+$APP_ROOT = $APP_ROOT ?? './';
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes" />
+    <meta name="description" content="<?= htmlspecialchars($page_description) ?>" />
+    <meta name="theme-color" content="#1a3a8c" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    
+    <title><?= htmlspecialchars($page_title) ?> — BCP Registrar System</title>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="<?= $APP_ROOT ?>assets/images/favicon.ico" />
+    <link rel="apple-touch-icon" href="<?= $APP_ROOT ?>assets/images/BCP_LOGO.png" />
+
+    <!-- Loader Meta -->
+    <meta name="loader-logo" content="<?= $APP_ROOT ?>assets/images/BCP_LOGO.png" />
+
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+
+    <!-- CSS Files -->
+    <link rel="stylesheet" href="<?= $APP_ROOT ?>css/page-loader.css" />
+    <link rel="stylesheet" href="<?= $APP_ROOT ?>css/components.css" />
+    <link rel="stylesheet" href="<?= $APP_ROOT ?>css/sidebar.css" />
+    <link rel="stylesheet" href="<?= $APP_ROOT ?>css/dashboard.css" />
+
+    <!-- Loader Script - MUST BE FIRST -->
+    <script src="<?= $APP_ROOT ?>js/page-loader.js"></script>
+
+    <!-- Extra CSS for specific pages -->
+    <?php if (isset($extra_css)): ?>
+        <?php foreach ($extra_css as $css_file): ?>
+            <link rel="stylesheet" href="<?= $APP_ROOT ?>css/<?= $css_file ?>" />
+        <?php endforeach; ?>
+    <?php endif; ?>
+
+    <!-- Custom page styles -->
+    <?php if (isset($page_styles)): ?>
+        <style>
+            <?= $page_styles ?>
+        </style>
+    <?php endif; ?>
+</head>
+<body>
