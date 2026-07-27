@@ -8,7 +8,8 @@
     --sidebar-collapsed-width: 72px;
 }
 
-.dashboard-main {
+.dashboard-main,
+.main {
     font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont,
                  'Helvetica Neue', Arial, sans-serif;
     margin-left: var(--sidebar-width);
@@ -445,7 +446,8 @@
 }
 
 @media (max-width: 1024px) {
-    .dashboard-main {
+    .dashboard-main,
+    .main {
         padding: 24px;
     }
     .header {
@@ -461,7 +463,8 @@
 }
 
 @media (max-width: 768px) {
-    .dashboard-main {
+    .dashboard-main,
+    .main {
         margin-left: 0;
         padding: 20px 16px;
         width: 100%;
@@ -502,7 +505,8 @@
 }
 
 @media (max-width: 480px) {
-    .dashboard-main {
+    .dashboard-main,
+    .main {
         padding: 16px 12px;
     }
     .header {

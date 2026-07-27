@@ -1,7 +1,7 @@
 <?php
 // ============================================================
 //  REGISTRAR/RFID-CARDS.PHP
-//  RFID cards management
+//  RFID cards management — fully inline (CSS + JS)
 // ============================================================
 
 require_once __DIR__ . '/../shared/security_headers.php';
@@ -17,7 +17,7 @@ require_once __DIR__ . '/../shared/database.php';
 $db = Database::getInstance();
 
 $cards = $db->fetchAll("
-    SELECT 
+    SELECT
         rf.*,
         CONCAT(s.first_name, ' ', s.last_name) AS student_name,
         s.student_number,
@@ -28,22 +28,26 @@ $cards = $db->fetchAll("
     ORDER BY rf.id DESC
 ");
 
-$totalCards = count($cards);
-$activeCards = count(array_filter($cards, fn($c) => $c['status'] === 'active'));
+$totalCards   = count($cards);
+$activeCards  = count(array_filter($cards, fn($c) => $c['status'] === 'active'));
 $expiredCards = count(array_filter($cards, fn($c) => $c['status'] === 'expired'));
-$lostCards = count(array_filter($cards, fn($c) => $c['status'] === 'lost'));
+$lostCards    = count(array_filter($cards, fn($c) => $c['status'] === 'lost'));
 
-$students = $db->fetchAll("SELECT id, student_number, CONCAT(first_name, ' ', last_name) AS name, course FROM students WHERE status = 'active' ORDER BY name");
+$students = $db->fetchAll(
+    "SELECT id, student_number, CONCAT(first_name, ' ', last_name) AS name, course
+     FROM students
+     WHERE status = 'active'
+     ORDER BY name"
+);
 
 $page_title = 'RFID Cards';
 $APP_ROOT = '../';
 $ACTIVE_NAV = 'rfid';
-$extra_css = ['rfid-cards.css'];
-$page_scripts = ['rfid.js'];
 
 include '../includes/header.php';
 include '../includes/sidebar.php';
 
+// Deterministic avatar color per student_id
 $avatarPalette = ['blue', 'green', 'purple', 'orange', 'pink'];
 $avatarClasses = [];
 foreach ($cards as $i => $c) {
@@ -52,7 +56,542 @@ foreach ($cards as $i => $c) {
 }
 ?>
 
-<main class="main">
+<style>
+/* ============================================================
+   RFID CARDS PAGE — INLINE STYLES
+   ============================================================ */
+
+/* ── Sidebar-aware main ── */
+:root { --sidebar-width: 260px; }
+.dashboard-main {
+    margin-left: var(--sidebar-width);
+    padding: 24px 32px;
+    min-height: 100vh;
+    width: calc(100% - var(--sidebar-width));
+    max-width: calc(100% - var(--sidebar-width));
+    overflow-x: hidden;
+    box-sizing: border-box;
+    transition: margin-left 0.3s ease, width 0.3s ease, max-width 0.3s ease;
+}
+
+/* ── Page header ── */
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 22px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #e8eaef;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+.header .title h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0 0 2px;
+}
+.header .title p {
+    font-size: 13px;
+    color: #64748b;
+    margin: 0;
+}
+.header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* ── Buttons ── */
+.btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 9px 16px;
+    border-radius: 10px;
+    font-size: 13px; font-weight: 600;
+    cursor: pointer;
+    border: 1.5px solid transparent;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    font-family: inherit;
+    line-height: 1;
+}
+.btn-primary {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    color: white;
+    box-shadow: 0 1px 3px rgba(37,99,235,0.25);
+}
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(37,99,235,0.3); }
+.btn-secondary { background: white; color: #475569; border-color: #e2e8f0; }
+.btn-secondary:hover { background: #f8fafc; border-color: #cbd5e1; color: #0f172a; }
+.btn-light { background: #f1f5f9; color: #475569; }
+.btn-light:hover { background: #e2e8f0; color: #0f172a; }
+
+/* ── Stats grid ── */
+.rfid-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 22px;
+}
+.rfid-stat-card {
+    background: white;
+    border-radius: 14px;
+    padding: 14px 18px;
+    border: 1px solid #e2e8f0;
+    display: flex; align-items: center; gap: 12px;
+    transition: all 0.2s ease;
+}
+.rfid-stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.05); }
+.rfid-stat-card .stat-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+}
+.rfid-stat-card .stat-icon.blue   { background: #eef4ff; color: #2563eb; }
+.rfid-stat-card .stat-icon.green  { background: #dcfce7; color: #16a34a; }
+.rfid-stat-card .stat-icon.yellow { background: #fef3c7; color: #b45309; }
+.rfid-stat-card .stat-icon.red    { background: #fee2e2; color: #dc2626; }
+.rfid-stat-card .stat-value {
+    font-size: 22px; font-weight: 700; color: #0f172a; line-height: 1.1;
+}
+.rfid-stat-card .stat-label { font-size: 12px; color: #64748b; margin-top: 2px; }
+
+/* ── Search ── */
+.search-filter-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.search-wrapper {
+    position: relative; display: flex; align-items: center;
+    height: 42px; flex: 1; min-width: 240px;
+}
+.search-icon {
+    position: absolute; left: 14px; top: 50%;
+    transform: translateY(-50%); color: #94a3b8;
+    font-size: 14px; pointer-events: none; z-index: 2;
+}
+.search-wrapper input {
+    width: 100%; height: 42px; padding: 0 38px;
+    border: 1.5px solid #e2e8f0; border-radius: 10px;
+    font-size: 14px; font-family: inherit;
+    outline: none; background: white; color: #1e293b;
+    box-sizing: border-box;
+    transition: all 0.2s ease;
+}
+.search-wrapper input:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.10);
+}
+.search-clear {
+    position: absolute; right: 8px; top: 50%;
+    transform: translateY(-50%);
+    background: none; border: none;
+    color: #94a3b8; cursor: pointer;
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+}
+.search-clear:hover { background: #f1f5f9; color: #1e293b; }
+
+/* ── Card UID pill ── */
+.card-uid-display {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px; font-weight: 600;
+    color: #0f172a;
+    background: #f1f5f9; padding: 4px 12px; border-radius: 8px;
+}
+.card-uid-display .chip {
+    width: 24px; height: 24px;
+    background: linear-gradient(135deg, #e2e8f0, #cbd5e1);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; color: #64748b;
+}
+
+/* ── Table ── */
+.rfid-table-wrapper {
+    background: white;
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+}
+.rfid-table-wrapper table { width: 100%; border-collapse: collapse; min-width: 820px; }
+.rfid-table-wrapper th {
+    text-align: left;
+    padding: 11px 16px;
+    font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    color: #64748b;
+    background: #f8fafc;
+    border-bottom: 2px solid #e2e8f0;
+    white-space: nowrap;
+}
+.rfid-table-wrapper td {
+    padding: 11px 16px;
+    font-size: 14px;
+    color: #1e293b;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+    white-space: nowrap;
+}
+.rfid-table-wrapper tbody tr:hover { background: #f8fafc; }
+.rfid-table-wrapper tbody tr:last-child td { border-bottom: none; }
+
+/* ── Student info cell ── */
+.student-info { display: flex; align-items: center; gap: 10px; }
+.student-avatar {
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: 700; font-size: 11px;
+    flex-shrink: 0;
+}
+.student-avatar.blue   { background: linear-gradient(135deg, #2563eb, #1d4ed8); }
+.student-avatar.green  { background: linear-gradient(135deg, #16a34a, #15803d); }
+.student-avatar.purple { background: linear-gradient(135deg, #7c3aed, #6d28d9); }
+.student-avatar.orange { background: linear-gradient(135deg, #b45309, #92400e); }
+.student-avatar.pink   { background: linear-gradient(135deg, #db2777, #be185d); }
+.student-name {
+    font-weight: 600; color: #0f172a;
+    font-size: 14px; line-height: 1.2;
+}
+.student-detail {
+    font-size: 12px; color: #94a3b8;
+    line-height: 1.2; margin-top: 2px;
+}
+.unassigned-text { color: #94a3b8; font-style: italic; font-size: 13px; }
+
+/* ── Status badges ── */
+.status-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px; font-weight: 600;
+    background: #f1f5f9; color: #475569;
+    line-height: 1.2; white-space: nowrap;
+}
+.status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    display: inline-block; flex-shrink: 0;
+}
+.status-badge.active    { background: #dcfce7; color: #16a34a; }
+.status-badge.expired,
+.status-badge.inactive,
+.status-badge.denied     { background: #fee2e2; color: #dc2626; }
+.status-badge.lost      { background: #fef3c7; color: #b45309; }
+
+/* ── Expiry warning ── */
+.expiry-warning { color: #b45309; font-size: 12px; font-weight: 500; margin-left: 6px; }
+
+/* ── Action group ── */
+.action-group { display: flex; gap: 6px; justify-content: center; }
+.action-btn {
+    width: 32px; height: 32px;
+    border: none; background: transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+.action-btn:hover { background: #f1f5f9; transform: scale(1.05); }
+.action-btn.view   { color: #2563eb; } .action-btn.view:hover   { background: #eef4ff; }
+.action-btn.edit   { color: #b45309; } .action-btn.edit:hover   { background: #fef3c7; }
+.action-btn.delete { color: #dc2626; } .action-btn.delete:hover { background: #fee2e2; }
+
+/* ── Table footer ── */
+.table-footer {
+    padding: 12px 18px;
+    background: #fafcfd;
+    border-top: 1px solid #f1f5f9;
+}
+.table-footer .info-text { font-size: 13px; color: #64748b; }
+.table-footer .info-text strong { color: #0f172a; }
+
+/* ── Modals (uses .logout-modal-overlay from sidebar.css) ── */
+.rfid-modal {
+    max-width: 520px;
+    text-align: left;
+    padding: 26px 30px 22px;
+}
+.rfid-modal-header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 16px;
+}
+.rfid-modal-header .header-icon {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+.rfid-modal-header .header-icon.assign { background: #eef4ff; color: #2563eb; }
+.rfid-modal-header .header-icon.edit   { background: #fef3c7; color: #b45309; }
+.rfid-modal-header h3 { font-size: 18px; font-weight: 700; color: #0f172a; margin: 0; }
+.rfid-modal-header p  { font-size: 13px; color: #64748b; margin: 2px 0 0; }
+
+.form-section { padding: 14px 0 4px; border-bottom: 1px dashed #f1f5f9; }
+.form-section:last-of-type { border-bottom: none; }
+.form-section-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.form-section-icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    background: #eef4ff; color: #2563eb;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+}
+.form-section-title { font-size: 13px; font-weight: 700; color: #0f172a; }
+.form-section-subtitle { font-size: 11px; color: #64748b; margin-top: 1px; }
+.form-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.form-group { margin-bottom: 12px; flex: 1; min-width: 140px; }
+.form-group label {
+    display: block;
+    font-size: 12px;
+    color: #475569;
+    margin-bottom: 5px;
+    font-weight: 600;
+}
+.form-control {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    background: white;
+    color: #1e293b;
+    box-sizing: border-box;
+}
+.form-control:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.10); }
+.form-control[readonly] { background: #f8fafc; color: #475569; }
+
+.uid-row { display: flex; gap: 8px; align-items: stretch; }
+.uid-row .form-control {
+    flex: 1;
+    font-family: 'Courier New', monospace;
+    font-size: 16px;
+    letter-spacing: 1px;
+}
+.btn-tap {
+    padding: 0 18px;
+    background: #f1f5f9;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    color: #475569;
+    font-weight: 600; font-size: 13px;
+    display: flex; align-items: center; gap: 6px;
+    cursor: pointer; white-space: nowrap;
+    font-family: inherit;
+    transition: all 0.2s ease;
+}
+.btn-tap:hover { background: #e2e8f0; color: #0f172a; }
+.btn-tap.tapping { background: #eef4ff; border-color: #2563eb; color: #2563eb; }
+.btn-tap.success { background: #dcfce7; border-color: #16a34a; color: #16a34a; }
+
+.student-search-wrapper { position: relative; }
+.student-search-results {
+    position: absolute; top: 100%; left: 0; right: 0;
+    background: white; border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    max-height: 220px; overflow-y: auto;
+    margin-top: 4px;
+    z-index: 10;
+    display: none;
+}
+.student-search-results.show { display: block; }
+.student-search-results .result-item {
+    padding: 10px 14px;
+    font-size: 14px; color: #1e293b;
+    cursor: pointer;
+}
+.student-search-results .result-item:hover { background: #f1f5f9; }
+.student-search-results .no-results {
+    padding: 14px;
+    font-size: 13px; color: #94a3b8;
+    text-align: center;
+}
+.selected-student-chip {
+    display: none;
+    align-items: center; gap: 10px;
+    margin-top: 8px;
+    padding: 10px 14px;
+    background: #f0fdf4;
+    border: 1px solid #86efac;
+    border-radius: 10px;
+}
+.selected-student-chip.show { display: flex; }
+.selected-student-chip i { color: #16a34a; }
+.selected-student-chip .chip-name { font-weight: 600; color: #14532d; font-size: 14px; flex: 1; }
+.selected-student-chip .chip-id   { font-size: 12px; color: #16a34a; }
+.selected-student-chip .chip-clear {
+    background: none; border: none;
+    color: #94a3b8; cursor: pointer;
+    padding: 4px;
+}
+.selected-student-chip .chip-clear:hover { color: #dc2626; }
+
+.rfid-modal-actions {
+    display: flex; gap: 10px; justify-content: flex-end;
+    margin-top: 18px; padding-top: 14px;
+    border-top: 1px solid #f1f5f9;
+}
+.rfid-modal-actions .btn { padding: 9px 18px; }
+
+/* ── View drawer ── */
+.rfid-drawer-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.5);
+    backdrop-filter: blur(8px);
+    z-index: 99998;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+.rfid-drawer-overlay.active { opacity: 1; pointer-events: auto; }
+.rfid-drawer {
+    position: fixed; top: 0; right: 0;
+    height: 100vh; width: 400px; max-width: 100%;
+    background: white;
+    box-shadow: -16px 0 48px rgba(0,0,0,0.15);
+    z-index: 99999;
+    transform: translateX(100%);
+    transition: transform 0.32s ease;
+    display: flex; flex-direction: column;
+}
+.rfid-drawer.active { transform: translateX(0); }
+.rfid-drawer .drawer-header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex; align-items: center; justify-content: space-between;
+}
+.rfid-drawer .drawer-header h2 {
+    font-size: 18px; font-weight: 700; color: #0f172a;
+    margin: 0;
+    display: flex; align-items: center; gap: 10px;
+}
+.rfid-drawer .drawer-header h2 i { color: #2563eb; }
+.rfid-drawer .drawer-close {
+    background: #f1f5f9; border: none;
+    width: 32px; height: 32px; border-radius: 8px;
+    color: #475569; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+}
+.rfid-drawer .drawer-close:hover { background: #e2e8f0; color: #0f172a; }
+.rfid-drawer .drawer-body { flex: 1; overflow-y: auto; padding: 18px 24px; }
+.rfid-drawer .drawer-section { margin-bottom: 18px; }
+.rfid-drawer .drawer-section-title {
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    color: #94a3b8;
+    margin-bottom: 8px;
+}
+.rfid-drawer .uid-display {
+    background: linear-gradient(135deg, #eef4ff, #dbeafe);
+    border: 1px solid #bfdbfe;
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex; align-items: center; gap: 12px;
+}
+.rfid-drawer .uid-display .uid-icon {
+    width: 36px; height: 36px;
+    background: white; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    color: #2563eb;
+}
+.rfid-drawer .uid-display .uid-text {
+    font-family: 'Courier New', monospace;
+    font-size: 16px; font-weight: 700;
+    color: #1e40af; letter-spacing: 1px;
+}
+.rfid-drawer .kv-list { list-style: none; padding: 0; margin: 0; }
+.rfid-drawer .kv-list li {
+    display: flex; justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px dashed #f1f5f9;
+    font-size: 13px;
+}
+.rfid-drawer .kv-list li:last-child { border-bottom: none; }
+.rfid-drawer .kv-list .kv-label { color: #64748b; }
+.rfid-drawer .kv-list .kv-value { color: #0f172a; font-weight: 600; text-align: right; max-width: 60%; word-break: break-word; }
+.rfid-drawer .notes-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 13px; color: #1e293b;
+    line-height: 1.5; min-height: 50px;
+}
+.rfid-drawer .scan-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #f8fafc;
+    margin-bottom: 6px;
+    font-size: 12px;
+}
+.rfid-drawer .scan-row .scan-meta { color: #64748b; }
+
+/* ── Toast (matches components.css) ── */
+.toast-container {
+    position: fixed; top: 24px; right: 24px;
+    z-index: 100000;
+    display: flex; flex-direction: column; gap: 8px;
+}
+.toast {
+    background: white; color: #0f172a;
+    padding: 14px 16px;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.10);
+    border: 1px solid #e2e8f0;
+    display: flex; align-items: flex-start; gap: 12px;
+    min-width: 260px; max-width: 360px;
+    animation: toastIn 0.25s ease-out;
+}
+.toast.success { border-left: 4px solid #16a34a; }
+.toast.error   { border-left: 4px solid #dc2626; }
+.toast.warning { border-left: 4px solid #b45309; }
+.toast.info    { border-left: 4px solid #2563eb; }
+.toast-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+.toast.success .toast-icon { color: #16a34a; }
+.toast.error   .toast-icon { color: #dc2626; }
+.toast.warning .toast-icon { color: #b45309; }
+.toast.info    .toast-icon { color: #2563eb; }
+.toast-title   { font-weight: 700; font-size: 13px; margin-bottom: 2px; }
+.toast-message { font-size: 12px; color: #475569; line-height: 1.4; }
+.toast-close {
+    background: none; border: none;
+    color: #94a3b8; cursor: pointer;
+    margin-left: auto;
+    padding: 2px;
+}
+.toast-close:hover { color: #0f172a; }
+.toast.hiding { animation: toastOut 0.3s ease-in forwards; }
+@keyframes toastIn  { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes toastOut { to   { opacity: 0; transform: translateX(20px); } }
+
+/* ── Responsive ── */
+@media (max-width: 1024px) {
+    .dashboard-main { padding: 22px; }
+    .rfid-stats { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 768px) {
+    .dashboard-main {
+        margin-left: 0;
+        width: 100%; max-width: 100%;
+        padding: 18px 14px;
+    }
+    .rfid-stats { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .rfid-table-wrapper table { min-width: 700px; }
+    .rfid-drawer { width: 100%; }
+    .rfid-modal { max-width: 96%; padding: 22px 18px; }
+}
+@media (max-width: 480px) {
+    .rfid-stats { grid-template-columns: 1fr; }
+    .header { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .header-actions { width: 100%; }
+}
+</style>
+
+<main class="dashboard-main">
     <header class="header">
         <div class="title">
             <h1>RFID Cards</h1>
@@ -75,28 +614,28 @@ foreach ($cards as $i => $c) {
     <div class="rfid-stats">
         <div class="rfid-stat-card">
             <div class="stat-icon blue"><i class="fas fa-credit-card"></i></div>
-            <div class="stat-info">
+            <div>
                 <div class="stat-value"><?= $totalCards ?></div>
                 <div class="stat-label">Total Cards</div>
             </div>
         </div>
         <div class="rfid-stat-card">
             <div class="stat-icon green"><i class="fas fa-check-circle"></i></div>
-            <div class="stat-info">
+            <div>
                 <div class="stat-value"><?= $activeCards ?></div>
                 <div class="stat-label">Active</div>
             </div>
         </div>
         <div class="rfid-stat-card">
             <div class="stat-icon yellow"><i class="fas fa-clock"></i></div>
-            <div class="stat-info">
+            <div>
                 <div class="stat-value"><?= $expiredCards ?></div>
                 <div class="stat-label">Expired</div>
             </div>
         </div>
         <div class="rfid-stat-card">
             <div class="stat-icon red"><i class="fas fa-triangle-exclamation"></i></div>
-            <div class="stat-info">
+            <div>
                 <div class="stat-value"><?= $lostCards ?></div>
                 <div class="stat-label">Lost</div>
             </div>
@@ -104,11 +643,11 @@ foreach ($cards as $i => $c) {
     </div>
 
     <!-- Search -->
-    <div class="search-filter-bar" style="margin-bottom: 16px;">
+    <div class="search-filter-bar">
         <div class="search-wrapper">
             <i class="fas fa-search search-icon"></i>
             <input type="text" id="rfidSearch" placeholder="Search by UID, student, or status..." />
-            <button class="search-clear" id="searchClear"><i class="fas fa-times"></i></button>
+            <button class="search-clear" id="searchClear" type="button"><i class="fas fa-times"></i></button>
         </div>
     </div>
 
@@ -128,10 +667,10 @@ foreach ($cards as $i => $c) {
             <tbody id="rfidTableBody">
                 <?php if (empty($cards)): ?>
                     <tr>
-                        <td colspan="6" class="text-center py-12 text-gray-500">
-                            <i class="fas fa-credit-card text-5xl block mb-3 text-gray-300"></i>
-                            <p class="text-lg font-medium text-gray-400">No RFID cards found</p>
-                            <p class="text-sm text-gray-400">Assign cards to students to get started</p>
+                        <td colspan="6" style="text-align:center; padding:48px 12px; color:#94a3b8;">
+                            <i class="fas fa-credit-card" style="font-size:42px; color:#cbd5e1; display:block; margin-bottom:10px;"></i>
+                            <p style="font-size:15px; font-weight:600; color:#64748b; margin:0;">No RFID cards found</p>
+                            <p style="font-size:13px; margin:4px 0 0;">Assign cards to students to get started</p>
                         </td>
                     </tr>
                 <?php else: ?>
@@ -143,7 +682,7 @@ foreach ($cards as $i => $c) {
                         }
                         $avatarClass = $avatarClasses[$cardIndex] ?? 'blue';
                     ?>
-                        <tr data-card='<?= json_encode($card) ?>'>
+                        <tr data-card='<?= htmlspecialchars(json_encode($card), ENT_QUOTES, 'UTF-8') ?>'>
                             <td>
                                 <div class="card-uid-display">
                                     <span class="chip"><i class="fas fa-microchip"></i></span>
@@ -151,7 +690,7 @@ foreach ($cards as $i => $c) {
                                 </div>
                             </td>
                             <td>
-                                <?php if ($card['student_id']): ?>
+                                <?php if (!empty($card['student_id'])): ?>
                                     <div class="student-info">
                                         <div class="student-avatar <?= $avatarClass ?>"><?= $initials ?: '?' ?></div>
                                         <div>
@@ -177,20 +716,20 @@ foreach ($cards as $i => $c) {
                                 <?php endif; ?>
                             </td>
                             <td>
-                                <span class="status-badge <?= $card['status'] ?>">
-                                    <span class="status-dot <?= $card['status'] ?>"></span>
-                                    <?= ucfirst($card['status']) ?>
+                                <span class="status-badge <?= htmlspecialchars($card['status']) ?>">
+                                    <span class="status-dot"></span>
+                                    <?= ucfirst(htmlspecialchars($card['status'])) ?>
                                 </span>
                             </td>
                             <td>
                                 <div class="action-group">
-                                    <button class="action-btn view" onclick="openViewDrawer(<?= $card['id'] ?>)" title="View">
+                                    <button class="action-btn view" onclick="openViewDrawer(<?= (int)$card['id'] ?>)" title="View">
                                         <i class="fas fa-eye"></i>
                                     </button>
-                                    <button class="action-btn edit" onclick="openEditModal(<?= $card['id'] ?>)" title="Edit">
+                                    <button class="action-btn edit" onclick="openEditModal(<?= (int)$card['id'] ?>)" title="Edit">
                                         <i class="fas fa-pen"></i>
                                     </button>
-                                    <button class="action-btn delete" onclick="confirmDelete(<?= $card['id'] ?>, '<?= htmlspecialchars($card['card_uid']) ?>')" title="Delete">
+                                    <button class="action-btn delete" onclick="confirmDelete(<?= (int)$card['id'] ?>, '<?= htmlspecialchars($card['card_uid'], ENT_QUOTES) ?>')" title="Delete">
                                         <i class="fas fa-trash-alt"></i>
                                     </button>
                                 </div>
@@ -221,9 +760,8 @@ foreach ($cards as $i => $c) {
         <form id="assignCardForm">
             <input type="hidden" id="selectedStudentId" name="student_id" value="">
 
-            <!-- Student picker -->
             <div class="form-section">
-                <div class="form-section-header" style="margin-bottom:10px;">
+                <div class="form-section-header">
                     <div class="form-section-icon"><i class="fas fa-user-graduate"></i></div>
                     <div>
                         <div class="form-section-title">Student</div>
@@ -236,7 +774,7 @@ foreach ($cards as $i => $c) {
                     <div class="student-search-results" id="studentSearchResults"></div>
                 </div>
 
-                <select id="studentSelect" class="form-control" style="display:none;">
+                <select id="studentSelect" style="display:none;">
                     <option value="">Select a student</option>
                     <?php foreach ($students as $student): ?>
                         <option value="<?= (int)$student['id'] ?>">
@@ -248,16 +786,15 @@ foreach ($cards as $i => $c) {
                 <div class="selected-student-chip" id="selectedStudentDisplay">
                     <i class="fas fa-check-circle"></i>
                     <span class="chip-name" id="selectedName"></span>
-                    <span class="chip-id" id="selectedId"></span>
+                    <span class="chip-id" id="selectedId">Selected</span>
                     <button type="button" class="chip-clear" onclick="clearSelectedStudent()" title="Clear">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
             </div>
 
-            <!-- UID + Tap -->
             <div class="form-section">
-                <div class="form-section-header" style="margin-bottom:10px;">
+                <div class="form-section-header">
                     <div class="form-section-icon"><i class="fas fa-microchip"></i></div>
                     <div>
                         <div class="form-section-title">Card UID</div>
@@ -274,14 +811,13 @@ foreach ($cards as $i => $c) {
                 </div>
             </div>
 
-            <!-- Dates + Notes -->
             <div class="form-section">
                 <div class="form-row">
-                    <div class="form-group" style="flex:1;">
+                    <div class="form-group">
                         <label>Issued Date</label>
                         <input type="date" id="issuedDate" name="issued_date" class="form-control" value="<?= date('Y-m-d') ?>" />
                     </div>
-                    <div class="form-group" style="flex:1;">
+                    <div class="form-group">
                         <label>Expiry Date</label>
                         <input type="date" id="expiryDate" name="expiry_date" class="form-control" value="<?= date('Y-m-d', strtotime('+1 year')) ?>" />
                     </div>
@@ -318,11 +854,11 @@ foreach ($cards as $i => $c) {
 
             <div class="form-section">
                 <div class="form-row">
-                    <div class="form-group" style="flex:1;">
+                    <div class="form-group">
                         <label>Card UID</label>
                         <div class="form-control" id="editUid" style="font-family:'Courier New',monospace;letter-spacing:1px;font-weight:600;"></div>
                     </div>
-                    <div class="form-group" style="flex:1;">
+                    <div class="form-group">
                         <label>Student</label>
                         <div class="form-control" id="editStudentName" style="font-weight:600;"></div>
                         <div style="font-size:12px;color:#64748b;margin-top:4px;" id="editStudentNumber"></div>
@@ -332,7 +868,7 @@ foreach ($cards as $i => $c) {
 
             <div class="form-section">
                 <div class="form-row">
-                    <div class="form-group" style="flex:1;">
+                    <div class="form-group">
                         <label>Status</label>
                         <select id="editStatus" class="form-control">
                             <option value="active">Active</option>
@@ -341,7 +877,7 @@ foreach ($cards as $i => $c) {
                             <option value="inactive">Inactive</option>
                         </select>
                     </div>
-                    <div class="form-group" style="flex:1;">
+                    <div class="form-group">
                         <label>Expiry Date</label>
                         <input type="date" id="editExpiryDate" class="form-control" />
                     </div>
@@ -413,7 +949,10 @@ foreach ($cards as $i => $c) {
     </div>
 </aside>
 
-<!-- Delete Confirmation Modal -->
+<!-- ── Toast container ── -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ── Delete Confirmation Modal ── -->
 <div class="logout-modal-overlay" id="deleteModal">
     <div class="logout-modal">
         <div class="logout-modal-icon" style="background: #fee2e2;">
@@ -422,8 +961,8 @@ foreach ($cards as $i => $c) {
         <h3 class="logout-modal-title">Delete RFID Card</h3>
         <p class="logout-modal-message" id="deleteMessage">Are you sure you want to delete this card? This action cannot be undone.</p>
         <div class="logout-modal-actions">
-            <button class="logout-btn-cancel" id="deleteCancel">Cancel</button>
-            <button class="logout-btn-confirm" id="deleteConfirm" style="background: #dc2626;">
+            <button class="logout-btn-cancel" id="deleteCancel" type="button">Cancel</button>
+            <button class="logout-btn-confirm" id="deleteConfirm" type="button" style="background: #dc2626;">
                 <i class="fas fa-trash-alt"></i> Delete
             </button>
         </div>
@@ -431,44 +970,389 @@ foreach ($cards as $i => $c) {
 </div>
 
 <script>
+// =================================================================
+// RFID CARDS — INLINE JS
+// =================================================================
 let deleteTarget = null;
 
+// ── Toast helper ──
+function showToast(title, message, type) {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+    const icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-triangle-exclamation', info: 'fa-info-circle' };
+    const toast = document.createElement('div');
+    toast.className = 'toast ' + (type || 'success');
+    toast.innerHTML = `
+        <i class="fas ${icons[type] || icons.success} toast-icon"></i>
+        <div>
+            <div class="toast-title">${title}</div>
+            <div class="toast-message">${message}</div>
+        </div>
+        <button class="toast-close" type="button"><i class="fas fa-times"></i></button>
+    `;
+    toast.querySelector('.toast-close').addEventListener('click', () => toast.remove());
+    container.appendChild(toast);
+    setTimeout(() => { toast.classList.add('hiding'); setTimeout(() => toast.remove(), 300); }, 4000);
+}
+
+// ── Delete modal ──
 function confirmDelete(id, uid) {
     deleteTarget = id;
     document.getElementById('deleteMessage').textContent = 'Are you sure you want to delete RFID card ' + uid + '? This action cannot be undone.';
     document.getElementById('deleteModal').classList.add('active');
     document.body.style.overflow = 'hidden';
 }
-
-document.getElementById('deleteCancel').addEventListener('click', function() {
+document.getElementById('deleteCancel').addEventListener('click', () => {
     document.getElementById('deleteModal').classList.remove('active');
     document.body.style.overflow = '';
     deleteTarget = null;
 });
-
-document.getElementById('deleteConfirm').addEventListener('click', function() {
+document.getElementById('deleteConfirm').addEventListener('click', () => {
     if (!deleteTarget) return;
-    fetch('../api/rfid.php?id=' + deleteTarget, { method: 'DELETE' })
-        .then(() => window.location.reload());
+    fetch('../api/rfid.php?id=' + deleteTarget, { method: 'DELETE' }).then(() => window.location.reload());
 });
-
-document.getElementById('deleteModal').addEventListener('click', function(e) {
-    if (e.target === this) {
-        this.classList.remove('active');
+document.getElementById('deleteModal').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) {
+        e.currentTarget.classList.remove('active');
         document.body.style.overflow = '';
         deleteTarget = null;
     }
 });
 
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-        const modal = document.getElementById('deleteModal');
-        if (modal.classList.contains('active')) {
-            modal.classList.remove('active');
-            document.body.style.overflow = '';
-            deleteTarget = null;
-        }
+// ── Live search ──
+const rfidSearchInput = document.getElementById('rfidSearch');
+const rfidTableBody = document.getElementById('rfidTableBody');
+const searchClearBtn = document.getElementById('searchClear');
+const showingCount = document.getElementById('showingCount');
+
+function applyRfidSearch() {
+    if (!rfidTableBody) return;
+    const query = (rfidSearchInput?.value || '').trim().toLowerCase();
+    const rows = rfidTableBody.querySelectorAll('tr[data-card]');
+    let visible = 0;
+    rows.forEach(row => {
+        if (!query) { row.style.display = ''; visible++; return; }
+        const data = (row.getAttribute('data-card') || '').toLowerCase();
+        const match = data.indexOf(query) !== -1;
+        row.style.display = match ? '' : 'none';
+        if (match) visible++;
+    });
+    if (showingCount) showingCount.textContent = visible;
+}
+if (rfidSearchInput) rfidSearchInput.addEventListener('input', applyRfidSearch);
+if (searchClearBtn) searchClearBtn.addEventListener('click', () => {
+    if (rfidSearchInput) rfidSearchInput.value = '';
+    applyRfidSearch();
+    rfidSearchInput && rfidSearchInput.focus();
+});
+
+// ── Assign modal: students from <select> ──
+const allStudents = [];
+const studentSelectEl = document.getElementById('studentSelect');
+if (studentSelectEl) {
+    Array.from(studentSelectEl.options).forEach(opt => {
+        if (opt.value) allStudents.push({ id: opt.value, name: opt.textContent.trim() });
+    });
+}
+const studentSearchInput = document.getElementById('studentSearchInput');
+const studentSearchResults = document.getElementById('studentSearchResults');
+
+function selectStudent(id, name) {
+    document.getElementById('studentSelect').value = id;
+    document.getElementById('selectedStudentId').value = id;
+    document.getElementById('selectedName').textContent = name;
+    document.getElementById('selectedId').textContent = 'Selected';
+    document.getElementById('selectedStudentDisplay').classList.add('show');
+    if (studentSearchInput) {
+        studentSearchInput.value = name;
+        studentSearchInput.style.borderColor = '#22c55e';
+        studentSearchInput.style.background = '#f0fdf4';
     }
+    if (studentSearchResults) studentSearchResults.classList.remove('show');
+    showToast('Student Selected', name, 'success');
+}
+
+function clearSelectedStudent() {
+    document.getElementById('selectedStudentDisplay').classList.remove('show');
+    document.getElementById('selectedStudentId').value = '';
+    document.getElementById('studentSelect').value = '';
+    if (studentSearchInput) {
+        studentSearchInput.value = '';
+        studentSearchInput.style.borderColor = '';
+        studentSearchInput.style.background = '';
+    }
+}
+
+if (studentSearchInput) {
+    studentSearchInput.addEventListener('input', function () {
+        const query = this.value.trim().toLowerCase();
+        if (!query) { studentSearchResults.classList.remove('show'); return; }
+        const results = allStudents.filter(s => s.name.toLowerCase().includes(query));
+        if (!results.length) {
+            studentSearchResults.innerHTML = '<div class="no-results">No students found</div>';
+        } else {
+            studentSearchResults.innerHTML = results.slice(0, 10).map(s =>
+                `<div class="result-item" onclick="selectStudent('${s.id}', '${s.name.replace(/'/g, "\\'")}')">
+                    <span class="student-name">${s.name}</span>
+                </div>`
+            ).join('');
+        }
+        studentSearchResults.classList.add('show');
+    });
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.student-search-wrapper')) studentSearchResults.classList.remove('show');
+    });
+}
+
+// ── UID input + Tap simulation ──
+const cardUidInput = document.getElementById('cardUid');
+const tapBtn = document.getElementById('tapBtn');
+let isTapping = false;
+
+if (cardUidInput) {
+    cardUidInput.addEventListener('input', function () {
+        this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);
+        if (this.value.length === 10) {
+            this.style.borderColor = '#22c55e'; this.style.background = '#f0fdf4';
+        } else {
+            this.style.borderColor = ''; this.style.background = '';
+        }
+    });
+}
+
+if (tapBtn) {
+    tapBtn.addEventListener('click', function () {
+        if (isTapping) return;
+        const btnText = document.getElementById('tapBtnText');
+        isTapping = true;
+        this.className = 'btn-tap tapping';
+        btnText.textContent = 'Reading...';
+        cardUidInput.placeholder = 'Reading card...';
+        cardUidInput.style.borderColor = '#2563eb';
+        const simUid = Math.floor(Math.random() * 9000000000 + 1000000000).toString();
+        setTimeout(() => {
+            cardUidInput.value = simUid;
+            cardUidInput.style.borderColor = '#22c55e';
+            cardUidInput.style.background = '#f0fdf4';
+            this.className = 'btn-tap success';
+            btnText.textContent = '✓ Read!';
+            setTimeout(() => {
+                this.className = 'btn-tap';
+                btnText.textContent = 'Tap';
+                cardUidInput.style.background = '';
+                isTapping = false;
+                showToast('Card Read', 'UID: ' + simUid, 'success');
+            }, 800);
+        }, 1200);
+    });
+}
+
+// ── Open / close modals ──
+function openAssignModal() {
+    document.getElementById('assignModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+    if (cardUidInput) setTimeout(() => cardUidInput.focus(), 50);
+}
+function closeAssignModal() {
+    document.getElementById('assignModal').classList.remove('active');
+    document.body.style.overflow = '';
+    const f = document.getElementById('assignCardForm');
+    if (f) f.reset();
+    clearSelectedStudent();
+    document.getElementById('issuedDate').value = new Date().toISOString().slice(0, 10);
+    const d = new Date(); d.setFullYear(d.getFullYear() + 1);
+    document.getElementById('expiryDate').value = d.toISOString().slice(0, 10);
+}
+function closeEditModal() {
+    document.getElementById('editModal').classList.remove('active');
+    document.body.style.overflow = '';
+}
+function closeViewDrawer() {
+    document.getElementById('rfidDrawer').classList.remove('active');
+    document.getElementById('rfidDrawerOverlay').classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+// ── Assign form submit ──
+document.getElementById('assignCardForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const studentId = document.getElementById('selectedStudentId').value;
+    const cardUid = document.getElementById('cardUid').value.trim();
+    if (!studentId) { showToast('Error', 'Please select a student.', 'error'); return; }
+    if (!cardUid || cardUid.length !== 10) { showToast('Error', 'Card UID must be exactly 10 digits.', 'error'); return; }
+
+    const submitBtn = document.getElementById('assignSubmitBtn');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Assigning...';
+
+    try {
+        const res = await fetch('../api/rfid.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                student_id: studentId,
+                card_uid: cardUid,
+                issued_date: document.getElementById('issuedDate').value,
+                expiry_date: document.getElementById('expiryDate').value,
+                notes: document.getElementById('cardNotes').value
+            })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast('Success', data.message, 'success');
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            showToast('Error', data.message, 'error');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-save"></i> Assign Card';
+        }
+    } catch (err) {
+        showToast('Error', 'Network error. Please try again.', 'error');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-save"></i> Assign Card';
+    }
+});
+
+// ── Edit modal ──
+async function openEditModal(id) {
+    const m = document.getElementById('editModal');
+    if (!m) return;
+    try {
+        const res = await fetch('../api/rfid.php?id=' + id);
+        const json = await res.json();
+        if (!json.success || !json.data) {
+            showToast('Error', json.message || 'Card not found.', 'error');
+            return;
+        }
+        const c = json.data;
+        document.getElementById('editCardId').value = c.id;
+        document.getElementById('editUid').textContent = c.card_uid;
+        document.getElementById('editStudentName').textContent = c.student_name || 'Unassigned';
+        document.getElementById('editStudentNumber').textContent = c.student_number || '';
+        document.getElementById('editStatus').value = c.status;
+        document.getElementById('editExpiryDate').value = c.expiry_date || '';
+        document.getElementById('editNotes').value = c.notes || '';
+        m.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    } catch (e) {
+        showToast('Error', 'Failed to load card details.', 'error');
+    }
+}
+
+document.getElementById('editCardForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const id = document.getElementById('editCardId').value;
+    if (!id) return;
+    const submitBtn = document.getElementById('editSubmitBtn');
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+    try {
+        const res = await fetch('../api/rfid.php?id=' + id, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                status: document.getElementById('editStatus').value,
+                expiry_date: document.getElementById('editExpiryDate').value,
+                notes: document.getElementById('editNotes').value
+            })
+        });
+        const data = await res.json();
+        if (data.success) {
+            showToast('Card updated', data.message || 'Saved.', 'success');
+            setTimeout(() => window.location.reload(), 800);
+        } else {
+            showToast('Error', data.message || 'Update failed.', 'error');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+        }
+    } catch (err) {
+        showToast('Error', 'Network error. Please try again.', 'error');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
+    }
+});
+
+// ── View drawer ──
+async function openViewDrawer(id) {
+    const drawer = document.getElementById('rfidDrawer');
+    if (!drawer) return;
+    drawer.classList.add('active');
+    document.getElementById('rfidDrawerOverlay').classList.add('active');
+    document.body.style.overflow = 'hidden';
+
+    const setText = (sel, v) => {
+        const el = drawer.querySelector(sel);
+        if (el) el.textContent = (v === null || v === undefined || v === '') ? '—' : v;
+    };
+
+    setText('[data-bind="uid"]', '…');
+    setText('[data-bind="student"]', 'Loading…');
+
+    try {
+        const res = await fetch('../api/rfid.php?id=' + id);
+        const json = await res.json();
+        if (!json.success || !json.data) { showToast('Error', json.message || 'Card not found.', 'error'); closeViewDrawer(); return; }
+        const c = json.data;
+        setText('[data-bind="uid"]', c.card_uid);
+        setText('[data-bind="student"]', c.student_name || 'Unassigned');
+        setText('[data-bind="student_number"]', c.student_number);
+        setText('[data-bind="course"]', c.course);
+        setText('[data-bind="year_level"]', c.year_level ? c.year_level + ' Year' : null);
+        setText('[data-bind="issued"]', c.issued_date ? new Date(c.issued_date).toLocaleDateString(undefined, { year:'numeric', month:'short', day:'2-digit' }) : null);
+        setText('[data-bind="expiry"]', c.expiry_date ? new Date(c.expiry_date).toLocaleDateString(undefined, { year:'numeric', month:'short', day:'2-digit' }) : null);
+        setText('[data-bind="status"]', c.status ? c.status[0].toUpperCase() + c.status.slice(1) : null);
+        const badge = drawer.querySelector('[data-bind="status-badge"]');
+        if (badge) badge.className = 'status-badge ' + (c.status || '');
+        setText('[data-bind="notes"]', c.notes || 'No notes.');
+
+        const list = drawer.querySelector('[data-bind="scans"]');
+        if (list) {
+            list.innerHTML = '<p style="color:#64748b;font-size:13px;text-align:center;padding:16px;">Loading scans…</p>';
+            try {
+                const sres = await fetch('../api/rfid-scan.php?limit=10');
+                const sjson = await sres.json();
+                const scans = (sjson.success ? sjson.data : []).filter(s => s.card_uid === c.card_uid).slice(0, 5);
+                if (!scans.length) {
+                    list.innerHTML = '<p style="color:#94a3b8;font-size:13px;text-align:center;padding:16px;">No scans recorded yet.</p>';
+                } else {
+                    list.innerHTML = scans.map(s => {
+                        const when = new Date(s.scanned_at).toLocaleString(undefined, { month:'short', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+                        const statusText = s.status ? s.status[0].toUpperCase() + s.status.slice(1) : '—';
+                        return '<div class="scan-row">' +
+                                    '<span class="status-badge ' + (s.status || '') + '">' + statusText + '</span>' +
+                                    '<span class="scan-meta">' + when + ' · ' + (s.location || 'Main Gate') + '</span>' +
+                                '</div>';
+                    }).join('');
+                }
+            } catch (e) {
+                list.innerHTML = '<p style="color:#dc2626;font-size:13px;text-align:center;padding:16px;">Failed to load scans.</p>';
+            }
+        }
+    } catch (err) {
+        showToast('Error', 'Failed to load card details.', 'error');
+        closeViewDrawer();
+    }
+}
+
+// ── Universal Esc + close-on-overlay ──
+document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (document.getElementById('assignModal').classList.contains('active')) closeAssignModal();
+    else if (document.getElementById('editModal').classList.contains('active')) closeEditModal();
+    else if (document.getElementById('rfidDrawer').classList.contains('active')) closeViewDrawer();
+    else if (document.getElementById('deleteModal').classList.contains('active')) {
+        document.getElementById('deleteModal').classList.remove('active');
+        document.body.style.overflow = '';
+        deleteTarget = null;
+    }
+});
+document.querySelectorAll('[data-close-modal]').forEach(el => {
+    el.addEventListener('click', () => {
+        const t = el.getAttribute('data-close-modal');
+        if (t === 'assign') closeAssignModal();
+        else if (t === 'edit') closeEditModal();
+        else if (t === 'drawer') closeViewDrawer();
+    });
 });
 </script>
 
