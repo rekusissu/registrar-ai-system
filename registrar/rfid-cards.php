@@ -437,82 +437,66 @@ foreach ($cards as $i => $c) {
 }
 .rfid-modal-actions .btn { padding: 9px 18px; }
 
-/* ── View drawer ── */
-.rfid-drawer-overlay {
-    position: fixed; inset: 0;
-    background: rgba(0,0,0,0.5);
-    backdrop-filter: blur(8px);
-    z-index: 99998;
-    opacity: 0; pointer-events: none;
-    transition: opacity 0.3s ease;
+/* ── View Modal (centered) ── */
+.rfid-view-modal {
+    max-width: 480px;
+    text-align: left;
+    padding: 26px 30px 22px;
 }
-.rfid-drawer-overlay.active { opacity: 1; pointer-events: auto; }
-.rfid-drawer {
-    position: fixed; top: 0; right: 0;
-    height: 100vh; width: 400px; max-width: 100%;
-    background: white;
-    box-shadow: -16px 0 48px rgba(0,0,0,0.15);
-    z-index: 99999;
-    transform: translateX(100%);
-    transition: transform 0.32s ease;
-    display: flex; flex-direction: column;
+.rfid-view-header {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 16px;
 }
-.rfid-drawer.active { transform: translateX(0); }
-.rfid-drawer .drawer-header {
-    padding: 20px 24px 16px;
-    border-bottom: 1px solid #f1f5f9;
-    display: flex; align-items: center; justify-content: space-between;
-}
-.rfid-drawer .drawer-header h2 {
-    font-size: 18px; font-weight: 700; color: #0f172a;
-    margin: 0;
-    display: flex; align-items: center; gap: 10px;
-}
-.rfid-drawer .drawer-header h2 i { color: #2563eb; }
-.rfid-drawer .drawer-close {
-    background: #f1f5f9; border: none;
-    width: 32px; height: 32px; border-radius: 8px;
-    color: #475569; cursor: pointer;
+.rfid-view-header .header-icon {
+    width: 44px; height: 44px;
+    border-radius: 12px;
     display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
 }
-.rfid-drawer .drawer-close:hover { background: #e2e8f0; color: #0f172a; }
-.rfid-drawer .drawer-body { flex: 1; overflow-y: auto; padding: 18px 24px; }
-.rfid-drawer .drawer-section { margin-bottom: 18px; }
-.rfid-drawer .drawer-section-title {
+.rfid-view-header .header-icon.view { background: #eef4ff; color: #2563eb; }
+.rfid-view-header h3 { font-size: 18px; font-weight: 700; color: #0f172a; margin: 0; }
+.rfid-view-header p  { font-size: 13px; color: #64748b; margin: 2px 0 0; }
+
+.rfid-view-body {
+    display: flex; flex-direction: column; gap: 18px;
+}
+.rfid-view-section { margin-bottom: 0; }
+.rfid-view-section-title {
     font-size: 11px; font-weight: 700;
     text-transform: uppercase; letter-spacing: 0.5px;
     color: #94a3b8;
     margin-bottom: 8px;
 }
-.rfid-drawer .uid-display {
+.rfid-view-uid {
     background: linear-gradient(135deg, #eef4ff, #dbeafe);
     border: 1px solid #bfdbfe;
     border-radius: 12px;
     padding: 14px 16px;
     display: flex; align-items: center; gap: 12px;
 }
-.rfid-drawer .uid-display .uid-icon {
+.rfid-view-uid .uid-icon {
     width: 36px; height: 36px;
     background: white; border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
     color: #2563eb;
 }
-.rfid-drawer .uid-display .uid-text {
+.rfid-view-uid .uid-text {
     font-family: 'Courier New', monospace;
     font-size: 16px; font-weight: 700;
     color: #1e40af; letter-spacing: 1px;
 }
-.rfid-drawer .kv-list { list-style: none; padding: 0; margin: 0; }
-.rfid-drawer .kv-list li {
+.rfid-view-kv { list-style: none; padding: 0; margin: 0; }
+.rfid-view-kv li {
     display: flex; justify-content: space-between;
     padding: 8px 0;
     border-bottom: 1px dashed #f1f5f9;
     font-size: 13px;
 }
-.rfid-drawer .kv-list li:last-child { border-bottom: none; }
-.rfid-drawer .kv-list .kv-label { color: #64748b; }
-.rfid-drawer .kv-list .kv-value { color: #0f172a; font-weight: 600; text-align: right; max-width: 60%; word-break: break-word; }
-.rfid-drawer .notes-box {
+.rfid-view-kv li:last-child { border-bottom: none; }
+.rfid-view-kv .kv-label { color: #64748b; }
+.rfid-view-kv .kv-value { color: #0f172a; font-weight: 600; text-align: right; max-width: 60%; word-break: break-word; }
+.rfid-view-notes {
     background: #f8fafc;
     border: 1px solid #e2e8f0;
     border-radius: 10px;
@@ -520,7 +504,7 @@ foreach ($cards as $i => $c) {
     font-size: 13px; color: #1e293b;
     line-height: 1.5; min-height: 50px;
 }
-.rfid-drawer .scan-row {
+.rfid-view-scan-row {
     display: flex; align-items: center; gap: 10px;
     padding: 10px 12px;
     border-radius: 10px;
@@ -528,7 +512,31 @@ foreach ($cards as $i => $c) {
     margin-bottom: 6px;
     font-size: 12px;
 }
-.rfid-drawer .scan-row .scan-meta { color: #64748b; }
+.rfid-view-scan-row .scan-meta { color: #64748b; }
+.rfid-view-status-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 12px; font-weight: 600;
+    background: #f1f5f9; color: #475569;
+    line-height: 1.2; white-space: nowrap;
+}
+.rfid-view-status-badge .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    display: inline-block; flex-shrink: 0;
+}
+.rfid-view-status-badge.active    { background: #dcfce7; color: #16a34a; }
+.rfid-view-status-badge.expired,
+.rfid-view-status-badge.inactive,
+.rfid-view-status-badge.denied     { background: #fee2e2; color: #dc2626; }
+.rfid-view-status-badge.lost      { background: #fef3c7; color: #b45309; }
+
+/* Responsive for view modal */
+@media (max-width: 768px) {
+    .rfid-view-modal { max-width: 96%; padding: 22px 18px; }
+}
 
 /* ── Toast (matches components.css) ── */
 .toast-container {
@@ -803,12 +811,13 @@ foreach ($cards as $i => $c) {
                 </div>
 
                 <div class="uid-row">
-                    <input type="text" id="cardUid" class="form-control" maxlength="10" inputmode="numeric" placeholder="e.g. 1234567890" />
-                    <button type="button" class="btn-tap" id="tapBtn">
+                    <input type="text" id="cardUid" class="form-control" maxlength="10" inputmode="numeric" placeholder="e.g. 1234567890" title="Enter 10-digit RFID card UID manually" />
+                    <button type="button" class="btn-tap" id="tapBtn" title="Simulate a card tap for testing (generates random 10-digit UID)">
                         <i class="fas fa-wave-square"></i>
-                        <span id="tapBtnText">Tap</span>
+                        <span id="tapBtnText">Simulate Tap</span>
                     </button>
                 </div>
+                <p style="font-size:11px;color:#94a3b8;margin:6px 0 0;text-align:right;">Tip: Enter UID manually or click "Simulate Tap" for testing</p>
             </div>
 
             <div class="form-section">
@@ -830,7 +839,7 @@ foreach ($cards as $i => $c) {
 
             <div class="rfid-modal-actions">
                 <button type="button" class="btn btn-light" data-close-modal="assign">Cancel</button>
-                <button type="submit" class="btn btn-primary" id="assignSubmitBtn">
+                <button type="submit" class="btn btn-primary" id="assignSubmitBtn" disabled>
                     <i class="fas fa-save"></i> Assign Card
                 </button>
             </div>
@@ -898,56 +907,73 @@ foreach ($cards as $i => $c) {
     </div>
 </div>
 
-<!-- ── View Card Drawer ── -->
-<div class="rfid-drawer-overlay" id="rfidDrawerOverlay" data-close-modal="drawer"></div>
-<aside class="rfid-drawer" id="rfidDrawer" aria-hidden="true">
-    <div class="drawer-header">
-        <h2><i class="fas fa-id-card"></i> Card Details</h2>
-        <button class="drawer-close" data-close-modal="drawer" title="Close">
-            <i class="fas fa-times"></i>
-        </button>
-    </div>
-    <div class="drawer-body">
-        <div class="uid-display">
-            <div class="uid-icon"><i class="fas fa-microchip"></i></div>
+<!-- ── View Card Modal (Centered) ── -->
+<div class="logout-modal-overlay" id="viewModal">
+    <div class="logout-modal rfid-view-modal">
+        <div class="rfid-view-header">
+            <div class="header-icon view"><i class="fas fa-id-card"></i></div>
             <div>
-                <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Card UID</div>
-                <div class="uid-text" data-bind="uid">—</div>
+                <h3>Card Details</h3>
+                <p>RFID card information and scan history</p>
             </div>
         </div>
 
-        <div class="drawer-section" style="margin-top:18px;">
-            <div class="drawer-section-title">Student</div>
-            <ul class="kv-list">
-                <li><span class="kv-label">Name</span><span class="kv-value" data-bind="student">—</span></li>
-                <li><span class="kv-label">Student #</span><span class="kv-value" data-bind="student_number">—</span></li>
-                <li><span class="kv-label">Course</span><span class="kv-value" data-bind="course">—</span></li>
-                <li><span class="kv-label">Year</span><span class="kv-value" data-bind="year_level">—</span></li>
-            </ul>
-        </div>
-
-        <div class="drawer-section">
-            <div class="drawer-section-title">Card Info</div>
-            <ul class="kv-list">
-                <li><span class="kv-label">Status</span><span class="kv-value"><span class="status-badge" data-bind="status-badge"><span class="status-dot"></span><span data-bind="status">—</span></span></span></li>
-                <li><span class="kv-label">Issued</span><span class="kv-value" data-bind="issued">—</span></li>
-                <li><span class="kv-label">Expiry</span><span class="kv-value" data-bind="expiry">—</span></li>
-            </ul>
-        </div>
-
-        <div class="drawer-section">
-            <div class="drawer-section-title">Notes</div>
-            <div class="notes-box" data-bind="notes">—</div>
-        </div>
-
-        <div class="drawer-section">
-            <div class="drawer-section-title">Recent Scans</div>
-            <div data-bind="scans">
-                <p style="color:#94a3b8;font-size:13px;text-align:center;padding:16px;">Open to load scans.</p>
+        <div class="rfid-view-body">
+            <div class="rfid-view-uid">
+                <div class="uid-icon"><i class="fas fa-microchip"></i></div>
+                <div>
+                    <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Card UID</div>
+                    <div class="uid-text" id="viewUid">—</div>
+                </div>
             </div>
+
+            <div class="rfid-view-section">
+                <div class="rfid-view-section-title">Student</div>
+                <ul class="rfid-view-kv">
+                    <li><span class="kv-label">Name</span><span class="kv-value" id="viewStudent">—</span></li>
+                    <li><span class="kv-label">Student #</span><span class="kv-value" id="viewStudentNumber">—</span></li>
+                    <li><span class="kv-label">Course</span><span class="kv-value" id="viewCourse">—</span></li>
+                    <li><span class="kv-label">Year</span><span class="kv-value" id="viewYearLevel">—</span></li>
+                </ul>
+            </div>
+
+            <div class="rfid-view-section">
+                <div class="rfid-view-section-title">Card Info</div>
+                <ul class="rfid-view-kv">
+                    <li>
+                        <span class="kv-label">Status</span>
+                        <span class="kv-value">
+                            <span class="rfid-view-status-badge" id="viewStatusBadge">
+                                <span class="status-dot"></span>
+                                <span id="viewStatus">—</span>
+                            </span>
+                        </span>
+                    </li>
+                    <li><span class="kv-label">Issued</span><span class="kv-value" id="viewIssued">—</span></li>
+                    <li><span class="kv-label">Expiry</span><span class="kv-value" id="viewExpiry">—</span></li>
+                </ul>
+            </div>
+
+            <div class="rfid-view-section">
+                <div class="rfid-view-section-title">Notes</div>
+                <div class="rfid-view-notes" id="viewNotes">—</div>
+            </div>
+
+            <div class="rfid-view-section">
+                <div class="rfid-view-section-title">Recent Scans</div>
+                <div id="viewScans">
+                    <p style="color:#94a3b8;font-size:13px;text-align:center;padding:16px;">Open to load scans.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="rfid-modal-actions">
+            <button type="button" class="btn btn-primary" data-close-modal="view">
+                <i class="fas fa-times"></i> Close
+            </button>
         </div>
     </div>
-</aside>
+</div>
 
 <!-- ── Toast container ── -->
 <div class="toast-container" id="toastContainer"></div>
@@ -1070,6 +1096,7 @@ function selectStudent(id, name) {
     }
     if (studentSearchResults) studentSearchResults.classList.remove('show');
     showToast('Student Selected', name, 'success');
+    validateAssignForm();
 }
 
 function clearSelectedStudent() {
@@ -1081,6 +1108,7 @@ function clearSelectedStudent() {
         studentSearchInput.style.borderColor = '';
         studentSearchInput.style.background = '';
     }
+    validateAssignForm();
 }
 
 if (studentSearchInput) {
@@ -1117,6 +1145,7 @@ if (cardUidInput) {
         } else {
             this.style.borderColor = ''; this.style.background = '';
         }
+        validateAssignForm();
     });
 }
 
@@ -1135,16 +1164,27 @@ if (tapBtn) {
             cardUidInput.style.borderColor = '#22c55e';
             cardUidInput.style.background = '#f0fdf4';
             this.className = 'btn-tap success';
-            btnText.textContent = '✓ Read!';
+            btnText.textContent = '✓ Simulated!';
             setTimeout(() => {
                 this.className = 'btn-tap';
-                btnText.textContent = 'Tap';
+                btnText.textContent = 'Simulate Tap';
                 cardUidInput.style.background = '';
                 isTapping = false;
-                showToast('Card Read', 'UID: ' + simUid, 'success');
+                showToast('Test Card Simulated', 'UID: ' + simUid + ' (for testing only)', 'info');
+                validateAssignForm();
             }, 800);
         }, 1200);
     });
+}
+
+// ── Form validation for Assign modal ──
+function validateAssignForm() {
+    const studentId = document.getElementById('selectedStudentId').value;
+    const cardUid = document.getElementById('cardUid').value.trim();
+    const submitBtn = document.getElementById('assignSubmitBtn');
+    if (submitBtn) {
+        submitBtn.disabled = !(studentId && cardUid && cardUid.length === 10);
+    }
 }
 
 // ── Open / close modals ──
@@ -1272,40 +1312,39 @@ document.getElementById('editCardForm').addEventListener('submit', async functio
     }
 });
 
-// ── View drawer ──
+// ── View modal ──
 async function openViewDrawer(id) {
-    const drawer = document.getElementById('rfidDrawer');
-    if (!drawer) return;
-    drawer.classList.add('active');
-    document.getElementById('rfidDrawerOverlay').classList.add('active');
+    const modal = document.getElementById('viewModal');
+    if (!modal) return;
+    modal.classList.add('active');
     document.body.style.overflow = 'hidden';
 
     const setText = (sel, v) => {
-        const el = drawer.querySelector(sel);
+        const el = modal.querySelector(sel);
         if (el) el.textContent = (v === null || v === undefined || v === '') ? '—' : v;
     };
 
-    setText('[data-bind="uid"]', '…');
-    setText('[data-bind="student"]', 'Loading…');
+    setText('#viewUid', '…');
+    setText('#viewStudent', 'Loading…');
 
     try {
         const res = await fetch('../api/rfid.php?id=' + id);
         const json = await res.json();
-        if (!json.success || !json.data) { showToast('Error', json.message || 'Card not found.', 'error'); closeViewDrawer(); return; }
+        if (!json.success || !json.data) { showToast('Error', json.message || 'Card not found.', 'error'); closeViewModal(); return; }
         const c = json.data;
-        setText('[data-bind="uid"]', c.card_uid);
-        setText('[data-bind="student"]', c.student_name || 'Unassigned');
-        setText('[data-bind="student_number"]', c.student_number);
-        setText('[data-bind="course"]', c.course);
-        setText('[data-bind="year_level"]', c.year_level ? c.year_level + ' Year' : null);
-        setText('[data-bind="issued"]', c.issued_date ? new Date(c.issued_date).toLocaleDateString(undefined, { year:'numeric', month:'short', day:'2-digit' }) : null);
-        setText('[data-bind="expiry"]', c.expiry_date ? new Date(c.expiry_date).toLocaleDateString(undefined, { year:'numeric', month:'short', day:'2-digit' }) : null);
-        setText('[data-bind="status"]', c.status ? c.status[0].toUpperCase() + c.status.slice(1) : null);
-        const badge = drawer.querySelector('[data-bind="status-badge"]');
-        if (badge) badge.className = 'status-badge ' + (c.status || '');
-        setText('[data-bind="notes"]', c.notes || 'No notes.');
+        setText('#viewUid', c.card_uid);
+        setText('#viewStudent', c.student_name || 'Unassigned');
+        setText('#viewStudentNumber', c.student_number);
+        setText('#viewCourse', c.course);
+        setText('#viewYearLevel', c.year_level ? c.year_level + ' Year' : null);
+        setText('#viewStatus', c.status ? c.status[0].toUpperCase() + c.status.slice(1) : null);
+        const badge = document.getElementById('viewStatusBadge');
+        if (badge) badge.className = 'rfid-view-status-badge ' + (c.status || '');
+        setText('#viewIssued', c.issued_date ? new Date(c.issued_date).toLocaleDateString(undefined, { year:'numeric', month:'short', day:'2-digit' }) : null);
+        setText('#viewExpiry', c.expiry_date ? new Date(c.expiry_date).toLocaleDateString(undefined, { year:'numeric', month:'short', day:'2-digit' }) : null);
+        setText('#viewNotes', c.notes || 'No notes.');
 
-        const list = drawer.querySelector('[data-bind="scans"]');
+        const list = document.getElementById('viewScans');
         if (list) {
             list.innerHTML = '<p style="color:#64748b;font-size:13px;text-align:center;padding:16px;">Loading scans…</p>';
             try {
@@ -1318,7 +1357,7 @@ async function openViewDrawer(id) {
                     list.innerHTML = scans.map(s => {
                         const when = new Date(s.scanned_at).toLocaleString(undefined, { month:'short', day:'2-digit', hour:'2-digit', minute:'2-digit' });
                         const statusText = s.status ? s.status[0].toUpperCase() + s.status.slice(1) : '—';
-                        return '<div class="scan-row">' +
+                        return '<div class="rfid-view-scan-row">' +
                                     '<span class="status-badge ' + (s.status || '') + '">' + statusText + '</span>' +
                                     '<span class="scan-meta">' + when + ' · ' + (s.location || 'Main Gate') + '</span>' +
                                 '</div>';
@@ -1330,8 +1369,14 @@ async function openViewDrawer(id) {
         }
     } catch (err) {
         showToast('Error', 'Failed to load card details.', 'error');
-        closeViewDrawer();
+        closeViewModal();
     }
+}
+
+function closeViewModal() {
+    const modal = document.getElementById('viewModal');
+    if (modal) modal.classList.remove('active');
+    document.body.style.overflow = '';
 }
 
 // ── Universal Esc + close-on-overlay ──
@@ -1339,7 +1384,7 @@ document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (document.getElementById('assignModal').classList.contains('active')) closeAssignModal();
     else if (document.getElementById('editModal').classList.contains('active')) closeEditModal();
-    else if (document.getElementById('rfidDrawer').classList.contains('active')) closeViewDrawer();
+    else if (document.getElementById('viewModal').classList.contains('active')) closeViewModal();
     else if (document.getElementById('deleteModal').classList.contains('active')) {
         document.getElementById('deleteModal').classList.remove('active');
         document.body.style.overflow = '';
@@ -1351,7 +1396,7 @@ document.querySelectorAll('[data-close-modal]').forEach(el => {
         const t = el.getAttribute('data-close-modal');
         if (t === 'assign') closeAssignModal();
         else if (t === 'edit') closeEditModal();
-        else if (t === 'drawer') closeViewDrawer();
+        else if (t === 'view') closeViewModal();
     });
 });
 </script>
