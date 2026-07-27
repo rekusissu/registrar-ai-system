@@ -39,9 +39,17 @@ $page_title = 'RFID Cards';
 $APP_ROOT = '../';
 $ACTIVE_NAV = 'rfid';
 $extra_css = ['rfid-cards.css'];
+$page_scripts = ['rfid.js'];
 
 include '../includes/header.php';
 include '../includes/sidebar.php';
+
+$avatarPalette = ['blue', 'green', 'purple', 'orange', 'pink'];
+$avatarClasses = [];
+foreach ($cards as $i => $c) {
+    $studentKey = (string)($c['student_id'] ?? $c['id'] ?? $i);
+    $avatarClasses[$i] = $avatarPalette[abs(crc32($studentKey)) % count($avatarPalette)];
+}
 ?>
 
 <main class="main">
@@ -57,7 +65,7 @@ include '../includes/sidebar.php';
             <a href="rfid-scan-logs.php" class="btn btn-secondary">
                 <i class="fas fa-clock-rotate-left"></i> Scan Logs
             </a>
-            <button class="btn btn-primary" id="openAssignModal">
+            <button class="btn btn-primary" id="openAssignModal" onclick="openAssignModal()">
                 <i class="fas fa-plus"></i> Assign Card
             </button>
         </div>
@@ -127,14 +135,13 @@ include '../includes/sidebar.php';
                         </td>
                     </tr>
                 <?php else: ?>
-                    <?php foreach ($cards as $card): 
+                    <?php foreach ($cards as $cardIndex => $card):
                         $initials = '';
                         if (!empty($card['student_name'])) {
                             $names = explode(' ', $card['student_name']);
                             $initials = strtoupper(substr($names[0], 0, 1) . (isset($names[1]) ? substr($names[1], 0, 1) : ''));
                         }
-                        $avatarClasses = ['blue', 'green', 'purple', 'orange', 'pink'];
-                        $avatarClass = $avatarClasses[array_rand($avatarClasses)];
+                        $avatarClass = $avatarClasses[$cardIndex] ?? 'blue';
                     ?>
                         <tr data-card='<?= json_encode($card) ?>'>
                             <td>
@@ -159,12 +166,12 @@ include '../includes/sidebar.php';
                             <td><?= $card['issued_date'] ? date('M d, Y', strtotime($card['issued_date'])) : '—' ?></td>
                             <td>
                                 <?= $card['expiry_date'] ? date('M d, Y', strtotime($card['expiry_date'])) : '—' ?>
-                                <?php 
+                                <?php
                                     $daysLeft = null;
                                     if ($card['expiry_date']) {
                                         $daysLeft = (strtotime($card['expiry_date']) - time()) / (60 * 60 * 24);
                                     }
-                                    if ($card['status'] === 'active' && $daysLeft !== null && $daysLeft <= 30 && $daysLeft > 0): 
+                                    if ($card['status'] === 'active' && $daysLeft !== null && $daysLeft <= 30 && $daysLeft > 0):
                                 ?>
                                     <span class="expiry-warning"><i class="fas fa-clock"></i> <?= round($daysLeft) ?> days</span>
                                 <?php endif; ?>
@@ -177,7 +184,7 @@ include '../includes/sidebar.php';
                             </td>
                             <td>
                                 <div class="action-group">
-                                    <button class="action-btn view" onclick="alert('View card <?= $card['id'] ?>')" title="View">
+                                    <button class="action-btn view" onclick="openViewDrawer(<?= $card['id'] ?>)" title="View">
                                         <i class="fas fa-eye"></i>
                                     </button>
                                     <button class="action-btn edit" onclick="openEditModal(<?= $card['id'] ?>)" title="Edit">
@@ -199,6 +206,212 @@ include '../includes/sidebar.php';
         <div class="info-text">Showing <strong id="showingCount"><?= count($cards) ?></strong> of <strong id="totalCount"><?= count($cards) ?></strong> cards</div>
     </div>
 </main>
+
+<!-- ── Assign Card Modal ── -->
+<div class="logout-modal-overlay" id="assignModal">
+    <div class="logout-modal rfid-modal">
+        <div class="rfid-modal-header">
+            <div class="header-icon assign"><i class="fas fa-credit-card"></i></div>
+            <div>
+                <h3>Assign RFID Card</h3>
+                <p>Tap a card or enter the 10-digit UID, then choose a student.</p>
+            </div>
+        </div>
+
+        <form id="assignCardForm">
+            <input type="hidden" id="selectedStudentId" name="student_id" value="">
+
+            <!-- Student picker -->
+            <div class="form-section">
+                <div class="form-section-header" style="margin-bottom:10px;">
+                    <div class="form-section-icon"><i class="fas fa-user-graduate"></i></div>
+                    <div>
+                        <div class="form-section-title">Student</div>
+                        <div class="form-section-subtitle">Search by name</div>
+                    </div>
+                </div>
+
+                <div class="student-search-wrapper">
+                    <input type="text" id="studentSearchInput" class="form-control" placeholder="Type a student name..." autocomplete="off" />
+                    <div class="student-search-results" id="studentSearchResults"></div>
+                </div>
+
+                <select id="studentSelect" class="form-control" style="display:none;">
+                    <option value="">Select a student</option>
+                    <?php foreach ($students as $student): ?>
+                        <option value="<?= (int)$student['id'] ?>">
+                            <?= htmlspecialchars($student['name']) ?> · <?= htmlspecialchars($student['student_number']) ?> · <?= htmlspecialchars($student['course']) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+
+                <div class="selected-student-chip" id="selectedStudentDisplay">
+                    <i class="fas fa-check-circle"></i>
+                    <span class="chip-name" id="selectedName"></span>
+                    <span class="chip-id" id="selectedId"></span>
+                    <button type="button" class="chip-clear" onclick="clearSelectedStudent()" title="Clear">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- UID + Tap -->
+            <div class="form-section">
+                <div class="form-section-header" style="margin-bottom:10px;">
+                    <div class="form-section-icon"><i class="fas fa-microchip"></i></div>
+                    <div>
+                        <div class="form-section-title">Card UID</div>
+                        <div class="form-section-subtitle">10-digit RFID identifier</div>
+                    </div>
+                </div>
+
+                <div class="uid-row">
+                    <input type="text" id="cardUid" class="form-control" maxlength="10" inputmode="numeric" placeholder="e.g. 1234567890" />
+                    <button type="button" class="btn-tap" id="tapBtn">
+                        <i class="fas fa-wave-square"></i>
+                        <span id="tapBtnText">Tap</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Dates + Notes -->
+            <div class="form-section">
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;">
+                        <label>Issued Date</label>
+                        <input type="date" id="issuedDate" name="issued_date" class="form-control" value="<?= date('Y-m-d') ?>" />
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label>Expiry Date</label>
+                        <input type="date" id="expiryDate" name="expiry_date" class="form-control" value="<?= date('Y-m-d', strtotime('+1 year')) ?>" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notes (optional)</label>
+                    <textarea id="cardNotes" name="notes" class="form-control" rows="2" placeholder="e.g. Re-issue, lost card reported..."></textarea>
+                </div>
+            </div>
+
+            <div class="rfid-modal-actions">
+                <button type="button" class="btn btn-light" data-close-modal="assign">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="assignSubmitBtn">
+                    <i class="fas fa-save"></i> Assign Card
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ── Edit Card Modal ── -->
+<div class="logout-modal-overlay" id="editModal">
+    <div class="logout-modal rfid-modal">
+        <div class="rfid-modal-header">
+            <div class="header-icon edit"><i class="fas fa-pen"></i></div>
+            <div>
+                <h3>Edit RFID Card</h3>
+                <p>Update status, expiry date, and notes.</p>
+            </div>
+        </div>
+
+        <form id="editCardForm">
+            <input type="hidden" id="editCardId" value="">
+
+            <div class="form-section">
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;">
+                        <label>Card UID</label>
+                        <div class="form-control" id="editUid" style="font-family:'Courier New',monospace;letter-spacing:1px;font-weight:600;"></div>
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label>Student</label>
+                        <div class="form-control" id="editStudentName" style="font-weight:600;"></div>
+                        <div style="font-size:12px;color:#64748b;margin-top:4px;" id="editStudentNumber"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;">
+                        <label>Status</label>
+                        <select id="editStatus" class="form-control">
+                            <option value="active">Active</option>
+                            <option value="expired">Expired</option>
+                            <option value="lost">Lost</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label>Expiry Date</label>
+                        <input type="date" id="editExpiryDate" class="form-control" />
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea id="editNotes" class="form-control" rows="3" placeholder="Optional notes..."></textarea>
+                </div>
+            </div>
+
+            <div class="rfid-modal-actions">
+                <button type="button" class="btn btn-light" data-close-modal="edit">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="editSubmitBtn">
+                    <i class="fas fa-save"></i> Save Changes
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ── View Card Drawer ── -->
+<div class="rfid-drawer-overlay" id="rfidDrawerOverlay" data-close-modal="drawer"></div>
+<aside class="rfid-drawer" id="rfidDrawer" aria-hidden="true">
+    <div class="drawer-header">
+        <h2><i class="fas fa-id-card"></i> Card Details</h2>
+        <button class="drawer-close" data-close-modal="drawer" title="Close">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+    <div class="drawer-body">
+        <div class="uid-display">
+            <div class="uid-icon"><i class="fas fa-microchip"></i></div>
+            <div>
+                <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Card UID</div>
+                <div class="uid-text" data-bind="uid">—</div>
+            </div>
+        </div>
+
+        <div class="drawer-section" style="margin-top:18px;">
+            <div class="drawer-section-title">Student</div>
+            <ul class="kv-list">
+                <li><span class="kv-label">Name</span><span class="kv-value" data-bind="student">—</span></li>
+                <li><span class="kv-label">Student #</span><span class="kv-value" data-bind="student_number">—</span></li>
+                <li><span class="kv-label">Course</span><span class="kv-value" data-bind="course">—</span></li>
+                <li><span class="kv-label">Year</span><span class="kv-value" data-bind="year_level">—</span></li>
+            </ul>
+        </div>
+
+        <div class="drawer-section">
+            <div class="drawer-section-title">Card Info</div>
+            <ul class="kv-list">
+                <li><span class="kv-label">Status</span><span class="kv-value"><span class="status-badge" data-bind="status-badge"><span class="status-dot"></span><span data-bind="status">—</span></span></span></li>
+                <li><span class="kv-label">Issued</span><span class="kv-value" data-bind="issued">—</span></li>
+                <li><span class="kv-label">Expiry</span><span class="kv-value" data-bind="expiry">—</span></li>
+            </ul>
+        </div>
+
+        <div class="drawer-section">
+            <div class="drawer-section-title">Notes</div>
+            <div class="notes-box" data-bind="notes">—</div>
+        </div>
+
+        <div class="drawer-section">
+            <div class="drawer-section-title">Recent Scans</div>
+            <div data-bind="scans">
+                <p style="color:#94a3b8;font-size:13px;text-align:center;padding:16px;">Open to load scans.</p>
+            </div>
+        </div>
+    </div>
+</aside>
 
 <!-- Delete Confirmation Modal -->
 <div class="logout-modal-overlay" id="deleteModal">
