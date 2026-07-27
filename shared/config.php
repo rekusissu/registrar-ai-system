@@ -24,6 +24,9 @@ define('APP_VERSION', '1.0.0');
 define('APP_ENV', 'development');
 define('APP_ROOT', dirname(__DIR__) . '/');
 
+/** Maximum enrollees per section when auto-generating masterlists (e.g. BSIT Section A = 50). */
+define('MAX_STUDENTS_PER_SECTION', 50);
+
 // Security
 define('JWT_SECRET', 'your-super-secret-key-change-in-production');
 

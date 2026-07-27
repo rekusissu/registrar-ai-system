@@ -338,6 +338,125 @@ function getStudentInitials($student) {
     return substr($initials, 0, 2);
 }
 
+/**
+ * Section letter/name for chunk index (0 = A, 25 = Z, 26 = AA, …).
+ */
+function sectionLabelFromChunkIndex(int $index): string {
+    $index = max(0, $index);
+    $label = '';
+    $n = $index + 1;
+    while ($n > 0) {
+        $n--;
+        $label = chr(65 + ($n % 26)) . $label;
+        $n = intdiv($n, 26);
+    }
+    return $label;
+}
+
+/**
+ * Assign sections automatically: group by course + year, max N students per section (alphabetical).
+ *
+ * @return array{updated: int, sections: list<array{course: ?string, year_level: ?int, section: string, count: int, max: int}>}
+ */
+function autoAssignStudentSections(?int $maxPerSection = null): array {
+    $maxPerSection = $maxPerSection ?? (defined('MAX_STUDENTS_PER_SECTION') ? (int) MAX_STUDENTS_PER_SECTION : 50);
+    if ($maxPerSection < 1) {
+        $maxPerSection = 50;
+    }
+
+    $db = Database::getInstance();
+    $students = $db->fetchAll(
+        "SELECT id, course, year_level, last_name, first_name
+         FROM students
+         WHERE course IS NOT NULL AND TRIM(course) != ''
+         ORDER BY TRIM(course) ASC, COALESCE(year_level, 0) ASC, last_name ASC, first_name ASC, id ASC"
+    );
+
+    $buckets = [];
+    foreach ($students as $row) {
+        $course = trim((string) $row['course']);
+        $year = $row['year_level'] !== null && $row['year_level'] !== '' ? (int) $row['year_level'] : 0;
+        $key = $course . "\0" . $year;
+        if (!isset($buckets[$key])) {
+            $buckets[$key] = [
+                'course' => $course,
+                'year_level' => $year,
+                'ids' => [],
+            ];
+        }
+        $buckets[$key]['ids'][] = (int) $row['id'];
+    }
+
+    $updated = 0;
+    $sections = [];
+    $conn = $db->getConnection();
+    $conn->beginTransaction();
+
+    try {
+        foreach ($buckets as $bucket) {
+            $chunks = array_chunk($bucket['ids'], $maxPerSection);
+            foreach ($chunks as $chunkIndex => $ids) {
+                $section = sectionLabelFromChunkIndex($chunkIndex);
+                foreach ($ids as $studentId) {
+                    $db->update('students', ['section' => $section], 'id = ?', [$studentId]);
+                    $updated++;
+                }
+                $sections[] = [
+                    'course' => $bucket['course'],
+                    'year_level' => $bucket['year_level'] > 0 ? $bucket['year_level'] : null,
+                    'section' => $section,
+                    'count' => count($ids),
+                    'max' => $maxPerSection,
+                ];
+            }
+        }
+        $conn->commit();
+    } catch (Exception $e) {
+        $conn->rollBack();
+        throw $e;
+    }
+
+    return ['updated' => $updated, 'sections' => $sections];
+}
+
+/**
+ * Group student rows for masterlist display (course → year → section).
+ *
+ * @param array<int, array<string, mixed>> $students
+ * @return list<array{course: string, year_level: string, section: string, students: array<int, array<string, mixed>>}>
+ */
+function groupStudentsForMasterlist(array $students): array {
+    $groups = [];
+
+    foreach ($students as $student) {
+        $courseRaw = trim((string) ($student['course'] ?? ''));
+        $course = $courseRaw !== '' ? $courseRaw : 'No Course';
+        $year = $student['year_level'];
+        $yearLabel = ($year !== null && $year !== '') ? (string) (int) $year : 'N/A';
+        $sectionRaw = trim((string) ($student['section'] ?? ''));
+        $section = $sectionRaw !== '' ? $sectionRaw : '—';
+        $key = $course . "\0" . $yearLabel . "\0" . $section;
+
+        if (!isset($groups[$key])) {
+            $groups[$key] = [
+                'course' => $course,
+                'year_level' => $yearLabel,
+                'section' => $section,
+                'students' => [],
+            ];
+        }
+        $groups[$key]['students'][] = $student;
+    }
+
+    $list = array_values($groups);
+    usort($list, static function (array $a, array $b): int {
+        return [$a['course'], $a['year_level'], $a['section']]
+            <=> [$b['course'], $b['year_level'], $b['section']];
+    });
+
+    return $list;
+}
+
 // ─── STATUS HELPERS ────────────────────────────────────────────
 
 /**
