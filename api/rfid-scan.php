@@ -53,6 +53,21 @@ if ($method === 'GET') {
 // ─── PROCESS SCAN ──────────────────────────────────────────────
 if ($method === 'POST') {
     $cardUid = trim($input['card_uid'] ?? $input['uid'] ?? '');
+    $readerId = null;
+    if (isset($input['reader_id']) && $input['reader_id'] !== '' && $input['reader_id'] !== null) {
+        $readerId = intval($input['reader_id']);
+    }
+
+    // Auto-detect reader from local config file if no reader_id POSTed
+    if ($readerId === null || $readerId <= 0) {
+        $localConfig = __DIR__ . '/../shared/config.local.php';
+        if (file_exists($localConfig)) {
+            include_once $localConfig;
+            if (defined('SCANNER_READER_ID') && SCANNER_READER_ID > 0) {
+                $readerId = intval(SCANNER_READER_ID);
+            }
+        }
+    }
 
     if (empty($cardUid)) {
         echo json_encode(['success' => false, 'message' => 'Card UID is required.']);
@@ -61,7 +76,10 @@ if ($method === 'POST') {
 
     try {
         $db = Database::getInstance();
-        
+
+        // Auto-expire cards past their expiry
+        $db->query("UPDATE rfid_cards SET status = 'expired' WHERE expiry_date IS NOT NULL AND expiry_date < CURDATE() AND status = 'active'");
+
         // Find the card and student
         $card = $db->fetchOne("
             SELECT 
@@ -111,25 +129,49 @@ if ($method === 'POST') {
             $studentData = null;
         }
 
+        // Look up reader for location
+        $location = $input['location'] ?? 'Main Gate';
+        $eventType = $input['event_type'] ?? 'entry';
+        $reader = null;
+        if ($readerId && $readerId > 0) {
+            $reader = $db->fetchOne("SELECT * FROM card_readers WHERE id = ? AND status = 'active'", [$readerId]);
+            if ($reader) {
+                $location = $reader['location'];
+                // Auto-detect event from reader type
+                if ($reader['reader_type'] === 'entrance') $eventType = 'entry';
+                else if ($reader['reader_type'] === 'exit') $eventType = 'exit';
+                // 'both' keeps whatever $input sent
+            }
+        }
+
         // Log the scan
         $db->insert('rfid_scan_logs', [
             'card_uid' => $cardUid,
             'student_id' => $card['student_id'] ?? null,
-            'location' => $input['location'] ?? 'Main Gate',
-            'event_type' => $input['event_type'] ?? 'entry',
+            'location' => $location,
+            'event_type' => $eventType,
             'status' => $status,
             'scanner_id' => $input['scanner_id'] ?? 'web-api',
             'ip_address' => $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'
         ]);
 
         // Return response
-        echo json_encode([
+        $resp = [
             'success' => $status === 'success',
             'status' => $status,
             'message' => $message,
             'card_uid' => $cardUid,
+            'event_type' => $eventType,
             'student' => $studentData
-        ]);
+        ];
+        if ($reader) {
+            $resp['actual_reader'] = [
+                'name' => $reader['name'],
+                'location' => $reader['location'],
+                'reader_type' => $reader['reader_type']
+            ];
+        }
+        echo json_encode($resp);
 
     } catch (Exception $e) {
         echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);

@@ -25,19 +25,47 @@ $id = isset($_GET['id']) ? intval($_GET['id']) : null;
 try {
     $db = Database::getInstance();
 
+    // ─── CHECK UID EXISTS ───────────────────────────────────────
+    if ($method === 'GET' && isset($_GET['check_uid'])) {
+        $uid = trim($_GET['check_uid']);
+        $card = $db->fetchOne(
+            "SELECT rf.id, CONCAT(s.first_name, ' ', s.last_name) AS student FROM rfid_cards rf LEFT JOIN students s ON rf.student_id = s.id WHERE rf.card_uid = ?",
+            [$uid]
+        );
+        echo json_encode(['exists' => !!$card, 'student' => $card ? $card['student'] : null]);
+        exit;
+    }
+
     // ─── GET ALL RFID CARDS ────────────────────────────────────
     if ($method === 'GET' && !$id) {
-        $cards = $db->fetchAll("
-            SELECT 
-                rf.*,
-                CONCAT(s.first_name, ' ', s.last_name) AS student_name,
-                s.student_number,
-                s.course,
-                s.year_level
-            FROM rfid_cards rf
-            LEFT JOIN students s ON rf.student_id = s.id
-            ORDER BY rf.id DESC
-        ");
+        $studentId = isset($_GET['student_id']) ? intval($_GET['student_id']) : null;
+        if ($studentId) {
+            $cards = $db->fetchAll(
+                "SELECT
+                    rf.*,
+                    CONCAT(s.first_name, ' ', s.last_name) AS student_name,
+                    s.student_number,
+                    s.course,
+                    s.year_level
+                FROM rfid_cards rf
+                LEFT JOIN students s ON rf.student_id = s.id
+                WHERE rf.student_id = ?
+                ORDER BY rf.id DESC",
+                [$studentId]
+            );
+        } else {
+            $cards = $db->fetchAll("
+                SELECT
+                    rf.*,
+                    CONCAT(s.first_name, ' ', s.last_name) AS student_name,
+                    s.student_number,
+                    s.course,
+                    s.year_level
+                FROM rfid_cards rf
+                LEFT JOIN students s ON rf.student_id = s.id
+                ORDER BY rf.id DESC
+            ");
+        }
         echo json_encode(['success' => true, 'data' => $cards]);
         exit;
     }

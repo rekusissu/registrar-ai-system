@@ -16,6 +16,9 @@ require_once __DIR__ . '/../shared/database.php';
 
 $db = Database::getInstance();
 
+// Auto-expire cards past expiry
+$db->query("UPDATE rfid_cards SET status = 'expired' WHERE expiry_date IS NOT NULL AND expiry_date < CURDATE() AND status = 'active'");
+
 $cards = $db->fetchAll("
     SELECT
         rf.*,
@@ -32,6 +35,17 @@ $totalCards   = count($cards);
 $activeCards  = count(array_filter($cards, fn($c) => $c['status'] === 'active'));
 $expiredCards = count(array_filter($cards, fn($c) => $c['status'] === 'expired'));
 $lostCards    = count(array_filter($cards, fn($c) => $c['status'] === 'lost'));
+$inactiveCards = $totalCards - $activeCards - $expiredCards - $lostCards;
+
+// Percentages
+$activePct  = $totalCards ? round($activeCards / $totalCards * 100) : 0;
+$expiredPct = $totalCards ? round($expiredCards / $totalCards * 100) : 0;
+$lostPct    = $totalCards ? round($lostCards / $totalCards * 100) : 0;
+
+// Month-over-month trend
+$thisMonthCards   = $db->fetchColumn("SELECT COUNT(*) FROM rfid_cards WHERE issued_date LIKE '" . date('Y-m') . "%'") ?: 0;
+$lastMonthCards   = $db->fetchColumn("SELECT COUNT(*) FROM rfid_cards WHERE issued_date LIKE '" . date('Y-m', strtotime('-1 month')) . "%'") ?: 0;
+$trendActive = $lastMonthCards > 0 ? round(($thisMonthCards - $lastMonthCards) / $lastMonthCards * 100) : ($thisMonthCards > 0 ? 100 : 0);
 
 $students = $db->fetchAll(
     "SELECT id, student_number, CONCAT(first_name, ' ', last_name) AS name, course
@@ -55,7 +69,6 @@ foreach ($cards as $i => $c) {
     $avatarClasses[$i] = $avatarPalette[abs(crc32($studentKey)) % count($avatarPalette)];
 }
 ?>
-
 <style>
 /* ============================================================
    RFID CARDS PAGE — INLINE STYLES
@@ -153,17 +166,63 @@ foreach ($cards as $i => $c) {
     font-size: 22px; font-weight: 700; color: #0f172a; line-height: 1.1;
 }
 .rfid-stat-card .stat-label { font-size: 12px; color: #64748b; margin-top: 2px; }
+.rfid-stat-card .stat-trend {
+    font-size: 11px; font-weight: 600;
+    margin-top: 4px;
+    display: flex; align-items: center; gap: 4px;
+}
+.rfid-stat-card .stat-trend.up   { color: #16a34a; }
+.rfid-stat-card .stat-trend.down { color: #dc2626; }
 
 /* ── Search ── */
-.search-filter-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.search-filter-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
 .search-wrapper {
     position: relative; display: flex; align-items: center;
-    height: 42px; flex: 1; min-width: 240px;
+    height: 42px; min-width: 200px; max-width: 360px; width: 100%;
 }
 .search-icon {
     position: absolute; left: 14px; top: 50%;
     transform: translateY(-50%); color: #94a3b8;
     font-size: 14px; pointer-events: none; z-index: 2;
+}
+
+/* ── Filter select ── */
+.filter-select-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    height: 42px;
+    min-width: 140px;
+}
+.filter-select-wrapper select {
+    width: 100%; height: 42px;
+    padding: 0 36px 0 36px;
+    border: 1.5px solid #e2e8f0; border-radius: 10px;
+    font-size: 13px; font-family: inherit;
+    color: #1e293b; background: white;
+    outline: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+}
+.filter-select-wrapper select:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.10);
+}
+.filter-select-icon {
+    position: absolute; left: 12px; top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8; font-size: 13px;
+    pointer-events: none; z-index: 2;
+}
+.filter-select-arrow {
+    position: absolute; right: 12px; top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8; font-size: 10px;
+    pointer-events: none; z-index: 2;
 }
 .search-wrapper input {
     width: 100%; height: 42px; padding: 0 38px;
@@ -306,11 +365,27 @@ foreach ($cards as $i => $c) {
 .table-footer .info-text { font-size: 13px; color: #64748b; }
 .table-footer .info-text strong { color: #0f172a; }
 
-/* ── Modals (uses .logout-modal-overlay from sidebar.css) ── */
+/* ── Modals ── */
 .rfid-modal {
     max-width: 520px;
     text-align: left;
     padding: 26px 30px 22px;
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+}
+.rfid-modal .rfid-modal-body-wrapper {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    margin: 0 -30px;
+    padding: 0 30px;
+}
+.rfid-modal form {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
 }
 .rfid-modal-header {
     display: flex; align-items: center; gap: 12px;
@@ -364,6 +439,10 @@ foreach ($cards as $i => $c) {
 .form-control:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.10); }
 .form-control[readonly] { background: #f8fafc; color: #475569; }
 
+/* Fix native dropdown in modals */
+.logout-modal select.form-control,
+.logout-modal select { appearance:auto !important; -webkit-appearance:auto !important; cursor:pointer !important; }
+
 .uid-row { display: flex; gap: 8px; align-items: stretch; }
 .uid-row .form-control {
     flex: 1;
@@ -371,21 +450,6 @@ foreach ($cards as $i => $c) {
     font-size: 16px;
     letter-spacing: 1px;
 }
-.btn-tap {
-    padding: 0 18px;
-    background: #f1f5f9;
-    border: 1.5px solid #e2e8f0;
-    border-radius: 8px;
-    color: #475569;
-    font-weight: 600; font-size: 13px;
-    display: flex; align-items: center; gap: 6px;
-    cursor: pointer; white-space: nowrap;
-    font-family: inherit;
-    transition: all 0.2s ease;
-}
-.btn-tap:hover { background: #e2e8f0; color: #0f172a; }
-.btn-tap.tapping { background: #eef4ff; border-color: #2563eb; color: #2563eb; }
-.btn-tap.success { background: #dcfce7; border-color: #16a34a; color: #16a34a; }
 
 .student-search-wrapper { position: relative; }
 .student-search-results {
@@ -395,7 +459,7 @@ foreach ($cards as $i => $c) {
     box-shadow: 0 8px 24px rgba(0,0,0,0.08);
     max-height: 220px; overflow-y: auto;
     margin-top: 4px;
-    z-index: 10;
+    z-index: 99;
     display: none;
 }
 .student-search-results.show { display: block; }
@@ -422,7 +486,7 @@ foreach ($cards as $i => $c) {
 .selected-student-chip.show { display: flex; }
 .selected-student-chip i { color: #16a34a; }
 .selected-student-chip .chip-name { font-weight: 600; color: #14532d; font-size: 14px; flex: 1; }
-.selected-student-chip .chip-id   { font-size: 12px; color: #16a34a; }
+.selected-student-chip .chip-id   { font-size: 12px; color: #16a34a; display:block; margin-top:1px; }
 .selected-student-chip .chip-clear {
     background: none; border: none;
     color: #94a3b8; cursor: pointer;
@@ -442,6 +506,16 @@ foreach ($cards as $i => $c) {
     max-width: 480px;
     text-align: left;
     padding: 26px 30px 22px;
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+}
+.rfid-view-body-wrapper {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    margin: 0 -30px;
+    padding: 0 30px;
 }
 .rfid-view-header {
     display: flex; align-items: center; gap: 12px;
@@ -460,13 +534,6 @@ foreach ($cards as $i => $c) {
 
 .rfid-view-body {
     display: flex; flex-direction: column; gap: 18px;
-}
-.rfid-view-section { margin-bottom: 0; }
-.rfid-view-section-title {
-    font-size: 11px; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.5px;
-    color: #94a3b8;
-    margin-bottom: 8px;
 }
 .rfid-view-uid {
     background: linear-gradient(135deg, #eef4ff, #dbeafe);
@@ -538,43 +605,8 @@ foreach ($cards as $i => $c) {
     .rfid-view-modal { max-width: 96%; padding: 22px 18px; }
 }
 
-/* ── Toast (matches components.css) ── */
-.toast-container {
-    position: fixed; top: 24px; right: 24px;
-    z-index: 100000;
-    display: flex; flex-direction: column; gap: 8px;
-}
-.toast {
-    background: white; color: #0f172a;
-    padding: 14px 16px;
-    border-radius: 12px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.10);
-    border: 1px solid #e2e8f0;
-    display: flex; align-items: flex-start; gap: 12px;
-    min-width: 260px; max-width: 360px;
-    animation: toastIn 0.25s ease-out;
-}
-.toast.success { border-left: 4px solid #16a34a; }
-.toast.error   { border-left: 4px solid #dc2626; }
-.toast.warning { border-left: 4px solid #b45309; }
-.toast.info    { border-left: 4px solid #2563eb; }
-.toast-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
-.toast.success .toast-icon { color: #16a34a; }
-.toast.error   .toast-icon { color: #dc2626; }
-.toast.warning .toast-icon { color: #b45309; }
-.toast.info    .toast-icon { color: #2563eb; }
-.toast-title   { font-weight: 700; font-size: 13px; margin-bottom: 2px; }
-.toast-message { font-size: 12px; color: #475569; line-height: 1.4; }
-.toast-close {
-    background: none; border: none;
-    color: #94a3b8; cursor: pointer;
-    margin-left: auto;
-    padding: 2px;
-}
-.toast-close:hover { color: #0f172a; }
-.toast.hiding { animation: toastOut 0.3s ease-in forwards; }
-@keyframes toastIn  { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
-@keyframes toastOut { to   { opacity: 0; transform: translateX(20px); } }
+/* ── Toast on top of everything ── */
+.toast-container { z-index: 100000 !important; }
 
 /* ── Responsive ── */
 @media (max-width: 1024px) {
@@ -589,7 +621,6 @@ foreach ($cards as $i => $c) {
     }
     .rfid-stats { grid-template-columns: repeat(2, 1fr); gap: 10px; }
     .rfid-table-wrapper table { min-width: 700px; }
-    .rfid-drawer { width: 100%; }
     .rfid-modal { max-width: 96%; padding: 22px 18px; }
 }
 @media (max-width: 480px) {
@@ -612,6 +643,9 @@ foreach ($cards as $i => $c) {
             <a href="rfid-scan-logs.php" class="btn btn-secondary">
                 <i class="fas fa-clock-rotate-left"></i> Scan Logs
             </a>
+            <a href="rfid-readers.php" class="btn btn-secondary">
+                <i class="fas fa-hard-hat"></i> Readers
+            </a>
             <button class="btn btn-primary" id="openAssignModal" onclick="openAssignModal()">
                 <i class="fas fa-plus"></i> Assign Card
             </button>
@@ -625,27 +659,28 @@ foreach ($cards as $i => $c) {
             <div>
                 <div class="stat-value"><?= $totalCards ?></div>
                 <div class="stat-label">Total Cards</div>
+                <div class="stat-trend up"><i class="fas fa-arrow-up"></i> <?= $trendActive ?>% vs last month</div>
             </div>
         </div>
         <div class="rfid-stat-card">
             <div class="stat-icon green"><i class="fas fa-check-circle"></i></div>
             <div>
                 <div class="stat-value"><?= $activeCards ?></div>
-                <div class="stat-label">Active</div>
+                <div class="stat-label">Active · <?= $activePct ?>% of total</div>
             </div>
         </div>
         <div class="rfid-stat-card">
             <div class="stat-icon yellow"><i class="fas fa-clock"></i></div>
             <div>
                 <div class="stat-value"><?= $expiredCards ?></div>
-                <div class="stat-label">Expired</div>
+                <div class="stat-label">Expired · <?= $expiredPct ?>% of total</div>
             </div>
         </div>
         <div class="rfid-stat-card">
             <div class="stat-icon red"><i class="fas fa-triangle-exclamation"></i></div>
             <div>
                 <div class="stat-value"><?= $lostCards ?></div>
-                <div class="stat-label">Lost</div>
+                <div class="stat-label">Lost · <?= $lostPct ?>% of total</div>
             </div>
         </div>
     </div>
@@ -654,9 +689,24 @@ foreach ($cards as $i => $c) {
     <div class="search-filter-bar">
         <div class="search-wrapper">
             <i class="fas fa-search search-icon"></i>
-            <input type="text" id="rfidSearch" placeholder="Search by UID, student, or status..." />
+            <input type="text" id="rfidSearch" placeholder="Search UID / student..." />
             <button class="search-clear" id="searchClear" type="button"><i class="fas fa-times"></i></button>
         </div>
+        <div class="filter-select-wrapper">
+            <i class="fas fa-filter filter-select-icon"></i>
+            <select id="statusFilter">
+                <option value="">All Statuses</option>
+                <option value="active">Active</option>
+                <option value="expired">Expired</option>
+                <option value="lost">Lost</option>
+                <option value="inactive">Inactive</option>
+                <option value="unassigned">Unassigned</option>
+            </select>
+            <i class="fas fa-chevron-down filter-select-arrow"></i>
+        </div>
+        <button type="button" id="resetFilterBtn" class="btn btn-light" style="height:42px;padding:0 14px;">
+            <i class="fas fa-undo"></i> Reset
+        </button>
     </div>
 
     <!-- Table -->
@@ -761,81 +811,103 @@ foreach ($cards as $i => $c) {
             <div class="header-icon assign"><i class="fas fa-credit-card"></i></div>
             <div>
                 <h3>Assign RFID Card</h3>
-                <p>Tap a card or enter the 10-digit UID, then choose a student.</p>
+                <p>Enter UID, assign to student, set validity.</p>
             </div>
         </div>
 
         <form id="assignCardForm">
             <input type="hidden" id="selectedStudentId" name="student_id" value="">
+            <div class="rfid-modal-body-wrapper">
 
-            <div class="form-section">
-                <div class="form-section-header">
-                    <div class="form-section-icon"><i class="fas fa-user-graduate"></i></div>
-                    <div>
-                        <div class="form-section-title">Student</div>
-                        <div class="form-section-subtitle">Search by name</div>
+                <div class="form-section">
+                    <div class="form-section-header">
+                        <div class="form-section-icon"><i class="fas fa-user-graduate"></i></div>
+                        <div>
+                            <div class="form-section-title">Student</div>
+                            <div class="form-section-subtitle">Search and select</div>
+                        </div>
+                    </div>
+
+                    <div class="student-search-wrapper" style="position:relative;">
+                        <input type="text" id="studentSearchInput" class="form-control" placeholder="Type student name..." autocomplete="off" />
+                        <div class="student-search-results" id="studentSearchResults"></div>
+                    </div>
+
+                    <select id="studentSelect" style="display:none;">
+                        <option value="">Select a student</option>
+                        <?php foreach ($students as $student): ?>
+                            <option value="<?= (int)$student['id'] ?>">
+                                <?= htmlspecialchars($student['name']) ?> · <?= htmlspecialchars($student['student_number']) ?> · <?= htmlspecialchars($student['course']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+
+                    <div class="selected-student-chip" id="selectedStudentDisplay">
+                        <i class="fas fa-check-circle"></i>
+                        <div style="flex:1;">
+                            <span class="chip-name" id="selectedName"></span>
+                            <span class="chip-id" id="selectedId" style="display:block;font-size:11px;color:#16a34a;margin-top:1px;">Selected</span>
+                        </div>
+                        <button type="button" class="chip-clear" onclick="clearSelectedStudent()" title="Clear">
+                            <i class="fas fa-times"></i>
+                        </button>
                     </div>
                 </div>
 
-                <div class="student-search-wrapper">
-                    <input type="text" id="studentSearchInput" class="form-control" placeholder="Type a student name..." autocomplete="off" />
-                    <div class="student-search-results" id="studentSearchResults"></div>
-                </div>
+                <div class="form-section">
+                    <div class="form-section-header">
+                        <div class="form-section-icon"><i class="fas fa-microchip"></i></div>
+                        <div>
+                            <div class="form-section-title">Card UID</div>
+                            <div class="form-section-subtitle">10-digit identifier</div>
+                        </div>
+                    </div>
 
-                <select id="studentSelect" style="display:none;">
-                    <option value="">Select a student</option>
-                    <?php foreach ($students as $student): ?>
-                        <option value="<?= (int)$student['id'] ?>">
-                            <?= htmlspecialchars($student['name']) ?> · <?= htmlspecialchars($student['student_number']) ?> · <?= htmlspecialchars($student['course']) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-
-                <div class="selected-student-chip" id="selectedStudentDisplay">
-                    <i class="fas fa-check-circle"></i>
-                    <span class="chip-name" id="selectedName"></span>
-                    <span class="chip-id" id="selectedId">Selected</span>
-                    <button type="button" class="chip-clear" onclick="clearSelectedStudent()" title="Clear">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-            </div>
-
-            <div class="form-section">
-                <div class="form-section-header">
-                    <div class="form-section-icon"><i class="fas fa-microchip"></i></div>
-                    <div>
-                        <div class="form-section-title">Card UID</div>
-                        <div class="form-section-subtitle">10-digit RFID identifier</div>
+                    <div class="uid-row">
+                        <div style="flex:1;position:relative;">
+                            <input type="text" id="cardUid" class="form-control" maxlength="10" inputmode="numeric" placeholder="e.g. 1234567890" style="padding-right:50px;" />
+                            <span id="uidLengthBadge" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:600;color:#94a3b8;background:#f1f5f9;padding:2px 8px;border-radius:6px;">0/10</span>
+                        </div>
+                        <div style="width:42px;height:42px;border:1.5px solid #e2e8f0;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#94a3b8;background:#f8fafc;flex-shrink:0;">
+                            <i class="fas fa-wave-square" style="font-size:16px;"></i>
+                        </div>
                     </div>
                 </div>
 
-                <div class="uid-row">
-                    <input type="text" id="cardUid" class="form-control" maxlength="10" inputmode="numeric" placeholder="e.g. 1234567890" title="Enter 10-digit RFID card UID manually" />
-                    <button type="button" class="btn-tap" id="tapBtn" title="Simulate a card tap for testing (generates random 10-digit UID)">
-                        <i class="fas fa-wave-square"></i>
-                        <span id="tapBtnText">Simulate Tap</span>
-                    </button>
+                <div class="form-section">
+                    <div class="form-section-header">
+                        <div class="form-section-icon"><i class="fas fa-calendar"></i></div>
+                        <div>
+                            <div class="form-section-title">Validity Period</div>
+                            <div class="form-section-subtitle">Issued and expiry dates</div>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Issued</label>
+                            <input type="date" id="issuedDate" name="issued_date" class="form-control" value="<?= date('Y-m-d') ?>" />
+                        </div>
+                        <div class="form-group">
+                            <label>Expiry</label>
+                            <input type="date" id="expiryDate" name="expiry_date" class="form-control" value="<?= date('Y-m-d', strtotime('+1 year')) ?>" />
+                        </div>
+                    </div>
                 </div>
-                <p style="font-size:11px;color:#94a3b8;margin:6px 0 0;text-align:right;">Tip: Enter UID manually or click "Simulate Tap" for testing</p>
-            </div>
 
-            <div class="form-section">
-                <div class="form-row">
+                <div class="form-section" style="border-bottom:none;">
+                    <div class="form-section-header">
+                        <div class="form-section-icon"><i class="fas fa-sticky-note"></i></div>
+                        <div>
+                            <div class="form-section-title">Notes</div>
+                            <div class="form-section-subtitle">Optional remarks</div>
+                        </div>
+                    </div>
                     <div class="form-group">
-                        <label>Issued Date</label>
-                        <input type="date" id="issuedDate" name="issued_date" class="form-control" value="<?= date('Y-m-d') ?>" />
-                    </div>
-                    <div class="form-group">
-                        <label>Expiry Date</label>
-                        <input type="date" id="expiryDate" name="expiry_date" class="form-control" value="<?= date('Y-m-d', strtotime('+1 year')) ?>" />
+                        <textarea id="cardNotes" name="notes" class="form-control" rows="2" placeholder="e.g. Replacement card, lost card reported..."></textarea>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label>Notes (optional)</label>
-                    <textarea id="cardNotes" name="notes" class="form-control" rows="2" placeholder="e.g. Re-issue, lost card reported..."></textarea>
-                </div>
-            </div>
+
+            </div><!-- /rfid-modal-body-wrapper -->
 
             <div class="rfid-modal-actions">
                 <button type="button" class="btn btn-light" data-close-modal="assign">Cancel</button>
@@ -860,42 +932,86 @@ foreach ($cards as $i => $c) {
 
         <form id="editCardForm">
             <input type="hidden" id="editCardId" value="">
+            <div class="rfid-modal-body-wrapper">
 
             <div class="form-section">
+                <div class="form-section-header">
+                    <div class="form-section-icon"><i class="fas fa-microchip"></i></div>
+                    <div>
+                        <div class="form-section-title">Card Identity</div>
+                        <div class="form-section-subtitle">Read-only card and student details</div>
+                    </div>
+                </div>
                 <div class="form-row">
                     <div class="form-group">
                         <label>Card UID</label>
-                        <div class="form-control" id="editUid" style="font-family:'Courier New',monospace;letter-spacing:1px;font-weight:600;"></div>
+                        <div class="uid-row" style="margin-top:5px;">
+                            <span class="chip" style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center;background:linear-gradient(135deg,#e2e8f0,#cbd5e1);border-radius:6px;font-size:12px;color:#64748b;flex-shrink:0;"><i class="fas fa-microchip"></i></span>
+                            <span id="editUid" style="font-family:'Courier New',monospace;font-size:16px;font-weight:700;color:#1e40af;letter-spacing:1px;line-height:32px;"></span>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label>Student</label>
-                        <div class="form-control" id="editStudentName" style="font-weight:600;"></div>
-                        <div style="font-size:12px;color:#64748b;margin-top:4px;" id="editStudentNumber"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;">
+                        <label>Assigned Student</label>
+                        <div style="padding:9px 12px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:8px;font-weight:600;font-size:14px;color:#0f172a;">
+                            <span id="editStudentName">—</span>
+                            <span id="editStudentNumber" style="font-weight:400;color:#64748b;margin-left:8px;"></span>
+                        </div>
                     </div>
+                </div>
+                <div style="margin-top:8px;padding:8px 12px;background:#fef9c3;border:1px solid #facc15;border-radius:8px;font-size:11px;color:#92400e;display:flex;align-items:center;gap:8px;">
+                    <i class="fas fa-info-circle"></i>
+                    <span>Last updated: <span id="editUpdatedAt">—</span></span>
                 </div>
             </div>
 
             <div class="form-section">
+                <div class="form-section-header">
+                    <div class="form-section-icon"><i class="fas fa-sliders"></i></div>
+                    <div>
+                        <div class="form-section-title">Status & Validity</div>
+                        <div class="form-section-subtitle">Change status and expiration</div>
+                    </div>
+                </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label>Status</label>
-                        <select id="editStatus" class="form-control">
-                            <option value="active">Active</option>
-                            <option value="expired">Expired</option>
-                            <option value="lost">Lost</option>
-                            <option value="inactive">Inactive</option>
-                        </select>
+                        <label><i class="fas fa-flag" style="margin-right:4px;color:#64748b;"></i>Status</label>
+                        <div style="position:relative;">
+                            <select id="editStatus" class="form-control">
+                                <option value="active">Active</option>
+                                <option value="expired">Expired</option>
+                                <option value="lost">Lost</option>
+                                <option value="inactive">Inactive</option>
+                            </select>
+                            <i class="fas fa-chevron-down" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:10px;pointer-events:none;"></i>
+                        </div>
                     </div>
                     <div class="form-group">
-                        <label>Expiry Date</label>
+                        <label><i class="fas fa-calendar" style="margin-right:4px;color:#64748b;"></i>Expiry Date</label>
                         <input type="date" id="editExpiryDate" class="form-control" />
                     </div>
                 </div>
                 <div class="form-group">
-                    <label>Notes</label>
+                    <label><i class="fas fa-message" style="margin-right:4px;color:#64748b;"></i>Reason for Change</label>
+                    <input type="text" id="editReason" class="form-control" placeholder="e.g. Student lost card, re-issuing..." />
+                </div>
+            </div>
+
+            <div class="form-section" style="border-bottom: none;">
+                <div class="form-section-header">
+                    <div class="form-section-icon"><i class="fas fa-sticky-note"></i></div>
+                    <div>
+                        <div class="form-section-title">Notes</div>
+                        <div class="form-section-subtitle">Additional remarks</div>
+                    </div>
+                </div>
+                <div class="form-group">
                     <textarea id="editNotes" class="form-control" rows="3" placeholder="Optional notes..."></textarea>
                 </div>
             </div>
+
+            </div><!-- /rfid-modal-body-wrapper -->
 
             <div class="rfid-modal-actions">
                 <button type="button" class="btn btn-light" data-close-modal="edit">Cancel</button>
@@ -907,7 +1023,7 @@ foreach ($cards as $i => $c) {
     </div>
 </div>
 
-<!-- ── View Card Modal (Centered) ── -->
+<!-- ── View Card Modal ── -->
 <div class="logout-modal-overlay" id="viewModal">
     <div class="logout-modal rfid-view-modal">
         <div class="rfid-view-header">
@@ -918,7 +1034,10 @@ foreach ($cards as $i => $c) {
             </div>
         </div>
 
+        <div class="rfid-view-body-wrapper">
         <div class="rfid-view-body">
+
+            <!-- UID -->
             <div class="rfid-view-uid">
                 <div class="uid-icon"><i class="fas fa-microchip"></i></div>
                 <div>
@@ -927,8 +1046,15 @@ foreach ($cards as $i => $c) {
                 </div>
             </div>
 
-            <div class="rfid-view-section">
-                <div class="rfid-view-section-title">Student</div>
+            <!-- Student -->
+            <div class="form-section">
+                <div class="form-section-header">
+                    <div class="form-section-icon"><i class="fas fa-user-graduate"></i></div>
+                    <div>
+                        <div class="form-section-title">Student</div>
+                        <div class="form-section-subtitle">Assigned student information</div>
+                    </div>
+                </div>
                 <ul class="rfid-view-kv">
                     <li><span class="kv-label">Name</span><span class="kv-value" id="viewStudent">—</span></li>
                     <li><span class="kv-label">Student #</span><span class="kv-value" id="viewStudentNumber">—</span></li>
@@ -937,8 +1063,15 @@ foreach ($cards as $i => $c) {
                 </ul>
             </div>
 
-            <div class="rfid-view-section">
-                <div class="rfid-view-section-title">Card Info</div>
+            <!-- Card Info -->
+            <div class="form-section">
+                <div class="form-section-header">
+                    <div class="form-section-icon"><i class="fas fa-info-circle"></i></div>
+                    <div>
+                        <div class="form-section-title">Card Info</div>
+                        <div class="form-section-subtitle">Status and validity</div>
+                    </div>
+                </div>
                 <ul class="rfid-view-kv">
                     <li>
                         <span class="kv-label">Status</span>
@@ -954,17 +1087,45 @@ foreach ($cards as $i => $c) {
                 </ul>
             </div>
 
-            <div class="rfid-view-section">
-                <div class="rfid-view-section-title">Notes</div>
+            <!-- Card History (other cards for same student) -->
+            <div class="form-section" id="viewHistorySection" style="display:none;">
+                <div class="form-section-header">
+                    <div class="form-section-icon"><i class="fas fa-clock-rotate-left"></i></div>
+                    <div>
+                        <div class="form-section-title">Card History</div>
+                        <div class="form-section-subtitle">Previous cards for this student</div>
+                    </div>
+                </div>
+                <div id="viewHistory"></div>
+            </div>
+
+            <!-- Notes -->
+            <div class="form-section">
+                <div class="form-section-header">
+                    <div class="form-section-icon"><i class="fas fa-sticky-note"></i></div>
+                    <div>
+                        <div class="form-section-title">Notes</div>
+                        <div class="form-section-subtitle">Additional information</div>
+                    </div>
+                </div>
                 <div class="rfid-view-notes" id="viewNotes">—</div>
             </div>
 
-            <div class="rfid-view-section">
-                <div class="rfid-view-section-title">Recent Scans</div>
+            <!-- Scans -->
+            <div class="form-section">
+                <div class="form-section-header">
+                    <div class="form-section-icon"><i class="fas fa-clock-rotate-left"></i></div>
+                    <div>
+                        <div class="form-section-title">Recent Scans</div>
+                        <div class="form-section-subtitle">Last 5 scan events</div>
+                    </div>
+                </div>
                 <div id="viewScans">
                     <p style="color:#94a3b8;font-size:13px;text-align:center;padding:16px;">Open to load scans.</p>
                 </div>
             </div>
+
+        </div>
         </div>
 
         <div class="rfid-modal-actions">
@@ -1001,24 +1162,36 @@ foreach ($cards as $i => $c) {
 // =================================================================
 let deleteTarget = null;
 
-// ── Toast helper ──
+// ── Toast helper (colored, from components.css) ──
 function showToast(title, message, type) {
-    const container = document.getElementById('toastContainer');
-    if (!container) return;
-    const icons = { success: 'fa-check-circle', error: 'fa-exclamation-circle', warning: 'fa-triangle-exclamation', info: 'fa-info-circle' };
+    const container = document.getElementById('toastContainer') || (() => {
+        const c = document.createElement('div');
+        c.className = 'toast-container';
+        document.body.appendChild(c);
+        return c;
+    })();
+    type = type || 'info';
+    const icons = { success: 'fa-circle-check', error: 'fa-circle-xmark', info: 'fa-circle-info', warning: 'fa-triangle-exclamation' };
     const toast = document.createElement('div');
-    toast.className = 'toast ' + (type || 'success');
-    toast.innerHTML = `
-        <i class="fas ${icons[type] || icons.success} toast-icon"></i>
-        <div>
-            <div class="toast-title">${title}</div>
-            <div class="toast-message">${message}</div>
-        </div>
-        <button class="toast-close" type="button"><i class="fas fa-times"></i></button>
-    `;
-    toast.querySelector('.toast-close').addEventListener('click', () => toast.remove());
+    toast.className = 'toast ' + type;
+    toast.innerHTML =
+        '<i class="fas ' + (icons[type] || icons.info) + ' toast-icon"></i>' +
+        '<div class="toast-content">' +
+            '<div class="toast-title"></div>' +
+            '<div class="toast-message"></div>' +
+        '</div>' +
+        '<button class="toast-close" aria-label="Close"><i class="fas fa-times"></i></button>';
+    toast.querySelector('.toast-title').textContent = title;
+    toast.querySelector('.toast-message').textContent = message;
+    toast.querySelector('.toast-close').addEventListener('click', () => {
+        toast.classList.add('hiding');
+        setTimeout(() => toast.remove(), 300);
+    });
     container.appendChild(toast);
-    setTimeout(() => { toast.classList.add('hiding'); setTimeout(() => toast.remove(), 300); }, 4000);
+    setTimeout(() => {
+        toast.classList.add('hiding');
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
 }
 
 // ── Delete modal ──
@@ -1044,30 +1217,46 @@ document.getElementById('deleteModal').addEventListener('click', (e) => {
         deleteTarget = null;
     }
 });
+['assignModal','editModal','viewModal'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) {
+            el.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+    });
+});
 
-// ── Live search ──
+// ── Live search + status filter ──
 const rfidSearchInput = document.getElementById('rfidSearch');
 const rfidTableBody = document.getElementById('rfidTableBody');
 const searchClearBtn = document.getElementById('searchClear');
 const showingCount = document.getElementById('showingCount');
+const statusFilter = document.getElementById('statusFilter');
+const resetFilterBtn = document.getElementById('resetFilterBtn');
 
 function applyRfidSearch() {
     if (!rfidTableBody) return;
     const query = (rfidSearchInput?.value || '').trim().toLowerCase();
+    const filterStatus = statusFilter?.value || '';
     const rows = rfidTableBody.querySelectorAll('tr[data-card]');
     let visible = 0;
     rows.forEach(row => {
-        if (!query) { row.style.display = ''; visible++; return; }
         const data = (row.getAttribute('data-card') || '').toLowerCase();
-        const match = data.indexOf(query) !== -1;
+        let match = true;
+        if (query) match = data.indexOf(query) !== -1;
+        if (match && filterStatus === 'unassigned') match = data.indexOf('"student_id":null') !== -1 || data.indexOf('"student_id":""') !== -1;
+        else if (match && filterStatus) match = data.indexOf('"status":"' + filterStatus + '"') !== -1;
         row.style.display = match ? '' : 'none';
         if (match) visible++;
     });
     if (showingCount) showingCount.textContent = visible;
 }
 if (rfidSearchInput) rfidSearchInput.addEventListener('input', applyRfidSearch);
-if (searchClearBtn) searchClearBtn.addEventListener('click', () => {
+if (statusFilter) statusFilter.addEventListener('change', applyRfidSearch);
+if (resetFilterBtn) resetFilterBtn.addEventListener('click', () => {
     if (rfidSearchInput) rfidSearchInput.value = '';
+    if (statusFilter) statusFilter.value = '';
     applyRfidSearch();
     rfidSearchInput && rfidSearchInput.focus();
 });
@@ -1132,48 +1321,42 @@ if (studentSearchInput) {
     });
 }
 
-// ── UID input + Tap simulation ──
+// ── UID input + duplicate check ──
 const cardUidInput = document.getElementById('cardUid');
-const tapBtn = document.getElementById('tapBtn');
-let isTapping = false;
+let uidCheckTimeout;
 
 if (cardUidInput) {
     cardUidInput.addEventListener('input', function () {
         this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);
-        if (this.value.length === 10) {
-            this.style.borderColor = '#22c55e'; this.style.background = '#f0fdf4';
-        } else {
-            this.style.borderColor = ''; this.style.background = '';
+        const len = this.value.length;
+        this.style.borderColor = len === 10 ? '#22c55e' : '';
+        this.style.background = len === 10 ? '#f0fdf4' : '';
+        const badge = document.getElementById('uidLengthBadge');
+        if (badge) {
+            badge.textContent = len + '/10';
+            badge.style.color = len === 10 ? '#16a34a' : '#94a3b8';
+            badge.style.background = len === 10 ? '#dcfce7' : '#f1f5f9';
+        }
+        // Duplicate check
+        clearTimeout(uidCheckTimeout);
+        const uid = this.value;
+        if (uid.length === 10) {
+            uidCheckTimeout = setTimeout(() => {
+                fetch('../api/rfid.php?check_uid=' + encodeURIComponent(uid))
+                    .then(r => r.json())
+                    .then(d => {
+                        if (d.exists) {
+                            this.style.borderColor = '#dc2626';
+                            this.style.background = '#fee2e2';
+                            const badge2 = document.getElementById('uidLengthBadge');
+                            if (badge2) { badge2.style.color = '#dc2626'; badge2.style.background = '#fee2e2'; }
+                            showToast('Duplicate UID', 'Card ' + uid + ' already assigned to ' + d.student, 'warning');
+                        }
+                    })
+                    .catch(() => {});
+            }, 500);
         }
         validateAssignForm();
-    });
-}
-
-if (tapBtn) {
-    tapBtn.addEventListener('click', function () {
-        if (isTapping) return;
-        const btnText = document.getElementById('tapBtnText');
-        isTapping = true;
-        this.className = 'btn-tap tapping';
-        btnText.textContent = 'Reading...';
-        cardUidInput.placeholder = 'Reading card...';
-        cardUidInput.style.borderColor = '#2563eb';
-        const simUid = Math.floor(Math.random() * 9000000000 + 1000000000).toString();
-        setTimeout(() => {
-            cardUidInput.value = simUid;
-            cardUidInput.style.borderColor = '#22c55e';
-            cardUidInput.style.background = '#f0fdf4';
-            this.className = 'btn-tap success';
-            btnText.textContent = '✓ Simulated!';
-            setTimeout(() => {
-                this.className = 'btn-tap';
-                btnText.textContent = 'Simulate Tap';
-                cardUidInput.style.background = '';
-                isTapping = false;
-                showToast('Test Card Simulated', 'UID: ' + simUid + ' (for testing only)', 'info');
-                validateAssignForm();
-            }, 800);
-        }, 1200);
     });
 }
 
@@ -1208,9 +1391,7 @@ function closeEditModal() {
     document.body.style.overflow = '';
 }
 function closeViewDrawer() {
-    document.getElementById('rfidDrawer').classList.remove('active');
-    document.getElementById('rfidDrawerOverlay').classList.remove('active');
-    document.body.style.overflow = '';
+    closeViewModal();
 }
 
 // ── Assign form submit ──
@@ -1272,6 +1453,9 @@ async function openEditModal(id) {
         document.getElementById('editStatus').value = c.status;
         document.getElementById('editExpiryDate').value = c.expiry_date || '';
         document.getElementById('editNotes').value = c.notes || '';
+        document.getElementById('editReason').value = '';
+        const updated = c.updated_at || c.updated_date;
+        document.getElementById('editUpdatedAt').textContent = updated ? new Date(updated).toLocaleString(undefined, { year:'numeric', month:'short', day:'2-digit', hour:'2-digit', minute:'2-digit' }) : 'Never';
         m.classList.add('active');
         document.body.style.overflow = 'hidden';
     } catch (e) {
@@ -1293,7 +1477,8 @@ document.getElementById('editCardForm').addEventListener('submit', async functio
             body: JSON.stringify({
                 status: document.getElementById('editStatus').value,
                 expiry_date: document.getElementById('editExpiryDate').value,
-                notes: document.getElementById('editNotes').value
+                notes: document.getElementById('editNotes').value,
+                reason: document.getElementById('editReason').value
             })
         });
         const data = await res.json();
@@ -1343,6 +1528,26 @@ async function openViewDrawer(id) {
         setText('#viewIssued', c.issued_date ? new Date(c.issued_date).toLocaleDateString(undefined, { year:'numeric', month:'short', day:'2-digit' }) : null);
         setText('#viewExpiry', c.expiry_date ? new Date(c.expiry_date).toLocaleDateString(undefined, { year:'numeric', month:'short', day:'2-digit' }) : null);
         setText('#viewNotes', c.notes || 'No notes.');
+
+        // Card history (other cards for same student)
+        const histSection = document.getElementById('viewHistorySection');
+        const histDiv = document.getElementById('viewHistory');
+        if (histSection && histDiv && c.student_id) {
+            try {
+                const hres = await fetch('../api/rfid.php?student_id=' + c.student_id);
+                const hjson = await hres.json();
+                const all = (hjson.success ? hjson.data : []).filter(h => parseInt(h.id) !== parseInt(id));
+                if (all.length) {
+                    histDiv.innerHTML = all.map(h =>
+                        '<div class="rfid-view-scan-row">' +
+                            '<span class="status-badge ' + (h.status || '') + '">' + (h.status ? h.status[0].toUpperCase() + h.status.slice(1) : '—') + '</span>' +
+                            '<span class="scan-meta">' + (h.card_uid || '—') + (h.issued_date ? ' · Issued ' + new Date(h.issued_date).toLocaleDateString() : '') + '</span>' +
+                        '</div>'
+                    ).join('');
+                    histSection.style.display = '';
+                }
+            } catch (e) {}
+        }
 
         const list = document.getElementById('viewScans');
         if (list) {
