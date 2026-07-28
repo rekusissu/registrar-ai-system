@@ -135,83 +135,132 @@ foreach ($cards as $i => $c) {
 .btn-light { background: #f1f5f9; color: #475569; }
 .btn-light:hover { background: #e2e8f0; color: #0f172a; }
 
-/* ── Stats grid ── */
+/* ── Stats grid (students.php style) ── */
 .rfid-stats {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 14px;
-    margin-bottom: 22px;
+    gap: 16px;
+    margin-bottom: 24px;
 }
 .rfid-stat-card {
     background: white;
     border-radius: 14px;
-    padding: 14px 18px;
+    padding: 18px 20px;
     border: 1px solid #e2e8f0;
-    display: flex; align-items: center; gap: 12px;
-    transition: all 0.2s ease;
+    transition: all 0.3s ease;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
 }
-.rfid-stat-card:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.05); }
+.rfid-stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06);
+    border-color: #d8dde4;
+}
+.rfid-stat-card .stat-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+}
 .rfid-stat-card .stat-icon {
-    width: 40px; height: 40px;
+    width: 38px; height: 38px;
     border-radius: 10px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 16px;
-    flex-shrink: 0;
+    font-size: 15px; flex-shrink: 0;
 }
 .rfid-stat-card .stat-icon.blue   { background: #eef4ff; color: #2563eb; }
 .rfid-stat-card .stat-icon.green  { background: #dcfce7; color: #16a34a; }
 .rfid-stat-card .stat-icon.yellow { background: #fef3c7; color: #b45309; }
 .rfid-stat-card .stat-icon.red    { background: #fee2e2; color: #dc2626; }
-.rfid-stat-card .stat-value {
-    font-size: 22px; font-weight: 700; color: #0f172a; line-height: 1.1;
-}
-.rfid-stat-card .stat-label { font-size: 12px; color: #64748b; margin-top: 2px; }
 .rfid-stat-card .stat-trend {
     font-size: 11px; font-weight: 600;
-    margin-top: 4px;
-    display: flex; align-items: center; gap: 4px;
+    padding: 2px 10px; border-radius: 9999px;
+    display: inline-flex; align-items: center; gap: 4px;
 }
-.rfid-stat-card .stat-trend.up   { color: #16a34a; }
-.rfid-stat-card .stat-trend.down { color: #dc2626; }
-
-/* ── Search ── */
-.search-filter-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
-.search-wrapper {
-    position: relative; display: flex; align-items: center;
-    height: 42px; min-width: 200px; max-width: 360px; width: 100%;
+.rfid-stat-card .stat-trend.up   { color: #16a34a; background: #dcfce7; }
+.rfid-stat-card .stat-trend.down { color: #dc2626; background: #fee2e2; }
+.rfid-stat-card .stat-trend.neutral { color: #64748b; background: #f1f5f9; }
+.rfid-stat-card .stat-number {
+    font-size: 24px; font-weight: 700; color: #0f172a; line-height: 1.2;
 }
-.search-icon {
-    position: absolute; left: 14px; top: 50%;
-    transform: translateY(-50%); color: #94a3b8;
-    font-size: 14px; pointer-events: none; z-index: 2;
+.rfid-stat-card .stat-label {
+    color: #64748b; font-size: 13px; margin-top: 1px;
 }
 
-/* ── Filter select ── */
-.filter-select-wrapper {
+/* ── Search Table Container (students.php style) ── */
+.search-table-container {
+    background: white;
+    border-radius: 14px;
+    border: 1px solid #e2e8f0;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+.search-bar {
+    padding: 14px 20px;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    row-gap: 10px;
+}
+.search-bar .search-wrapper {
+    flex: 1 1 320px;
+    min-width: 240px;
+    max-width: 100%;
     position: relative;
     display: flex;
     align-items: center;
-    height: 42px;
-    min-width: 140px;
+    height: 40px;
+}
+.search-bar .search-wrapper i {
+    position: absolute; left: 14px; top: 50%;
+    transform: translateY(-50%);
+    color: #94a3b8; font-size: 14px;
+    pointer-events: none; z-index: 2;
+}
+.search-bar .search-wrapper input {
+    width: 100%; height: 40px;
+    padding: 0 38px 0 38px;
+    border: 1.5px solid #e2e8f0; border-radius: 10px;
+    font-size: 14px; font-family: inherit;
+    outline: none; transition: all 0.2s ease;
+    background: white; color: #1e293b;
+    box-sizing: border-box;
+}
+.search-bar .search-wrapper input:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.10);
+}
+.search-bar .search-wrapper input::placeholder { color: #94a3b8; }
+.search-bar .search-wrapper .search-clear {
+    position: absolute; right: 8px; top: 50%;
+    transform: translateY(-50%);
+    background: none; border: none;
+    color: #94a3b8; cursor: pointer;
+    width: 24px; height: 24px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%; z-index: 2;
+}
+.search-bar .search-wrapper .search-clear:hover { background: #f1f5f9; color: #1e293b; }
+.search-bar .search-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.search-bar .search-actions .btn { height: 40px; padding: 0 18px; border-radius: 10px; font-size: 13px; font-weight: 600; }
+
+/* ── Filter select (within search-bar) ── */
+.filter-select-wrapper {
+    position: relative; display: flex; align-items: center;
+    min-width: 130px;
 }
 .filter-select-wrapper select {
-    width: 100%; height: 42px;
+    width: 100%; height: 40px;
     padding: 0 36px 0 36px;
     border: 1.5px solid #e2e8f0; border-radius: 10px;
     font-size: 13px; font-family: inherit;
     color: #1e293b; background: white;
-    outline: none;
-    cursor: pointer;
-    transition: all 0.2s ease;
+    outline: none; cursor: pointer;
     box-sizing: border-box;
-    appearance: none;
-    -webkit-appearance: none;
-    -moz-appearance: none;
 }
-.filter-select-wrapper select:focus {
-    border-color: #2563eb;
-    box-shadow: 0 0 0 3px rgba(37,99,235,0.10);
-}
+.filter-select-wrapper select:focus { border-color: #2563eb; }
 .filter-select-icon {
     position: absolute; left: 12px; top: 50%;
     transform: translateY(-50%);
@@ -611,20 +660,24 @@ foreach ($cards as $i => $c) {
 /* ── Responsive ── */
 @media (max-width: 1024px) {
     .dashboard-main { padding: 22px; }
-    .rfid-stats { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 768px) {
     .dashboard-main {
-        margin-left: 0;
-        width: 100%; max-width: 100%;
+        margin-left: 0; width: 100%; max-width: 100%;
         padding: 18px 14px;
     }
-    .rfid-stats { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .rfid-stats { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .rfid-stat-card { padding: 14px 16px; }
+    .rfid-stat-card .stat-number { font-size: 20px; }
+    .rfid-stat-card .stat-icon { width: 34px; height: 34px; font-size: 14px; }
     .rfid-table-wrapper table { min-width: 700px; }
     .rfid-modal { max-width: 96%; padding: 22px 18px; }
+    .search-bar { padding: 10px 14px; }
+    .search-bar .search-wrapper { min-width: 200px; }
 }
-@media (max-width: 480px) {
+@media (max-width: 600px) {
     .rfid-stats { grid-template-columns: 1fr; }
+    .rfid-stat-card .stat-number { font-size: 18px; }
     .header { flex-direction: column; align-items: flex-start; gap: 12px; }
     .header-actions { width: 100%; }
 }
@@ -655,59 +708,63 @@ foreach ($cards as $i => $c) {
     <!-- Stats -->
     <div class="rfid-stats">
         <div class="rfid-stat-card">
-            <div class="stat-icon blue"><i class="fas fa-credit-card"></i></div>
-            <div>
-                <div class="stat-value"><?= $totalCards ?></div>
-                <div class="stat-label">Total Cards</div>
-                <div class="stat-trend up"><i class="fas fa-arrow-up"></i> <?= $trendActive ?>% vs last month</div>
+            <div class="stat-top">
+                <div class="stat-icon blue"><i class="fas fa-credit-card"></i></div>
+                <span class="stat-trend up"><i class="fas fa-arrow-up"></i> <?= $trendActive ?>%</span>
             </div>
+            <div class="stat-number"><?= $totalCards ?></div>
+            <div class="stat-label">Total Cards</div>
         </div>
         <div class="rfid-stat-card">
-            <div class="stat-icon green"><i class="fas fa-check-circle"></i></div>
-            <div>
-                <div class="stat-value"><?= $activeCards ?></div>
-                <div class="stat-label">Active · <?= $activePct ?>% of total</div>
+            <div class="stat-top">
+                <div class="stat-icon green"><i class="fas fa-check-circle"></i></div>
+                <span class="stat-trend up"><i class="fas fa-arrow-up"></i> <?= $activePct ?>%</span>
             </div>
+            <div class="stat-number"><?= $activeCards ?></div>
+            <div class="stat-label">Active</div>
         </div>
         <div class="rfid-stat-card">
-            <div class="stat-icon yellow"><i class="fas fa-clock"></i></div>
-            <div>
-                <div class="stat-value"><?= $expiredCards ?></div>
-                <div class="stat-label">Expired · <?= $expiredPct ?>% of total</div>
+            <div class="stat-top">
+                <div class="stat-icon yellow"><i class="fas fa-clock"></i></div>
+                <span class="stat-trend down"><i class="fas fa-arrow-down"></i> <?= $expiredPct ?>%</span>
             </div>
+            <div class="stat-number"><?= $expiredCards ?></div>
+            <div class="stat-label">Expired</div>
         </div>
         <div class="rfid-stat-card">
-            <div class="stat-icon red"><i class="fas fa-triangle-exclamation"></i></div>
-            <div>
-                <div class="stat-value"><?= $lostCards ?></div>
-                <div class="stat-label">Lost · <?= $lostPct ?>% of total</div>
+            <div class="stat-top">
+                <div class="stat-icon red"><i class="fas fa-triangle-exclamation"></i></div>
+                <span class="stat-trend down"><i class="fas fa-arrow-down"></i> <?= $lostPct ?>%</span>
             </div>
+            <div class="stat-number"><?= $lostCards ?></div>
+            <div class="stat-label">Lost</div>
         </div>
     </div>
 
-    <!-- Search -->
-    <div class="search-filter-bar">
-        <div class="search-wrapper">
-            <i class="fas fa-search search-icon"></i>
-            <input type="text" id="rfidSearch" placeholder="Search UID / student..." />
-            <button class="search-clear" id="searchClear" type="button"><i class="fas fa-times"></i></button>
+    <!-- Search + Table -->
+    <div class="search-table-container">
+        <div class="search-bar">
+            <div class="search-wrapper">
+                <i class="fas fa-search"></i>
+                <input type="text" id="rfidSearch" placeholder="Search UID / student..." />
+                <button class="search-clear" id="searchClear"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="search-actions">
+                <div class="filter-select-wrapper" style="height:40px;min-width:130px;">
+                    <i class="fas fa-filter filter-select-icon"></i>
+                    <select id="statusFilter" style="height:40px;">
+                        <option value="">All Statuses</option>
+                        <option value="active">Active</option>
+                        <option value="expired">Expired</option>
+                        <option value="lost">Lost</option>
+                        <option value="inactive">Inactive</option>
+                        <option value="unassigned">Unassigned</option>
+                    </select>
+                    <i class="fas fa-chevron-down filter-select-arrow"></i>
+                </div>
+                <button type="button" id="resetFilterBtn" class="btn btn-light"><i class="fas fa-undo"></i> Reset</button>
+            </div>
         </div>
-        <div class="filter-select-wrapper">
-            <i class="fas fa-filter filter-select-icon"></i>
-            <select id="statusFilter">
-                <option value="">All Statuses</option>
-                <option value="active">Active</option>
-                <option value="expired">Expired</option>
-                <option value="lost">Lost</option>
-                <option value="inactive">Inactive</option>
-                <option value="unassigned">Unassigned</option>
-            </select>
-            <i class="fas fa-chevron-down filter-select-arrow"></i>
-        </div>
-        <button type="button" id="resetFilterBtn" class="btn btn-light" style="height:42px;padding:0 14px;">
-            <i class="fas fa-undo"></i> Reset
-        </button>
-    </div>
 
     <!-- Table -->
     <div class="rfid-table-wrapper">
@@ -800,9 +857,10 @@ foreach ($cards as $i => $c) {
     </div>
 
     <div class="table-footer">
-        <div class="info-text">Showing <strong id="showingCount"><?= count($cards) ?></strong> of <strong id="totalCount"><?= count($cards) ?></strong> cards</div>
-    </div>
-</main>
+            <div class="info-text">Showing <strong id="showingCount"><?= count($cards) ?></strong> of <strong id="totalCount"><?= count($cards) ?></strong> cards</div>
+        </div>
+</div><!-- /search-table-container -->
+    </main>
 
 <!-- ── Assign Card Modal ── -->
 <div class="logout-modal-overlay" id="assignModal">
