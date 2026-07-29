@@ -95,6 +95,21 @@ $ACTIVE_NAV = $ACTIVE_NAV ?? '';
             <span class="sidebar-text">Reports</span>
         </a>
 
+        <a href="<?= $APP_ROOT ?>registrar/health-records.php" class="sidebar-item <?= $ACTIVE_NAV === 'health' ? 'active' : '' ?>">
+            <i class="fa-solid fa-heartbeat"></i>
+            <span class="sidebar-text">Health Records</span>
+        </a>
+
+        <a href="<?= $APP_ROOT ?>registrar/academic-history.php" class="sidebar-item <?= $ACTIVE_NAV === 'academic' ? 'active' : '' ?>">
+            <i class="fa-solid fa-school"></i>
+            <span class="sidebar-text">Academic History</span>
+        </a>
+
+        <a href="<?= $APP_ROOT ?>registrar/audit-log.php" class="sidebar-item <?= $ACTIVE_NAV === 'audit' ? 'active' : '' ?>">
+            <i class="fa-solid fa-list"></i>
+            <span class="sidebar-text">Audit Log</span>
+        </a>
+
         <div class="sidebar-divider"></div>
 
         <!-- GROUP 3 — AI Tools -->
