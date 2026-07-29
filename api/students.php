@@ -33,6 +33,39 @@ try {
         exit;
     }
 
+    // ─── GET ACADEMIC HISTORY ──────────────────────────────────
+    if ($method === 'GET' && isset($_GET['action']) && $_GET['action'] === 'academic' && isset($_GET['student_id'])) {
+        $data = $db->fetchAll("SELECT * FROM academic_history WHERE student_id = ? ORDER BY created_at DESC", [intval($_GET['student_id'])]);
+        echo json_encode(['success' => true, 'data' => $data]);
+        exit;
+    }
+
+    // ─── GET HEALTH ────────────────────────────────────────────
+    if ($method === 'GET' && isset($_GET['action']) && $_GET['action'] === 'health' && isset($_GET['student_id'])) {
+        $data = $db->fetchOne("SELECT * FROM health_records WHERE student_id = ?", [intval($_GET['student_id'])]);
+        echo json_encode(['success' => true, 'data' => $data]);
+        exit;
+    }
+
+    // ─── GET DOCUMENT REQUESTS ─────────────────────────────────
+    if ($method === 'GET' && isset($_GET['action']) && $_GET['action'] === 'documents' && isset($_GET['student_id'])) {
+        $data = $db->fetchAll("SELECT * FROM document_requests WHERE student_id = ? ORDER BY request_date DESC", [intval($_GET['student_id'])]);
+        echo json_encode(['success' => true, 'data' => $data]);
+        exit;
+    }
+
+    // ─── GET LAST SCAN ────────────────────────────────────────
+    if ($method === 'GET' && isset($_GET['action']) && $_GET['action'] === 'lastscan' && isset($_GET['student_id'])) {
+        $student = $db->fetchOne("SELECT card_uid FROM rfid_cards WHERE student_id = ?", [intval($_GET['student_id'])]);
+        if ($student) {
+            $scan = $db->fetchOne("SELECT scanned_at, location, event_type, status FROM rfid_scan_logs WHERE card_uid = ? ORDER BY scanned_at DESC LIMIT 1", [$student['card_uid']]);
+            echo json_encode(['success' => true, 'data' => $scan]);
+        } else {
+            echo json_encode(['success' => true, 'data' => null]);
+        }
+        exit;
+    }
+
     // ─── GET ALL STUDENTS ──────────────────────────────────────
     if ($method === 'GET' && !$id) {
         $students = $db->fetchAll(
@@ -52,6 +85,30 @@ try {
             echo json_encode(['success' => true, 'data' => $student]);
         } else {
             echo json_encode(['success' => false, 'message' => 'Student not found.']);
+        }
+        exit;
+    }
+
+    // ─── PHOTO UPLOAD ─────────────────────────────────────────
+    if ($method === 'POST' && isset($_GET['action']) && $_GET['action'] === 'upload-photo') {
+        $studentId = intval($_POST['student_id'] ?? 0);
+        if (!$studentId || !isset($_FILES['photo'])) {
+            echo json_encode(['success' => false, 'message' => 'No file or student ID.']);
+            exit;
+        }
+        $ext = strtolower(pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION));
+        if (!in_array($ext, ['jpg','jpeg','png','gif','webp'])) {
+            echo json_encode(['success' => false, 'message' => 'Invalid file type.']);
+            exit;
+        }
+        $filename = 'student_' . $studentId . '_' . time() . '.' . $ext;
+        $dest = __DIR__ . '/../uploads/students/' . $filename;
+        if (move_uploaded_file($_FILES['photo']['tmp_name'], $dest)) {
+            $photoUrl = '../uploads/students/' . $filename;
+            $db->update('students', ['photo' => $photoUrl], 'id = ?', [$studentId]);
+            echo json_encode(['success' => true, 'photo_url' => $photoUrl]);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Upload failed.']);
         }
         exit;
     }

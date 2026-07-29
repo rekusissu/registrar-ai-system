@@ -145,8 +145,6 @@ include '../includes/sidebar.php';
 .table-footer .info-text strong{color:#0f172a}
 
 /* Empty state */
-.vtab.active{border-bottom-color:#2563eb !important;color:#2563eb !important;}
-.vtab-content.active{display:block}
 .empty-state{text-align:center;padding:30px 20px;color:#94a3b8}
 .empty-state i{font-size:36px;color:#e2e8f0;display:block;margin-bottom:8px}
 .empty-state p{font-size:15px;font-weight:500;color:#94a3b8}
@@ -262,7 +260,6 @@ select.form-control{cursor:pointer;appearance:auto;-webkit-appearance:auto;}
 <button class="search-clear" id="searchClear"><i class="fas fa-times"></i></button>
 </div>
 <div class="search-actions">
-<button class="btn btn-secondary" onclick="printTable()"><i class="fas fa-print"></i> Print</button>
 <button class="btn btn-secondary" id="filterToggle"><i class="fas fa-sliders"></i> Filter</button>
 <button class="btn btn-secondary" id="resetBtn"><i class="fas fa-rotate-right"></i> Reset</button>
 </div>
@@ -330,25 +327,9 @@ $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' :
 </div>
 </div>
 
-<!-- View Modal (tabbed) -->
-<div class="modal-overlay" id="viewModal"><div class="modal-content" style="max-width:600px;"><div class="modal-header"><h2><i class="fas fa-id-card"></i> Student Profile</h2><button class="modal-close" onclick="closeViewModal()"><i class="fas fa-times"></i></button></div>
-<div style="display:flex;gap:4px;margin-bottom:14px;border-bottom:1px solid #e2e8f0;padding-bottom:0;">
-<button class="vtab active" onclick="switchVTab(this,'profile')" style="padding:8px 14px;border:none;background:none;font-size:12px;font-weight:600;color:#2563eb;cursor:pointer;border-bottom:2px solid #2563eb;font-family:inherit;"><i class="fas fa-user"></i> Profile</button>
-<button class="vtab" onclick="switchVTab(this,'documents')" style="padding:8px 14px;border:none;background:none;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;border-bottom:2px solid transparent;font-family:inherit;"><i class="fas fa-file"></i> Documents</button>
-<button class="vtab" onclick="switchVTab(this,'academic')" style="padding:8px 14px;border:none;background:none;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;border-bottom:2px solid transparent;font-family:inherit;"><i class="fas fa-school"></i> Academic</button>
-<button class="vtab" onclick="switchVTab(this,'health')" style="padding:8px 14px;border:none;background:none;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;border-bottom:2px solid transparent;font-family:inherit;"><i class="fas fa-heartbeat"></i> Health</button>
-</div>
-<div class="modal-body">
-<!-- Tab: Profile -->
-<div class="vtab-content active" id="tabProfile">
-<div class="view-profile">
-<div class="big-avatar blue" id="vAvatar" style="cursor:pointer;position:relative;" onclick="document.getElementById('photoInput').click()"><span id="vAvatarText">JD</span></div>
-<input type="file" id="photoInput" accept="image/*" style="display:none" onchange="uploadPhoto()">
-<div class="vp-name" id="vName">—</div>
-<div class="vp-id" id="vStudentId">—</div>
-<div id="vLastScan" style="font-size:11px;color:#94a3b8;margin-top:4px;"></div>
-</div>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid #f1f5f9">
+<!-- View Modal (full profile) -->
+<div class="modal-overlay" id="viewModal"><div class="modal-content" style="max-width:540px;"><div class="modal-header"><h2><i class="fas fa-id-card"></i> Student Profile</h2><button class="modal-close" onclick="closeViewModal()"><i class="fas fa-times"></i></button></div><div class="modal-body"><div class="view-profile"><div class="big-avatar blue" id="vAvatar">JD</div><div class="vp-name" id="vName">—</div><div class="vp-id" id="vStudentId">—</div></div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid #f1f5f9">
 <div class="view-item"><div class="lbl">Status</div><div class="val" id="vStatus">—</div></div>
 <div class="view-item"><div class="lbl">Gender</div><div class="val" id="vGender">—</div></div>
 <div class="view-item"><div class="lbl">Civil Status</div><div class="val" id="vCivilStatus">—</div></div>
@@ -362,17 +343,9 @@ $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' :
 <div class="view-item"><div class="lbl">Contact</div><div class="val" id="vContact">—</div></div>
 <div class="view-item" style="grid-column:span 2;"><div class="lbl">Address</div><div class="val" id="vAddress">—</div></div>
 </div>
-<div id="vGuardianSection" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid #f1f5f9;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:6px;">Guardian</div><div id="vGuardianInfo" style="font-size:13px;color:#475569;"></div></div>
-<div id="vRfidSection" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid #f1f5f9;text-align:center;display:flex;gap:8px;justify-content:center;"><a id="vRfidLink" href="#" class="btn btn-secondary" style="padding:6px 14px;font-size:12px;"><i class="fas fa-credit-card"></i> RFID Card</a> <a id="vScanLink" href="#" class="btn btn-secondary" style="padding:6px 14px;font-size:12px;"><i class="fas fa-clock-rotate-left"></i> Scan Logs</a></div>
-</div>
-<!-- Tab: Documents -->
-<div class="vtab-content" id="tabDocuments" style="display:none;"><div id="vDocuments" style="padding:8px 0;"><p style="color:#94a3b8;font-size:13px;">Loading...</p></div></div>
-<!-- Tab: Academic -->
-<div class="vtab-content" id="tabAcademic" style="display:none;"><div id="vAcademic" style="padding:8px 0;"><p style="color:#94a3b8;font-size:13px;">Loading...</p></div></div>
-<!-- Tab: Health -->
-<div class="vtab-content" id="tabHealth" style="display:none;"><div id="vHealth" style="padding:8px 0;"><p style="color:#94a3b8;font-size:13px;">Loading...</p></div></div>
-</div>
-<div class="modal-footer"><button class="btn btn-primary" onclick="closeViewModal()"><i class="fas fa-times"></i> Close</button></div></div></div>
+<div id="vGuardianSection" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid #f1f5f9;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;">Guardian</div><div id="vGuardianInfo" style="font-size:13px;color:#475569;"></div></div>
+<div id="vRfidSection" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid #f1f5f9;text-align:center;"><a id="vRfidLink" href="#" class="btn btn-secondary"><i class="fas fa-credit-card"></i> View RFID Card</a> <a id="vScanLink" href="#" class="btn btn-secondary"><i class="fas fa-clock-rotate-left"></i> Scan Logs</a></div>
+</div><div class="modal-footer"><button class="btn btn-primary" onclick="closeViewModal()"><i class="fas fa-times"></i> Close</button></div></div></div>
 
 <!-- Add Modal (inline, with guardian) -->
 <div class="modal-overlay" id="addModal"><div class="modal-content" style="max-width:640px;"><div class="modal-header"><h2><i class="fas fa-plus-circle"></i> Enroll New Student</h2><button class="modal-close" onclick="closeAddModal()"><i class="fas fa-times"></i></button></div><form id="addForm"><div class="modal-body">
@@ -512,10 +485,7 @@ function applyBulkAction() {
 
 // ─── VIEW MODAL (full profile) ──────────────────────────────
 const viewModal = document.getElementById('viewModal');
-var currentViewId = null;
-
 function viewStudent(id) {
-    currentViewId = id;
     fetch('../api/students.php?id=' + id).then(r => r.json()).then(d => {
         if (!d.success || !d.data) return;
         const s = d.data;
@@ -523,11 +493,8 @@ function viewStudent(id) {
         const initials = (s.first_name||'')[0] + (s.last_name||'')[0];
         const colors = ['blue','green','purple','orange','pink'];
         const c = colors[Math.abs((s.first_name||'a').charCodeAt(0)) % colors.length];
-        const avatarEl = document.getElementById('vAvatar');
-        const avatarText = document.getElementById('vAvatarText');
-        avatarEl.className = 'big-avatar ' + c;
-        if (s.photo) { avatarEl.style.background = 'transparent'; avatarEl.style.backgroundImage = 'url('+s.photo+')'; avatarEl.style.backgroundSize = 'cover'; avatarText.style.display = 'none'; }
-        else { avatarEl.style.backgroundImage = ''; avatarText.style.display = ''; avatarText.textContent = initials.toUpperCase(); }
+        document.getElementById('vAvatar').className = 'big-avatar ' + c;
+        document.getElementById('vAvatar').textContent = initials.toUpperCase();
         document.getElementById('vName').textContent = name;
         document.getElementById('vStudentId').textContent = s.student_number;
         document.getElementById('vStatus').innerHTML = '<span class="status-badge '+(s.status||'active')+'"><span class="status-dot '+(s.status||'active')+'"></span>'+ucfirst(s.status||'Active')+'</span>';
@@ -547,82 +514,19 @@ function viewStudent(id) {
             const gs=document.getElementById('vGuardianSection'),gi=document.getElementById('vGuardianInfo');
             if(gd.success&&gd.data){gs.style.display='block';gi.innerHTML=(gd.data.full_name||'')+(gd.data.relationship?' <span style=\"color:#94a3b8\">('+gd.data.relationship+')</span>':'')+'<br>'+(gd.data.contact_number?'<i class=\"fas fa-phone\" style=\"color:#94a3b8\"></i> '+gd.data.contact_number:'')+(gd.data.email?' <i class=\"fas fa-envelope\" style=\"color:#94a3b8\"></i> '+gd.data.email:'');}
         }).catch(()=>{});
-        // Last scan
-        fetch('../api/students.php?action=lastscan&student_id='+s.id).then(r=>r.json()).then(sd=>{
-            const el=document.getElementById('vLastScan');
-            if(sd.success&&sd.data){const ls=sd.data;el.innerHTML='<i class=\"fas fa-clock\" style=\"color:#94a3b8\"></i> Last '+ucfirst(ls.event_type||'scan')+' '+(ls.scanned_at?new Date(ls.scanned_at).toLocaleString():'')+' <span style=\"color:#94a3b8\">·</span> '+(ls.location||'')+' <span class=\"status-badge '+(ls.status||'')+'\" style=\"font-size:10px;padding:1px 7px;\">'+ucfirst(ls.status||'')+'</span>';}
-        }).catch(()=>{});
-        // RFID
         const rfidSec = document.getElementById('vRfidSection');
         <?php if (!empty($rfidMap)): ?>
         const hasRfid = <?= json_encode(array_keys($rfidMap)) ?>.includes(String(s.id));
         <?php else: ?>
         const hasRfid = false;
         <?php endif; ?>
-        if (hasRfid) { rfidSec.style.display = 'flex'; document.getElementById('vRfidLink').href = 'rfid-cards.php?search='+encodeURIComponent(s.student_number); document.getElementById('vScanLink').href = 'rfid-scan-logs.php?search='+encodeURIComponent(s.student_number); }
+        if (hasRfid) { rfidSec.style.display = 'block'; document.getElementById('vRfidLink').href = 'rfid-cards.php?search='+encodeURIComponent(s.student_number); document.getElementById('vScanLink').href = 'rfid-scan-logs.php?search='+encodeURIComponent(s.student_number); }
         else rfidSec.style.display = 'none';
-        // Load other tabs
-        loadDocuments(s.id);
-        loadAcademic(s.id);
-        loadHealth(s.id);
-        // Reset to profile tab
-        document.querySelectorAll('.vtab').forEach(t=>t.classList.remove('active'));
-        document.querySelector('.vtab[data-tab="profile"]')?.classList.add('active');
-        document.querySelectorAll('.vtab-content').forEach(t=>t.style.display='none');
-        document.getElementById('tabProfile').style.display = '';
         viewModal.classList.add('active'); document.body.style.overflow = 'hidden';
     }).catch(() => alert('Failed to load.'));
 }
-
-function switchVTab(btn, tab) {
-    document.querySelectorAll('.vtab').forEach(t=>{t.style.borderBottomColor='transparent';t.style.color='#64748b'});
-    btn.style.borderBottomColor='#2563eb';btn.style.color='#2563eb';
-    document.querySelectorAll('.vtab-content').forEach(t=>t.style.display='none');
-    document.getElementById('tab'+tab.charAt(0).toUpperCase()+tab.slice(1)).style.display='';
-}
-
-function loadDocuments(sid) {
-    fetch('../api/students.php?action=documents&student_id='+sid).then(r=>r.json()).then(d=>{
-        const el=document.getElementById('vDocuments');
-        if(!d.success||!d.data||!d.data.length){el.innerHTML='<p style="color:#94a3b8;font-size:13px;">No document requests.</p>';return;}
-        el.innerHTML='<table style="width:100%;font-size:12px;"><tr style="color:#64748b;font-weight:600;"><td>Type</td><td>Status</td><td>Date</td></tr>'+d.data.map(dr=>'<tr style="border-bottom:1px solid #f1f5f9;"><td>'+ucfirst(dr.document_type.replace('_',' '))+'</td><td><span class="status-badge '+(dr.status||'')+'" style="font-size:10px;">'+ucfirst(dr.status||'')+'</span></td><td>'+(dr.request_date?new Date(dr.request_date).toLocaleDateString():'')+'</td></tr>').join('')+'</table>';
-    }).catch(()=>{});
-}
-function loadAcademic(sid) {
-    fetch('../api/students.php?action=academic&student_id='+sid).then(r=>r.json()).then(d=>{
-        const el=document.getElementById('vAcademic');
-        if(!d.success||!d.data||!d.data.length){el.innerHTML='<p style="color:#94a3b8;font-size:13px;">No academic history found.</p>';return;}
-        el.innerHTML='<table style="width:100%;font-size:12px;"><tr style="color:#64748b;font-weight:600;"><td>School</td><td>Year</td><td>GWA</td></tr>'+d.data.map(a=>'<tr style="border-bottom:1px solid #f1f5f9;"><td>'+a.school_name+'</td><td>'+(a.school_year||'')+'</td><td>'+(a.gwa||'—')+'</td></tr>').join('')+'</table>';
-    }).catch(()=>{});
-}
-function loadHealth(sid) {
-    fetch('../api/students.php?action=health&student_id='+sid).then(r=>r.json()).then(d=>{
-        const el=document.getElementById('vHealth');
-        if(!d.success||!d.data){el.innerHTML='<p style="color:#94a3b8;font-size:13px;">No health record.</p>';return;}
-        const h=d.data;
-        el.innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><div class="view-item"><div class="lbl">Blood Type</div><div class="val">'+(h.blood_type||'—')+'</div></div><div class="view-item"><div class="lbl">Height / Weight</div><div class="val">'+(h.height?h.height+'cm':'—')+' / '+(h.weight?h.weight+'kg':'—')+'</div></div><div class="view-item" style="grid-column:span 2;"><div class="lbl">Allergies</div><div class="val">'+(h.allergies||'None')+'</div></div><div class="view-item" style="grid-column:span 2;"><div class="lbl">Pre-existing Conditions</div><div class="val">'+(h.pre_existing_conditions||'None')+'</div></div></div>';
-    }).catch(()=>{});
-}
-function uploadPhoto() {
-    const input = document.getElementById('photoInput');
-    if (!input.files[0] || !currentViewId) return;
-    const fd = new FormData();
-    fd.append('photo', input.files[0]);
-    fd.append('student_id', currentViewId);
-    fetch('../api/students.php?action=upload-photo', { method:'POST', body:fd })
-    .then(r=>r.json()).then(d=>{ if(d.success) window.location.reload(); else alert(d.message); })
-    .catch(()=>alert('Upload failed.'));
-}
 function closeViewModal() { viewModal.classList.remove('active'); document.body.style.overflow = ''; }
 viewModal.addEventListener('click', function(e) { if (e.target === this) closeViewModal(); });
-
-function printTable() {
-    const w = window.open(); w.document.write('<html><head><style>table{width:100%;border-collapse:collapse}th,td{padding:8px;border:1px solid #ddd;text-align:left;font-size:12px}th{background:#f4f4f4}</style></head><body><h2>Student List</h2><table><tr><th>ID</th><th>Name</th><th>Course</th><th>Year</th><th>Status</th></tr>');
-    allStudents.filter(s=>s.element&&s.element.style.display!=='none').forEach(s=>{
-        w.document.write('<tr><td>'+(s.student_number||'')+'</td><td>'+(s.first_name||'')+' '+(s.last_name||'')+'</td><td>'+(s.course||'')+'</td><td>'+(s.year_level||'')+'</td><td>'+(s.status||'')+'</td></tr>');
-    });
-    w.document.write('</table></body></html>'); w.document.close(); w.print();
-}
 
 // ─── EDIT MODAL (full fields) ───────────────────────────────
 function editStudent(id) {
