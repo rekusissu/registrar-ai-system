@@ -218,7 +218,7 @@ try {
             exit;
         }
 
-        $db->update('students', ['status' => 'deleted'], 'id = ?', [$id]);
+        $db->update('students', ['status' => 'archived'], 'id = ?', [$id]);
         echo json_encode(['success' => true, 'message' => 'Student deactivated.']);
         exit;
     }
