@@ -66,10 +66,6 @@ $ACTIVE_NAV = $ACTIVE_NAV ?? '';
             <span class="sidebar-text">RFID Cards</span>
         </a>
 
-        <a href="<?= $APP_ROOT ?>registrar/rfid-readers.php" class="sidebar-item <?= $ACTIVE_NAV === 'readers' ? 'active' : '' ?>">
-            <i class="fa-solid fa-hard-hat"></i>
-            <span class="sidebar-text">Card Readers</span>
-        </a>
 
         <a href="<?= $APP_ROOT ?>registrar/rfid-scan-logs.php" class="sidebar-item <?= $ACTIVE_NAV === 'scanlogs' ? 'active' : '' ?>">
             <i class="fa-solid fa-clock-rotate-left"></i>
