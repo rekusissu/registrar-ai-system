@@ -105,7 +105,7 @@ include '../includes/sidebar.php';
 .search-wrap input:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,0.10)}
 .search-wrap i{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:14px;pointer-events:none}
 .filter-group{display:flex;gap:8px;align-items:center}
-.filter-group select{height:40px;padding:0 32px 0 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:13px;font-family:inherit;color:#1e293b;background:white;outline:none;cursor:pointer;appearance:auto;min-width:130px}
+.filter-group select{height:40px;padding:0 32px 0 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:13px;font-family:inherit;color:#1e293b;background:white;outline:none;cursor:pointer;appearance:auto !important;-webkit-appearance:auto !important;min-width:130px}
 .filter-group select:focus{border-color:#2563eb}
 
 /* Table */
@@ -155,7 +155,7 @@ tr:last-child td{border-bottom:none}
 .form-group label{display:block;font-size:12px;color:#475569;margin-bottom:4px;font-weight:600}
 .form-control{width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;background:white;color:#1e293b;box-sizing:border-box}
 .form-control:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,0.10)}
-select.form-control{cursor:pointer;appearance:auto}
+select.form-control{cursor:pointer;appearance:auto !important;-webkit-appearance:auto !important}
 .check-row{display:flex;gap:16px;margin-top:8px;flex-wrap:wrap}
 .check-row label{display:flex;align-items:center;gap:6px;font-size:13px;color:#1e293b;cursor:pointer}
 .check-row input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:#2563eb}
@@ -230,7 +230,7 @@ $initials = strtoupper(substr($g['full_name'],0,1).(strpos($g['full_name'],' ') 
 ?>
 <tr class="g-row" data-name="<?= strtolower(htmlspecialchars($g['full_name'])) ?>" data-contact="<?= strtolower(htmlspecialchars($g['contact_number'] ?? '')) ?>" data-student="<?= strtolower(htmlspecialchars($g['student_name'] ?? '')) ?>">
 <td><input type="checkbox" class="cb" value="<?= (int)$g['id'] ?>" style="accent-color:#2563eb;cursor:pointer;"></td>
-<td><div style="display:flex;align-items:center;gap:10px;"><div class="g-avatar <?= $ac ?>"><?= $inititals ?: '?' ?></init></div><div><strong><?= htmlspecialchars($g['full_name']) ?></strong></div></div></td>
+<td><div style="display:flex;align-items:center;gap:10px;"><div class="g-avatar <?= $ac ?>"><?= $initials ?: '?' ?></div><div><strong><?= htmlspecialchars($g['full_name']) ?></strong></div></div></td>
 <td><span class="rel-badge rel-<?= htmlspecialchars($g['relationship']) ?>"><?= htmlspecialchars(ucfirst($g['relationship'])) ?></span></td>
 <td><?= htmlspecialchars($g['contact_number'] ?? '—') ?></td>
 <td><?= htmlspecialchars($g['email'] ?? '—') ?></td>
