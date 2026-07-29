@@ -173,6 +173,23 @@ try {
         }
 
         $db->update('students', $data, 'id = ?', [$id]);
+        // Update guardian if provided
+        $guardianName = trim($input['guardian_name'] ?? '');
+        if ($guardianName !== '') {
+            $existingGuardian = $db->fetchOne("SELECT id FROM guardians WHERE student_id = ?", [$id]);
+            $gData = [
+                'full_name' => $guardianName,
+                'relationship' => $input['guardian_relationship'] ?? 'guardian',
+                'contact_number' => $input['guardian_contact'] ?? '',
+                'email' => $input['guardian_email'] ?? null
+            ];
+            if ($existingGuardian) {
+                $db->update('guardians', $gData, 'student_id = ?', [$id]);
+            } else {
+                $gData['student_id'] = $id;
+                $db->insert('guardians', $gData);
+            }
+        }
         echo json_encode(['success' => true, 'message' => 'Student updated successfully.']);
         exit;
     }

@@ -377,6 +377,10 @@ $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' :
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-book"></i> Enrollment Details</div>
 <div class="form-row"><div class="form-group"><label>Course</label><input type="text" id="editCourse" class="form-control"></div><div class="form-group"><label>Year Level</label><select id="editYearLevel" class="form-control"><option value="">Select</option><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option></select></div><div class="form-group"><label>Section</label><input type="text" id="editSection" class="form-control"></div></div>
+<hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
+<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-users"></i> Guardian</div>
+<div class="form-row"><div class="form-group"><label>Full Name</label><input type="text" id="editGuardianName" class="form-control"></div><div class="form-group"><label>Relationship</label><select id="editGuardianRel" class="form-control"><option value="">Select</option><option value="father">Father</option><option value="mother">Mother</option><option value="guardian">Guardian</option></select></div></div>
+<div class="form-row"><div class="form-group"><label>Contact No.</label><input type="text" id="editGuardianContact" class="form-control"></div><div class="form-group"><label>Email</label><input type="email" id="editGuardianEmail" class="form-control"></div></div>
 </div><div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeEditModal()">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save</button></div></form></div></div>
 
 <!-- Delete Modal -->
@@ -545,6 +549,14 @@ function editStudent(id) {
         document.getElementById('editEmail').value = s.email || '';
         document.getElementById('editContact').value = s.contact_number || '';
         document.getElementById('editAddress').value = s.address || '';
+        // Load guardian
+        document.getElementById('editGuardianName').value = '';
+        document.getElementById('editGuardianRel').value = '';
+        document.getElementById('editGuardianContact').value = '';
+        document.getElementById('editGuardianEmail').value = '';
+        fetch('../api/students.php?action=guardian&student_id='+id).then(r=>r.json()).then(gd=>{
+            if(gd.success&&gd.data){document.getElementById('editGuardianName').value=gd.data.full_name||'';document.getElementById('editGuardianRel').value=gd.data.relationship||'';document.getElementById('editGuardianContact').value=gd.data.contact_number||'';document.getElementById('editGuardianEmail').value=gd.data.email||'';}
+        }).catch(()=>{});
         document.getElementById('editModal').classList.add('active');
         document.body.style.overflow = 'hidden';
     }).catch(() => alert('Failed to load.'));
@@ -576,7 +588,11 @@ document.getElementById('editForm').addEventListener('submit', async function(e)
                 section: document.getElementById('editSection').value,
                 email: document.getElementById('editEmail').value,
                 contact_number: document.getElementById('editContact').value,
-                address: document.getElementById('editAddress').value
+                address: document.getElementById('editAddress').value,
+                guardian_name: document.getElementById('editGuardianName').value,
+                guardian_relationship: document.getElementById('editGuardianRel').value,
+                guardian_contact: document.getElementById('editGuardianContact').value,
+                guardian_email: document.getElementById('editGuardianEmail').value
             })
         });
         const d = await res.json();
