@@ -182,7 +182,7 @@ include '../includes/sidebar.php';
 .form-group label{display:block;font-size:12px;color:#475569;margin-bottom:4px;font-weight:600}
 .form-control{width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;background:white;color:#1e293b;box-sizing:border-box}
 .form-control:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,0.10)}
-select.form-control{cursor:pointer}
+select.form-control{cursor:pointer;appearance:auto;-webkit-appearance:auto}
 
 /* Delete icon */
 .delete-icon{width:60px;height:60px;border-radius:50%;background:#fee2e2;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:26px;color:#dc2626}
