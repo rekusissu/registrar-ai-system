@@ -55,10 +55,6 @@ $ACTIVE_NAV = $ACTIVE_NAV ?? '';
             <span class="sidebar-text">Students</span>
         </a>
 
-        <a href="<?= $APP_ROOT ?>registrar/guardians.php" class="sidebar-item <?= $ACTIVE_NAV === 'guardians' ? 'active' : '' ?>">
-            <i class="fa-solid fa-people-arrows"></i>
-            <span class="sidebar-text">Guardians</span>
-        </a>
 
         <a href="<?= $APP_ROOT ?>registrar/teachers.php" class="sidebar-item <?= $ACTIVE_NAV === 'teachers' ? 'active' : '' ?>">
             <i class="fa-solid fa-chalkboard-user"></i>
