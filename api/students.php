@@ -153,6 +153,22 @@ try {
         exit;
     }
 
+    // ─── BULK STATUS UPDATE ────────────────────────────────────
+    if ($method === 'POST' && isset($_GET['action']) && $_GET['action'] === 'bulk-status') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $ids = $input['ids'] ?? [];
+        $status = $input['status'] ?? '';
+        if (empty($ids) || !$status) {
+            echo json_encode(['success' => false, 'message' => 'Invalid request.']);
+            exit;
+        }
+        foreach ($ids as $sid) {
+            $db->update('students', ['status' => $status], 'id = ?', [intval($sid)]);
+        }
+        echo json_encode(['success' => true, 'message' => count($ids) . ' student(s) updated.']);
+        exit;
+    }
+
     // ─── DELETE STUDENT ────────────────────────────────────────
     if ($method === 'DELETE' && $id) {
         $existing = $db->fetchOne("SELECT id FROM students WHERE id = ?", [$id]);
