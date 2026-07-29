@@ -155,7 +155,8 @@ include '../includes/sidebar.php';
 /* Modal */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);backdrop-filter:blur(4px);z-index:9999;align-items:center;justify-content:center;padding:20px}
 .modal-overlay.active{display:flex}
-.modal-content{background:white;border-radius:20px;padding:28px 32px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,0.15);animation:modalSlide .3s ease}
+.modal-content{background:white;border-radius:20px;padding:28px 32px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,0.15);animation:modalSlide .3s ease;scrollbar-width:thin;scrollbar-color:#cbd5e1 transparent}
+.modal-content::-webkit-scrollbar{width:5px}.modal-content::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:999px}
 @keyframes modalSlide{from{opacity:0;transform:translateY(20px) scale(0.96)}to{opacity:1;transform:translateY(0) scale(1)}}
 .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
 .modal-header h2{font-size:18px;font-weight:700;color:#0f172a;display:flex;align-items:center;gap:10px}
@@ -342,11 +343,12 @@ $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' :
 <!-- Tab: Profile -->
 <div class="vtab-content active" id="tabProfile">
 <div class="view-profile">
-<div class="big-avatar blue" id="vAvatar" style="cursor:pointer;position:relative;" onclick="document.getElementById('photoInput').click()"><span id="vAvatarText">JD</span></div>
-<input type="file" id="photoInput" accept="image/*" style="display:none" onchange="uploadPhoto()">
+<div class="big-avatar blue" id="vAvatar" style="position:relative;"><span id="vAvatarText">JD</span></div>
+<input type="file" id="photoInput" accept="image/*" style="display:none">
+<button class="btn btn-secondary" style="margin:-4px auto 10px;padding:4px 12px;font-size:11px;" onclick="document.getElementById('photoInput').click()"><i class="fas fa-camera"></i> Change Photo</button>
 <div class="vp-name" id="vName">—</div>
 <div class="vp-id" id="vStudentId">—</div>
-<div id="vLastScan" style="font-size:11px;color:#94a3b8;margin-top:4px;"></div>
+<div id="vLastScan" style="font-size:12px;color:#64748b;margin-top:6px;display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;"></div>
 </div>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid #f1f5f9">
 <div class="view-item"><div class="lbl">Status</div><div class="val" id="vStatus">—</div></div>
@@ -550,7 +552,7 @@ function viewStudent(id) {
         // Last scan
         fetch('../api/students.php?action=lastscan&student_id='+s.id).then(r=>r.json()).then(sd=>{
             const el=document.getElementById('vLastScan');
-            if(sd.success&&sd.data){const ls=sd.data;el.innerHTML='<i class=\"fas fa-clock\" style=\"color:#94a3b8\"></i> Last '+ucfirst(ls.event_type||'scan')+' '+(ls.scanned_at?new Date(ls.scanned_at).toLocaleString():'')+' <span style=\"color:#94a3b8\">·</span> '+(ls.location||'')+' <span class=\"status-badge '+(ls.status||'')+'\" style=\"font-size:10px;padding:1px 7px;\">'+ucfirst(ls.status||'')+'</span>';}
+            if(sd.success&&sd.data){const ls=sd.data;const ei=ls.event_type==='entry'?'fa-right-to-bracket':ls.event_type==='exit'?'fa-right-from-bracket':'fa-circle';el.innerHTML='<span style=\"display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;\"><i class=\"fas '+ei+'\" style=\"color:'+(ls.event_type==='entry'?'#2563eb':'#b45309')+';\"></i> <strong>'+ucfirst(ls.event_type||'scan')+'</strong> <span style=\"color:#94a3b8\">·</span> '+(ls.scanned_at?new Date(ls.scanned_at).toLocaleString():'')+' <span style=\"color:#94a3b8\">·</span> '+(ls.location||'')+' <span class=\"status-badge '+(ls.status||'')+'\" style=\"font-size:10px;padding:1px 8px;\">'+ucfirst(ls.status||'')+'</span></span>';}
         }).catch(()=>{});
         // RFID
         const rfidSec = document.getElementById('vRfidSection');
