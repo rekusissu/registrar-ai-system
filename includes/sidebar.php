@@ -60,11 +60,6 @@ $ACTIVE_NAV = $ACTIVE_NAV ?? '';
             <span class="sidebar-text">Guardians</span>
         </a>
 
-        <a href="<?= $APP_ROOT ?>registrar/enrollment.php" class="sidebar-item <?= $ACTIVE_NAV === 'enrollment' ? 'active' : '' ?>">
-            <i class="fa-solid fa-clipboard-list"></i>
-            <span class="sidebar-text">Enrollment</span>
-        </a>
-
         <a href="<?= $APP_ROOT ?>registrar/rfid-cards.php" class="sidebar-item <?= $ACTIVE_NAV === 'rfid' ? 'active' : '' ?>">
             <i class="fa-solid fa-credit-card"></i>
             <span class="sidebar-text">RFID Cards</span>
@@ -98,11 +93,6 @@ $ACTIVE_NAV = $ACTIVE_NAV ?? '';
         <a href="<?= $APP_ROOT ?>registrar/reports.php" class="sidebar-item <?= $ACTIVE_NAV === 'reports' ? 'active' : '' ?>">
             <i class="fa-solid fa-chart-bar"></i>
             <span class="sidebar-text">Reports</span>
-        </a>
-
-        <a href="<?= $APP_ROOT ?>registrar/school-year.php" class="sidebar-item <?= $ACTIVE_NAV === 'schoolyear' ? 'active' : '' ?>">
-            <i class="fa-solid fa-calendar"></i>
-            <span class="sidebar-text">School Year</span>
         </a>
 
         <div class="sidebar-divider"></div>
