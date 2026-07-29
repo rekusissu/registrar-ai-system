@@ -43,11 +43,6 @@ $ACTIVE_NAV = $ACTIVE_NAV ?? '';
             <span class="sidebar-text">Dashboard</span>
         </a>
 
-        <a href="<?= $APP_ROOT ?>registrar/rfid-scan-logs.php" class="sidebar-item <?= $ACTIVE_NAV === 'scanlogs' ? 'active' : '' ?>">
-            <i class="fa-solid fa-clock-rotate-left"></i>
-            <span class="sidebar-text">Scan Logs</span>
-        </a>
-
         <div class="sidebar-divider"></div>
 
         <!-- GROUP 2 — Registrar -->
@@ -63,16 +58,6 @@ $ACTIVE_NAV = $ACTIVE_NAV ?? '';
         <a href="<?= $APP_ROOT ?>registrar/rfid-cards.php" class="sidebar-item <?= $ACTIVE_NAV === 'rfid' ? 'active' : '' ?>">
             <i class="fa-solid fa-credit-card"></i>
             <span class="sidebar-text">RFID Cards</span>
-        </a>
-
-        <a href="<?= $APP_ROOT ?>registrar/rfid-readers.php" class="sidebar-item <?= $ACTIVE_NAV === 'readers' ? 'active' : '' ?>">
-            <i class="fa-solid fa-hard-hat"></i>
-            <span class="sidebar-text">Card Readers</span>
-        </a>
-
-        <a href="<?= $APP_ROOT ?>registrar/rfid-kiosk.php" class="sidebar-item <?= $ACTIVE_NAV === 'kiosk' ? 'active' : '' ?>">
-            <i class="fa-solid fa-maximize"></i>
-            <span class="sidebar-text">RFID Kiosk</span>
         </a>
 
         <a href="<?= $APP_ROOT ?>registrar/documents.php" class="sidebar-item <?= $ACTIVE_NAV === 'documents' ? 'active' : '' ?>">
