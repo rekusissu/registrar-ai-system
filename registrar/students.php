@@ -182,7 +182,9 @@ include '../includes/sidebar.php';
 .form-group label{display:block;font-size:12px;color:#475569;margin-bottom:4px;font-weight:600}
 .form-control{width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;background:white;color:#1e293b;box-sizing:border-box}
 .form-control:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,0.10)}
-select.form-control{cursor:pointer;appearance:auto;-webkit-appearance:auto}
+select.form-control{cursor:pointer;}
+.modal-overlay select.form-control,
+.modal-overlay select { cursor:pointer !important; appearance:auto !important; -webkit-appearance:auto !important; }
 
 /* Delete icon */
 .delete-icon{width:60px;height:60px;border-radius:50%;background:#fee2e2;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:26px;color:#dc2626}
@@ -322,10 +324,11 @@ $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' :
 </div>
 
 <!-- View Modal (full profile) -->
-<div class="modal-overlay" id="viewModal"><div class="modal-content" style="max-width:520px;"><div class="modal-header"><h2><i class="fas fa-id-card"></i> Student Profile</h2><button class="modal-close" onclick="closeViewModal()"><i class="fas fa-times"></i></button></div><div class="modal-body"><div class="view-profile"><div class="big-avatar blue" id="vAvatar">JD</div><div class="vp-name" id="vName">—</div><div class="vp-id" id="vStudentId">—</div></div>
+<div class="modal-overlay" id="viewModal"><div class="modal-content" style="max-width:540px;"><div class="modal-header"><h2><i class="fas fa-id-card"></i> Student Profile</h2><button class="modal-close" onclick="closeViewModal()"><i class="fas fa-times"></i></button></div><div class="modal-body"><div class="view-profile"><div class="big-avatar blue" id="vAvatar">JD</div><div class="vp-name" id="vName">—</div><div class="vp-id" id="vStudentId">—</div></div>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid #f1f5f9">
 <div class="view-item"><div class="lbl">Status</div><div class="val" id="vStatus">—</div></div>
 <div class="view-item"><div class="lbl">Gender</div><div class="val" id="vGender">—</div></div>
+<div class="view-item"><div class="lbl">Civil Status</div><div class="val" id="vCivilStatus">—</div></div>
 <div class="view-item"><div class="lbl">Birth Date</div><div class="val" id="vBirthDate">—</div></div>
 <div class="view-item"><div class="lbl">Place of Birth</div><div class="val" id="vBirthPlace">—</div></div>
 <div class="view-item"><div class="lbl">Nationality</div><div class="val" id="vNationality">—</div></div>
@@ -336,32 +339,43 @@ $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' :
 <div class="view-item"><div class="lbl">Contact</div><div class="val" id="vContact">—</div></div>
 <div class="view-item" style="grid-column:span 2;"><div class="lbl">Address</div><div class="val" id="vAddress">—</div></div>
 </div>
+<div id="vGuardianSection" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid #f1f5f9;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;">Guardian</div><div id="vGuardianInfo" style="font-size:13px;color:#475569;"></div></div>
 <div id="vRfidSection" style="display:none;margin-top:14px;padding-top:14px;border-top:1px solid #f1f5f9;text-align:center;"><a id="vRfidLink" href="#" class="btn btn-secondary"><i class="fas fa-credit-card"></i> View RFID Card</a> <a id="vScanLink" href="#" class="btn btn-secondary"><i class="fas fa-clock-rotate-left"></i> Scan Logs</a></div>
 </div><div class="modal-footer"><button class="btn btn-primary" onclick="closeViewModal()"><i class="fas fa-times"></i> Close</button></div></div></div>
 
-<!-- Edit Modal (full fields) -->
-<div class="modal-overlay" id="editModal"><div class="modal-content" style="max-width:600px;"><div class="modal-header"><h2><i class="fas fa-pen"></i> Edit Student</h2><button class="modal-close" onclick="closeEditModal()"><i class="fas fa-times"></i></button></div><form id="editForm"><input type="hidden" id="editId" value=""><div class="modal-body">
-<div class="form-row"><div class="form-group"><label>Student ID</label><input type="text" id="editStudentNumber" class="form-control" readonly style="background:#f8fafc;"></div><div class="form-group"><label>Status</label><select id="editStatus" class="form-control"><option value="active">Active</option><option value="probation">Probation</option><option value="at-risk">At Risk</option><option value="graduated">Graduated</option><option value="loa">LOA</option><option value="transferred">Transferred</option><option value="dropped">Dropped</option></select></div></div>
+<!-- Add Modal (inline, with guardian) -->
+<div class="modal-overlay" id="addModal"><div class="modal-content" style="max-width:640px;"><div class="modal-header"><h2><i class="fas fa-plus-circle"></i> Enroll New Student</h2><button class="modal-close" onclick="closeAddModal()"><i class="fas fa-times"></i></button></div><form id="addForm"><div class="modal-body">
+<div class="form-row"><div class="form-group" style="flex:0 0 160px;"><label>Student ID</label><input type="text" id="addStudentNumber" class="form-control" placeholder="Auto" style="background:#f8fafc;font-size:12px;" readonly></div><div class="form-group"><label>Academic Status</label><select id="addStatus" class="form-control"><option value="active">Active</option></select></div></div>
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:0 0 12px;">
-<div class="form-row"><div class="form-group"><label>First Name <span style="color:#dc2626;">*</span></label><input type="text" id="editFirstName" class="form-control" required></div><div class="form-group"><label>Middle Name</label><input type="text" id="editMiddleName" class="form-control"></div><div class="form-group"><label>Last Name <span style="color:#dc2626;">*</span></label><input type="text" id="editLastName" class="form-control" required></div></div>
-<div class="form-row"><div class="form-group"><label>Gender</label><select id="editGender" class="form-control"><option value="">Select</option><option value="Male">Male</option><option value="Female">Female</option></select></div><div class="form-group"><label>Birth Date</label><input type="date" id="editBirthDate" class="form-control"></div><div class="form-group"><label>Place of Birth</label><input type="text" id="editBirthPlace" class="form-control"></div></div>
-<div class="form-row"><div class="form-group"><label>Nationality</label><input type="text" id="editNationality" class="form-control"></div><div class="form-group"><label>Religion</label><input type="text" id="editReligion" class="form-control"></div></div>
-<div class="form-row"><div class="form-group"><label>Course</label><input type="text" id="editCourse" class="form-control"></div><div class="form-group"><label>Year Level</label><select id="editYearLevel" class="form-control"><option value="">Select</option><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option></select></div><div class="form-group"><label>Section</label><input type="text" id="editSection" class="form-control"></div></div>
-<div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="editEmail" class="form-control"></div><div class="form-group"><label>Contact</label><input type="text" id="editContact" class="form-control"></div></div>
-<div class="form-row"><div class="form-group"><label>Address <span style="color:#dc2626;">*</span></label><textarea id="editAddress" class="form-control" rows="2" required></textarea></div></div>
-</div><div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeEditModal()">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save</button></div></form></div></div>
-
-<!-- Add Modal (inline, full fields) -->
-<div class="modal-overlay" id="addModal"><div class="modal-content" style="max-width:600px;"><div class="modal-header"><h2><i class="fas fa-plus-circle"></i> Add Student</h2><button class="modal-close" onclick="closeAddModal()"><i class="fas fa-times"></i></button></div><form id="addForm"><div class="modal-body">
-<div class="form-row"><div class="form-group" style="flex:0 0 160px;"><label>Student ID</label><input type="text" id="addStudentNumber" class="form-control" placeholder="Auto-generated" style="background:#f8fafc;" readonly></div><div class="form-group"><label>Status</label><select id="addStatus" class="form-control"><option value="active">Active</option><option value="probation">Probation</option><option value="at-risk">At Risk</option></select></div></div>
-<hr style="border:none;border-top:1px solid #f1f5f9;margin:0 0 12px;">
+<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-user"></i> Personal Information</div>
 <div class="form-row"><div class="form-group"><label>First Name <span style="color:#dc2626;">*</span></label><input type="text" id="addFirstName" class="form-control" required></div><div class="form-group"><label>Middle Name</label><input type="text" id="addMiddleName" class="form-control"></div><div class="form-group"><label>Last Name <span style="color:#dc2626;">*</span></label><input type="text" id="addLastName" class="form-control" required></div></div>
-<div class="form-row"><div class="form-group"><label>Gender</label><select id="addGender" class="form-control"><option value="">Select</option><option value="Male">Male</option><option value="Female">Female</option></select></div><div class="form-group"><label>Birth Date</label><input type="date" id="addBirthDate" class="form-control"></div><div class="form-group"><label>Place of Birth</label><input type="text" id="addBirthPlace" class="form-control"></div></div>
-<div class="form-row"><div class="form-group"><label>Nationality</label><input type="text" id="addNationality" class="form-control"></div><div class="form-group"><label>Religion</label><input type="text" id="addReligion" class="form-control"></div></div>
-<div class="form-row"><div class="form-group"><label>Course</label><input type="text" id="addCourse" class="form-control"></div><div class="form-group"><label>Year Level</label><select id="addYearLevel" class="form-control"><option value="">Select</option><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option></select></div><div class="form-group"><label>Section</label><input type="text" id="addSection" class="form-control"></div></div>
-<div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="addEmail" class="form-control"></div><div class="form-group"><label>Contact</label><input type="text" id="addContact" class="form-control"></div></div>
+<div class="form-row"><div class="form-group"><label>Gender</label><select id="addGender" class="form-control"><option value="">Select</option><option value="Male">Male</option><option value="Female">Female</option></select></div><div class="form-group"><label>Civil Status</label><select id="addCivilStatus" class="form-control"><option value="">Select</option><option value="Single">Single</option><option value="Married">Married</option><option value="Widowed">Widowed</option><option value="Separated">Separated</option></select></div><div class="form-group"><label>Birth Date</label><input type="date" id="addBirthDate" class="form-control"></div></div>
+<div class="form-row"><div class="form-group"><label>Place of Birth</label><input type="text" id="addBirthPlace" class="form-control" placeholder="City, Province"></div><div class="form-group"><label>Nationality</label><input type="text" id="addNationality" class="form-control" value="Filipino"></div><div class="form-group"><label>Religion</label><input type="text" id="addReligion" class="form-control"></div></div>
+<div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="addEmail" class="form-control" placeholder="student@school.edu.ph"></div><div class="form-group"><label>Contact No.</label><input type="text" id="addContact" class="form-control" placeholder="0917xxx"></div></div>
 <div class="form-row"><div class="form-group"><label>Address <span style="color:#dc2626;">*</span></label><textarea id="addAddress" class="form-control" rows="2" required></textarea></div></div>
-</div><div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeAddModal()">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Add Student</button></div></form></div></div>
+<hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
+<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-book"></i> Enrollment Details</div>
+<div class="form-row"><div class="form-group"><label>Course <span style="color:#dc2626;">*</span></label><input type="text" id="addCourse" class="form-control" required></div><div class="form-group"><label>Year Level</label><select id="addYearLevel" class="form-control"><option value="">Select</option><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option></select></div><div class="form-group"><label>Section</label><input type="text" id="addSection" class="form-control" placeholder="A,B,C..."></div></div>
+<hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
+<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-users"></i> Guardian / Parent</div>
+<div class="form-row"><div class="form-group"><label>Full Name <span style="color:#dc2626;">*</span></label><input type="text" id="addGuardianName" class="form-control" required></div><div class="form-group"><label>Relationship</label><select id="addGuardianRel" class="form-control"><option value="father">Father</option><option value="mother">Mother</option><option value="guardian">Guardian</option></select></div></div>
+<div class="form-row"><div class="form-group"><label>Contact No.</label><input type="text" id="addGuardianContact" class="form-control"></div><div class="form-group"><label>Email (optional)</label><input type="email" id="addGuardianEmail" class="form-control"></div></div>
+</div><div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeAddModal()">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Enroll</button></div></form></div></div>
+
+<!-- Edit Modal (same structure) -->
+<div class="modal-overlay" id="editModal"><div class="modal-content" style="max-width:640px;"><div class="modal-header"><h2><i class="fas fa-pen"></i> Edit Student</h2><button class="modal-close" onclick="closeEditModal()"><i class="fas fa-times"></i></button></div><form id="editForm"><input type="hidden" id="editId" value=""><div class="modal-body">
+<div class="form-row"><div class="form-group" style="flex:0 0 160px;"><label>Student ID</label><input type="text" id="editStudentNumber" class="form-control" readonly style="background:#f8fafc;font-size:12px;"></div><div class="form-group"><label>Academic Status</label><select id="editStatus" class="form-control"><option value="active">Active</option><option value="probation">Probation</option><option value="at-risk">At Risk</option><option value="graduated">Graduated</option><option value="loa">LOA</option><option value="transferred">Transferred</option><option value="dropped">Dropped</option></select></div></div>
+<hr style="border:none;border-top:1px solid #f1f5f9;margin:0 0 12px;">
+<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-user"></i> Personal Information</div>
+<div class="form-row"><div class="form-group"><label>First Name <span style="color:#dc2626;">*</span></label><input type="text" id="editFirstName" class="form-control" required></div><div class="form-group"><label>Middle Name</label><input type="text" id="editMiddleName" class="form-control"></div><div class="form-group"><label>Last Name <span style="color:#dc2626;">*</span></label><input type="text" id="editLastName" class="form-control" required></div></div>
+<div class="form-row"><div class="form-group"><label>Gender</label><select id="editGender" class="form-control"><option value="">Select</option><option value="Male">Male</option><option value="Female">Female</option></select></div><div class="form-group"><label>Civil Status</label><select id="editCivilStatus" class="form-control"><option value="">Select</option><option value="Single">Single</option><option value="Married">Married</option><option value="Widowed">Widowed</option><option value="Separated">Separated</option></select></div><div class="form-group"><label>Birth Date</label><input type="date" id="editBirthDate" class="form-control"></div></div>
+<div class="form-row"><div class="form-group"><label>Place of Birth</label><input type="text" id="editBirthPlace" class="form-control"></div><div class="form-group"><label>Nationality</label><input type="text" id="editNationality" class="form-control"></div><div class="form-group"><label>Religion</label><input type="text" id="editReligion" class="form-control"></div></div>
+<div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="editEmail" class="form-control"></div><div class="form-group"><label>Contact No.</label><input type="text" id="editContact" class="form-control"></div></div>
+<div class="form-row"><div class="form-group"><label>Address <span style="color:#dc2626;">*</span></label><textarea id="editAddress" class="form-control" rows="2" required></textarea></div></div>
+<hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
+<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-book"></i> Enrollment Details</div>
+<div class="form-row"><div class="form-group"><label>Course</label><input type="text" id="editCourse" class="form-control"></div><div class="form-group"><label>Year Level</label><select id="editYearLevel" class="form-control"><option value="">Select</option><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option></select></div><div class="form-group"><label>Section</label><input type="text" id="editSection" class="form-control"></div></div>
+</div><div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeEditModal()">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save</button></div></form></div></div>
 
 <!-- Delete Modal -->
 <div class="modal-overlay" id="deleteModal"><div class="modal-content" style="max-width:420px;text-align:center;"><div class="delete-icon"><i class="fas fa-trash-alt"></i></div><h3 style="font-size:19px;font-weight:700;color:#0f172a;margin-bottom:4px;">Delete Student</h3><p id="deleteMessage" style="color:#64748b;font-size:14px;margin-bottom:18px;">This cannot be undone.</p><div class="modal-footer" style="justify-content:center;"><button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button><button class="btn btn-danger" id="confirmDeleteBtn" style="background:#dc2626;color:white;border:none;padding:9px 18px;border-radius:10px;font-weight:600;cursor:pointer;"><i class="fas fa-trash-alt"></i> Delete</button></div></div></div>
@@ -475,17 +489,23 @@ function viewStudent(id) {
         document.getElementById('vAvatar').textContent = initials.toUpperCase();
         document.getElementById('vName').textContent = name;
         document.getElementById('vStudentId').textContent = s.student_number;
-        document.getElementById('vStatus').innerHTML = '<span class="status-badge ' + (s.status||'active') + '"><span class="status-dot ' + (s.status||'active') + '"></span>' + ucfirst(s.status||'Active') + '</span>';
-        document.getElementById('vGender').textContent = s.gender || '—';
-        document.getElementById('vBirthDate').textContent = s.birth_date ? new Date(s.birth_date).toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}) : '—';
-        document.getElementById('vBirthPlace').textContent = s.place_of_birth || '—';
-        document.getElementById('vNationality').textContent = s.nationality || '—';
-        document.getElementById('vReligion').textContent = s.religion || '—';
-        document.getElementById('vCourse').textContent = s.course || '—';
-        document.getElementById('vYearSection').textContent = (s.year_level?s.year_level+' Year':'') + (s.section?' — '+s.section:'');
-        document.getElementById('vEmail').textContent = s.email || '—';
-        document.getElementById('vContact').textContent = s.contact_number || '—';
-        document.getElementById('vAddress').textContent = s.address || '—';
+        document.getElementById('vStatus').innerHTML = '<span class="status-badge '+(s.status||'active')+'"><span class="status-dot '+(s.status||'active')+'"></span>'+ucfirst(s.status||'Active')+'</span>';
+        document.getElementById('vGender').textContent = s.gender||'—';
+        document.getElementById('vCivilStatus').textContent = s.civil_status||'—';
+        document.getElementById('vBirthDate').textContent = s.birth_date?new Date(s.birth_date).toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}):'—';
+        document.getElementById('vBirthPlace').textContent = s.place_of_birth||'—';
+        document.getElementById('vNationality').textContent = s.nationality||'—';
+        document.getElementById('vReligion').textContent = s.religion||'—';
+        document.getElementById('vCourse').textContent = s.course||'—';
+        document.getElementById('vYearSection').textContent = (s.year_level?s.year_level+' Year':'')+(s.section?' — '+s.section:'');
+        document.getElementById('vEmail').textContent = s.email||'—';
+        document.getElementById('vContact').textContent = s.contact_number||'—';
+        document.getElementById('vAddress').textContent = s.address||'—';
+        // Guardian
+        fetch('../api/students.php?action=guardian&student_id='+s.id).then(r=>r.json()).then(gd=>{
+            const gs=document.getElementById('vGuardianSection'),gi=document.getElementById('vGuardianInfo');
+            if(gd.success&&gd.data){gs.style.display='block';gi.innerHTML=(gd.data.full_name||'')+(gd.data.relationship?' <span style=\"color:#94a3b8\">('+gd.data.relationship+')</span>':'')+'<br>'+(gd.data.contact_number?'<i class=\"fas fa-phone\" style=\"color:#94a3b8\"></i> '+gd.data.contact_number:'')+(gd.data.email?' <i class=\"fas fa-envelope\" style=\"color:#94a3b8\"></i> '+gd.data.email:'');}
+        }).catch(()=>{});
         const rfidSec = document.getElementById('vRfidSection');
         <?php if (!empty($rfidMap)): ?>
         const hasRfid = <?= json_encode(array_keys($rfidMap)) ?>.includes(String(s.id));
@@ -512,6 +532,7 @@ function editStudent(id) {
         document.getElementById('editMiddleName').value = s.middle_name || '';
         document.getElementById('editLastName').value = s.last_name;
         document.getElementById('editGender').value = s.gender || '';
+        document.getElementById('editCivilStatus').value = s.civil_status || '';
         document.getElementById('editBirthDate').value = s.birth_date || '';
         document.getElementById('editBirthPlace').value = s.place_of_birth || '';
         document.getElementById('editNationality').value = s.nationality || '';
@@ -542,6 +563,7 @@ document.getElementById('editForm').addEventListener('submit', async function(e)
                 middle_name: document.getElementById('editMiddleName').value,
                 last_name: document.getElementById('editLastName').value,
                 gender: document.getElementById('editGender').value,
+                civil_status: document.getElementById('editCivilStatus').value,
                 birth_date: document.getElementById('editBirthDate').value,
                 place_of_birth: document.getElementById('editBirthPlace').value,
                 nationality: document.getElementById('editNationality').value,
@@ -578,6 +600,7 @@ document.getElementById('addForm').addEventListener('submit', async function(e) 
                 middle_name: document.getElementById('addMiddleName').value,
                 last_name: document.getElementById('addLastName').value,
                 gender: document.getElementById('addGender').value,
+                civil_status: document.getElementById('addCivilStatus').value,
                 birth_date: document.getElementById('addBirthDate').value,
                 place_of_birth: document.getElementById('addBirthPlace').value,
                 nationality: document.getElementById('addNationality').value,
@@ -588,7 +611,11 @@ document.getElementById('addForm').addEventListener('submit', async function(e) 
                 section: document.getElementById('addSection').value,
                 email: document.getElementById('addEmail').value,
                 contact_number: document.getElementById('addContact').value,
-                address: document.getElementById('addAddress').value
+                address: document.getElementById('addAddress').value,
+                guardian_name: document.getElementById('addGuardianName').value,
+                guardian_relationship: document.getElementById('addGuardianRel').value,
+                guardian_contact: document.getElementById('addGuardianContact').value,
+                guardian_email: document.getElementById('addGuardianEmail').value
             })
         });
         const d = await res.json();

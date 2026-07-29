@@ -26,6 +26,13 @@ $id = isset($_GET['id']) ? intval($_GET['id']) : null;
 try {
     $db = Database::getInstance();
 
+    // ─── GET GUARDIAN ──────────────────────────────────────────
+    if ($method === 'GET' && isset($_GET['action']) && $_GET['action'] === 'guardian' && isset($_GET['student_id'])) {
+        $guardian = $db->fetchOne("SELECT * FROM guardians WHERE student_id = ? ORDER BY is_primary DESC, id ASC LIMIT 1", [intval($_GET['student_id'])]);
+        echo json_encode(['success' => true, 'data' => $guardian]);
+        exit;
+    }
+
     // ─── GET ALL STUDENTS ──────────────────────────────────────
     if ($method === 'GET' && !$id) {
         $students = $db->fetchAll(
@@ -88,6 +95,7 @@ try {
             'middle_name' => isset($input['middle_name']) && $input['middle_name'] !== '' ? trim($input['middle_name']) : null,
             'last_name' => $lastName,
             'gender' => $input['gender'] ?? null,
+            'civil_status' => $input['civil_status'] ?? null,
             'birth_date' => $birthDate,
             'place_of_birth' => $input['place_of_birth'] ?? null,
             'nationality' => $input['nationality'] ?? null,
@@ -102,6 +110,21 @@ try {
         ];
 
         $newId = $db->insert('students', $data);
+
+        // Insert guardian
+        $guardianName = trim($input['guardian_name'] ?? '');
+        if ($guardianName !== '') {
+            try {
+                $db->insert('guardians', [
+                    'student_id' => $newId,
+                    'full_name' => $guardianName,
+                    'relationship' => $input['guardian_relationship'] ?? 'guardian',
+                    'contact_number' => $input['guardian_contact'] ?? '',
+                    'email' => $input['guardian_email'] ?? null
+                ]);
+            } catch (Exception $e) {}
+        }
+
         echo json_encode(['success' => true, 'message' => 'Student added successfully.', 'data' => ['id' => $newId, 'student_number' => $studentNumber]]);
         exit;
     }
@@ -122,7 +145,7 @@ try {
         }
 
         $data = [];
-        $allowedFields = ['first_name', 'middle_name', 'last_name', 'gender', 'birth_date', 'place_of_birth',
+        $allowedFields = ['first_name', 'middle_name', 'last_name', 'gender', 'civil_status', 'birth_date', 'place_of_birth',
                           'nationality', 'religion', 'address', 'contact_number', 'email',
                           'course', 'year_level', 'section', 'status'];
 
