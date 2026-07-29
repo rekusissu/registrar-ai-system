@@ -193,7 +193,7 @@ try {
         exit;
     }
 
-    // ─── DELETE STUDENT ────────────────────────────────────────
+    // ─── SOFT DELETE STUDENT ────────────────────────────────────
     if ($method === 'DELETE' && $id) {
         $existing = $db->fetchOne("SELECT id FROM students WHERE id = ?", [$id]);
         if (!$existing) {
@@ -201,16 +201,8 @@ try {
             exit;
         }
 
-        // Clean up related rows where the schema links to students
-        try { $db->delete('guardians', 'student_id = ?', [$id]); } catch (Exception $e) {}
-        try { $db->delete('document_requests', 'student_id = ?', [$id]); } catch (Exception $e) {}
-
-        $deleted = $db->delete('students', 'id = ?', [$id]);
-        if ($deleted) {
-            echo json_encode(['success' => true, 'message' => 'Student deleted successfully.']);
-        } else {
-            echo json_encode(['success' => false, 'message' => 'Failed to delete student.']);
-        }
+        $db->update('students', ['status' => 'deleted'], 'id = ?', [$id]);
+        echo json_encode(['success' => true, 'message' => 'Student deactivated.']);
         exit;
     }
 
