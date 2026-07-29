@@ -43,6 +43,11 @@ $ACTIVE_NAV = $ACTIVE_NAV ?? '';
             <span class="sidebar-text">Dashboard</span>
         </a>
 
+        <a href="<?= $APP_ROOT ?>registrar/rfid-scan-logs.php" class="sidebar-item <?= $ACTIVE_NAV === 'scanlogs' ? 'active' : '' ?>">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+            <span class="sidebar-text">Scan Logs</span>
+        </a>
+
         <div class="sidebar-divider"></div>
 
         <!-- GROUP 2 — Registrar -->
@@ -58,6 +63,16 @@ $ACTIVE_NAV = $ACTIVE_NAV ?? '';
         <a href="<?= $APP_ROOT ?>registrar/rfid-cards.php" class="sidebar-item <?= $ACTIVE_NAV === 'rfid' ? 'active' : '' ?>">
             <i class="fa-solid fa-credit-card"></i>
             <span class="sidebar-text">RFID Cards</span>
+        </a>
+
+        <a href="<?= $APP_ROOT ?>registrar/rfid-readers.php" class="sidebar-item <?= $ACTIVE_NAV === 'readers' ? 'active' : '' ?>">
+            <i class="fa-solid fa-hard-hat"></i>
+            <span class="sidebar-text">Card Readers</span>
+        </a>
+
+        <a href="<?= $APP_ROOT ?>registrar/rfid-kiosk.php" class="sidebar-item <?= $ACTIVE_NAV === 'kiosk' ? 'active' : '' ?>">
+            <i class="fa-solid fa-maximize"></i>
+            <span class="sidebar-text">RFID Kiosk</span>
         </a>
 
         <a href="<?= $APP_ROOT ?>registrar/documents.php" class="sidebar-item <?= $ACTIVE_NAV === 'documents' ? 'active' : '' ?>">
@@ -350,25 +365,37 @@ $ACTIVE_NAV = $ACTIVE_NAV ?? '';
     var notifList = document.getElementById('notifList');
     var bellBadge = document.getElementById('bellBadge');
 
-    var notifications = [
-        { id: 1, title: 'New Student Registered', message: 'Juan Dela Cruz has been registered for 2nd Year - BSIT.', time: '2 minutes ago', unread: true, icon: 'fa-user-plus' },
-        { id: 2, title: 'RFID Card Assigned', message: 'RFID card #A4F2B1 has been assigned to Maria Santos.', time: '15 minutes ago', unread: true, icon: 'fa-credit-card' },
-        { id: 3, title: 'Document Request Approved', message: 'Certificate of Good Moral request for Pedro Reyes has been approved.', time: '1 hour ago', unread: true, icon: 'fa-file-circle-check' },
-        { id: 4, title: 'System Update', message: 'BCP Registrar System has been updated to v1.0.1.', time: '3 hours ago', unread: false, icon: 'fa-gear' }
-    ];
+    var notifications = [];
+
+    function loadNotifications() {
+        fetch('../api/notifications.php')
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.success && d.data) {
+                    notifications = d.data;
+                    renderNotifications();
+                }
+            })
+            .catch(function() {});
+    }
 
     function renderNotifications() {
         if (!notifList) return;
         var unreadCount = 0;
+        if (!notifications.length) {
+            notifList.innerHTML = '<p style="color:#64748b;font-size:14px;text-align:center;">No notifications yet.</p>';
+            if (bellBadge) { bellBadge.textContent = '0'; bellBadge.style.display = 'none'; }
+            return;
+        }
         var html = '';
         notifications.forEach(function(n) {
             if (n.unread) unreadCount++;
             html += '<div class="notif-item ' + (n.unread ? 'unread' : '') + '">' +
-                '<div class="notif-icon"><i class="fas ' + n.icon + '"></i></div>' +
+                '<div class="notif-icon"><i class="fas ' + (n.icon || 'fa-circle-info') + '"></i></div>' +
                 '<div class="notif-content">' +
-                    '<div class="notif-title">' + n.title + '</div>' +
-                    '<div class="notif-message">' + n.message + '</div>' +
-                    '<div class="notif-time">' + n.time + '</div>' +
+                    '<div class="notif-title">' + (n.title || '') + '</div>' +
+                    '<div class="notif-message">' + (n.message || '') + '</div>' +
+                    '<div class="notif-time">' + (n.time || '') + '</div>' +
                 '</div>' +
             '</div>';
         });
@@ -380,21 +407,12 @@ $ACTIVE_NAV = $ACTIVE_NAV ?? '';
     }
 
     function openNotifModal(e) {
-        if (e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-        if (notifModal) {
-            notifModal.classList.add('active');
-            document.body.style.overflow = 'hidden';
-        }
+        if (e) { e.preventDefault(); e.stopPropagation(); }
+        if (notifModal) { notifModal.classList.add('active'); document.body.style.overflow = 'hidden'; }
     }
 
     function closeNotifModal() {
-        if (notifModal) {
-            notifModal.classList.remove('active');
-            document.body.style.overflow = '';
-        }
+        if (notifModal) { notifModal.classList.remove('active'); document.body.style.overflow = ''; }
     }
 
     function markAllRead() {
@@ -403,33 +421,14 @@ $ACTIVE_NAV = $ACTIVE_NAV ?? '';
         closeNotifModal();
     }
 
-    if (bellBtn) {
-        bellBtn.addEventListener('click', openNotifModal);
-    }
-
-    if (notifClose) {
-        notifClose.addEventListener('click', closeNotifModal);
-    }
-
-    if (notifMarkRead) {
-        notifMarkRead.addEventListener('click', markAllRead);
-    }
-
-    if (notifModal) {
-        notifModal.addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeNotifModal();
-            }
-        });
-    }
-
+    if (bellBtn) bellBtn.addEventListener('click', openNotifModal);
+    if (notifClose) notifClose.addEventListener('click', closeNotifModal);
+    if (notifMarkRead) notifMarkRead.addEventListener('click', markAllRead);
+    if (notifModal) notifModal.addEventListener('click', function(e) { if (e.target === this) closeNotifModal(); });
     document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && notifModal && notifModal.classList.contains('active')) {
-            closeNotifModal();
-        }
+        if (e.key === 'Escape' && notifModal && notifModal.classList.contains('active')) closeNotifModal();
     });
 
-    renderNotifications();
-
+    loadNotifications();
 })();
 </script>
