@@ -87,6 +87,7 @@ try {
             'first_name' => $firstName,
             'middle_name' => isset($input['middle_name']) && $input['middle_name'] !== '' ? trim($input['middle_name']) : null,
             'last_name' => $lastName,
+            'gender' => $input['gender'] ?? null,
             'birth_date' => $birthDate,
             'place_of_birth' => $input['place_of_birth'] ?? null,
             'nationality' => $input['nationality'] ?? null,
@@ -121,7 +122,7 @@ try {
         }
 
         $data = [];
-        $allowedFields = ['first_name', 'middle_name', 'last_name', 'birth_date', 'place_of_birth',
+        $allowedFields = ['first_name', 'middle_name', 'last_name', 'gender', 'birth_date', 'place_of_birth',
                           'nationality', 'religion', 'address', 'contact_number', 'email',
                           'course', 'year_level', 'section', 'status'];
 
