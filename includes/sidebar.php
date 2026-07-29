@@ -60,6 +60,11 @@ $ACTIVE_NAV = $ACTIVE_NAV ?? '';
             <span class="sidebar-text">RFID Cards</span>
         </a>
 
+        <a href="<?= $APP_ROOT ?>registrar/rfid-scan-logs.php" class="sidebar-item <?= $ACTIVE_NAV === 'scanlogs' ? 'active' : '' ?>">
+            <i class="fa-solid fa-clock-rotate-left"></i>
+            <span class="sidebar-text">Scan Logs</span>
+        </a>
+
         <a href="<?= $APP_ROOT ?>registrar/documents.php" class="sidebar-item <?= $ACTIVE_NAV === 'documents' ? 'active' : '' ?>">
             <i class="fa-solid fa-file-lines"></i>
             <span class="sidebar-text">Documents</span>
@@ -73,6 +78,16 @@ $ACTIVE_NAV = $ACTIVE_NAV ?? '';
         <a href="<?= $APP_ROOT ?>registrar/masterlist.php" class="sidebar-item <?= $ACTIVE_NAV === 'masterlist' ? 'active' : '' ?>">
             <i class="fa-solid fa-table-list"></i>
             <span class="sidebar-text">Masterlist</span>
+        </a>
+
+        <a href="<?= $APP_ROOT ?>registrar/reports.php" class="sidebar-item <?= $ACTIVE_NAV === 'reports' ? 'active' : '' ?>">
+            <i class="fa-solid fa-chart-bar"></i>
+            <span class="sidebar-text">Reports</span>
+        </a>
+
+        <a href="<?= $APP_ROOT ?>registrar/school-year.php" class="sidebar-item <?= $ACTIVE_NAV === 'schoolyear' ? 'active' : '' ?>">
+            <i class="fa-solid fa-calendar"></i>
+            <span class="sidebar-text">School Year</span>
         </a>
 
         <div class="sidebar-divider"></div>
