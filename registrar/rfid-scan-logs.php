@@ -30,7 +30,7 @@ $logs = $db->fetchAll("
 
 $page_title = 'Scan Logs';
 $APP_ROOT = '../';
-$ACTIVE_NAV = 'rfid';
+$ACTIVE_NAV = 'scanlogs';
 
 include '../includes/header.php';
 include '../includes/sidebar.php';
