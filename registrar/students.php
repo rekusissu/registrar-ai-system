@@ -400,7 +400,6 @@ $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' :
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-book"></i> Enrollment Details</div>
 <div class="form-row"><div class="form-group"><label>Course <span style="color:#dc2626;">*</span></label><select id="addCourse" class="form-control" required><option value="">Select course</option><?php foreach ($offeredCourses as $cname => $majors): ?><option value="<?= htmlspecialchars($cname) ?>"><?= htmlspecialchars($cname) ?></option><?php endforeach; ?></select></div><div class="form-group" id="addMajorGroup" style="display:none;"><label>Major</label><select id="addMajor" class="form-control"><option value="">Select major</option></select></div><div class="form-group"><label>Year Level</label><select id="addYearLevel" class="form-control"><option value="">Select</option><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option></select></div></div>
 <div class="form-row"><div class="form-group"><label>School Year</label><input type="text" id="addSchoolYear" class="form-control" placeholder="2026-2027" value="2026-2027"></div><div class="form-group"><label>Semester</label><select id="addSemester" class="form-control"><option value="">—</option><option value="1st">1st Semester</option><option value="2nd">2nd Semester</option><option value="summer">Summer</option></select></div></div>
-<div class="form-row"><div class="form-group"><label>Adviser</label><select id="addAdviser" class="form-control"><option value="">—</option><?php foreach ($advisers as $ad): ?><option value="<?= (int)$ad['id'] ?>"><?= htmlspecialchars($ad['full_name']) ?></option><?php endforeach; ?></select></div></div>
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-users"></i> Guardian / Parent</div>
 <div class="form-row"><div class="form-group"><label>Full Name <span style="color:#dc2626;">*</span></label><input type="text" id="addGuardianName" class="form-control" required></div><div class="form-group"><label>Relationship</label><select id="addGuardianRel" class="form-control"><option value="father">Father</option><option value="mother">Mother</option><option value="guardian">Guardian</option></select></div></div>
@@ -421,7 +420,6 @@ $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' :
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-book"></i> Enrollment Details</div>
 <div class="form-row"><div class="form-group"><label>Course</label><select id="editCourse" class="form-control"><option value="">Select course</option><?php foreach ($offeredCourses as $cname => $majors): ?><option value="<?= htmlspecialchars($cname) ?>"><?= htmlspecialchars($cname) ?></option><?php endforeach; ?></select></div><div class="form-group" id="editMajorGroup" style="display:none;"><label>Major</label><select id="editMajor" class="form-control"><option value="">Select major</option></select></div><div class="form-group"><label>Year Level</label><select id="editYearLevel" class="form-control"><option value="">Select</option><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option></select></div></div>
 <div class="form-row"><div class="form-group"><label>School Year</label><input type="text" id="editSchoolYear" class="form-control" placeholder="2026-2027"></div><div class="form-group"><label>Semester</label><select id="editSemester" class="form-control"><option value="">—</option><option value="1st">1st Semester</option><option value="2nd">2nd Semester</option><option value="summer">Summer</option></select></div></div>
-<div class="form-row"><div class="form-group"><label>Adviser</label><select id="editAdviser" class="form-control"><option value="">—</option><?php foreach ($advisers as $ad): ?><option value="<?= (int)$ad['id'] ?>"><?= htmlspecialchars($ad['full_name']) ?></option><?php endforeach; ?></select></div></div>
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-users"></i> Guardian</div>
 <div class="form-row"><div class="form-group"><label>Full Name</label><input type="text" id="editGuardianName" class="form-control"></div><div class="form-group"><label>Relationship</label><select id="editGuardianRel" class="form-control"><option value="">Select</option><option value="father">Father</option><option value="mother">Mother</option><option value="guardian">Guardian</option></select></div></div>
@@ -668,7 +666,6 @@ function editStudent(id) {
         document.getElementById('editYearLevel').value = s.year_level || '';
         document.getElementById('editSchoolYear').value = s.school_year || '';
         document.getElementById('editSemester').value = s.semester || '';
-        document.getElementById('editAdviser').value = s.adviser_id || '';
         document.getElementById('editEmail').value = s.email || '';
         document.getElementById('editContact').value = s.contact_number || '';
         document.getElementById('editAddress').value = s.address || '';
@@ -711,7 +708,6 @@ document.getElementById('editForm').addEventListener('submit', async function(e)
                 year_level: document.getElementById('editYearLevel').value,
                 school_year: document.getElementById('editSchoolYear').value,
                 semester: document.getElementById('editSemester').value,
-                adviser_id: document.getElementById('editAdviser').value || null,
                 email: document.getElementById('editEmail').value,
                 contact_number: document.getElementById('editContact').value,
                 address: document.getElementById('editAddress').value,
@@ -780,7 +776,6 @@ document.getElementById('addForm').addEventListener('submit', async function(e) 
                 year_level: document.getElementById('addYearLevel').value,
                 school_year: document.getElementById('addSchoolYear').value,
                 semester: document.getElementById('addSemester').value,
-                adviser_id: document.getElementById('addAdviser').value || null,
                 email: document.getElementById('addEmail').value,
                 contact_number: document.getElementById('addContact').value,
                 address: document.getElementById('addAddress').value,
