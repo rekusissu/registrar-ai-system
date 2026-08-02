@@ -8,6 +8,7 @@ require_once __DIR__ . '/../shared/security_headers.php';
 require_once __DIR__ . '/../shared/session_config.php';
 if (empty($_SESSION['user_id'])) { header('Location: ../login.php'); exit; }
 require_once __DIR__ . '/../shared/database.php';
+require_once __DIR__ . '/../shared/functions.php';
 
 $db = Database::getInstance();
 
@@ -26,6 +27,13 @@ $trendTotal = $lastMonth > 0 ? round(($thisMonth - $lastMonth) / $lastMonth * 10
 
 // Courses for filter
 $courses = $db->fetchAll("SELECT DISTINCT course FROM students WHERE course IS NOT NULL AND course != '' ORDER BY course");
+
+// ─── OFFERED COURSES & MAJORS ────────────────────────────────
+// Single source of truth (shared with the Masterlist via shared/functions.php).
+$offeredCourses = getOfferedCourses();
+
+// Teachers/advisers for the adviser dropdown (role teacher or staff, active)
+$advisers = $db->fetchAll("SELECT id, full_name FROM users WHERE role IN ('teacher','staff') AND is_active = 1 ORDER BY full_name");
 
 // RFID cards lookup for indicator
 $rfidCards = $db->fetchAll("SELECT student_id, card_uid, status FROM rfid_cards");
@@ -360,6 +368,8 @@ $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' :
 <div class="view-item"><div class="lbl">Religion</div><div class="val" id="vReligion">—</div></div>
 <div class="view-item"><div class="lbl">Course</div><div class="val" id="vCourse">—</div></div>
 <div class="view-item"><div class="lbl">Year / Section</div><div class="val" id="vYearSection">—</div></div>
+<div class="view-item"><div class="lbl">School Year / Sem</div><div class="val" id="vSchoolYearSem">—</div></div>
+<div class="view-item"><div class="lbl">Adviser</div><div class="val" id="vAdviser">—</div></div>
 <div class="view-item"><div class="lbl">Email</div><div class="val" id="vEmail">—</div></div>
 <div class="view-item"><div class="lbl">Contact</div><div class="val" id="vContact">—</div></div>
 <div class="view-item" style="grid-column:span 2;"><div class="lbl">Address</div><div class="val" id="vAddress">—</div></div>
@@ -388,7 +398,9 @@ $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' :
 <div class="form-row"><div class="form-group"><label>Address <span style="color:#dc2626;">*</span></label><textarea id="addAddress" class="form-control" rows="2" required></textarea></div></div>
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-book"></i> Enrollment Details</div>
-<div class="form-row"><div class="form-group"><label>Course <span style="color:#dc2626;">*</span></label><input type="text" id="addCourse" class="form-control" required></div><div class="form-group"><label>Year Level</label><select id="addYearLevel" class="form-control"><option value="">Select</option><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option></select></div><div class="form-group"><label>Section</label><input type="text" id="addSection" class="form-control" placeholder="A,B,C..."></div></div>
+<div class="form-row"><div class="form-group"><label>Course <span style="color:#dc2626;">*</span></label><select id="addCourse" class="form-control" required><option value="">Select course</option><?php foreach ($offeredCourses as $cname => $majors): ?><option value="<?= htmlspecialchars($cname) ?>"><?= htmlspecialchars($cname) ?></option><?php endforeach; ?></select></div><div class="form-group" id="addMajorGroup" style="display:none;"><label>Major</label><select id="addMajor" class="form-control"><option value="">Select major</option></select></div><div class="form-group"><label>Year Level</label><select id="addYearLevel" class="form-control"><option value="">Select</option><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option></select></div></div>
+<div class="form-row"><div class="form-group"><label>School Year</label><input type="text" id="addSchoolYear" class="form-control" placeholder="2026-2027" value="2026-2027"></div><div class="form-group"><label>Semester</label><select id="addSemester" class="form-control"><option value="">—</option><option value="1st">1st Semester</option><option value="2nd">2nd Semester</option><option value="summer">Summer</option></select></div></div>
+<div class="form-row"><div class="form-group"><label>Adviser</label><select id="addAdviser" class="form-control"><option value="">—</option><?php foreach ($advisers as $ad): ?><option value="<?= (int)$ad['id'] ?>"><?= htmlspecialchars($ad['full_name']) ?></option><?php endforeach; ?></select></div></div>
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-users"></i> Guardian / Parent</div>
 <div class="form-row"><div class="form-group"><label>Full Name <span style="color:#dc2626;">*</span></label><input type="text" id="addGuardianName" class="form-control" required></div><div class="form-group"><label>Relationship</label><select id="addGuardianRel" class="form-control"><option value="father">Father</option><option value="mother">Mother</option><option value="guardian">Guardian</option></select></div></div>
@@ -407,7 +419,9 @@ $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' :
 <div class="form-row"><div class="form-group"><label>Address <span style="color:#dc2626;">*</span></label><textarea id="editAddress" class="form-control" rows="2" required></textarea></div></div>
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-book"></i> Enrollment Details</div>
-<div class="form-row"><div class="form-group"><label>Course</label><input type="text" id="editCourse" class="form-control"></div><div class="form-group"><label>Year Level</label><select id="editYearLevel" class="form-control"><option value="">Select</option><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option></select></div><div class="form-group"><label>Section</label><input type="text" id="editSection" class="form-control"></div></div>
+<div class="form-row"><div class="form-group"><label>Course</label><select id="editCourse" class="form-control"><option value="">Select course</option><?php foreach ($offeredCourses as $cname => $majors): ?><option value="<?= htmlspecialchars($cname) ?>"><?= htmlspecialchars($cname) ?></option><?php endforeach; ?></select></div><div class="form-group" id="editMajorGroup" style="display:none;"><label>Major</label><select id="editMajor" class="form-control"><option value="">Select major</option></select></div><div class="form-group"><label>Year Level</label><select id="editYearLevel" class="form-control"><option value="">Select</option><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option></select></div></div>
+<div class="form-row"><div class="form-group"><label>School Year</label><input type="text" id="editSchoolYear" class="form-control" placeholder="2026-2027"></div><div class="form-group"><label>Semester</label><select id="editSemester" class="form-control"><option value="">—</option><option value="1st">1st Semester</option><option value="2nd">2nd Semester</option><option value="summer">Summer</option></select></div></div>
+<div class="form-row"><div class="form-group"><label>Adviser</label><select id="editAdviser" class="form-control"><option value="">—</option><?php foreach ($advisers as $ad): ?><option value="<?= (int)$ad['id'] ?>"><?= htmlspecialchars($ad['full_name']) ?></option><?php endforeach; ?></select></div></div>
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-users"></i> Guardian</div>
 <div class="form-row"><div class="form-group"><label>Full Name</label><input type="text" id="editGuardianName" class="form-control"></div><div class="form-group"><label>Relationship</label><select id="editGuardianRel" class="form-control"><option value="">Select</option><option value="father">Father</option><option value="mother">Mother</option><option value="guardian">Guardian</option></select></div></div>
@@ -427,6 +441,9 @@ const showingCount = document.getElementById('showingCount');
 const totalCount = document.getElementById('totalCount');
 let allStudents = [];
 let deleteTarget = null;
+
+// id → name map of advisers, injected from PHP
+const ADVISER_MAP = <?= json_encode(array_column($advisers, 'full_name', 'id')) ?>;
 
 document.querySelectorAll('#studentTableBody tr').forEach(row => {
     try {
@@ -541,6 +558,8 @@ function viewStudent(id) {
         document.getElementById('vReligion').textContent = s.religion||'—';
         document.getElementById('vCourse').textContent = s.course||'—';
         document.getElementById('vYearSection').textContent = (s.year_level?s.year_level+' Year':'')+(s.section?' — '+s.section:'');
+        document.getElementById('vSchoolYearSem').textContent = (s.school_year?s.school_year:'—')+(s.semester?' — '+s.semester:'');
+        document.getElementById('vAdviser').textContent = (s.adviser_id && ADVISER_MAP[s.adviser_id]) ? ADVISER_MAP[s.adviser_id] : '—';
         document.getElementById('vEmail').textContent = s.email||'—';
         document.getElementById('vContact').textContent = s.contact_number||'—';
         document.getElementById('vAddress').textContent = s.address||'—';
@@ -644,8 +663,12 @@ function editStudent(id) {
         document.getElementById('editNationality').value = s.nationality || '';
         document.getElementById('editReligion').value = s.religion || '';
         document.getElementById('editCourse').value = s.course || '';
+        refreshMajorOptions('edit');
+        document.getElementById('editMajor').value = s.major || '';
         document.getElementById('editYearLevel').value = s.year_level || '';
-        document.getElementById('editSection').value = s.section || '';
+        document.getElementById('editSchoolYear').value = s.school_year || '';
+        document.getElementById('editSemester').value = s.semester || '';
+        document.getElementById('editAdviser').value = s.adviser_id || '';
         document.getElementById('editEmail').value = s.email || '';
         document.getElementById('editContact').value = s.contact_number || '';
         document.getElementById('editAddress').value = s.address || '';
@@ -684,8 +707,11 @@ document.getElementById('editForm').addEventListener('submit', async function(e)
                 religion: document.getElementById('editReligion').value,
                 status: document.getElementById('editStatus').value,
                 course: document.getElementById('editCourse').value,
+                major: document.getElementById('editMajor').value || null,
                 year_level: document.getElementById('editYearLevel').value,
-                section: document.getElementById('editSection').value,
+                school_year: document.getElementById('editSchoolYear').value,
+                semester: document.getElementById('editSemester').value,
+                adviser_id: document.getElementById('editAdviser').value || null,
                 email: document.getElementById('editEmail').value,
                 contact_number: document.getElementById('editContact').value,
                 address: document.getElementById('editAddress').value,
@@ -700,6 +726,31 @@ document.getElementById('editForm').addEventListener('submit', async function(e)
         else { alert(d.message); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save Changes'; }
     } catch(e) { alert('Network error.'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save Changes'; }
 });
+
+// ─── COURSE & MAJOR DROPDOWN ────────────────────────────────
+const COURSE_MAJORS = <?= json_encode($offeredCourses) ?>;
+function refreshMajorOptions(prefix) {
+    const courseEl = document.getElementById(prefix + 'Course');
+    const majorGroup = document.getElementById(prefix + 'MajorGroup');
+    const majorEl = document.getElementById(prefix + 'Major');
+    if (!courseEl || !majorGroup || !majorEl) return;
+    const course = courseEl.value;
+    const majors = COURSE_MAJORS[course] || [];
+    if (majors.length > 0) {
+        majorGroup.style.display = '';
+        majorEl.innerHTML = '<option value="">Select major</option>' + majors.map(m => '<option value="' + m.replace(/"/g, '&quot;') + '">' + m + '</option>').join('');
+    } else {
+        majorGroup.style.display = 'none';
+        majorEl.innerHTML = '<option value="">Select major</option>';
+    }
+}
+['add', 'edit'].forEach(prefix => {
+    const cEl = document.getElementById(prefix + 'Course');
+    if (cEl) cEl.addEventListener('change', () => refreshMajorOptions(prefix));
+});
+
+// ─── NOTE: Section is auto-generated by the Masterlist module
+// ("Auto-assign sections"), so it is not a manual form field.
 
 // ─── ADD MODAL ───────────────────────────────────────────────
 function openAddModal() { document.getElementById('addModal').classList.add('active'); document.body.style.overflow = 'hidden'; document.getElementById('addForm').reset(); }
@@ -725,8 +776,11 @@ document.getElementById('addForm').addEventListener('submit', async function(e) 
                 religion: document.getElementById('addReligion').value,
                 status: document.getElementById('addStatus').value,
                 course: document.getElementById('addCourse').value,
+                major: document.getElementById('addMajor').value || null,
                 year_level: document.getElementById('addYearLevel').value,
-                section: document.getElementById('addSection').value,
+                school_year: document.getElementById('addSchoolYear').value,
+                semester: document.getElementById('addSemester').value,
+                adviser_id: document.getElementById('addAdviser').value || null,
                 email: document.getElementById('addEmail').value,
                 contact_number: document.getElementById('addContact').value,
                 address: document.getElementById('addAddress').value,

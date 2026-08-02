@@ -33,8 +33,10 @@
 
     // ── Hide when fully loaded ───────────────────────────────
     // ↓↓ CHANGE THIS NUMBER to adjust how long the loader stays visible ↓↓
-    // Examples: 500 = 0.5s  |  800 = 0.8s  |  1500 = 1.5s  |  2500 = 2.5s
-    const MIN_MS  = 1000;
+    // Examples: 200 = 0.2s  |  500 = 0.5s  |  800 = 0.8s  |  1500 = 1.5s
+    // Pages render in ~35ms on localhost, so a large minimum only adds
+    // artificial delay — 200ms keeps the fade intentional but snappy.
+    const MIN_MS  = 200;
     const started = Date.now();
 
     window.addEventListener('load', () => {

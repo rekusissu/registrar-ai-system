@@ -113,6 +113,22 @@ try {
         exit;
     }
 
+    // ─── BULK STATUS UPDATE ────────────────────────────────────
+    if ($method === 'POST' && isset($_GET['action']) && $_GET['action'] === 'bulk-status') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $ids = $input['ids'] ?? [];
+        $status = $input['status'] ?? '';
+        if (empty($ids) || !$status) {
+            echo json_encode(['success' => false, 'message' => 'Invalid request.']);
+            exit;
+        }
+        foreach ($ids as $sid) {
+            $db->update('students', ['status' => $status], 'id = ?', [intval($sid)]);
+        }
+        echo json_encode(['success' => true, 'message' => count($ids) . ' student(s) updated.']);
+        exit;
+    }
+
     // ─── CREATE STUDENT ────────────────────────────────────────
     if ($method === 'POST') {
         $input = json_decode(file_get_contents('php://input'), true);
@@ -161,8 +177,12 @@ try {
             'contact_number' => $input['contact_number'] ?? null,
             'email' => $input['email'] ?? null,
             'course' => $input['course'] ?? null,
+            'major' => $input['major'] ?? null,
             'year_level' => isset($input['year_level']) && $input['year_level'] !== '' ? (int)$input['year_level'] : null,
+            'school_year' => $input['school_year'] ?? null,
+            'semester' => $input['semester'] ?? null,
             'section' => $input['section'] ?? null,
+            'adviser_id' => isset($input['adviser_id']) && $input['adviser_id'] !== '' ? (int)$input['adviser_id'] : null,
             'status' => $input['status'] ?? 'active'
         ];
 
@@ -204,12 +224,12 @@ try {
         $data = [];
         $allowedFields = ['first_name', 'middle_name', 'last_name', 'gender', 'civil_status', 'birth_date', 'place_of_birth',
                           'nationality', 'religion', 'address', 'contact_number', 'email',
-                          'course', 'year_level', 'section', 'status'];
+                          'course', 'major', 'year_level', 'school_year', 'semester', 'section', 'adviser_id', 'status'];
 
         foreach ($allowedFields as $field) {
             if (array_key_exists($field, $input)) {
                 $value = $input[$field];
-                if ($value === '' && in_array($field, ['birth_date', 'middle_name', 'place_of_birth', 'nationality', 'religion', 'contact_number', 'email', 'course', 'year_level', 'section'], true)) {
+                if ($value === '' && in_array($field, ['birth_date', 'middle_name', 'place_of_birth', 'nationality', 'religion', 'contact_number', 'email', 'course', 'major', 'year_level', 'school_year', 'semester', 'section', 'adviser_id'], true)) {
                     $value = null;
                 }
                 if ($field === 'birth_date' && $value === '0000-00-00') {
@@ -219,6 +239,9 @@ try {
                     $value = (int)$value;
                 } elseif ($field === 'year_level' && $value === '') {
                     $value = null;
+                }
+                if ($field === 'adviser_id' && $value !== null) {
+                    $value = (int)$value;
                 }
                 $data[$field] = $value;
             }
@@ -248,22 +271,6 @@ try {
             }
         }
         echo json_encode(['success' => true, 'message' => 'Student updated successfully.']);
-        exit;
-    }
-
-    // ─── BULK STATUS UPDATE ────────────────────────────────────
-    if ($method === 'POST' && isset($_GET['action']) && $_GET['action'] === 'bulk-status') {
-        $input = json_decode(file_get_contents('php://input'), true);
-        $ids = $input['ids'] ?? [];
-        $status = $input['status'] ?? '';
-        if (empty($ids) || !$status) {
-            echo json_encode(['success' => false, 'message' => 'Invalid request.']);
-            exit;
-        }
-        foreach ($ids as $sid) {
-            $db->update('students', ['status' => $status], 'id = ?', [intval($sid)]);
-        }
-        echo json_encode(['success' => true, 'message' => count($ids) . ' student(s) updated.']);
         exit;
     }
 

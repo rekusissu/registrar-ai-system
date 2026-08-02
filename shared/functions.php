@@ -339,24 +339,105 @@ function getStudentInitials($student) {
 }
 
 /**
- * Section letter/name for chunk index (0 = A, 25 = Z, 26 = AA, …).
+ * Semester digit for a semester label ('' → 1, '1st' → 1, '2nd' → 2, 'summer' → 3).
  */
-function sectionLabelFromChunkIndex(int $index): string {
-    $index = max(0, $index);
-    $label = '';
-    $n = $index + 1;
-    while ($n > 0) {
-        $n--;
-        $label = chr(65 + ($n % 26)) . $label;
-        $n = intdiv($n, 26);
-    }
-    return $label;
+function semesterDigit(?string $semester): int {
+    $semester = strtolower(trim((string) $semester));
+    if ($semester === '2nd') return 2;
+    if ($semester === 'summer') return 3;
+    return 1; // '' or '1st'
 }
 
 /**
- * Assign sections automatically: group by course + year, max N students per section (alphabetical).
+ * Section code for a year/semester/section-number combo, e.g. 11001 =
+ * year 1, semester 1, section 1. Format: [year][sem][###] (5 digits).
+ */
+function sectionCodeFromParts(int $year, ?string $semester, int $sectionNumber): string {
+    $yearDigit = max(1, min(9, $year));
+    $semDigit = semesterDigit($semester);
+    $num = max(1, min(999, $sectionNumber));
+    return $yearDigit . $semDigit . str_pad((string) $num, 3, '0', STR_PAD_LEFT);
+}
+
+/**
+ * Next section number for a course+year+semester, mirroring autoAssignStudentSections.
+ * Scoped by course + year + semester only (the code has no SY digit), consistent with
+ * auto-assign's bucket key. Manual codes that aren't 5-digit numeric are ignored.
+ */
+function nextSectionNumber(string $course, int $year, ?string $semester): int {
+    $db = Database::getInstance();
+    $prefix = substr(sectionCodeFromParts($year, $semester, 1), 0, 2); // e.g. "11"
+    $rows = $db->fetchAll(
+        "SELECT DISTINCT section FROM students
+         WHERE TRIM(course) = ? AND year_level = ?
+           AND TRIM(IFNULL(semester, '')) = ?
+           AND section LIKE ? AND section REGEXP '^[0-9]{5}$'",
+        [$course, $year, (string) $semester, $prefix . '%']
+    );
+    $max = 0;
+    foreach ($rows as $r) {
+        $num = (int) substr(trim((string) $r['section']), 2);
+        if ($num > $max) $max = $num;
+    }
+    return $max + 1;
+}
+
+/**
+ * True if a student already exists in this course+year+semester+section.
+ * Same code across different courses is allowed (matches auto-assign).
+ */
+function sectionExists(string $course, int $year, ?string $semester, string $section): bool {
+    $db = Database::getInstance();
+    $found = $db->fetchOne(
+        "SELECT id FROM students
+         WHERE TRIM(course) = ? AND year_level = ?
+           AND TRIM(IFNULL(semester, '')) = ? AND TRIM(section) = ?
+         LIMIT 1",
+        [$course, $year, (string) $semester, $section]
+    );
+    return (bool) $found;
+}
+
+/**
+ * Offered BCP courses with their majors. Single source of truth shared by
+ * the Students page and the Masterlist section-creation flow.
+ */
+function getOfferedCourses(): array {
+    return [
+        'BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY (BSIT)' => [],
+        'BACHELOR OF SCIENCE IN HOSPITALITY MANAGEMENT (BSHM)' => [],
+        'BACHELOR OF SCIENCE IN ACCOUNTING INFORMATION SYSTEM (BSAIS)' => [],
+        'BACHELOR OF SCIENCE IN TOURISM MANAGEMENT (BSTM)' => [],
+        'BACHELOR OF SCIENCE IN OFFICE ADMINISTRATION (BSOA)' => [],
+        'BACHELOR OF SCIENCE IN ENTREPRENEURSHIP (BSENTREP)' => [],
+        'BACHELOR OF SCIENCE IN BUSINESS ADMINISTRATION (BSBA)' => [
+            'Human Resource Management',
+            'Marketing Management',
+        ],
+        'BACHELOR OF LIBRARY INFORMATION SCIENCE (BLIS)' => [],
+        'BACHELOR OF SCIENCE IN COMPUTER ENGINEERING (BSCpE)' => [],
+        'BACHELOR OF SCIENCE IN PSYCHOLOGY (BSP)' => [],
+        'BACHELOR OF SCIENCE IN CRIMINOLOGY (BSCRIM)' => [],
+        'BACHELOR OF SCIENCE IN PHYSICAL EDUCATION (BPED)' => [],
+        'BACHELOR OF SCIENCE IN TECHNOLOGICAL & LIVELIHOOD EDUCATION (BTLED)' => [],
+        'BACHELOR OF SCIENCE IN ELEMENTARY EDUCATION (BEED)' => [],
+        'BACHELOR OF SCIENCE IN SECONDARY EDUCATION (BSED)' => [
+            'English',
+            'Social Studies',
+            'Filipino',
+            'Values Education',
+            'Mathematics',
+            'Science',
+        ],
+    ];
+}
+
+/**
+ * Assign sections automatically: group by course + year + semester,
+ * max N students per section. Section codes follow [year][sem][###],
+ * e.g. 11001 (yr 1, sem 1, section 1), 12001 (yr 1, sem 2), 21001 (yr 2, sem 1).
  *
- * @return array{updated: int, sections: list<array{course: ?string, year_level: ?int, section: string, count: int, max: int}>}
+ * @return array{updated: int, sections: list<array{course: ?string, year_level: ?int, semester: ?string, section: string, count: int, max: int}>}
  */
 function autoAssignStudentSections(?int $maxPerSection = null): array {
     $maxPerSection = $maxPerSection ?? (defined('MAX_STUDENTS_PER_SECTION') ? (int) MAX_STUDENTS_PER_SECTION : 50);
@@ -366,7 +447,7 @@ function autoAssignStudentSections(?int $maxPerSection = null): array {
 
     $db = Database::getInstance();
     $students = $db->fetchAll(
-        "SELECT id, course, year_level, last_name, first_name
+        "SELECT id, course, year_level, semester, section, last_name, first_name
          FROM students
          WHERE course IS NOT NULL AND TRIM(course) != ''
          ORDER BY TRIM(course) ASC, COALESCE(year_level, 0) ASC, last_name ASC, first_name ASC, id ASC"
@@ -376,15 +457,20 @@ function autoAssignStudentSections(?int $maxPerSection = null): array {
     foreach ($students as $row) {
         $course = trim((string) $row['course']);
         $year = $row['year_level'] !== null && $row['year_level'] !== '' ? (int) $row['year_level'] : 0;
-        $key = $course . "\0" . $year;
+        $semester = ($row['semester'] ?? '') !== '' ? (string) $row['semester'] : null;
+        $key = $course . "\0" . $year . "\0" . ($semester ?? '');
         if (!isset($buckets[$key])) {
             $buckets[$key] = [
                 'course' => $course,
                 'year_level' => $year,
+                'semester' => $semester,
                 'ids' => [],
             ];
         }
-        $buckets[$key]['ids'][] = (int) $row['id'];
+        $buckets[$key]['ids'][] = [
+            'id' => (int) $row['id'],
+            'section' => trim((string) ($row['section'] ?? '')),
+        ];
     }
 
     $updated = 0;
@@ -394,20 +480,87 @@ function autoAssignStudentSections(?int $maxPerSection = null): array {
 
     try {
         foreach ($buckets as $bucket) {
-            $chunks = array_chunk($bucket['ids'], $maxPerSection);
-            foreach ($chunks as $chunkIndex => $ids) {
-                $section = sectionLabelFromChunkIndex($chunkIndex);
-                foreach ($ids as $studentId) {
-                    $db->update('students', ['section' => $section], 'id = ?', [$studentId]);
+            $course = $bucket['course'];
+            $year = $bucket['year_level'];
+            $semester = $bucket['semester'];
+
+            // Split this bucket's students into those already in a section vs unassigned
+            $unassigned = [];
+            foreach ($bucket['ids'] as $s) {
+                if ($s['section'] === '') $unassigned[] = $s['id'];
+            }
+
+            // Existing section codes for this course+year+semester (5-digit only)
+            $existingRows = $db->fetchAll(
+                "SELECT TRIM(section) AS section, COUNT(*) AS cnt
+                 FROM students
+                 WHERE TRIM(course) = ? AND year_level = ?
+                   AND TRIM(IFNULL(semester, '')) = ?
+                   AND section REGEXP '^[0-9]{5}$'
+                 GROUP BY TRIM(section)
+                 ORDER BY section",
+                [$course, $year, (string) $semester]
+            );
+
+            $existingCodes = [];
+            foreach ($existingRows as $r) {
+                $existingCodes[trim($r['section'])] = (int) $r['cnt'];
+            }
+
+            // 1) Fill existing sections first (only unassigned students)
+            foreach ($existingCodes as $code => $cnt) {
+                if (empty($unassigned)) break;
+                $slots = $maxPerSection - $cnt;
+                if ($slots <= 0) continue;
+                $toPlace = array_splice($unassigned, 0, $slots);
+                foreach ($toPlace as $sid) {
+                    $db->update('students', ['section' => $code], 'id = ?', [$sid]);
                     $updated++;
                 }
+                $existingCodes[$code] += count($toPlace);
+            }
+
+            // 2) Create new sections only for students still unassigned
+            $nextNumber = 1;
+            while (!empty($unassigned)) {
+                // Pick the next free code (skip codes already used)
+                while (isset($existingCodes[sectionCodeFromParts($year, $semester, $nextNumber)])) {
+                    $nextNumber++;
+                }
+                $code = sectionCodeFromParts($year, $semester, $nextNumber);
+                $toPlace = array_splice($unassigned, 0, $maxPerSection);
+                foreach ($toPlace as $sid) {
+                    $db->update('students', ['section' => $code], 'id = ?', [$sid]);
+                    $updated++;
+                }
+                $existingCodes[$code] = count($toPlace);
                 $sections[] = [
-                    'course' => $bucket['course'],
-                    'year_level' => $bucket['year_level'] > 0 ? $bucket['year_level'] : null,
-                    'section' => $section,
-                    'count' => count($ids),
+                    'course' => $course,
+                    'year_level' => $year > 0 ? $year : null,
+                    'semester' => $semester,
+                    'section' => $code,
+                    'count' => count($toPlace),
                     'max' => $maxPerSection,
                 ];
+            }
+
+            // Record the filled existing sections in the result
+            foreach ($existingCodes as $code => $cnt) {
+                // Skip codes we already added as newly-created (avoid duplicates in the report)
+                $isNew = false;
+                foreach ($sections as $s) {
+                    if ($s['section'] === $code) { $isNew = true; break; }
+                }
+                if (!$isNew) {
+                    $sections[] = [
+                        'course' => $course,
+                        'year_level' => $year > 0 ? $year : null,
+                        'semester' => $semester,
+                        'section' => $code,
+                        'count' => $cnt,
+                        'max' => $maxPerSection,
+                    ];
+                }
             }
         }
         $conn->commit();
@@ -455,6 +608,24 @@ function groupStudentsForMasterlist(array $students): array {
     });
 
     return $list;
+}
+
+/**
+ * Whether a masterlist group has a real assigned section (not placeholder).
+ */
+function masterlistGroupHasSection(array $group): bool {
+    $section = trim((string) ($group['section'] ?? ''));
+    return $section !== '' && $section !== '—';
+}
+
+/**
+ * Keep only groups that belong to an assigned section.
+ *
+ * @param list<array<string, mixed>> $groups
+ * @return list<array<string, mixed>>
+ */
+function filterAssignedMasterlistGroups(array $groups): array {
+    return array_values(array_filter($groups, 'masterlistGroupHasSection'));
 }
 
 // ─── STATUS HELPERS ────────────────────────────────────────────
