@@ -114,6 +114,42 @@ switch ($action) {
         echo json_encode(['success' => true, 'message' => 'Course updated.']);
         exit;
 
+    // ─── DRAFT SUBJECT STANDARDIZATION ───────────────────────
+    // Deterministic: apply subjectStandardize() to every subject code/title
+    // that has a canonical alias, surfacing edits a registrar can confirm.
+    case 'subject_standardize':
+        $subjects = $db->fetchAll("SELECT id, code, title FROM subjects");
+        $changes = [];
+        foreach ($subjects as $s) {
+            $std = subjectStandardize((string) ($s['code'] ?? ''));
+            if ($std !== '' && $std !== (string) ($s['code'] ?? '') && $std !== $s['code']) {
+                $newTitle = subjectTitle($std);
+                $changes[] = [
+                    'id'   => (int) $s['id'],
+                    'from' => $s['code'],
+                    'to'   => $std,
+                    'title_to' => ($newTitle !== $std) ? $newTitle : $s['title'],
+                ];
+            }
+        }
+        echo json_encode(['success' => true, 'data' => ['changes' => $changes]]);
+        exit;
+
+    // ─── APPLY A SUBJECT STANDARDIZATION CHANGE ──────────────
+    case 'apply_subject_std':
+        $id = (int) ($input['id'] ?? 0);
+        $newCode = trim((string) ($input['code'] ?? ''));
+        $newTitle = trim((string) ($input['title'] ?? ''));
+        if (!$id || $newCode === '') {
+            echo json_encode(['success' => false, 'message' => 'Invalid request.']);
+            exit;
+        }
+        $updates = ['code' => $newCode];
+        if ($newTitle !== '') $updates['title'] = $newTitle;
+        $db->update('subjects', $updates, 'id = ?', [$id]);
+        echo json_encode(['success' => true, 'message' => 'Subject updated.']);
+        exit;
+
     // ─── DUPLICATE SCAN ──────────────────────────────────────
     case 'scan_dupes':
         $students = $db->fetchAll("SELECT id, first_name, middle_name, last_name, student_number, birth_date FROM students");
@@ -268,6 +304,140 @@ switch ($action) {
         }
 
         echo json_encode(['success' => true, 'data' => ['summary' => $summary]]);
+        exit;
+
+    // ─── SUBJECT ↔ TEACHER MATCHING ──────────────────────────
+    // Given a teacher's specialization/degree, AI suggests which master
+    // subjects they are best suited to teach. Draft-only; a registrar
+    // confirms each suggestion before any assignment is written.
+    case 'subject_teacher_match':
+        $teacherId = (int) ($input['id'] ?? 0);
+        $teacher = $teacherId ? $db->fetchOne("SELECT id, full_name FROM users WHERE id = ?", [$teacherId]) : null;
+        if (!$teacher) {
+            echo json_encode(['success' => false, 'message' => 'Teacher not found.']);
+            exit;
+        }
+        $profile = $db->fetchOne("SELECT * FROM teacher_profiles WHERE user_id = ?", [$teacherId]) ?: [];
+        $subjects = $db->fetchAll("SELECT id, code, title, department FROM subjects WHERE is_active = 1 ORDER BY code");
+        $currently = $db->fetchColumn("SELECT COUNT(*) FROM teacher_subjects WHERE teacher_id = ?", [$teacherId]);
+
+        $system = "You are a registrar's faculty-loading assistant. Given a teacher's professional profile and a list of offered subjects, suggest which subjects this teacher is best suited to teach. Return ONLY a JSON object: {\"suggestions\": [{\"subject_id\": int, \"reason\": string}], \"notes\": string}. Choose up to 6 subjects. Base reasons only on the profile fields given (degree, specialization, department, years). Do not invent credentials. If the profile is empty, return {\"suggestions\": [], \"notes\": \"No profile on file yet.\"}";
+
+        $subjectLines = [];
+        foreach ($subjects as $s) {
+            $subjectLines[] = "{$s['id']} | {$s['code']} | {$s['title']} | {$s['department']}";
+        }
+        $facts = "Teacher: {$teacher['full_name']}\n"
+            . "Profile: " . json_encode($profile, JSON_UNESCAPED_UNICODE) . "\n"
+            . "Currently assigned to {$currently} subject(s)\n"
+            . "Offered subjects:\n" . implode("\n", $subjectLines);
+
+        $match = aiGenerateJson($system, $facts, [], ['max_tokens' => 500]);
+        if (!is_array($match)) $match = [];
+
+        echo json_encode(['success' => true, 'data' => $match]);
+        exit;
+
+    // ─── FACULTY WORKLOAD SUMMARY ────────────────────────────
+    case 'faculty_workload':
+        $teachers = $db->fetchAll("SELECT id, full_name, email, role, is_active FROM users WHERE role IN ('teacher','staff') ORDER BY full_name");
+        $advRows = $db->fetchAll("SELECT adviser_id, COUNT(*) AS cnt FROM students WHERE adviser_id IS NOT NULL GROUP BY adviser_id");
+        $advByTeacher = [];
+        foreach ($advRows as $r) $advByTeacher[(int)$r['adviser_id']] = (int)$r['cnt'];
+
+        $lines = [];
+        $totalAssign = 0; $totalAdvisees = 0; $withNoTeach = 0; $withNoAdvise = 0; $inactiveAdvising = 0;
+        foreach ($teachers as $t) {
+            $teaching = teacherTeachingLoad((int)$t['id']);
+            $advisees = $advByTeacher[(int)$t['id']] ?? 0;
+            $totalAssign += $teaching['assignments'];
+            $totalAdvisees += $advisees;
+            if ($teaching['assignments'] === 0 && (int)$t['is_active'] === 1) $withNoTeach++;
+            if ($advisees === 0) $withNoAdvise++;
+            if ((int)$t['is_active'] === 0 && $advisees > 0) $inactiveAdvising++;
+            $lines[] = "{$t['full_name']} ({$t['role']}, " . ((int)$t['is_active'] ? 'active' : 'inactive') . "): {$teaching['assignments']} subject assignment(s), {$teaching['units']} units, {$advisees} advisee(s)";
+        }
+
+        $system = "You are a registrar's faculty-loading assistant. Write a concise 3-4 sentence summary of the teaching faculty workload, highlighting notable trends or concerns (underload/overload, teachers with no subject assignment, inactive teachers still advising). Do not invent data.";
+        $facts = "Faculty count: " . count($teachers) . "\n"
+            . "Total subject assignments: {$totalAssign}\n"
+            . "Total advisees: {$totalAdvisees}\n"
+            . "Active with no subject assignment: {$withNoTeach}\n"
+            . "Teachers with no advisees: {$withNoAdvise}\n"
+            . "Inactive but still advising: {$inactiveAdvising}\n"
+            . "Per teacher:\n" . implode("\n", $lines);
+
+        $report = aiGenerate($system, $facts, ['max_tokens' => 300]);
+        if ($report === '') {
+            $report = "Faculty count: " . count($teachers) . ". Total subject assignments: {$totalAssign}. Total advisees: {$totalAdvisees}. No data issues found to report.";
+        }
+
+        echo json_encode(['success' => true, 'data' => ['report' => $report]]);
+        exit;
+
+    // ─── SCHEDULE CLASH DETECTION ────────────────────────────
+    // Deterministic check for day/time conflicts in a teacher's subject
+    // assignments. Draft-only; registrar confirms any changes.
+    case 'schedule_clash':
+        $teacherId = (int) ($input['id'] ?? 0);
+        if (!$teacherId) {
+            echo json_encode(['success' => false, 'message' => 'Teacher ID required.']);
+            exit;
+        }
+        $assigns = $db->fetchAll(
+            "SELECT ts.id, s.code, s.title, ts.section, ts.semester, ts.schedule
+             FROM teacher_subjects ts JOIN subjects s ON s.id = ts.subject_id
+             WHERE ts.teacher_id = ?", [$teacherId]);
+
+        $clashes = [];
+        foreach ($assigns as $i => $a) {
+            if (empty($a['schedule'])) continue;
+            foreach ($assigns as $j => $b) {
+                if ($j <= $i) continue;
+                if (empty($b['schedule'])) continue;
+                if (trim((string) $a['schedule']) === trim((string) $b['schedule'])) {
+                    $clashes[] = [
+                        'a' => ['code' => $a['code'], 'section' => $a['section'], 'schedule' => $a['schedule']],
+                        'b' => ['code' => $b['code'], 'section' => $b['section'], 'schedule' => $b['schedule']],
+                        'reason' => 'Identical schedule string.',
+                    ];
+                }
+            }
+        }
+
+        echo json_encode(['success' => true, 'data' => ['clashes' => $clashes]]);
+        exit;
+
+    // ─── QUALIFICATION SCAN ──────────────────────────────────
+    // Flag teachers whose assigned subjects fall outside their declared
+    // department/specialization. Draft-only.
+    case 'qualification_scan':
+        $teachers = $db->fetchAll(
+            "SELECT u.id, u.full_name, u.is_active, p.department, p.specialization
+             FROM users u LEFT JOIN teacher_profiles p ON p.user_id = u.id
+             WHERE u.role IN ('teacher','staff') ORDER BY u.full_name");
+
+        $issues = [];
+        foreach ($teachers as $t) {
+            $assigns = $db->fetchAll(
+                "SELECT s.code, s.title, s.department FROM teacher_subjects ts
+                 JOIN subjects s ON s.id = ts.subject_id WHERE ts.teacher_id = ?", [$t['id']]);
+            $dep = strtolower(trim((string) ($t['department'] ?? '')));
+            foreach ($assigns as $a) {
+                $subDep = strtolower(trim((string) ($a['department'] ?? '')));
+                if ($dep !== '' && $subDep !== '' && $dep !== $subDep) {
+                    $issues[] = [
+                        'teacher_id' => (int) $t['id'],
+                        'teacher'    => $t['full_name'],
+                        'department' => $t['department'] ?: '',
+                        'subject'    => "{$a['code']} — {$a['title']}",
+                        'subject_department' => $a['department'] ?: '',
+                    ];
+                }
+            }
+        }
+
+        echo json_encode(['success' => true, 'data' => ['issues' => $issues]]);
         exit;
 
     // ─── NATURAL-LANGUAGE SEARCH ─────────────────────────────

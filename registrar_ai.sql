@@ -275,6 +275,100 @@ INSERT INTO `status_tracker` (`id`, `student_id`, `previous_status`, `current_st
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `subjects`
+--
+
+CREATE TABLE `subjects` (
+  `id` int(11) NOT NULL,
+  `code` varchar(20) NOT NULL,
+  `title` varchar(150) NOT NULL,
+  `units` decimal(4,2) NOT NULL DEFAULT 3.00,
+  `department` varchar(100) DEFAULT NULL,
+  `year_level` int(11) DEFAULT NULL,
+  `semester` varchar(20) DEFAULT NULL,
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `subjects`
+--
+
+INSERT INTO `subjects` (`id`, `code`, `title`, `units`, `department`, `year_level`, `semester`, `is_active`) VALUES
+(1, 'GE101', 'Purposive Communication', 3.00, 'General Education', 1, '1st', 1),
+(2, 'GE102', 'Mathematics in the Modern World', 3.00, 'General Education', 1, '1st', 1),
+(3, 'GE103', 'The Contemporary World', 3.00, 'General Education', 1, '1st', 1),
+(4, 'GE104', 'Understanding the Self', 3.00, 'General Education', 1, '1st', 1),
+(5, 'GE105', 'Readings in Philippine History', 3.00, 'General Education', 1, '2nd', 1),
+(6, 'GE106', 'Science, Technology and Society', 3.00, 'General Education', 1, '2nd', 1),
+(7, 'GE107', 'Ethics', 3.00, 'General Education', 1, '2nd', 1),
+(8, 'GE108', 'Art Appreciation', 3.00, 'General Education', 1, '2nd', 1),
+(9, 'GE109', 'Life and Works of Rizal', 3.00, 'General Education', 2, '2nd', 1),
+(10, 'PE101', 'Physical Fitness', 2.00, 'Physical Education', 1, '1st', 1),
+(11, 'PE102', 'Rhythmic Activities', 2.00, 'Physical Education', 1, '2nd', 1),
+(12, 'NSTP101', 'National Service Training Program 1', 3.00, 'General Education', 1, '1st', 1),
+(13, 'IT101', 'Introduction to Computing', 3.00, 'BSIT', 1, '1st', 1),
+(14, 'IT102', 'Computer Programming 1', 3.00, 'BSIT', 1, '1st', 1),
+(15, 'IT103', 'Computer Programming 2', 3.00, 'BSIT', 1, '2nd', 1),
+(16, 'IT104', 'Discrete Mathematics', 3.00, 'BSIT', 1, '2nd', 1),
+(17, 'IT105', 'Data Structures and Algorithms', 3.00, 'BSIT', 2, '1st', 1),
+(18, 'IT106', 'Information Management', 3.00, 'BSIT', 2, '1st', 1),
+(19, 'IT107', 'Networking 1', 3.00, 'BSIT', 2, '1st', 1),
+(20, 'IT108', 'Web Systems and Technologies', 3.00, 'BSIT', 2, '2nd', 1),
+(21, 'IT109', 'Systems Analysis and Design', 3.00, 'BSIT', 2, '2nd', 1),
+(22, 'IT110', 'Software Engineering 1', 3.00, 'BSIT', 3, '1st', 1),
+(23, 'ED101', 'The Teaching Profession', 3.00, 'BSED', 1, '1st', 1),
+(24, 'ED102', 'Child and Adolescent Learners and Learning Principles', 3.00, 'BSED', 1, '1st', 1),
+(25, 'ED103', 'The Teacher and the School Curriculum', 3.00, 'BSED', 1, '2nd', 1),
+(26, 'ED104', 'Facilitating Learner-Centered Teaching', 3.00, 'BSED', 2, '1st', 1),
+(27, 'ED105', 'Assessment in Learning 1', 3.00, 'BSED', 2, '1st', 1),
+(28, 'ED106', 'Technology for Teaching and Learning 1', 3.00, 'BSED', 2, '2nd', 1),
+(29, 'MATH101', 'College Algebra', 3.00, 'BSED', 1, '1st', 1),
+(30, 'SCI101', 'General Biology', 3.00, 'BSED', 1, '1st', 1),
+(31, 'ENG101', 'Structure of English', 3.00, 'BSED', 1, '1st', 1),
+(32, 'BA101', 'Introduction to Business Management', 3.00, 'BSBA', 1, '1st', 1),
+(33, 'ACC101', 'Principles of Accounting', 3.00, 'BSAIS', 1, '1st', 1),
+(34, 'HM101', 'Introduction to Hospitality and Tourism', 3.00, 'BSHM', 1, '1st', 1);
+
+--
+-- Table structure for table `teacher_profiles`
+--
+
+CREATE TABLE `teacher_profiles` (
+  `user_id` int(11) NOT NULL,
+  `employee_number` varchar(20) DEFAULT NULL,
+  `designation` enum('Faculty','Part-time','Adjunct','Admin-Faculty') DEFAULT 'Faculty',
+  `department` varchar(100) DEFAULT NULL,
+  `highest_degree` varchar(150) DEFAULT NULL,
+  `specialization` varchar(200) DEFAULT NULL,
+  `years_teaching` int(11) DEFAULT NULL,
+  `date_hired` date DEFAULT NULL,
+  `contact_number` varchar(15) DEFAULT NULL,
+  `emergency_contact` varchar(100) DEFAULT NULL,
+  `birthdate` date DEFAULT NULL,
+  `address` text DEFAULT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Table structure for table `teacher_subjects`
+--
+
+CREATE TABLE `teacher_subjects` (
+  `id` int(11) NOT NULL,
+  `teacher_id` int(11) NOT NULL,
+  `subject_id` int(11) NOT NULL,
+  `section` varchar(30) DEFAULT NULL,
+  `school_year` varchar(20) DEFAULT NULL,
+  `semester` varchar(20) DEFAULT NULL,
+  `schedule` varchar(80) DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `students`
 --
 
@@ -477,6 +571,29 @@ ALTER TABLE `students`
   ADD KEY `idx_course` (`course`);
 
 --
+-- Indexes for table `subjects`
+--
+ALTER TABLE `subjects`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `code` (`code`),
+  ADD KEY `idx_department` (`department`);
+
+--
+-- Indexes for table `teacher_profiles`
+--
+ALTER TABLE `teacher_profiles`
+  ADD PRIMARY KEY (`user_id`),
+  ADD UNIQUE KEY `employee_number` (`employee_number`);
+
+--
+-- Indexes for table `teacher_subjects`
+--
+ALTER TABLE `teacher_subjects`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_teacher` (`teacher_id`),
+  ADD KEY `idx_subject` (`subject_id`);
+
+--
 -- Indexes for table `student_ids`
 --
 ALTER TABLE `student_ids`
@@ -577,6 +694,18 @@ ALTER TABLE `students`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
+-- AUTO_INCREMENT for table `subjects`
+--
+ALTER TABLE `subjects`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=35;
+
+--
+-- AUTO_INCREMENT for table `teacher_subjects`
+--
+ALTER TABLE `teacher_subjects`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `student_ids`
 --
 ALTER TABLE `student_ids`
@@ -654,6 +783,19 @@ ALTER TABLE `status_tracker`
 --
 ALTER TABLE `student_ids`
   ADD CONSTRAINT `student_ids_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `teacher_profiles`
+--
+ALTER TABLE `teacher_profiles`
+  ADD CONSTRAINT `teacher_profiles_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `teacher_subjects`
+--
+ALTER TABLE `teacher_subjects`
+  ADD CONSTRAINT `teacher_subjects_ibfk_1` FOREIGN KEY (`teacher_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `teacher_subjects_ibfk_2` FOREIGN KEY (`subject_id`) REFERENCES `subjects` (`id`) ON DELETE CASCADE;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

@@ -490,3 +490,157 @@ function currentSemester(): string {
 function defaultYearLevel(): int {
     return 1;
 }
+
+// ==================================================================
+//  TEACHER / MASTER-SUBJECT HELPERS
+//  Deterministic glue for the teacher_profiles, subjects, and
+//  teacher_subjects tables (added 2026-08-04). No LLM cost.
+// ==================================================================
+
+/**
+ * Alias map for subject codes/titles → canonical subject code.
+ * Mirrors courseAliases(): any common abbreviation/nickname variant
+ * resolves to the single authoritative code in the `subjects` table.
+ *
+ * @return array<string,string> lowercase-key → canonical code
+ */
+function subjectAliases(): array {
+    $byCode = [];
+    $byTitle = [
+        'bsit'   => 'IT101',
+        'bsed'   => 'ED101',
+        'computer programming 1'  => 'IT102',
+        'comp prog 1'             => 'IT102',
+        'computer programming 2'  => 'IT103',
+        'comp prog 2'             => 'IT103',
+        'data structures'         => 'IT105',
+        'discrete math'           => 'IT104',
+        'introduction to computing' => 'IT101',
+        'web systems'             => 'IT108',
+        'networking 1'            => 'IT107',
+        'software engineering'    => 'IT110',
+        'purposive communication'=> 'GE101',
+        'math in the modern world'=> 'GE102',
+        'the contemporary world'  => 'GE103',
+        'understanding the self'  => 'GE104',
+        'philippine history'      => 'GE105',
+        'science technology and society' => 'GE106',
+        'ethics'                  => 'GE107',
+        'art appreciation'        => 'GE108',
+        'rizal'                   => 'GE109',
+        'physical fitness'        => 'PE101',
+        'rhythmic activities'     => 'PE102',
+        'national service training' => 'NSTP101',
+        'nstp'                    => 'NSTP101',
+        'the teaching profession' => 'ED101',
+        'assessment in learning'  => 'ED105',
+        'college algebra'         => 'MATH101',
+        'general biology'         => 'SCI101',
+        'structure of english'    => 'ENG101',
+        'principles of accounting'=> 'ACC101',
+        'business management'     => 'BA101',
+        'hospitality and tourism' => 'HM101',
+    ];
+    foreach ($byTitle as $k => $code) $byCode[strtolower(preg_replace('/[^a-z0-9]+/i', '', $k))] = $code;
+    return $byCode;
+}
+
+/**
+ * Canonical official subject code for a raw code/title, or the raw
+ * input unchanged if it can't be confidently matched. Like
+ * courseStandardize() for subjects (no LLM).
+ */
+function subjectStandardize(?string $raw): string {
+    $raw = trim((string) $raw);
+    if ($raw === '') return '';
+    $map = subjectAliases();
+    $key = strtolower(preg_replace('/[^a-z0-9]+/i', '', $raw));
+    if (isset($map[$key])) return $map[$key];
+    return $raw;
+}
+
+/**
+ * Official name for a subject code (resolved from the `subjects`
+ * table), or the code itself if unknown.
+ */
+function subjectTitle(?string $code): string {
+    $code = trim((string) $code);
+    if ($code === '') return '';
+    try {
+        $db = Database::getInstance();
+        $row = $db->fetchOne("SELECT title FROM subjects WHERE code = ?", [$code]);
+        return $row ? (string) $row['title'] : $code;
+    } catch (Exception $e) {
+        return $code;
+    }
+}
+
+/**
+ * Teaching load for a teacher: how many subject-assignment rows, total
+ * units, and distinct sections they currently handle.
+ *
+ * @return array{assignments:int, units:float, sections:int}
+ */
+function teacherTeachingLoad(int $teacherId): array {
+    try {
+        $db = Database::getInstance();
+        $assignments = (int) $db->fetchColumn(
+            "SELECT COUNT(*) FROM teacher_subjects WHERE teacher_id = ?", [$teacherId]);
+        $units = (float) ($db->fetchColumn(
+            "SELECT COALESCE(SUM(s.units),0) FROM teacher_subjects ts
+             JOIN subjects s ON s.id = ts.subject_id WHERE ts.teacher_id = ?", [$teacherId]) ?: 0);
+        $sections = (int) $db->fetchColumn(
+            "SELECT COUNT(DISTINCT section) FROM teacher_subjects WHERE teacher_id = ? AND section IS NOT NULL", [$teacherId]);
+        return ['assignments' => $assignments, 'units' => $units, 'sections' => $sections];
+    } catch (Exception $e) {
+        return ['assignments' => 0, 'units' => 0.0, 'sections' => 0];
+    }
+}
+
+/**
+ * Subject assignments (with subject info) for a teacher.
+ *
+ * @return array<int, array{subject_id:int, code:string, title:string, units:string, section:string, school_year:string, semester:string, schedule:string, notes:string}>
+ */
+function teacherSubjects(int $teacherId): array {
+    try {
+        $db = Database::getInstance();
+        return $db->fetchAll(
+            "SELECT ts.subject_id, s.code, s.title, s.units, ts.section, ts.school_year,
+                    ts.semester, ts.schedule, ts.notes
+             FROM teacher_subjects ts
+             JOIN subjects s ON s.id = ts.subject_id
+             WHERE ts.teacher_id = ?
+             ORDER BY s.code", [$teacherId]);
+    } catch (Exception $e) {
+        return [];
+    }
+}
+
+/**
+ * Teacher data-quality flags extended to cover the professional
+ * profile + teaching load. Adds to the classic missing-field flags.
+ *
+ * @param array  $t            raw `users` row
+ * @param array  $allUsers     all user rows (conflict detection)
+ * @param int    $studentLoad  advisee count
+ * @param array  $profile      teacher_profiles row (or [])
+ * @param int    $teachingLoad teaching assignment count
+ * @return array<string>
+ */
+function teacherProfileDataQualityFlags(array $t, array $allUsers, ?int $studentLoad, array $profile = [], ?int $teachingLoad = null): array {
+    $flags = teacherDataQualityFlags($t, $allUsers, $studentLoad);
+
+    if (!empty($profile)) {
+        if (empty(trim((string) ($profile['employee_number'] ?? '')))) $flags[] = 'Missing employee number';
+        if (empty(trim((string) ($profile['department'] ?? ''))))      $flags[] = 'Missing department';
+        if (empty(trim((string) ($profile['highest_degree'] ?? ''))))  $flags[] = 'Missing highest degree';
+        if (empty(trim((string) ($profile['specialization'] ?? ''))))  $flags[] = 'Missing specialization';
+    }
+
+    if ($teachingLoad === 0 && (int) ($t['is_active'] ?? 1) === 1) {
+        $flags[] = 'Active but no subject assignment';
+    }
+
+    return $flags;
+}
