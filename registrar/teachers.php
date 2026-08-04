@@ -220,6 +220,10 @@ code{background:#f1f5f9;padding:3px 8px;border-radius:5px;font-size:12px}
 .table-footer .info-text{color:#64748b;font-size:13px}
 .load-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600}
 .load-chip.open{background:#eef4ff;color:#2563eb} .load-chip.full{background:#fef3c7;color:#b45309}
+/* Native selects inside modals (matches students page) */
+.modal-overlay select.form-control,
+.modal-overlay select { cursor:pointer !important; appearance:auto !important; -webkit-appearance:auto !important; }
+.delete-icon{width:60px;height:60px;border-radius:50%;background:#fee2e2;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:26px;color:#dc2626}
 /* Responsive */
 @media(max-width:992px){.dashboard-stats{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:768px){.dashboard-main{margin-left:0;padding:16px}.dashboard-stats{grid-template-columns:repeat(2,1fr);gap:12px}.search-bar{flex-direction:column;align-items:stretch}.search-bar .search-wrapper{flex:1 1 auto;min-width:0;width:100%}.search-bar .search-actions{width:100%;justify-content:flex-end;flex-wrap:wrap}.table-responsive th,.table-responsive td{padding:8px 8px;font-size:12px}}
@@ -283,8 +287,8 @@ $loadClass = $activeStudents >= $avg && $avg > 0 ? 'full' : 'open';
 <td style="text-align:center;"><?php if (!empty($tFlags)): ?><i class="fas fa-exclamation-triangle" style="color:#f59e0b;font-size:12px;" title="<?= htmlspecialchars(implode('; ', $tFlags)) ?>"></i><?php else: ?><span style="color:#16a34a;"><i class="fas fa-check-circle"></i></span><?php endif; ?></td>
 <td style="text-align:center;"><div class="action-group">
 <button class="action-btn view" onclick="viewTeacher(<?= (int)$t['id'] ?>)" title="View"><i class="fas fa-eye"></i></button>
-<button class="action-btn edit" onclick='openEdit(<?= json_encode($t) ?>)' title="Edit"><i class="fas fa-pen"></i></button>
-<form method="POST" style="display:inline;margin:0;" onsubmit="return confirm('Deactivate <?= htmlspecialchars($t['full_name']) ?>?')"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int)$t['id'] ?>"><button class="action-btn delete" title="Deactivate"><i class="fas fa-trash-alt"></i></button></form>
+<button class="action-btn edit" onclick="editTeacher(<?= (int)$t['id'] ?>)" title="Edit"><i class="fas fa-pen"></i></button>
+<button class="action-btn delete" onclick="confirmTeacherDelete(<?= (int)$t['id'] ?>,'<?= htmlspecialchars($t['full_name'], ENT_QUOTES) ?>')" title="Deactivate"><i class="fas fa-trash-alt"></i></button>
 </div></td>
 </tr>
 <?php endforeach; endif; ?>
@@ -333,7 +337,35 @@ $loadClass = $activeStudents >= $avg && $avg > 0 ? 'full' : 'open';
 <div id="viewAiSummary" style="display:none;margin-top:14px;background:linear-gradient(135deg,#eef4ff,#f5f3ff);border:1px solid #dbeafe;border-radius:10px;padding:12px 14px;font-size:13px;color:#1e40af;"></div>
 <div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeView()">Close</button></div></div></div>
 
+<!-- Delete/Deactivate Confirmation Modal -->
+<div class="modal-overlay" id="deleteModal"><div class="modal-content" style="max-width:420px;text-align:center;"><div class="delete-icon"><i class="fas fa-trash-alt"></i></div><h3 style="font-size:19px;font-weight:700;color:#0f172a;margin-bottom:4px;">Deactivate Teacher</h3><p id="deleteMessage" style="color:#64748b;font-size:14px;margin-bottom:18px;"></p><div class="modal-footer" style="justify-content:center;"><button class="btn btn-secondary" onclick="closeTeacherDelete()">Cancel</button><button class="btn btn-danger" id="confirmDeleteBtn" style="background:#dc2626;color:white;border:none;padding:9px 18px;border-radius:10px;font-weight:600;cursor:pointer;"><i class="fas fa-trash-alt"></i> Deactivate</button></div></div></div>
+
 <script>
+// ─── DELETE / DEACTIVATE ─────────────────────────────────────
+const deleteModal = document.getElementById('deleteModal');
+let deleteTarget = null;
+function confirmTeacherDelete(id, name) {
+    deleteTarget = id;
+    document.getElementById('deleteMessage').textContent = 'Deactivate ' + name + '? They will no longer be able to log in, but their records are kept.';
+    deleteModal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeTeacherDelete() { deleteModal.classList.remove('active'); document.body.style.overflow = ''; deleteTarget = null; }
+document.getElementById('confirmDeleteBtn').addEventListener('click', async function() {
+    if (!deleteTarget) return;
+    this.disabled = true; this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deactivating...';
+    try {
+        const res = await fetch('../api/teachers.php?action=deactivate', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: deleteTarget })
+        });
+        const d = await res.json();
+        if (d.success) window.location.reload();
+        else alert(d.message);
+    } catch(e) { alert('Error deactivating teacher.'); }
+    finally { this.disabled = false; this.innerHTML = '<i class="fas fa-trash-alt"></i> Deactivate'; closeTeacherDelete(); }
+});
+deleteModal.addEventListener('click', function(e) { if (e.target === this) closeTeacherDelete(); });
+
 // ─── SEARCH ─────────────────────────────────────────────────
 const searchInput = document.getElementById('teacherSearch');
 const searchClear = document.getElementById('searchClear');
@@ -415,7 +447,9 @@ function getSelectedSubjects() {
     return Array.from(boxes).map(b => parseInt(b.value, 10));
 }
 
-function openEdit(t) {
+function editTeacher(id) {
+    const t = (typeof TEACHERS !== 'undefined' ? TEACHERS : []).find(x => String(x.id) === String(id));
+    if (!t) { alert('Teacher not found.'); return; }
     document.getElementById('editId').value = t.id;
     document.getElementById('editName').value = t.full_name;
     document.getElementById('editEmail').value = t.email;
@@ -514,7 +548,7 @@ function viewTeacher(id) {
     const load = t.load || { students: 0, sections: 0 };
     const teach = t.teaching || { assignments: 0, units: 0, sections: 0 };
     content.innerHTML =
-        '<div style="display:flex;gap:14px;align-items:center;margin-bottom:12px;"><div style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#7c3aed);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:20px;">' + (t.full_name[0] || '?').toUpperCase() + '</div><div><div style="font-size:18px;font-weight:700;color:#0f172a;">' + (t.full_name||'') + '</div><div style="color:#64748b;font-size:12px;">' + (t.email||'') + ' · ' + (t.role||'').toUpperCase() + '</div></div></div>'
+        '<div style="display:flex;gap:14px;align-items:center;margin-bottom:12px;"><div style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#7c3aed);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:20px;">' + ((t.full_name || '?').charAt(0) || '?').toUpperCase() + '</div><div><div style="font-size:18px;font-weight:700;color:#0f172a;">' + (t.full_name||'') + '</div><div style="color:#64748b;font-size:12px;">' + (t.email||'') + ' · ' + (t.role||'').toUpperCase() + '</div></div></div>'
         + '<div style="background:#f8fafc;border-radius:8px;padding:12px 14px;margin-bottom:10px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px;text-align:center;">'
         + '<div><div style="font-size:22px;font-weight:700;color:#2563eb;">' + (load.students||0) + '</div><div style="font-size:11px;color:#64748b;">Advisees</div></div>'
         + '<div><div style="font-size:22px;font-weight:700;color:#dc2626;">' + (teach.assignments||0) + '</div><div style="font-size:11px;color:#64748b;">Subjects (' + (teach.units||0) + ' units)</div></div>'

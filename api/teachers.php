@@ -184,6 +184,20 @@ if ($method === 'POST' && isset($_GET['action']) && $_GET['action'] === 'assign_
     exit;
 }
 
+// ─── DEACTIVATE TEACHER (soft delete) ──────────────────────
+if ($method === 'POST' && isset($_GET['action']) && $_GET['action'] === 'deactivate') {
+    $input = json_decode(file_get_contents('php://input'), true);
+    if (!is_array($input)) $input = [];
+    $id = isset($input['id']) ? intval($input['id']) : 0;
+    if (!$id) {
+        echo json_encode(['success' => false, 'message' => 'Teacher ID required.']);
+        exit;
+    }
+    $db->update('users', ['is_active' => 0], 'id = ?', [$id]);
+    echo json_encode(['success' => true, 'message' => 'Teacher deactivated.']);
+    exit;
+}
+
 // ─── UNKNOWN ───────────────────────────────────────────────
 echo json_encode(['success' => false, 'message' => 'Unknown action.']);
 exit;
