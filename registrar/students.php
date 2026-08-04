@@ -196,6 +196,35 @@ include '../includes/sidebar.php';
 .form-control{width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;background:white;color:#1e293b;box-sizing:border-box}
 .form-control:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,0.10)}
 select.form-control{cursor:pointer;appearance:auto;-webkit-appearance:auto;}
+/* ─── Course selection: scrollable dropdown ─────────────────── */
+.course-select-wrap{ position:relative; }
+/* Hide the native select's default arrow; it's replaced by a styled
+   scrollable list, but the select itself stays functional (keeps value,
+   required, and form submission working). */
+.course-select-wrap select.form-control{
+  appearance:none;-webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-position:right 12px center;
+  background-repeat:no-repeat;
+  background-size:14px;
+  padding-right:32px;
+  cursor:pointer;
+}
+/* Scrollable list: max 5 options (~5*34px) tall, then scrolls */
+.course-select-list{
+  position:absolute;top:100%;left:0;right:0;z-index:100;
+  margin-top:2px;background:#fff;border:1.5px solid #e2e8f0;
+  border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.1);
+  max-height:170px;overflow-y:auto;
+}
+.course-select-list .cs-option{
+  padding:7px 12px;font-size:13px;color:#1e293b;cursor:pointer;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  border-bottom:1px solid #f1f5f9;
+}
+.course-select-list .cs-option:last-child{border-bottom:none;}
+.course-select-list .cs-option:hover{ background:#eef4ff; color:#2563eb; }
+.course-select-list .cs-option.active{ background:#eef4ff; color:#2563eb; font-weight:600; }
 .modal-overlay select.form-control,
 .modal-overlay select { cursor:pointer !important; appearance:auto !important; -webkit-appearance:auto !important; }
 /* bulk bar select inside page (not modal) — force native */
@@ -387,7 +416,7 @@ $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' :
 <div class="modal-footer"><button class="btn btn-primary" onclick="closeViewModal()"><i class="fas fa-times"></i> Close</button></div></div></div>
 
 <!-- Add Modal (inline, with guardian) -->
-<div class="modal-overlay" id="addModal"><div class="modal-content" style="max-width:640px;"><div class="modal-header"><h2><i class="fas fa-plus-circle"></i> Enroll New Student</h2><button class="modal-close" onclick="closeAddModal()"><i class="fas fa-times"></i></button></div><form id="addForm"><div class="modal-body">
+<div class="modal-overlay" id="addModal"><div class="modal-content" style="max-width:760px;"><div class="modal-header"><h2><i class="fas fa-plus-circle"></i> Enroll New Student</h2><button class="modal-close" onclick="closeAddModal()"><i class="fas fa-times"></i></button></div><form id="addForm"><div class="modal-body">
 <div class="form-row"><div class="form-group" style="flex:0 0 160px;"><label>Student ID</label><input type="text" id="addStudentNumber" class="form-control" placeholder="Auto" style="background:#f8fafc;font-size:12px;" readonly></div><div class="form-group"><label>Academic Status</label><select id="addStatus" class="form-control"><option value="active">Active</option></select></div></div>
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:0 0 12px;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-user"></i> Personal Information</div>
@@ -398,7 +427,7 @@ $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' :
 <div class="form-row"><div class="form-group"><label>Address <span style="color:#dc2626;">*</span></label><textarea id="addAddress" class="form-control" rows="2" required></textarea></div></div>
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-book"></i> Enrollment Details</div>
-<div class="form-row"><div class="form-group"><label>Course <span style="color:#dc2626;">*</span></label><select id="addCourse" class="form-control" required><option value="">Select course</option><?php foreach ($offeredCourses as $cname => $majors): ?><option value="<?= htmlspecialchars($cname) ?>"><?= htmlspecialchars($cname) ?></option><?php endforeach; ?></select></div><div class="form-group" id="addMajorGroup" style="display:none;"><label>Major</label><select id="addMajor" class="form-control"><option value="">Select major</option></select></div><div class="form-group"><label>Year Level</label><select id="addYearLevel" class="form-control"><option value="">Select</option><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option></select></div></div>
+<div class="form-row"><div class="form-group" style="flex:1 1 220px;min-width:150px;"><label>Course <span style="color:#dc2626;">*</span></label><div class="course-select-wrap"><select id="addCourse" class="form-control" required><option value="">Select course</option><?php foreach ($offeredCourses as $cname => $majors): ?><option value="<?= htmlspecialchars($cname) ?>"><?= htmlspecialchars($cname) ?></option><?php endforeach; ?></select><div class="course-select-list" style="display:none;"></div></div></div><div class="form-group" style="flex:0 0 150px;"><label>Year Level</label><select id="addYearLevel" class="form-control"><option value="">Select</option><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option></select></div><div class="form-group" id="addMajorGroup" style="display:none;flex:1 1 200px;"><label>Major</label><select id="addMajor" class="form-control"><option value="">Select major</option></select></div></div>
 <div class="form-row"><div class="form-group"><label>School Year</label><input type="text" id="addSchoolYear" class="form-control" placeholder="2026-2027" value="2026-2027"></div><div class="form-group"><label>Semester</label><select id="addSemester" class="form-control"><option value="">—</option><option value="1st">1st Semester</option><option value="2nd">2nd Semester</option><option value="summer">Summer</option></select></div></div>
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-users"></i> Guardian / Parent</div>
@@ -407,7 +436,7 @@ $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' :
 </div><div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeAddModal()">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Enroll</button></div></form></div></div>
 
 <!-- Edit Modal (same structure) -->
-<div class="modal-overlay" id="editModal"><div class="modal-content" style="max-width:640px;"><div class="modal-header"><h2><i class="fas fa-pen"></i> Edit Student</h2><button class="modal-close" onclick="closeEditModal()"><i class="fas fa-times"></i></button></div><form id="editForm"><input type="hidden" id="editId" value=""><div class="modal-body">
+<div class="modal-overlay" id="editModal"><div class="modal-content" style="max-width:760px;"><div class="modal-header"><h2><i class="fas fa-pen"></i> Edit Student</h2><button class="modal-close" onclick="closeEditModal()"><i class="fas fa-times"></i></button></div><form id="editForm"><input type="hidden" id="editId" value=""><div class="modal-body">
 <div class="form-row"><div class="form-group" style="flex:0 0 160px;"><label>Student ID</label><input type="text" id="editStudentNumber" class="form-control" readonly style="background:#f8fafc;font-size:12px;"></div><div class="form-group"><label>Academic Status</label><select id="editStatus" class="form-control"><option value="active">Active</option><option value="probation">Probation</option><option value="at-risk">At Risk</option><option value="graduated">Graduated</option><option value="loa">LOA</option><option value="transferred">Transferred</option><option value="dropped">Dropped</option><option value="archived">Archived</option></select></div></div>
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:0 0 12px;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-user"></i> Personal Information</div>
@@ -418,7 +447,7 @@ $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' :
 <div class="form-row"><div class="form-group"><label>Address <span style="color:#dc2626;">*</span></label><textarea id="editAddress" class="form-control" rows="2" required></textarea></div></div>
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-book"></i> Enrollment Details</div>
-<div class="form-row"><div class="form-group"><label>Course</label><select id="editCourse" class="form-control"><option value="">Select course</option><?php foreach ($offeredCourses as $cname => $majors): ?><option value="<?= htmlspecialchars($cname) ?>"><?= htmlspecialchars($cname) ?></option><?php endforeach; ?></select></div><div class="form-group" id="editMajorGroup" style="display:none;"><label>Major</label><select id="editMajor" class="form-control"><option value="">Select major</option></select></div><div class="form-group"><label>Year Level</label><select id="editYearLevel" class="form-control"><option value="">Select</option><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option></select></div></div>
+<div class="form-row"><div class="form-group" style="flex:1 1 220px;min-width:150px;"><label>Course</label><div class="course-select-wrap"><select id="editCourse" class="form-control"><option value="">Select course</option><?php foreach ($offeredCourses as $cname => $majors): ?><option value="<?= htmlspecialchars($cname) ?>"><?= htmlspecialchars($cname) ?></option><?php endforeach; ?></select><div class="course-select-list" style="display:none;"></div></div></div><div class="form-group" style="flex:0 0 150px;"><label>Year Level</label><select id="editYearLevel" class="form-control"><option value="">Select</option><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option></select></div><div class="form-group" id="editMajorGroup" style="display:none;flex:1 1 200px;"><label>Major</label><select id="editMajor" class="form-control"><option value="">Select major</option></select></div></div>
 <div class="form-row"><div class="form-group"><label>School Year</label><input type="text" id="editSchoolYear" class="form-control" placeholder="2026-2027"></div><div class="form-group"><label>Semester</label><select id="editSemester" class="form-control"><option value="">—</option><option value="1st">1st Semester</option><option value="2nd">2nd Semester</option><option value="summer">Summer</option></select></div></div>
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-users"></i> Guardian</div>
@@ -723,33 +752,96 @@ document.getElementById('editForm').addEventListener('submit', async function(e)
     } catch(e) { alert('Network error.'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save Changes'; }
 });
 
-// ─── COURSE & MAJOR DROPDOWN ────────────────────────────────
+// ─── COURSE & MAJOR DROPDOWN (native select) ─────────────────
+// Course data is rendered directly into the <select> options by PHP.
 const COURSE_MAJORS = <?= json_encode($offeredCourses) ?>;
+
+/**
+ * Refresh the Major dropdown for a given prefix (add/edit).
+ * Reads the selected course value from the native #<prefix>Course select.
+ */
 function refreshMajorOptions(prefix) {
-    const courseEl = document.getElementById(prefix + 'Course');
+    const course = document.getElementById(prefix + 'Course').value;
     const majorGroup = document.getElementById(prefix + 'MajorGroup');
     const majorEl = document.getElementById(prefix + 'Major');
-    if (!courseEl || !majorGroup || !majorEl) return;
-    const course = courseEl.value;
-    const majors = COURSE_MAJORS[course] || [];
+    if (!majorGroup || !majorEl) return;
+    const majors = (COURSE_MAJORS[course] || []);
     if (majors.length > 0) {
         majorGroup.style.display = '';
-        majorEl.innerHTML = '<option value="">Select major</option>' + majors.map(m => '<option value="' + m.replace(/"/g, '&quot;') + '">' + m + '</option>').join('');
+        majorEl.innerHTML = '<option value="">Select major</option>' +
+            majors.map(m => '<option value="' + m.replace(/"/g, '&quot;') + '">' + m + '</option>').join('');
     } else {
         majorGroup.style.display = 'none';
         majorEl.innerHTML = '<option value="">Select major</option>';
     }
 }
+
+// Wire the course selects so changing the course refreshes the Major dropdown
 ['add', 'edit'].forEach(prefix => {
     const cEl = document.getElementById(prefix + 'Course');
     if (cEl) cEl.addEventListener('change', () => refreshMajorOptions(prefix));
+});
+
+// ─── Course select: scrollable custom list ────────────────────
+// Builds a styled, scrollable option list (max ~5 rows) for the course
+// <select>, syncs the hidden select value so form submission and the
+// Major dropdown logic keep working unchanged.
+['add', 'edit'].forEach(prefix => {
+    const wrap = document.querySelector(`#${prefix}Modal .course-select-wrap`);
+    const sel = document.getElementById(prefix + 'Course');
+    const list = wrap ? wrap.querySelector('.course-select-list') : null;
+    if (!wrap || !sel || !list) return;
+
+    function renderOptions() {
+        const opts = Array.from(sel.options);
+        list.innerHTML = opts.map((o, i) =>
+            '<div class="cs-option" data-idx="' + i + '">' +
+              o.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;') +
+            '</div>'
+        ).join('');
+        list.querySelectorAll('.cs-option').forEach(opt => {
+            opt.addEventListener('click', () => {
+                const idx = parseInt(opt.dataset.idx, 10);
+                sel.selectedIndex = idx;
+                sel.dispatchEvent(new Event('change'));
+                list.style.display = 'none';
+            });
+        });
+    }
+    function syncActive() {
+        list.querySelectorAll('.cs-option').forEach(o =>
+            o.classList.toggle('active', parseInt(o.dataset.idx, 10) === sel.selectedIndex));
+    }
+
+    renderOptions();
+
+    // The select is the visual trigger — mousedown stops the native
+    // dropdown from opening, then click toggles the styled list.
+    sel.addEventListener('mousedown', e => e.preventDefault());
+    sel.addEventListener('click', () => {
+        const open = list.style.display === 'block';
+        // close any other open course list
+        document.querySelectorAll('.course-select-list').forEach(l => { if (l !== list) l.style.display = 'none'; });
+        list.style.display = open ? 'none' : 'block';
+        if (list.style.display === 'block') syncActive();
+    });
+    sel.addEventListener('change', () => { list.style.display = 'none'; refreshMajorOptions(prefix); });
+    // Clicking outside closes it
+    document.addEventListener('click', e => {
+        if (!wrap.contains(e.target)) list.style.display = 'none';
+    });
 });
 
 // ─── NOTE: Section is auto-generated by the Masterlist module
 // ("Auto-assign sections"), so it is not a manual form field.
 
 // ─── ADD MODAL ───────────────────────────────────────────────
-function openAddModal() { document.getElementById('addModal').classList.add('active'); document.body.style.overflow = 'hidden'; document.getElementById('addForm').reset(); }
+function openAddModal() {
+    document.getElementById('addModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+    document.getElementById('addForm').reset();
+    refreshMajorOptions('add');
+}
 function closeAddModal() { document.getElementById('addModal').classList.remove('active'); document.body.style.overflow = ''; }
 document.getElementById('addModal').addEventListener('click', function(e) { if (e.target === this) closeAddModal(); });
 

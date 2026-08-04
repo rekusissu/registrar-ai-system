@@ -58,6 +58,21 @@ CREATE TABLE `ai_cache` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `authorized_cards`
+--
+
+CREATE TABLE `authorized_cards` (
+  `id` int(11) NOT NULL,
+  `card_uid` varchar(20) NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `role` enum('admin','registrar','superadmin') DEFAULT 'registrar',
+  `can_change_station` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `audit_logs`
 --
 
@@ -269,6 +284,8 @@ CREATE TABLE `students` (
   `first_name` varchar(50) NOT NULL,
   `middle_name` varchar(50) DEFAULT NULL,
   `last_name` varchar(50) NOT NULL,
+  `gender` enum('Male','Female') DEFAULT NULL,
+  `civil_status` enum('Single','Married','Widowed','Separated') DEFAULT NULL,
   `birth_date` date NOT NULL,
   `place_of_birth` varchar(100) DEFAULT NULL,
   `nationality` varchar(50) DEFAULT NULL,
@@ -277,7 +294,11 @@ CREATE TABLE `students` (
   `contact_number` varchar(15) DEFAULT NULL,
   `email` varchar(100) DEFAULT NULL,
   `course` varchar(50) DEFAULT NULL,
+  `major` varchar(100) DEFAULT NULL,
   `year_level` int(11) DEFAULT NULL,
+  `school_year` varchar(20) DEFAULT NULL,
+  `semester` varchar(20) DEFAULT NULL,
+  `adviser_id` int(11) DEFAULT NULL,
   `section` varchar(20) DEFAULT NULL,
   `status` enum('active','probation','at-risk','loa','graduated','transferred','dropped') DEFAULT 'active',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -355,6 +376,13 @@ ALTER TABLE `ai_cache`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `prompt_hash` (`prompt_hash`),
   ADD KEY `idx_prompt_hash` (`prompt_hash`);
+
+--
+-- Indexes for table `authorized_cards`
+--
+ALTER TABLE `authorized_cards`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `card_uid` (`card_uid`);
 
 --
 -- Indexes for table `audit_logs`
@@ -479,6 +507,12 @@ ALTER TABLE `academic_history`
 -- AUTO_INCREMENT for table `ai_cache`
 --
 ALTER TABLE `ai_cache`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `authorized_cards`
+--
+ALTER TABLE `authorized_cards`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
