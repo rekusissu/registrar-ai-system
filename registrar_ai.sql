@@ -293,7 +293,7 @@ CREATE TABLE `students` (
   `address` text NOT NULL,
   `contact_number` varchar(15) DEFAULT NULL,
   `email` varchar(100) DEFAULT NULL,
-  `course` varchar(50) DEFAULT NULL,
+  `course` varchar(100) DEFAULT NULL,
   `major` varchar(100) DEFAULT NULL,
   `year_level` int(11) DEFAULT NULL,
   `school_year` varchar(20) DEFAULT NULL,

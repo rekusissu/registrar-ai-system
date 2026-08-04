@@ -64,7 +64,9 @@ function courseAliases(): array {
         'bsais'  => 'BACHELOR OF SCIENCE IN ACCOUNTING INFORMATION SYSTEM (BSAIS)',
         'bscp'   => 'BACHELOR OF SCIENCE IN COMPUTER ENGINEERING (BSCpE)',
         'bscpe'  => 'BACHELOR OF SCIENCE IN COMPUTER ENGINEERING (BSCpE)',
-        'bscs'   => 'BACHELOR OF SCIENCE IN COMPUTER ENGINEERING (BSCpE)',
+        // BSCS is Computer *Science* — a course this school does not offer.
+        // It must NOT be silently mapped to Computer Engineering.
+        'bscs'   => 'BACHELOR OF SCIENCE IN COMPUTER SCIENCE (BSCS)',
         'bstm'   => 'BACHELOR OF SCIENCE IN TOURISM MANAGEMENT (BSTM)',
         'bsoa'   => 'BACHELOR OF SCIENCE IN OFFICE ADMINISTRATION (BSOA)',
         'bsentrep' => 'BACHELOR OF SCIENCE IN ENTREPRENEURSHIP (BSENTREP)',
@@ -122,16 +124,64 @@ function courseStandardize(?string $raw): string {
         }
     }
 
-    // 3) Word-set containment (e.g. "information technology", "bs computer science")
-    $rawWords = preg_split('/\s+/', strtolower(trim($raw)));
-    $rawWords = array_values(array_filter($rawWords, fn($w) => strlen($w) >= 3));
-    foreach ($rawWords as $w) {
-        if (isset($map[$w])) {
-            return $map[$w];
+    // 3) Conservative word/abbreviation match. A single shared generic word
+    //    (e.g. "computer") must NOT pull a course to a different discipline.
+    //    We score the input against every official name and only accept a
+    //    match when the input is clearly the same course.
+    $officialNames = array_keys(getOfferedCourses());
+    $bestName  = null;
+    $bestScore = 0.0;
+    foreach ($officialNames as $official) {
+        $score = courseNameSimilarity($raw, $official);
+        if ($score > $bestScore) {
+            $bestScore = $score;
+            $bestName  = $official;
         }
+    }
+    // Accept only a confident, unambiguous match (>= 0.7 and clearly beating
+    // the runner-up). Otherwise leave the value untouched.
+    if ($bestName !== null && $bestScore >= 0.7) {
+        return $bestName;
     }
 
     return $raw;
+}
+
+/**
+ * Simple lexical similarity between a raw course input and an official name.
+ * Tokenizes both, compares the distinctive (non-generic) words, and combines
+ * with a substring bonus. Returns 0..1.
+ */
+function courseNameSimilarity(string $raw, string $official): float {
+    $generic = ['bachelor', 'of', 'science', 'in', 'and', 'the', 'management', 'technology', 'education', 'computer'];
+    $norm = function (string $s) {
+        $s = strtolower(preg_replace('/[^a-z0-9]+/i', ' ', $s));
+        $words = preg_split('/\s+/', trim($s));
+        return array_values(array_filter($words, fn($w) => strlen($w) >= 3));
+    };
+    $rw = $norm($raw);
+    $ow = $norm($official);
+    if (empty($rw) || empty($ow)) return 0.0;
+
+    // Distinctive words only (drop generic terms).
+    $rd = array_diff($rw, $generic);
+    $od = array_diff($ow, $generic);
+    if (empty($od)) return 0.0;
+
+    // How many distinctive raw words appear in the official set?
+    $hits = count(array_intersect($rd, $od));
+    $coverage = $hits / max(count($rd), 1);
+
+    // Substring bonus for distinctive words (e.g. "bsit" inside "BSIT").
+    $subBonus = 0.0;
+    foreach ($rd as $w) {
+        if (strlen($w) >= 4 && stripos($official, $w) !== false) {
+            $subBonus += 0.15;
+        }
+    }
+
+    $score = $coverage * 0.85 + min($subBonus, 0.3);
+    return max(0.0, min(1.0, $score));
 }
 
 /**
