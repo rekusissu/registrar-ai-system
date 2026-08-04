@@ -268,6 +268,10 @@ select.form-control{cursor:pointer;appearance:auto;-webkit-appearance:auto;}
 .search-bar .search-actions .btn{padding:0 14px;font-size:12px;height:36px}
 .table-responsive th,.table-responsive td{padding:6px 6px;font-size:11px}
 }
+.quality-legend{position:relative;display:inline-flex;margin-left:3px;}
+.quality-legend .quality-legend-box{display:none;position:absolute;top:20px;left:50%;transform:translateX(-50%);z-index:50;background:#0f172a;color:#f8fafc;font-size:12px;line-height:1.6;padding:10px 12px;border-radius:8px;white-space:nowrap;box-shadow:0 8px 24px rgba(15,23,42,.2);font-weight:500;text-align:left;}
+.quality-legend:hover .quality-legend-box{display:block;}
+.quality-legend-box::before{content:'';position:absolute;top:-5px;left:50%;transform:translateX(-50%);border:6px solid transparent;border-bottom-color:#0f172a;}
 </style>
 <main class="dashboard-main">
 <header class="header">
@@ -318,7 +322,11 @@ select.form-control{cursor:pointer;appearance:auto;-webkit-appearance:auto;}
 <div class="table-responsive">
 <table>
 <thead>
-<tr><th style="width:30px;"><div class="cb-wrap"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></div></th><th>ID</th><th>Name</th><th>Course</th><th>Year</th><th>Section</th><th>Gender</th><th>RFID</th><th>Status</th><th style="text-align:center;">Quality</th><th style="text-align:center;">Actions</th></tr>
+<tr><th style="width:30px;"><div class="cb-wrap"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></div></th><th>ID</th><th>Name</th><th>Course</th><th>Year</th><th>Section</th><th>Gender</th><th>RFID</th><th>Status</th><th style="text-align:center;">Quality <span class="quality-legend" title=""><i class="fas fa-circle-info" style="cursor:help;"></i><span class="quality-legend-box">Quality score = % of required student fields filled.
+<span style="color:#22c55e;">●</span> 85–100% &nbsp; Complete
+<span style="color:#f59e0b;">●</span> 60–84% &nbsp; Some fields missing
+<span style="color:#ef4444;">●</span> &lt;60% &nbsp; Many fields missing
+<span style="color:#f59e0b;">⚠</span> Anomaly worth checking (hover the row)</span></span></th><th style="text-align:center;">Actions</th></tr>
 </thead>
 <tbody id="studentTableBody">
 <?php if (empty($students)): ?>
@@ -346,8 +354,21 @@ $qDotClass = $qScore >= 85 ? 'good' : ($qScore >= 60 ? 'warn' : 'bad');
 <td><a href="../registrar/rfid-cards.php?search=<?= urlencode($s['student_number']) ?>" class="rfid-chip <?= $rfidStatus ?>"><i class="fas fa-<?= $rfidStatus==='active'?'check-circle':'credit-card' ?>"></i> <?= $rfidStatus==='active'?($rfidMap[$s['id']]['card_uid']):($rfidStatus==='none'?'—':$rfidMap[$s['id']]['status']) ?></a></td>
 <td><div class="quick-status-wrap"><button class="status-badge <?= $s['status']??'active' ?>" onclick="toggleQuickMenu(<?= (int)$s['id'] ?>)"><span class="status-dot <?= $s['status']??'active' ?>"></span><?= ucfirst($s['status']??'Active') ?></button><div class="quick-status-menu" id="qsm_<?= (int)$s['id'] ?>"><?php $statuses=['active','probation','at-risk','graduated','loa','transferred','dropped']; if($s['status']==='archived')$statuses[]='archived'; foreach($statuses as $st): ?><button onclick="quickStatus(<?= (int)$s['id'] ?>,'<?= $st ?>')" class="<?= ($s['status']??'active')===$st?'active':'' ?>"><?= ucfirst($st) ?></button><?php endforeach; ?></div></div></td>
 <td style="text-align:center;">
-<span class="q-dot q-<?= $qDotClass ?>" title="Data quality: <?= $qScore ?>%<?= !empty($qAnoms) ? ' — ' . implode(', ', $qAnoms) : '' ?>" style="display:inline-block;width:10px;height:10px;border-radius:50%;<?= $qScore>=85?'background:#22c55e':($qScore>=60?'background:#f59e0b':'background:#ef4444') ?>;"></span>
-<?php if (!empty($qAnoms)): ?><i class="fas fa-exclamation-triangle" style="color:#f59e0b;margin-left:4px;font-size:11px;" title="<?= htmlspecialchars(implode(', ', $qAnoms)) ?>"></i><?php endif; ?>
+<?php
+$qAnomLabels = array_map(function ($k) {
+    return [
+        'age_mismatch' => 'Age doesn\'t match year level',
+        'future_birthdate' => 'Birth date is in the future',
+        'no_address' => 'Missing address',
+        'no_contact' => 'Missing contact number',
+        'no_gender' => 'Missing gender',
+        'course_nonstandard' => 'Course name not standardized',
+    ][$k] ?? $k;
+}, $qAnoms);
+$qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; ', $qAnomLabels) : ' — all key fields filled');
+?>
+<span class="q-dot q-<?= $qDotClass ?>" title="<?= htmlspecialchars($qTitle) ?>" style="display:inline-block;width:10px;height:10px;border-radius:50%;<?= $qScore>=85?'background:#22c55e':($qScore>=60?'background:#f59e0b':'background:#ef4444') ?>;"></span>
+<?php if (!empty($qAnoms)): ?><i class="fas fa-exclamation-triangle" style="color:#f59e0b;margin-left:4px;font-size:11px;" title="<?= htmlspecialchars(implode('; ', $qAnomLabels)) ?>"></i><?php endif; ?>
 </td>
 <td><div class="action-group"><button class="action-btn view" onclick="viewStudent(<?= (int)$s['id'] ?>)" title="View"><i class="fas fa-eye"></i></button><button class="action-btn edit" onclick="editStudent(<?= (int)$s['id'] ?>)" title="Edit"><i class="fas fa-pen"></i></button><?php if ($s['status']==='archived'): ?><button class="action-btn restore" onclick="restoreStudent(<?= (int)$s['id'] ?>,'<?= htmlspecialchars($s['first_name']." ".$s['last_name'],ENT_QUOTES) ?>')" title="Restore"><i class="fas fa-undo"></i></button><?php else: ?><button class="action-btn delete" onclick="confirmDelete(<?= (int)$s['id'] ?>,'<?= htmlspecialchars($s['first_name']." ".$s['last_name'],ENT_QUOTES) ?>')" title="Delete"><i class="fas fa-trash-alt"></i></button><?php endif; ?></div></td>
 </tr>
