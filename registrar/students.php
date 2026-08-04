@@ -443,10 +443,13 @@ $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' :
 <div class="form-row"><div class="form-group"><label>Contact No.</label><input type="text" id="addGuardianContact" class="form-control"></div><div class="form-group"><label>Email (optional)</label><input type="email" id="addGuardianEmail" class="form-control"></div></div>
 </div><div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeAddModal()">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Enroll</button></div></form></div></div>
 
-<!-- AI Paste-to-Fill Modal -->
-<div class="modal-overlay" id="pasteModal"><div class="modal-content" style="max-width:640px;"><div class="modal-header"><h2><i class="fas fa-magic"></i> AI Paste to Fill</h2><button class="modal-close" onclick="closePasteModal()"><i class="fas fa-times"></i></button></div><div class="modal-body">
-<p style="font-size:13px;color:#64748b;margin-bottom:12px;">Paste a transcript, enrolment slip, or student info text. AI will extract the details so you can review and apply them.</p>
-<textarea id="pasteText" class="form-control" rows="6" placeholder="Paste text here..." style="margin-bottom:12px;"></textarea>
+<!-- AI Document Reader / Paste-to-Fill Modal -->
+<div class="modal-overlay" id="pasteModal"><div class="modal-content" style="max-width:640px;"><div class="modal-header"><h2><i class="fas fa-file-import"></i> AI Document Reader</h2><button class="modal-close" onclick="closePasteModal()"><i class="fas fa-times"></i></button></div><div class="modal-body">
+<p style="font-size:13px;color:#64748b;margin-bottom:12px;">Upload a PDF, Word (.docx), or text file, <em>or</em> paste text. AI will extract the student details for you to review and apply.</p>
+<label class="btn btn-secondary" style="cursor:pointer;margin-bottom:12px;"><i class="fas fa-upload"></i> Upload PDF / Word <input type="file" id="pasteFile" accept=".pdf,.docx,.txt" style="display:none;"></label>
+<div id="pasteFileName" style="font-size:12px;color:#64748b;margin-bottom:8px;"></div>
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;color:#94a3b8;font-size:12px;"><span style="flex:1;border-top:1px solid #e2e8f0;"></span> or <span style="flex:1;border-top:1px solid #e2e8f0;"></span></div>
+<textarea id="pasteText" class="form-control" rows="5" placeholder="Paste student info text here..." style="margin-bottom:12px;"></textarea>
 <div id="pastePreview" style="display:none;border:1px solid #dbeafe;background:#f8fbff;border-radius:10px;padding:14px;margin-bottom:12px;"></div>
 </div><div class="modal-footer"><button type="button" class="btn btn-light" onclick="closePasteModal()">Cancel</button><button id="pasteExtractBtn" type="button" class="btn btn-primary" onclick="extractPaste()"><i class="fas fa-magic"></i> Extract</button><button id="pasteApplyBtn" type="button" class="btn btn-primary" style="display:none;" onclick="applyPaste()"><i class="fas fa-check"></i> Apply to Form</button></div></div></div>
 
@@ -919,26 +922,43 @@ async function aiPost(action, body) {
     return await res.json();
 }
 
-// Paste-to-fill modal
+// Document reader / paste-to-fill modal
 function openPasteModal() {
     document.getElementById('pasteModal').classList.add('active');
     document.body.style.overflow = 'hidden';
     document.getElementById('pasteText').value = '';
+    document.getElementById('pasteFile').value = '';
+    document.getElementById('pasteFileName').textContent = '';
     document.getElementById('pastePreview').style.display = 'none';
     document.getElementById('pasteApplyBtn').style.display = 'none';
     document.getElementById('pasteExtractBtn').style.display = '';
 }
 function closePasteModal() { document.getElementById('pasteModal').classList.remove('active'); document.body.style.overflow = ''; }
 document.getElementById('pasteModal').addEventListener('click', function(e) { if (e.target === this) closePasteModal(); });
+document.getElementById('pasteFile').addEventListener('change', function() {
+    document.getElementById('pasteFileName').textContent = this.files.length ? 'Selected: ' + this.files[0].name : '';
+});
 
 let pasteData = null;
 async function extractPaste() {
+    const fileEl = document.getElementById('pasteFile');
     const text = document.getElementById('pasteText').value.trim();
-    if (!text) { alert('Paste some text first.'); return; }
+    const hasFile = fileEl.files && fileEl.files.length > 0;
+    if (!hasFile && !text) { alert('Upload a file or paste some text first.'); return; }
     const btn = document.getElementById('pasteExtractBtn');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Extracting...';
     try {
-        const d = await aiPost('paste_fill', { text });
+        let d;
+        if (hasFile) {
+            const fd = new FormData();
+            fd.append('file', fileEl.files[0]);
+            const res = await fetch('../api/ai-assist.php?action=extract_doc', {
+                method: 'POST', body: fd
+            });
+            d = await res.json();
+        } else {
+            d = await aiPost('paste_fill', { text });
+        }
         if (!d.success) { alert(d.message || 'Extraction failed.'); return; }
         pasteData = d.data || {};
         const keys = ['first_name','middle_name','last_name','gender','birth_date','place_of_birth','nationality','religion','email','contact_number','address','course','year_level','guardian_name','guardian_relationship'];

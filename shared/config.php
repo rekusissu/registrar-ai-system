@@ -35,7 +35,7 @@ define('JWT_SECRET', 'your-super-secret-key-change-in-production');
 // Bearer key. Endpoint verified live at /v1/models (OpenAI format).
 define('AI_API_URL', 'http://localhost:20128/v1/chat/completions');
 define('AI_MODEL', 'nvidia/minimaxai/minimax-m3');
-define('AI_API_KEY', '');
+define('AI_API_KEY', 'sk-0e90f5fb364ec285-9rcjw3-5bc5bf60');
 define('AI_CACHE_TTL', 86400); // seconds (1 day)
 
 // Timezone
