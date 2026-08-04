@@ -641,7 +641,7 @@ function viewStudent(id) {
         const aiSum = document.getElementById('vAiSummary');
         aiSum.style.display = 'none';
         aiSum.innerHTML = '<span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#3b82f6;"><i class="fas fa-brain"></i> AI Summary</span> <span style="color:#64748b;font-size:12px;margin-left:4px;"><i class="fas fa-spinner fa-spin"></i> Generating...</span>';
-        aiPost('profile', { id: s.id }).then(d => {
+        aiToolsPost('profile', { id: s.id }).then(d => {
             if (d.success && d.data && d.data.summary) {
                 aiSum.innerHTML = '<span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#3b82f6;"><i class="fas fa-brain"></i> AI Summary</span><p style="margin:6px 0 0;color:#334155;">' + d.data.summary + '</p>';
                 aiSum.style.display = 'block';
@@ -928,6 +928,16 @@ async function aiPost(action, body) {
     return await res.json();
 }
 
+// Batch AI tools (data quality, standardization, duplicate scan) live
+// in api/ai-tools.php, not ai-assist.php.
+async function aiToolsPost(action, body) {
+    const res = await fetch('../api/ai-tools.php?action=' + action, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {})
+    });
+    return await res.json();
+}
+
 // Document reader / paste-to-fill modal
 function openPasteModal() {
     document.getElementById('pasteModal').classList.add('active');
@@ -1074,7 +1084,7 @@ function openQualityPanel(force) {
     document.body.style.overflow = 'hidden';
     loading.style.display = '';
     content.style.display = 'none';
-    aiPost('quality').then(d => {
+    aiToolsPost('quality').then(d => {
         loading.style.display = 'none';
         if (!d.success || !d.data) { content.innerHTML = '<p style="color:#dc2626;">Failed to analyze.</p>'; content.style.display='block'; return; }
         qualityData = d.data;
@@ -1121,7 +1131,7 @@ function renderQualityPanel() {
 function runDupScan() {
     const box = document.getElementById('qualityResult');
     box.innerHTML = '<p style="color:#64748b;font-size:13px;"><i class="fas fa-spinner fa-spin"></i> Scanning...</p>';
-    aiPost('scan_dupes').then(d => {
+    aiToolsPost('scan_dupes').then(d => {
         if (!d.success) { box.innerHTML = '<p style="color:#dc2626;">Scan failed.</p>'; return; }
         const pairs = (d.data && d.data.pairs) || [];
         if (!pairs.length) { box.innerHTML = '<p style="color:#16a34a;font-size:13px;"><i class="fas fa-check-circle"></i> No likely duplicates found.</p>'; return; }
@@ -1138,7 +1148,7 @@ function runDupScan() {
 function runStandardizeAll() {
     const box = document.getElementById('qualityResult');
     box.innerHTML = '<p style="color:#64748b;font-size:13px;"><i class="fas fa-spinner fa-spin"></i> Drafting standardization...</p>';
-    aiPost('standardize').then(d => {
+    aiToolsPost('standardize').then(d => {
         if (!d.success) { box.innerHTML = '<p style="color:#dc2626;">Failed.</p>'; return; }
         const changes = (d.data && d.data.changes) || [];
         if (!changes.length) { box.innerHTML = '<p style="color:#16a34a;font-size:13px;"><i class="fas fa-check-circle"></i> All course names already standardized.</p>'; return; }
@@ -1152,18 +1162,18 @@ function runStandardizeAll() {
 
 function applyStd(from, to) {
     if (!confirm('Change "' + from + '" → "' + to + '"?')) return;
-    aiPost('standardize').then(d => {
+    aiToolsPost('standardize').then(d => {
         if (!d.success) return;
         const changes = (d.data && d.data.changes) || [];
         const match = changes.filter(c => c.from === from).map(c => c.id);
-        const chain = match.map(id => aiPost('apply_std', { id, to }));
+        const chain = match.map(id => aiToolsPost('apply_std', { id, to }));
         return Promise.all(chain);
     }).then(() => { showToast('Updated', 'Course standardized.', 'success'); openQualityPanel(true); }).catch(() => alert('Error applying.'));
 }
 function applyStdById(id, to, btn) {
     if (!confirm('Apply course change?')) return;
     btn.disabled = true;
-    aiPost('apply_std', { id, to }).then(d => {
+    aiToolsPost('apply_std', { id, to }).then(d => {
         if (d.success) { showToast('Updated', 'Course updated.', 'success'); btn.parentElement.remove(); }
         else { alert(d.message || 'Failed.'); btn.disabled = false; }
     }).catch(() => { alert('Error.'); btn.disabled = false; });
