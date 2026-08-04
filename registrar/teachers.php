@@ -74,6 +74,19 @@ unset($_SESSION['teacher_created_password']);
 $teacherError = $_SESSION['teacher_error'] ?? null;
 unset($_SESSION['teacher_error']);
 
+// Stats for the header cards.
+$teacherTotal = count($teachers);
+$teacherActive = count(array_filter($teachers, fn($t) => $t['is_active']));
+$teacherLoadSum = array_sum(array_map(fn($l) => $l['students'], $load));
+$teacherWithRfid = count(array_filter($teachers, fn($t) => !empty($t['rfid_uid'])));
+$teacherWithFlags = 0;
+foreach ($teachers as $t) {
+    $loadInfo = $load[(int)$t['id']] ?? ['students' => 0];
+    if (!empty(teacherDataQualityFlags($t, $allUsers, $loadInfo['students']))) {
+        $teacherWithFlags++;
+    }
+}
+
 $page_title = 'Teachers';
 $APP_ROOT = '../';
 $ACTIVE_NAV = 'teachers';
@@ -114,7 +127,65 @@ tr:hover{background:#f8fafc}
 .form-check input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:#2563eb}
 .modal-footer{display:flex;gap:10px;justify-content:flex-end;padding-top:14px;border-top:1px solid #f1f5f9}
 code{background:#f1f5f9;padding:3px 8px;border-radius:5px;font-size:12px}
-@media(max-width:768px){.dashboard-main{margin-left:0;padding:16px}}
+/* ── Stat cards (match students page) ── */
+.dashboard-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.stat-card{background:white;border-radius:14px;padding:18px 20px;border:1px solid #e2e8f0;transition:all .3s;box-shadow:0 1px 3px rgba(15,23,42,0.04)}
+.stat-card:hover{transform:translateY(-3px);box-shadow:0 6px 20px rgba(15,23,42,0.06);border-color:#d8dde4}
+.stat-card .stat-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.stat-card .stat-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.stat-icon.blue{background:#eef4ff;color:#2563eb} .stat-icon.green{background:#dcfce7;color:#16a34a}
+.stat-icon.yellow{background:#fef3c7;color:#b45309} .stat-icon.purple{background:#f3e8ff;color:#7c3aed}
+.stat-card .stat-number{font-size:24px;font-weight:700;color:#0f172a;line-height:1.2}
+.stat-card .stat-label{color:#64748b;font-size:13px;margin-top:1px}
+.stat-card .stat-trend{font-size:11px;font-weight:600;padding:2px 10px;border-radius:9999px;display:inline-flex;align-items:center;gap:4px}
+.stat-trend.up{color:#16a34a;background:#dcfce7}
+/* ── Search + table container ── */
+.search-table-container{background:white;border-radius:14px;border:1px solid #e2e8f0;overflow:hidden;box-shadow:0 1px 3px rgba(15,23,42,0.04)}
+.search-bar{padding:14px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;row-gap:10px}
+.search-bar .search-wrapper{flex:1 1 320px;min-width:240px;position:relative;display:flex;align-items:center;height:40px}
+.search-bar .search-wrapper i{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:14px;pointer-events:none;z-index:2}
+.search-bar .search-wrapper input{width:100%;height:40px;padding:0 38px 0 38px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:14px;font-family:inherit;outline:none;background:white;color:#1e293b;box-sizing:border-box}
+.search-bar .search-wrapper input:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,0.10)}
+.search-bar .search-wrapper input::placeholder{color:#94a3b8}
+.search-bar .search-wrapper .search-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#94a3b8;cursor:pointer;width:24px;height:24px;display:none;border-radius:50%;align-items:center;justify-content:center;z-index:2}
+.search-bar .search-wrapper .search-clear.visible{display:flex}
+.search-bar .search-wrapper .search-clear:hover{background:#f1f5f9;color:#1e293b}
+.search-bar .search-actions{display:flex;gap:8px;flex-shrink:0;align-items:center;height:40px}
+.search-bar .search-actions .btn{height:40px;padding:0 16px;font-size:13px;display:inline-flex;align-items:center;justify-content:center}
+/* ── Table responsive ── */
+.table-responsive{overflow-x:auto}
+.table-responsive table{width:100%;border-collapse:collapse}
+.table-responsive th{text-align:left;padding:10px 10px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:#64748b;background:#fafcfd;border-bottom:2px solid #e8edf4;white-space:nowrap}
+.table-responsive td{padding:10px 10px;font-size:13px;color:#1e293b;border-bottom:1px solid #f1f5f9;vertical-align:middle}
+.table-responsive tbody tr{transition:background .15s ease}
+.table-responsive tbody tr:hover{background:#f8fafc}
+.table-responsive tbody tr:last-child td{border-bottom:none}
+/* Teacher avatar + info */
+.teacher-info{display:flex;align-items:center;gap:10px}
+.teacher-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:11px;flex-shrink:0}
+.teacher-avatar.blue{background:linear-gradient(135deg,#2563eb,#1d4ed8)} .teacher-avatar.green{background:linear-gradient(135deg,#16a34a,#15803d)}
+.teacher-avatar.purple{background:linear-gradient(135deg,#7c3aed,#6d28d9)} .teacher-avatar.orange{background:linear-gradient(135deg,#b45309,#92400e)}
+.teacher-avatar.pink{background:linear-gradient(135deg,#db2777,#be185d)}
+.teacher-email{display:block;font-size:11px;color:#94a3b8;margin-top:1px}
+/* Action buttons */
+.action-btn{width:30px;height:30px;border:none;border-radius:8px;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;font-size:12px;background:transparent;color:#94a3b8}
+.action-btn:hover{background:#f1f5f9;color:#1e293b;transform:scale(1.05)}
+.action-btn.view{color:#2563eb} .action-btn.view:hover{background:#eef4ff}
+.action-btn.edit{color:#7c3aed} .action-btn.edit:hover{background:#f3e8ff}
+.action-btn.delete{color:#dc2626} .action-btn.delete:hover{background:#fee2e2}
+.action-group{display:flex;gap:4px;justify-content:center}
+/* Empty state */
+.empty-state{text-align:center;padding:36px 20px;color:#94a3b8}
+.empty-state i{font-size:44px;display:block;margin-bottom:10px;color:#e2e8f0}
+.empty-state p{font-size:15px;color:#64748b;margin:0 0 4px}
+/* Table footer */
+.table-footer{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-top:1px solid #e2e8f0;background:#fafcfd}
+.table-footer .info-text{color:#64748b;font-size:13px}
+.load-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600}
+.load-chip.open{background:#eef4ff;color:#2563eb} .load-chip.full{background:#fef3c7;color:#b45309}
+/* Responsive */
+@media(max-width:992px){.dashboard-stats{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:768px){.dashboard-main{margin-left:0;padding:16px}.dashboard-stats{grid-template-columns:repeat(2,1fr);gap:12px}.search-bar{flex-direction:column;align-items:stretch}.search-bar .search-wrapper{flex:1 1 auto;min-width:0;width:100%}.search-bar .search-actions{width:100%;justify-content:flex-end;flex-wrap:wrap}.table-responsive th,.table-responsive td{padding:8px 8px;font-size:12px}}
 </style>
 <main class="dashboard-main">
 <?php if ($createdPassword): ?>
@@ -128,32 +199,60 @@ code{background:#f1f5f9;padding:3px 8px;border-radius:5px;font-size:12px}
 <?php endif; ?>
 <header class="header"><div class="title"><h1>Teachers</h1><p>Manage teacher accounts</p></div>
 <div class="header-actions"><button class="btn btn-primary" onclick="openAdd()"><i class="fas fa-plus"></i> Add Teacher</button></div></header>
+
+<!-- Stats -->
+<div class="dashboard-stats">
+<div class="stat-card"><div class="stat-top"><div class="stat-icon blue"><i class="fas fa-chalkboard-teacher"></i></div><span class="stat-trend up"><i class="fas fa-users"></i> <?= $teacherLoadSum ?> advised</span></div><div class="stat-number"><?= $teacherTotal ?></div><div class="stat-label">Total Teachers</div></div>
+<div class="stat-card"><div class="stat-top"><div class="stat-icon green"><i class="fas fa-user-check"></i></div></div><div class="stat-number"><?= $teacherActive ?></div><div class="stat-label">Active</div></div>
+<div class="stat-card"><div class="stat-top"><div class="stat-icon purple"><i class="fas fa-id-card"></i></div></div><div class="stat-number"><?= $teacherWithRfid ?></div><div class="stat-label">With RFID</div></div>
+<div class="stat-card"><div class="stat-top"><div class="stat-icon yellow"><i class="fas fa-triangle-exclamation"></i></div></div><div class="stat-number"><?= $teacherWithFlags ?></div><div class="stat-label">Need Attention</div></div>
+</div>
+
+<!-- Search + Table -->
+<div class="search-table-container">
+<div class="search-bar">
+<div class="search-wrapper">
+<i class="fas fa-search"></i>
+<input type="text" id="teacherSearch" placeholder="Search by name, email, role..." />
+<button class="search-clear" id="searchClear"><i class="fas fa-times"></i></button>
+</div>
+<div class="search-actions"><button class="btn btn-secondary" onclick="printTable()"><i class="fas fa-print"></i> Print</button></div>
+</div>
+
+<div class="table-responsive">
 <table>
-<thead><tr><th>Name</th><th>Email</th><th>Role</th><th>RFID UID</th><th>Adviser Load</th><th>Status</th><th style="text-align:center;">Flags</th><th style="text-align:center;">Actions</th></tr></thead>
-<tbody>
+<thead><tr><th>Name</th><th>Role</th><th>RFID UID</th><th>Adviser Load</th><th>Status</th><th style="text-align:center;">Flags</th><th style="text-align:center;">Actions</th></tr></thead>
+<tbody id="teacherTableBody">
 <?php if (empty($teachers)): ?>
-<tr><td colspan="8" style="text-align:center;padding:30px;color:#94a3b8;">No teachers found.</td></tr>
-<?php else: foreach ($teachers as $t):
+<tr><td colspan="7" class="empty-state"><i class="fas fa-chalkboard-teacher"></i><p>No teachers found</p><span>Add your first teacher to get started</span></td></tr>
+<?php else: foreach ($teachers as $i => $t):
 $loadInfo = $load[(int)$t['id']] ?? ['students' => 0, 'sections' => 0];
 $tFlags = teacherDataQualityFlags($t, $allUsers, $loadInfo['students']);
+$tc = ['blue','green','purple','orange','pink'][$i % 5];
+$initials = strtoupper(substr($t['full_name'] ?? '?',0,1).(strpos($t['full_name'] ?? ' ',' ')!==false ? substr(trim(strrchr($t['full_name'],' ')),0,1) : ''));
+$activeStudents = (int) $loadInfo['students'];
+$avg = $teacherTotal > 0 ? ceil($teacherLoadSum / $teacherTotal) : 0;
+$loadClass = $activeStudents >= $avg && $avg > 0 ? 'full' : 'open';
 ?>
-<tr>
-<td><strong><?= htmlspecialchars($t['full_name']) ?></strong></td>
-<td><?= htmlspecialchars($t['email']) ?></td>
+<tr data-teacher='<?= htmlspecialchars(json_encode($t),ENT_QUOTES,'UTF-8') ?>'>
+<td><div class="teacher-info"><div class="teacher-avatar <?= $tc ?>"><?= $initials ?: '?' ?></div><div><div class="teacher-name" style="font-weight:600;font-size:13px;color:#0f172a;"><?= htmlspecialchars($t['full_name']) ?></div><span class="teacher-email"><?= htmlspecialchars($t['email']) ?></span></div></div></td>
 <td><span class="badge" style="background:#f3e8ff;color:#7c3aed;"><?= htmlspecialchars(ucfirst($t['role'])) ?></span></td>
 <td><?= $t['rfid_uid'] ? '<code>'.$t['rfid_uid'].'</code>' : '<span style="color:#94a3b8;">—</span>' ?></td>
-<td><span title="<?= $loadInfo['sections'] ?> section(s)"><?= $loadInfo['students'] ?> students</span></td>
+<td><span class="load-chip <?= $loadClass ?>" title="<?= $loadInfo['sections'] ?> section(s)"><?= $activeStudents ?> students</span></td>
 <td><span class="badge <?= $t['is_active'] ? 'active' : 'inactive' ?>"><?= $t['is_active'] ? 'Active' : 'Inactive' ?></span></td>
 <td style="text-align:center;"><?php if (!empty($tFlags)): ?><i class="fas fa-exclamation-triangle" style="color:#f59e0b;font-size:12px;" title="<?= htmlspecialchars(implode('; ', $tFlags)) ?>"></i><?php else: ?><span style="color:#16a34a;"><i class="fas fa-check-circle"></i></span><?php endif; ?></td>
-<td style="text-align:center;">
-<button class="btn btn-secondary" style="padding:5px 10px;font-size:12px;" onclick="viewTeacher(<?= (int)$t['id'] ?>)" title="View"><i class="fas fa-eye"></i></button>
-<button class="btn btn-secondary" style="padding:5px 10px;font-size:12px;" onclick='openEdit(<?= json_encode($t) ?>)'><i class="fas fa-pen"></i></button>
-<form method="POST" style="display:inline;" onsubmit="return confirm('Deactivate <?= htmlspecialchars($t['full_name']) ?>?')"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int)$t['id'] ?>"><button class="btn btn-light" style="padding:5px 10px;font-size:12px;color:#dc2626;"><i class="fas fa-trash-alt"></i></button></form>
-</td>
+<td style="text-align:center;"><div class="action-group">
+<button class="action-btn view" onclick="viewTeacher(<?= (int)$t['id'] ?>)" title="View"><i class="fas fa-eye"></i></button>
+<button class="action-btn edit" onclick='openEdit(<?= json_encode($t) ?>)' title="Edit"><i class="fas fa-pen"></i></button>
+<form method="POST" style="display:inline;margin:0;" onsubmit="return confirm('Deactivate <?= htmlspecialchars($t['full_name']) ?>?')"><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= (int)$t['id'] ?>"><button class="action-btn delete" title="Deactivate"><i class="fas fa-trash-alt"></i></button></form>
+</div></td>
 </tr>
 <?php endforeach; endif; ?>
 </tbody>
 </table>
+</div>
+<div class="table-footer"><div class="info-text">Showing <strong id="showingCount"><?= count($teachers) ?></strong> of <strong id="totalCount"><?= count($teachers) ?></strong> teachers</div></div>
+</div>
 </main>
 
 <!-- Add Modal -->
@@ -180,6 +279,55 @@ $tFlags = teacherDataQualityFlags($t, $allUsers, $loadInfo['students']);
 <div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeView()">Close</button></div></div></div>
 
 <script>
+// ─── SEARCH ─────────────────────────────────────────────────
+const searchInput = document.getElementById('teacherSearch');
+const searchClear = document.getElementById('searchClear');
+const tableBody = document.getElementById('teacherTableBody');
+const showingCount = document.getElementById('showingCount');
+const totalCount = document.getElementById('totalCount');
+let allTeacherRows = [];
+document.querySelectorAll('#teacherTableBody tr').forEach(row => {
+    try {
+        const data = JSON.parse(row.dataset.teacher);
+        if (data) allTeacherRows.push({ ...data, element: row });
+    } catch(e) {}
+});
+function performSearch() {
+    const q = searchInput.value.trim().toLowerCase();
+    let visible = 0;
+    allTeacherRows.forEach(t => {
+        const hay = ((t.full_name||'') + ' ' + (t.email||'') + ' ' + (t.role||'')).toLowerCase();
+        const show = !q || hay.includes(q);
+        t.element.style.display = show ? '' : 'none';
+        if (show) visible++;
+    });
+    showingCount.textContent = visible;
+    searchClear.classList.toggle('visible', q.length > 0);
+    // Empty state handling
+    let emptyRow = tableBody.querySelector('.empty-state-row');
+    if (visible === 0 && allTeacherRows.length > 0) {
+        if (!emptyRow) {
+            emptyRow = document.createElement('tr'); emptyRow.className = 'empty-state-row';
+            emptyRow.innerHTML = '<td colspan="7" class="empty-state"><i class="fas fa-search"></i><p>No teachers match</p><span>Try a different search term</span></td>';
+            tableBody.appendChild(emptyRow);
+        }
+        emptyRow.style.display = '';
+    } else if (emptyRow) emptyRow.style.display = 'none';
+}
+searchInput.addEventListener('input', performSearch);
+searchClear.addEventListener('click', () => { searchInput.value = ''; performSearch(); });
+
+function printTable() {
+    const w = window.open();
+    w.document.write('<html><head><title>Teachers</title><style>table{width:100%;border-collapse:collapse}th,td{padding:8px;border:1px solid #ddd;text-align:left;font-size:12px}th{background:#f4f4f4}</style></head><body><h2>Teachers</h2><table><tr><th>Name</th><th>Email</th><th>Role</th><th>RFID</th><th>Status</th></tr>');
+    allTeacherRows.forEach(t => {
+        w.document.write('<tr><td>'+(t.full_name||'')+'</td><td>'+(t.email||'')+'</td><td>'+(t.role||'')+'</td><td>'+(t.rfid_uid||'—')+'</td><td>'+(t.is_active?'Active':'Inactive')+'</td></tr>');
+    });
+    w.document.write('</table></body></html>');
+    w.document.close();
+    w.print();
+}
+
 function openAdd() { document.getElementById('addModal').classList.add('active'); document.body.style.overflow = 'hidden'; }
 document.getElementById('addModal').addEventListener('click', function(e) { if (e.target === this) { this.classList.remove('active'); document.body.style.overflow = ''; }});
 function openEdit(t) {
