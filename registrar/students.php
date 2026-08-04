@@ -279,6 +279,7 @@ select.form-control{cursor:pointer;appearance:auto;-webkit-appearance:auto;}
 <a href="#" onclick="exportFiltered()"><i class="fas fa-filter-circle-dollar"></i> Export Filtered</a>
 </div>
 </div>
+<button class="btn btn-secondary" onclick="openQualityPanel()"><i class="fas fa-shield-halved"></i> Data Quality</button>
 <button class="btn btn-primary" onclick="openAddModal()"><i class="fas fa-plus"></i> Add Student</button>
 </div>
 </header>
@@ -386,6 +387,7 @@ $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' :
 <div class="vp-name" id="vName">—</div>
 <div class="vp-id" id="vStudentId">—</div>
 <div id="vLastScan" style="font-size:12px;color:#64748b;margin-top:6px;display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;"></div>
+<div id="vAiSummary" style="display:none;margin-top:12px;background:linear-gradient(135deg,#eef4ff,#f5f3ff);border:1px solid #dbeafe;border-radius:10px;padding:12px 14px;font-size:13px;color:#1e40af;"></div>
 </div>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid #f1f5f9">
 <div class="view-item"><div class="lbl">Status</div><div class="val" id="vStatus">—</div></div>
@@ -415,8 +417,14 @@ $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' :
 </div>
 <div class="modal-footer"><button class="btn btn-primary" onclick="closeViewModal()"><i class="fas fa-times"></i> Close</button></div></div></div>
 
+<!-- Data Quality Panel Modal -->
+<div class="modal-overlay" id="qualityModal"><div class="modal-content" style="max-width:760px;"><div class="modal-header"><h2><i class="fas fa-shield-halved"></i> Data Quality</h2><button class="modal-close" onclick="closeQualityPanel()"><i class="fas fa-times"></i></button></div><div class="modal-body">
+<div id="qualityLoading" style="text-align:center;padding:30px;color:#94a3b8;"><i class="fas fa-spinner fa-spin"></i> Analyzing records...</div>
+<div id="qualityContent" style="display:none;"></div>
+</div><div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeQualityPanel()">Close</button><button id="qualityRefreshBtn" type="button" class="btn btn-secondary" onclick="openQualityPanel(true)"><i class="fas fa-rotate"></i> Refresh</button></div></div></div>
+
 <!-- Add Modal (inline, with guardian) -->
-<div class="modal-overlay" id="addModal"><div class="modal-content" style="max-width:760px;"><div class="modal-header"><h2><i class="fas fa-plus-circle"></i> Enroll New Student</h2><button class="modal-close" onclick="closeAddModal()"><i class="fas fa-times"></i></button></div><form id="addForm"><div class="modal-body">
+<div class="modal-overlay" id="addModal"><div class="modal-content" style="max-width:760px;"><div class="modal-header"><h2><i class="fas fa-plus-circle"></i> Enroll New Student</h2><div style="display:flex;gap:8px;align-items:center;"><button class="btn btn-secondary" style="padding:6px 12px;font-size:12px;" onclick="openPasteModal()"><i class="fas fa-magic"></i> Paste to Fill</button><button class="modal-close" onclick="closeAddModal()"><i class="fas fa-times"></i></button></div></div><form id="addForm"><div class="modal-body">
 <div class="form-row"><div class="form-group" style="flex:0 0 160px;"><label>Student ID</label><input type="text" id="addStudentNumber" class="form-control" placeholder="Auto" style="background:#f8fafc;font-size:12px;" readonly></div><div class="form-group"><label>Academic Status</label><select id="addStatus" class="form-control"><option value="active">Active</option></select></div></div>
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:0 0 12px;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-user"></i> Personal Information</div>
@@ -434,6 +442,13 @@ $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' :
 <div class="form-row"><div class="form-group"><label>Full Name <span style="color:#dc2626;">*</span></label><input type="text" id="addGuardianName" class="form-control" required></div><div class="form-group"><label>Relationship</label><select id="addGuardianRel" class="form-control"><option value="father">Father</option><option value="mother">Mother</option><option value="guardian">Guardian</option></select></div></div>
 <div class="form-row"><div class="form-group"><label>Contact No.</label><input type="text" id="addGuardianContact" class="form-control"></div><div class="form-group"><label>Email (optional)</label><input type="email" id="addGuardianEmail" class="form-control"></div></div>
 </div><div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeAddModal()">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Enroll</button></div></form></div></div>
+
+<!-- AI Paste-to-Fill Modal -->
+<div class="modal-overlay" id="pasteModal"><div class="modal-content" style="max-width:640px;"><div class="modal-header"><h2><i class="fas fa-magic"></i> AI Paste to Fill</h2><button class="modal-close" onclick="closePasteModal()"><i class="fas fa-times"></i></button></div><div class="modal-body">
+<p style="font-size:13px;color:#64748b;margin-bottom:12px;">Paste a transcript, enrolment slip, or student info text. AI will extract the details so you can review and apply them.</p>
+<textarea id="pasteText" class="form-control" rows="6" placeholder="Paste text here..." style="margin-bottom:12px;"></textarea>
+<div id="pastePreview" style="display:none;border:1px solid #dbeafe;background:#f8fbff;border-radius:10px;padding:14px;margin-bottom:12px;"></div>
+</div><div class="modal-footer"><button type="button" class="btn btn-light" onclick="closePasteModal()">Cancel</button><button id="pasteExtractBtn" type="button" class="btn btn-primary" onclick="extractPaste()"><i class="fas fa-magic"></i> Extract</button><button id="pasteApplyBtn" type="button" class="btn btn-primary" style="display:none;" onclick="applyPaste()"><i class="fas fa-check"></i> Apply to Form</button></div></div></div>
 
 <!-- Edit Modal (same structure) -->
 <div class="modal-overlay" id="editModal"><div class="modal-content" style="max-width:760px;"><div class="modal-header"><h2><i class="fas fa-pen"></i> Edit Student</h2><button class="modal-close" onclick="closeEditModal()"><i class="fas fa-times"></i></button></div><form id="editForm"><input type="hidden" id="editId" value=""><div class="modal-body">
@@ -613,6 +628,18 @@ function viewStudent(id) {
         loadDocuments(s.id);
         loadAcademic(s.id);
         loadHealth(s.id);
+        // AI profile summary
+        const aiSum = document.getElementById('vAiSummary');
+        aiSum.style.display = 'none';
+        aiSum.innerHTML = '<span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#3b82f6;"><i class="fas fa-brain"></i> AI Summary</span> <span style="color:#64748b;font-size:12px;margin-left:4px;"><i class="fas fa-spinner fa-spin"></i> Generating...</span>';
+        aiPost('profile', { id: s.id }).then(d => {
+            if (d.success && d.data && d.data.summary) {
+                aiSum.innerHTML = '<span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#3b82f6;"><i class="fas fa-brain"></i> AI Summary</span><p style="margin:6px 0 0;color:#334155;">' + d.data.summary + '</p>';
+                aiSum.style.display = 'block';
+            } else {
+                aiSum.style.display = 'none';
+            }
+        }).catch(() => { aiSum.style.display = 'none'; });
         // Reset to profile tab
         document.querySelectorAll('.vtab').forEach(t=>t.classList.remove('active'));
         document.querySelector('.vtab[data-tab="profile"]')?.classList.add('active');
@@ -882,6 +909,217 @@ document.getElementById('addForm').addEventListener('submit', async function(e) 
         else { alert(d.message); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Add Student'; }
     } catch(e) { alert('Network error.'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Add Student'; }
 });
+
+// ─── AI ASSIST ───────────────────────────────────────────────
+async function aiPost(action, body) {
+    const res = await fetch('../api/ai-assist.php?action=' + action, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+    });
+    return await res.json();
+}
+
+// Paste-to-fill modal
+function openPasteModal() {
+    document.getElementById('pasteModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+    document.getElementById('pasteText').value = '';
+    document.getElementById('pastePreview').style.display = 'none';
+    document.getElementById('pasteApplyBtn').style.display = 'none';
+    document.getElementById('pasteExtractBtn').style.display = '';
+}
+function closePasteModal() { document.getElementById('pasteModal').classList.remove('active'); document.body.style.overflow = ''; }
+document.getElementById('pasteModal').addEventListener('click', function(e) { if (e.target === this) closePasteModal(); });
+
+let pasteData = null;
+async function extractPaste() {
+    const text = document.getElementById('pasteText').value.trim();
+    if (!text) { alert('Paste some text first.'); return; }
+    const btn = document.getElementById('pasteExtractBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Extracting...';
+    try {
+        const d = await aiPost('paste_fill', { text });
+        if (!d.success) { alert(d.message || 'Extraction failed.'); return; }
+        pasteData = d.data || {};
+        const keys = ['first_name','middle_name','last_name','gender','birth_date','place_of_birth','nationality','religion','email','contact_number','address','course','year_level','guardian_name','guardian_relationship'];
+        let html = '<div style="font-size:12px;font-weight:700;color:#1e40af;margin-bottom:8px;">Extracted — review before applying</div>';
+        let found = 0;
+        keys.forEach(k => {
+            const v = pasteData[k];
+            if (v !== undefined && v !== null && v !== '') { found++; html += '<div style="font-size:13px;color:#334155;padding:2px 0;"><b style="color:#475569;display:inline-block;width:130px;">' + k.replace(/_/g,' ') + ':</b> ' + (typeof v === 'string' ? v : v) + '</div>'; }
+        });
+        if (found === 0) html += '<p style="color:#94a3b8;font-size:13px;">No fields recognized. Try more complete text.</p>';
+        document.getElementById('pastePreview').innerHTML = html;
+        document.getElementById('pastePreview').style.display = 'block';
+        document.getElementById('pasteApplyBtn').style.display = '';
+    } catch(e) { alert('Extraction error: ' + e.message); }
+    finally { btn.disabled = false; btn.innerHTML = '<i class="fas fa-magic"></i> Extract'; }
+}
+
+function applyPaste() {
+    if (!pasteData) return;
+    const map = {
+        first_name: 'addFirstName', middle_name: 'addMiddleName', last_name: 'addLastName',
+        gender: 'addGender', birth_date: 'addBirthDate', place_of_birth: 'addBirthPlace',
+        nationality: 'addNationality', religion: 'addReligion', email: 'addEmail',
+        contact_number: 'addContact', address: 'addAddress', course: 'addCourse',
+        year_level: 'addYearLevel', guardian_name: 'addGuardianName', guardian_relationship: 'addGuardianRel'
+    };
+    for (const k in map) {
+        const el = document.getElementById(map[k]);
+        if (el && pasteData[k] !== undefined && pasteData[k] !== null && pasteData[k] !== '') {
+            el.value = pasteData[k];
+        }
+    }
+    refreshMajorOptions('add');
+    closePasteModal();
+    showToast('Applied', 'Form pre-filled from extracted data.', 'success');
+}
+
+// Duplicate check on name blur (deterministic, no LLM)
+function checkDuplicateHint() {
+    const fn = document.getElementById('addFirstName').value.trim();
+    const ln = document.getElementById('addLastName').value.trim();
+    const bd = document.getElementById('addBirthDate').value;
+    if (!fn || !ln) return;
+    aiPost('check_duplicate', { first_name: fn, last_name: ln, birth_date: bd })
+    .then(d => {
+        if (d.success && d.data && d.data.length) {
+            const hit = d.data[0];
+            let msg = 'Possible duplicate: ' + hit.name + ' (' + (hit.student_number||'') + '). Enrol anyway?';
+            if (hit.score >= 0.9 && hit.birth_date === bd) {
+                msg = 'Likely duplicate of ' + hit.name + ' (' + hit.student_number + ').';
+            }
+            if (!confirm(msg)) return;
+        }
+    }).catch(() => {});
+}
+document.getElementById('addFirstName').addEventListener('blur', checkDuplicateHint);
+document.getElementById('addLastName').addEventListener('blur', checkDuplicateHint);
+
+// Course auto-standardize on blur (deterministic)
+function standardizeCourse() {
+    const el = document.getElementById('addCourse');
+    const val = el.value.trim();
+    if (!val) return;
+    fetch('../api/ai-assist.php?action=suggest_field', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ field: 'course', value: val, context: 'student enrollment' })
+    }).then(r => r.json()).then(d => {
+        if (d.success && d.data && d.data.suggested && d.data.suggested !== val) {
+            if (confirm('Standardize course to "' + d.data.suggested + '"?')) {
+                el.value = d.data.suggested;
+                refreshMajorOptions('add');
+            }
+        }
+    }).catch(() => {});
+}
+document.getElementById('addCourse').addEventListener('blur', standardizeCourse);
+
+// ─── DATA QUALITY PANEL ─────────────────────────────────────
+let qualityData = null;
+function openQualityPanel(force) {
+    const modal = document.getElementById('qualityModal');
+    const loading = document.getElementById('qualityLoading');
+    const content = document.getElementById('qualityContent');
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    loading.style.display = '';
+    content.style.display = 'none';
+    aiPost('quality').then(d => {
+        loading.style.display = 'none';
+        if (!d.success || !d.data) { content.innerHTML = '<p style="color:#dc2626;">Failed to analyze.</p>'; content.style.display='block'; return; }
+        qualityData = d.data;
+        renderQualityPanel();
+    }).catch(() => { loading.style.display='none'; content.innerHTML='<p style="color:#dc2626;">Error analyzing data.</p>'; content.style.display='block'; });
+}
+function closeQualityPanel() { document.getElementById('qualityModal').classList.remove('active'); document.body.style.overflow = ''; }
+document.getElementById('qualityModal').addEventListener('click', function(e) { if (e.target === this) closeQualityPanel(); });
+
+function renderQualityPanel() {
+    const d = qualityData;
+    let html = '<div style="margin-bottom:14px;"><b style="font-size:14px;color:#0f172a;">' + d.total_students + ' student records</b></div>';
+    // Issue summary
+    const issues = d.issue_counts || {};
+    const issueKeys = Object.keys(issues);
+    if (issueKeys.length) {
+        html += '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:6px;">Data Issues</div><div style="margin-bottom:12px;">';
+        issueKeys.forEach(k => {
+            html += '<div style="display:flex;justify-content:space-between;padding:5px 8px;background:#fef2f2;border-radius:6px;margin-bottom:4px;font-size:13px;color:#991b1b;"><span>' + k + '</span><b>' + issues[k] + '</b></div>';
+        });
+        html += '</div>';
+    } else {
+        html += '<p style="color:#16a34a;font-size:13px;"><i class="fas fa-check-circle"></i> No data issues found.</p>';
+    }
+    // Non-standard courses
+    const nsc = d.non_standard_courses || [];
+    if (nsc.length) {
+        html += '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin:10px 0 6px;">Non-standard course names</div>';
+        nsc.forEach(c => {
+            const btn = c.standardized
+                ? '<button class="btn btn-secondary" style="padding:3px 10px;font-size:11px;margin-left:6px;" onclick="applyStd(\'' + c.raw.replace(/'/g,"\\'") + '\',\'' + c.standardized.replace(/'/g,"\\'") + '\')">Fix → ' + c.standardized + '</button>'
+                : '<span style="color:#94a3b8;font-size:11px;margin-left:6px;">(no confident match)</span>';
+            html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:#fffbeb;border-radius:6px;margin-bottom:4px;font-size:13px;color:#92400e;"><span><b>' + c.raw + '</b> × ' + c.count + '</span>' + btn + '</div>';
+        });
+    }
+    html += '<div style="margin-top:14px;border-top:1px solid #e2e8f0;padding-top:12px;">';
+    html += '<button class="btn btn-secondary" style="margin-right:6px;" onclick="runDupScan()"><i class="fas fa-clone"></i> Scan for Duplicates</button>';
+    html += '<button class="btn btn-secondary" onclick="runStandardizeAll()"><i class="fas fa-magic"></i> Standardize All Courses</button>';
+    html += '</div><div id="qualityResult" style="margin-top:12px;"></div>';
+    document.getElementById('qualityContent').innerHTML = html;
+    document.getElementById('qualityContent').style.display = 'block';
+}
+
+function runDupScan() {
+    const box = document.getElementById('qualityResult');
+    box.innerHTML = '<p style="color:#64748b;font-size:13px;"><i class="fas fa-spinner fa-spin"></i> Scanning...</p>';
+    aiPost('scan_dupes').then(d => {
+        if (!d.success) { box.innerHTML = '<p style="color:#dc2626;">Scan failed.</p>'; return; }
+        const pairs = (d.data && d.data.pairs) || [];
+        if (!pairs.length) { box.innerHTML = '<p style="color:#16a34a;font-size:13px;"><i class="fas fa-check-circle"></i> No likely duplicates found.</p>'; return; }
+        let html = '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94a3b8;margin-bottom:6px;">Potential duplicates</div>';
+        pairs.forEach(p => {
+            html += '<div style="background:#f8fafc;border-radius:6px;padding:8px;margin-bottom:6px;font-size:13px;color:#334155;">'
+                + '<b>' + p.a.name + '</b> (' + p.a.sn + ') <span style="color:#94a3b8;">vs</span> <b>' + p.b.name + '</b> (' + p.b.sn + ')'
+                + ' <span style="color:#64748b;font-size:11px;">score ' + p.score + '</span></div>';
+        });
+        box.innerHTML = html;
+    }).catch(() => { box.innerHTML = '<p style="color:#dc2626;">Scan error.</p>'; });
+}
+
+function runStandardizeAll() {
+    const box = document.getElementById('qualityResult');
+    box.innerHTML = '<p style="color:#64748b;font-size:13px;"><i class="fas fa-spinner fa-spin"></i> Drafting standardization...</p>';
+    aiPost('standardize').then(d => {
+        if (!d.success) { box.innerHTML = '<p style="color:#dc2626;">Failed.</p>'; return; }
+        const changes = (d.data && d.data.changes) || [];
+        if (!changes.length) { box.innerHTML = '<p style="color:#16a34a;font-size:13px;"><i class="fas fa-check-circle"></i> All course names already standardized.</p>'; return; }
+        let html = '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94a3b8;margin-bottom:6px;">' + changes.length + ' course change(s) ready</div>';
+        changes.forEach(c => {
+            html += '<div style="display:flex;align-items:center;justify-content:space-between;background:#f8fafc;border-radius:6px;padding:6px 8px;margin-bottom:4px;font-size:13px;color:#334155;"><span>' + c.from + ' <span style="color:#94a3b8;">→</span> <b>' + c.to + '</b></span><button class="btn btn-secondary" style="padding:3px 10px;font-size:11px;" onclick="applyStdById(' + c.id + ',\'' + c.to.replace(/'/g,"\\'") + '\',this)">Apply</button></div>';
+        });
+        box.innerHTML = html;
+    }).catch(() => { box.innerHTML = '<p style="color:#dc2626;">Error.</p>'; });
+}
+
+function applyStd(from, to) {
+    if (!confirm('Change "' + from + '" → "' + to + '"?')) return;
+    aiPost('standardize').then(d => {
+        if (!d.success) return;
+        const changes = (d.data && d.data.changes) || [];
+        const match = changes.filter(c => c.from === from).map(c => c.id);
+        const chain = match.map(id => aiPost('apply_std', { id, to }));
+        return Promise.all(chain);
+    }).then(() => { showToast('Updated', 'Course standardized.', 'success'); openQualityPanel(true); }).catch(() => alert('Error applying.'));
+}
+function applyStdById(id, to, btn) {
+    if (!confirm('Apply course change?')) return;
+    btn.disabled = true;
+    aiPost('apply_std', { id, to }).then(d => {
+        if (d.success) { showToast('Updated', 'Course updated.', 'success'); btn.parentElement.remove(); }
+        else { alert(d.message || 'Failed.'); btn.disabled = false; }
+    }).catch(() => { alert('Error.'); btn.disabled = false; });
+}
 
 // ─── QUICK STATUS ────────────────────────────────────────────
 function toggleQuickMenu(id) { document.getElementById('qsm_'+id).classList.toggle('show'); }
