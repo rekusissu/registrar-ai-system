@@ -1,0 +1,14 @@
+# Local AI API key (never commit)
+shared/ai_key.local
+.env
+*.local
+
+# Runtime / uploads
+uploads/ai_docs/
+uploads/students/*
+!uploads/students/.htaccess
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log

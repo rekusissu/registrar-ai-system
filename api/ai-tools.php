@@ -154,6 +154,49 @@ switch ($action) {
         echo json_encode(['success' => true, 'data' => ['pairs' => array_slice($pairs, 0, 30)]]);
         exit;
 
+    // ─── MERGE DUPLICATE RECORDS ─────────────────────────────
+    case 'merge':
+        $keeperId  = (int) ($input['keeper_id'] ?? 0);
+        $removeId  = (int) ($input['remove_id'] ?? 0);
+        if (!$keeperId || !$removeId || $keeperId === $removeId) {
+            echo json_encode(['success' => false, 'message' => 'Invalid merge request.']);
+            exit;
+        }
+
+        $keeper = $db->fetchOne("SELECT * FROM students WHERE id = ?", [$keeperId]);
+        $remove = $db->fetchOne("SELECT * FROM students WHERE id = ?", [$removeId]);
+        if (!$keeper || !$remove) {
+            echo json_encode(['success' => false, 'message' => 'One or both records not found.']);
+            exit;
+        }
+
+        // Reassign related records to the keeper.
+        $tables = ['academic_history', 'guardians', 'health_records', 'status_tracker', 'student_ids', 'rfid_cards', 'documents'];
+        foreach ($tables as $t) {
+            $db->update($t, ['student_id' => $keeperId], 'student_id = ?', [$removeId]);
+        }
+        $db->update('document_requests', ['student_id' => $keeperId], 'student_id = ?', [$removeId]);
+
+        // Keep non-empty fields from the keeper, falling back to the removed record.
+        $mergeFields = ['first_name','middle_name','last_name','gender','civil_status','birth_date','place_of_birth','nationality','religion','address','contact_number','email','course','major','year_level','school_year','semester','section','status'];
+        $updates = [];
+        foreach ($mergeFields as $f) {
+            $k = trim((string) ($keeper[$f] ?? ''));
+            $r = trim((string) ($remove[$f] ?? ''));
+            if ($k === '' && $r !== '') {
+                $updates[$f] = $remove[$f];
+            }
+        }
+        if ($updates) {
+            $db->update('students', $updates, 'id = ?', [$keeperId]);
+        }
+
+        // Delete the removed record.
+        $db->delete('students', 'id = ?', [$removeId]);
+
+        echo json_encode(['success' => true, 'message' => 'Records merged.']);
+        exit;
+
     // ─── AI PROFILE SUMMARY ──────────────────────────────────
     case 'profile':
         $id = (int) ($input['id'] ?? 0);
@@ -191,6 +234,118 @@ switch ($action) {
         }
 
         echo json_encode(['success' => true, 'data' => ['summary' => $summary]]);
+        exit;
+
+    // ─── NATURAL-LANGUAGE SEARCH ─────────────────────────────
+    case 'nl_search':
+        $query = trim((string) ($input['query'] ?? ''));
+        if ($query === '') {
+            echo json_encode(['success' => false, 'message' => 'Query required.']);
+            exit;
+        }
+
+        $system = "You are a registrar's search assistant. Translate a natural-language query into a JSON filter object for a student database. "
+                . "Return ONLY a JSON object with any of these keys: "
+                . "status (one of active/probation/at-risk/loa/graduated/transferred/dropped/archived), "
+                . "year_level (integer), course (a keyword substring), section, semester (1st/2nd/summer), "
+                . "gender (Male/Female), has_rfid (bool), or keywords (array of free-text search terms to match against name/student_number/course). "
+                . "If the query implies no filter for a key, omit it. Be literal and conservative.";
+
+        $filter = aiGenerateJson($system, "Query: \"" . mb_substr($query, 0, 300) . "\"", [], ['max_tokens' => 200]);
+        if (!is_array($filter) || empty($filter)) {
+            // Fall back to a free-text keyword search.
+            $filter = ['keywords' => [$query]];
+        }
+
+        // Build the SQL from the structured filter.
+        $sql = "SELECT * FROM students WHERE 1=1";
+        $params = [];
+        if (!empty($filter['status'])) {
+            $sql .= " AND status = ?"; $params[] = (string) $filter['status'];
+        }
+        if (isset($filter['year_level']) && $filter['year_level'] !== '' && $filter['year_level'] !== null) {
+            $sql .= " AND year_level = ?"; $params[] = (int) $filter['year_level'];
+        }
+        if (!empty($filter['course'])) {
+            $sql .= " AND course LIKE ?"; $params[] = '%' . (string) $filter['course'] . '%';
+        }
+        if (!empty($filter['section'])) {
+            $sql .= " AND section = ?"; $params[] = (string) $filter['section'];
+        }
+        if (!empty($filter['semester'])) {
+            $sql .= " AND semester = ?"; $params[] = (string) $filter['semester'];
+        }
+        if (!empty($filter['gender'])) {
+            $sql .= " AND gender = ?"; $params[] = (string) $filter['gender'];
+        }
+        if (isset($filter['has_rfid']) && $filter['has_rfid']) {
+            $sql .= " AND id IN (SELECT DISTINCT student_id FROM rfid_cards)";
+        }
+        if (!empty($filter['keywords']) && is_array($filter['keywords'])) {
+            $sql .= " AND (";
+            $kwParts = [];
+            foreach ($filter['keywords'] as $kw) {
+                if ($kw === '' || $kw === null) continue;
+                $kwParts[] = "(first_name LIKE ? OR last_name LIKE ? OR student_number LIKE ? OR course LIKE ?)";
+                $like = '%' . (string) $kw . '%';
+                $params[] = $like; $params[] = $like; $params[] = $like; $params[] = $like;
+            }
+            if ($kwParts) {
+                $sql .= implode(' OR ', $kwParts) . ")";
+            }
+        }
+        $sql .= " ORDER BY id DESC LIMIT 50";
+
+        $rows = $db->fetchAll($sql, $params);
+        $out = [];
+        foreach ($rows as $r) {
+            $out[] = [
+                'id' => (int) $r['id'],
+                'student_number' => (string) ($r['student_number'] ?? ''),
+                'name' => trim(($r['first_name'] ?? '') . ' ' . ($r['last_name'] ?? '')),
+                'course' => (string) ($r['course'] ?? ''),
+                'year_level' => $r['year_level'] ?? null,
+                'section' => (string) ($r['section'] ?? ''),
+                'status' => (string) ($r['status'] ?? ''),
+            ];
+        }
+
+        echo json_encode([
+            'success' => true,
+            'data' => ['filter' => $filter, 'students' => $out],
+        ]);
+        exit;
+
+    // ─── BATCH AI REPORT (whole list summary) ─────────────────
+    case 'report':
+        $students = $db->fetchAll("SELECT * FROM students");
+        $total = count($students);
+        $active = 0; $atRisk = 0; $noGender = 0; $noCourse = 0;
+        $byCourse = []; $byStatus = [];
+        foreach ($students as $s) {
+            if (($s['status'] ?? '') === 'active') $active++;
+            if (($s['status'] ?? '') === 'at-risk') $atRisk++;
+            if (empty(trim((string)($s['gender'] ?? '')))) $noGender++;
+            if (empty(trim((string)($s['course'] ?? '')))) $noCourse++;
+            $c = trim((string)($s['course'] ?? 'N/A'));
+            $byCourse[$c] = ($byCourse[$c] ?? 0) + 1;
+            $st = $s['status'] ?? 'N/A';
+            $byStatus[$st] = ($byStatus[$st] ?? 0) + 1;
+        }
+        arsort($byCourse); arsort($byStatus);
+
+        $system = "You are a registrar's reporting assistant. Write a concise 3-4 sentence summary of the student population, highlighting notable trends or concerns a registrar should know. Do not invent data.";
+        $facts = "Total students: {$total}\n"
+            . "Active: {$active}, At-risk: {$atRisk}, Missing gender: {$noGender}, Missing course: {$noCourse}\n"
+            . "By course: " . json_encode($byCourse) . "\n"
+            . "By status: " . json_encode($byStatus);
+
+        $report = aiGenerate($system, $facts, ['max_tokens' => 300]);
+        if ($report === '') {
+            $report = "Total students: {$total}. Active: {$active}. No data issues found to report.";
+        }
+
+        echo json_encode(['success' => true, 'data' => ['report' => $report]]);
         exit;
 
     default:

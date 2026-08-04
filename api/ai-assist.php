@@ -51,6 +51,46 @@ switch ($action) {
             exit;
         }
 
+        $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+
+        // A4: Image uploads (scans/photos) go through the vision model.
+        $imageExt = ['png', 'jpg', 'jpeg', 'webp', 'gif'];
+        if (in_array($ext, $imageExt, true)) {
+            $imageData = file_get_contents($tmpName);
+            if ($imageData === false || $imageData === '') {
+                echo json_encode(['success' => false, 'message' => 'Could not read the image file.']);
+                exit;
+            }
+            $mimeMap = ['png'=>'image/png','jpg'=>'image/jpeg','jpeg'=>'image/jpeg','webp'=>'image/webp','gif'=>'image/gif'];
+            $mime = $mimeMap[$ext] ?? 'image/' . $ext;
+
+            $system = "You are a data-entry assistant for a Philippine university registrar. " .
+                      "Look at the image of a document (enrolment slip, transcript, PSA birth cert, etc.) " .
+                      "and extract the student's details. Respond with ONLY a JSON object using these keys " .
+                      "(omit keys you cannot find): first_name, middle_name, last_name, gender, civil_status, " .
+                      "birth_date (YYYY-MM-DD), place_of_birth, nationality, religion, email, contact_number, " .
+                      "address, course, year_level, guardian_name, guardian_relationship. Be conservative — " .
+                      "do not invent data not visible in the image.";
+
+            $raw = aiGenerateVision($system, 'Extract the student details from this document image.', base64_encode($imageData), $mime, ['max_tokens' => 800]);
+            $result = [];
+            $decoded = json_decode($raw, true);
+            if (is_array($decoded)) {
+                $result = $decoded;
+            } elseif (trim($raw) !== '') {
+                // Try to salvage a JSON object from the raw text.
+                preg_match('/\{.*\}/s', $raw, $m);
+                if ($m) {
+                    $d = json_decode($m[0], true);
+                    if (is_array($d)) $result = $d;
+                }
+            }
+
+            $result = aiNormalizeExtracted($result);
+            echo json_encode(['success' => true, 'data' => $result]);
+            exit;
+        }
+
         try {
             $text = extractDocumentText($tmpName, $origName);
         } catch (RuntimeException $e) {
@@ -77,14 +117,7 @@ switch ($action) {
         ]);
 
         if (is_array($result)) {
-            if (!empty($result['first_name']))  $result['first_name']  = normalizeNameCase((string) $result['first_name']);
-            if (!empty($result['last_name']))   $result['last_name']   = normalizeNameCase((string) $result['last_name']);
-            if (!empty($result['middle_name'])) $result['middle_name'] = normalizeNameCase((string) $result['middle_name']);
-            if (!empty($result['contact_number'])) $result['contact_number'] = normalizePhone((string) $result['contact_number']);
-            if (!empty($result['course']))      $result['course']      = courseStandardize((string) $result['course']);
-            if (!empty($result['nationality']) && strtolower(trim((string)$result['nationality'])) === 'filipino') {
-                $result['nationality'] = 'Filipino';
-            }
+            $result = aiNormalizeExtracted($result);
         }
 
         echo json_encode(['success' => true, 'data' => $result]);
@@ -112,14 +145,7 @@ switch ($action) {
 
         // Normalize extracted values through the deterministic layer.
         if (is_array($result)) {
-            if (!empty($result['first_name']))  $result['first_name']  = normalizeNameCase((string) $result['first_name']);
-            if (!empty($result['last_name']))   $result['last_name']   = normalizeNameCase((string) $result['last_name']);
-            if (!empty($result['middle_name'])) $result['middle_name'] = normalizeNameCase((string) $result['middle_name']);
-            if (!empty($result['contact_number'])) $result['contact_number'] = normalizePhone((string) $result['contact_number']);
-            if (!empty($result['course']))      $result['course']      = courseStandardize((string) $result['course']);
-            if (!empty($result['nationality']) && strtolower(trim((string)$result['nationality'])) === 'filipino') {
-                $result['nationality'] = 'Filipino';
-            }
+            $result = aiNormalizeExtracted($result);
         }
 
         echo json_encode(['success' => true, 'data' => $result]);
@@ -159,6 +185,25 @@ switch ($action) {
                 'reason'    => (string) ($result['reason'] ?? ''),
             ],
         ]);
+        exit;
+
+    // ─── SECTION SUGGESTION (deterministic) ─────────────────
+    case 'suggest_section':
+        $course = trim((string) ($input['course'] ?? ''));
+        $year   = (int) ($input['year_level'] ?? 0);
+        $sem    = trim((string) ($input['semester'] ?? ''));
+        $sem    = $sem !== '' ? $sem : null;
+
+        if ($course === '' || $year <= 0) {
+            echo json_encode(['success' => false, 'data' => ['suggestion' => ''], 'message' => 'Choose a course and year first.']);
+            exit;
+        }
+
+        require_once __DIR__ . '/../shared/functions.php';
+        $next = nextSectionNumber($course, $year, $sem);
+        $code = sectionCodeFromParts($year, $sem, $next);
+
+        echo json_encode(['success' => true, 'data' => ['suggestion' => $code]]);
         exit;
 
     // ─── DUPLICATE CHECK (deterministic) ────────────────────

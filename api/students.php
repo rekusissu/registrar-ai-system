@@ -13,6 +13,7 @@ require_once __DIR__ . '/../shared/config.php';
 require_once __DIR__ . '/../shared/database.php';
 require_once __DIR__ . '/../shared/session_config.php';
 require_once __DIR__ . '/../shared/functions.php';
+require_once __DIR__ . '/../shared/normalize.php';
 
 // Require login
 if (!isLoggedIn()) {
@@ -162,24 +163,29 @@ try {
         $birthDateRaw = trim((string)($input['birth_date'] ?? ''));
         $birthDate = ($birthDateRaw !== '' && $birthDateRaw !== '0000-00-00') ? $birthDateRaw : null;
 
+        // B3: normalize before save so bad data never lands.
+        $firstName = normalizeNameCase($firstName);
+        $lastName  = normalizeNameCase($lastName);
+        $address   = trim($address);
+
         $data = [
             'student_number' => $studentNumber,
             'first_name' => $firstName,
-            'middle_name' => isset($input['middle_name']) && $input['middle_name'] !== '' ? trim($input['middle_name']) : null,
+            'middle_name' => isset($input['middle_name']) && $input['middle_name'] !== '' ? normalizeNameCase(trim($input['middle_name'])) : null,
             'last_name' => $lastName,
             'gender' => $input['gender'] ?? null,
             'civil_status' => $input['civil_status'] ?? null,
             'birth_date' => $birthDate,
-            'place_of_birth' => $input['place_of_birth'] ?? null,
-            'nationality' => $input['nationality'] ?? null,
-            'religion' => $input['religion'] ?? null,
+            'place_of_birth' => isset($input['place_of_birth']) && $input['place_of_birth'] !== '' ? normalizeNameCase(trim($input['place_of_birth'])) : null,
+            'nationality' => isset($input['nationality']) && trim($input['nationality']) !== '' ? trim($input['nationality']) : null,
+            'religion' => isset($input['religion']) && trim($input['religion']) !== '' ? normalizeNameCase(trim($input['religion'])) : null,
             'address' => $address,
-            'contact_number' => $input['contact_number'] ?? null,
-            'email' => $input['email'] ?? null,
-            'course' => $input['course'] ?? null,
-            'major' => $input['major'] ?? null,
+            'contact_number' => isset($input['contact_number']) && trim($input['contact_number']) !== '' ? normalizePhone(trim($input['contact_number'])) : null,
+            'email' => isset($input['email']) && trim($input['email']) !== '' ? strtolower(trim($input['email'])) : null,
+            'course' => isset($input['course']) && trim($input['course']) !== '' ? courseStandardize(trim($input['course'])) : null,
+            'major' => isset($input['major']) && trim($input['major']) !== '' ? trim($input['major']) : null,
             'year_level' => isset($input['year_level']) && $input['year_level'] !== '' ? (int)$input['year_level'] : null,
-            'school_year' => $input['school_year'] ?? null,
+            'school_year' => isset($input['school_year']) && trim($input['school_year']) !== '' ? trim($input['school_year']) : null,
             'semester' => $input['semester'] ?? null,
             'section' => $input['section'] ?? null,
             'adviser_id' => isset($input['adviser_id']) && $input['adviser_id'] !== '' ? (int)$input['adviser_id'] : null,
@@ -242,6 +248,20 @@ try {
                 }
                 if ($field === 'adviser_id' && $value !== null) {
                     $value = (int)$value;
+                }
+                // B3: normalize text fields before saving.
+                if ($value !== null && $value !== '') {
+                    if (in_array($field, ['first_name', 'middle_name', 'last_name', 'place_of_birth', 'religion'], true)) {
+                        $value = normalizeNameCase((string) $value);
+                    } elseif ($field === 'contact_number') {
+                        $value = normalizePhone((string) $value);
+                    } elseif ($field === 'email') {
+                        $value = strtolower(trim((string) $value));
+                    } elseif ($field === 'course') {
+                        $value = courseStandardize((string) $value);
+                    } elseif ($field === 'address' || $field === 'nationality' || $field === 'major' || $field === 'school_year') {
+                        $value = trim((string) $value);
+                    }
                 }
                 $data[$field] = $value;
             }

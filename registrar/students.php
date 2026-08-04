@@ -9,6 +9,7 @@ require_once __DIR__ . '/../shared/session_config.php';
 if (empty($_SESSION['user_id'])) { header('Location: ../login.php'); exit; }
 require_once __DIR__ . '/../shared/database.php';
 require_once __DIR__ . '/../shared/functions.php';
+require_once __DIR__ . '/../shared/normalize.php';
 
 $db = Database::getInstance();
 
@@ -317,11 +318,11 @@ select.form-control{cursor:pointer;appearance:auto;-webkit-appearance:auto;}
 <div class="table-responsive">
 <table>
 <thead>
-<tr><th style="width:30px;"><div class="cb-wrap"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></div></th><th>ID</th><th>Name</th><th>Course</th><th>Year</th><th>Section</th><th>Gender</th><th>RFID</th><th>Status</th><th style="text-align:center;">Actions</th></tr>
+<tr><th style="width:30px;"><div class="cb-wrap"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></div></th><th>ID</th><th>Name</th><th>Course</th><th>Year</th><th>Section</th><th>Gender</th><th>RFID</th><th>Status</th><th style="text-align:center;">Quality</th><th style="text-align:center;">Actions</th></tr>
 </thead>
 <tbody id="studentTableBody">
 <?php if (empty($students)): ?>
-<tr><td colspan="10" class="empty-state"><i class="fas fa-user-graduate"></i><p>No students found</p><span>Add your first student to get started</span></td></tr>
+<tr><td colspan="11" class="empty-state"><i class="fas fa-user-graduate"></i><p>No students found</p><span>Add your first student to get started</span></td></tr>
 <?php else:
 $avatarColors = ['blue','green','purple','orange','pink'];
 foreach ($students as $i => $s):
@@ -329,6 +330,10 @@ $initials = strtoupper(substr($s['first_name'],0,1).substr($s['last_name'],0,1))
 $ac = $avatarColors[$i % count($avatarColors)];
 $hasRfid = isset($rfidMap[$s['id']]);
 $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' : ($hasRfid ? 'inactive' : 'none');
+// Data quality score + anomaly flags (deterministic)
+$qScore = studentQualityScore($s);
+$qAnoms = studentAnomalies($s);
+$qDotClass = $qScore >= 85 ? 'good' : ($qScore >= 60 ? 'warn' : 'bad');
 ?>
 <tr data-student='<?= htmlspecialchars(json_encode($s),ENT_QUOTES,'UTF-8') ?>' class="<?= $s['status']==='archived'?'archived':'' ?>">
 <td><div class="cb-wrap"><input type="checkbox" class="student-cb" value="<?= (int)$s['id'] ?>" onchange="updateBulkBar()"></div></td>
@@ -340,6 +345,10 @@ $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' :
 <td><?= htmlspecialchars(($s['gender'] ?? '') ?: '—') ?></td>
 <td><a href="../registrar/rfid-cards.php?search=<?= urlencode($s['student_number']) ?>" class="rfid-chip <?= $rfidStatus ?>"><i class="fas fa-<?= $rfidStatus==='active'?'check-circle':'credit-card' ?>"></i> <?= $rfidStatus==='active'?($rfidMap[$s['id']]['card_uid']):($rfidStatus==='none'?'—':$rfidMap[$s['id']]['status']) ?></a></td>
 <td><div class="quick-status-wrap"><button class="status-badge <?= $s['status']??'active' ?>" onclick="toggleQuickMenu(<?= (int)$s['id'] ?>)"><span class="status-dot <?= $s['status']??'active' ?>"></span><?= ucfirst($s['status']??'Active') ?></button><div class="quick-status-menu" id="qsm_<?= (int)$s['id'] ?>"><?php $statuses=['active','probation','at-risk','graduated','loa','transferred','dropped']; if($s['status']==='archived')$statuses[]='archived'; foreach($statuses as $st): ?><button onclick="quickStatus(<?= (int)$s['id'] ?>,'<?= $st ?>')" class="<?= ($s['status']??'active')===$st?'active':'' ?>"><?= ucfirst($st) ?></button><?php endforeach; ?></div></div></td>
+<td style="text-align:center;">
+<span class="q-dot q-<?= $qDotClass ?>" title="Data quality: <?= $qScore ?>%<?= !empty($qAnoms) ? ' — ' . implode(', ', $qAnoms) : '' ?>" style="display:inline-block;width:10px;height:10px;border-radius:50%;<?= $qScore>=85?'background:#22c55e':($qScore>=60?'background:#f59e0b':'background:#ef4444') ?>;"></span>
+<?php if (!empty($qAnoms)): ?><i class="fas fa-exclamation-triangle" style="color:#f59e0b;margin-left:4px;font-size:11px;" title="<?= htmlspecialchars(implode(', ', $qAnoms)) ?>"></i><?php endif; ?>
+</td>
 <td><div class="action-group"><button class="action-btn view" onclick="viewStudent(<?= (int)$s['id'] ?>)" title="View"><i class="fas fa-eye"></i></button><button class="action-btn edit" onclick="editStudent(<?= (int)$s['id'] ?>)" title="Edit"><i class="fas fa-pen"></i></button><?php if ($s['status']==='archived'): ?><button class="action-btn restore" onclick="restoreStudent(<?= (int)$s['id'] ?>,'<?= htmlspecialchars($s['first_name']." ".$s['last_name'],ENT_QUOTES) ?>')" title="Restore"><i class="fas fa-undo"></i></button><?php else: ?><button class="action-btn delete" onclick="confirmDelete(<?= (int)$s['id'] ?>,'<?= htmlspecialchars($s['first_name']." ".$s['last_name'],ENT_QUOTES) ?>')" title="Delete"><i class="fas fa-trash-alt"></i></button><?php endif; ?></div></td>
 </tr>
 <?php endforeach; endif; ?>
@@ -436,7 +445,7 @@ $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' :
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-book"></i> Enrollment Details</div>
 <div class="form-row"><div class="form-group" style="flex:1 1 220px;min-width:150px;"><label>Course <span style="color:#dc2626;">*</span></label><div class="course-select-wrap"><select id="addCourse" class="form-control" required><option value="">Select course</option><?php foreach ($offeredCourses as $cname => $majors): ?><option value="<?= htmlspecialchars($cname) ?>"><?= htmlspecialchars($cname) ?></option><?php endforeach; ?></select><div class="course-select-list" style="display:none;"></div></div></div><div class="form-group" style="flex:0 0 150px;"><label>Year Level</label><select id="addYearLevel" class="form-control"><option value="">Select</option><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option></select></div><div class="form-group" id="addMajorGroup" style="display:none;flex:1 1 200px;"><label>Major</label><select id="addMajor" class="form-control"><option value="">Select major</option></select></div></div>
-<div class="form-row"><div class="form-group"><label>School Year</label><input type="text" id="addSchoolYear" class="form-control" placeholder="2026-2027" value="2026-2027"></div><div class="form-group"><label>Semester</label><select id="addSemester" class="form-control"><option value="">—</option><option value="1st">1st Semester</option><option value="2nd">2nd Semester</option><option value="summer">Summer</option></select></div></div>
+<div class="form-row"><div class="form-group"><label>School Year</label><input type="text" id="addSchoolYear" class="form-control" placeholder="2026-2027" value="2026-2027"></div><div class="form-group"><label>Semester</label><select id="addSemester" class="form-control"><option value="">—</option><option value="1st">1st Semester</option><option value="2nd">2nd Semester</option><option value="summer">Summer</option></select></div><div class="form-group"><label>Section <button type="button" style="background:none;border:none;color:#2563eb;cursor:pointer;font-size:11px;padding:0;" onclick="suggestSection()"><i class="fas fa-magic"></i> Suggest</button></label><input type="text" id="addSection" class="form-control" placeholder="e.g. 11001"></div></div>
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-users"></i> Guardian / Parent</div>
 <div class="form-row"><div class="form-group"><label>Full Name <span style="color:#dc2626;">*</span></label><input type="text" id="addGuardianName" class="form-control" required></div><div class="form-group"><label>Relationship</label><select id="addGuardianRel" class="form-control"><option value="father">Father</option><option value="mother">Mother</option><option value="guardian">Guardian</option></select></div></div>
@@ -450,8 +459,8 @@ $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' :
 <div id="pasteDropzone" style="border:2px dashed #cbd5e1;border-radius:12px;padding:26px 16px;text-align:center;color:#64748b;background:#f8fafc;cursor:pointer;transition:all .15s;margin-bottom:8px;">
 <i class="fas fa-cloud-arrow-up" style="font-size:26px;display:block;margin-bottom:8px;color:#94a3b8;"></i>
 <div style="font-size:13px;"><strong>Drag &amp; drop a file here</strong> or <span style="color:#2563eb;text-decoration:underline;">click to browse</span></div>
-<div style="font-size:12px;color:#94a3b8;margin-top:4px;">PDF, DOCX, or TXT · up to 15 MB</div>
-<input type="file" id="pasteFile" accept=".pdf,.docx,.txt" style="display:none;">
+<div style="font-size:12px;color:#94a3b8;margin-top:4px;">PDF, DOCX, TXT, or image (PNG/JPG) · up to 15 MB</div>
+<input type="file" id="pasteFile" accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.webp" style="display:none;">
 </div>
 <div id="pasteFileName" style="font-size:12px;color:#16a34a;margin-bottom:8px;"></div>
 <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;color:#94a3b8;font-size:12px;"><span style="flex:1;border-top:1px solid #e2e8f0;"></span> or paste text <span style="flex:1;border-top:1px solid #e2e8f0;"></span></div>
@@ -918,6 +927,7 @@ document.getElementById('addForm').addEventListener('submit', async function(e) 
                 year_level: document.getElementById('addYearLevel').value,
                 school_year: document.getElementById('addSchoolYear').value,
                 semester: document.getElementById('addSemester').value,
+                section: document.getElementById('addSection').value,
                 email: document.getElementById('addEmail').value,
                 contact_number: document.getElementById('addContact').value,
                 address: document.getElementById('addAddress').value,
@@ -1152,8 +1162,8 @@ function runDupScan() {
         let html = '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94a3b8;margin-bottom:6px;">Potential duplicates</div>';
         pairs.forEach(p => {
             html += '<div style="background:#f8fafc;border-radius:6px;padding:8px;margin-bottom:6px;font-size:13px;color:#334155;">'
-                + '<b>' + p.a.name + '</b> (' + p.a.sn + ') <span style="color:#94a3b8;">vs</span> <b>' + p.b.name + '</b> (' + p.b.sn + ')'
-                + ' <span style="color:#64748b;font-size:11px;">score ' + p.score + '</span></div>';
+                + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;"><span><b>' + p.a.name + '</b> (' + p.a.sn + ') <span style="color:#94a3b8;">vs</span> <b>' + p.b.name + '</b> (' + p.b.sn + ') <span style="color:#64748b;font-size:11px;">· score ' + p.score + '</span></span>'
+                + '<button class="btn btn-secondary" style="padding:3px 10px;font-size:11px;" onclick="mergeDupes(' + p.a.id + ',' + p.b.id + ',this)"><i class="fas fa-code-merge"></i> Merge</button></div></div>';
         });
         box.innerHTML = html;
     }).catch(() => { box.innerHTML = '<p style="color:#dc2626;">Scan error.</p>'; });
@@ -1192,6 +1202,48 @@ function applyStdById(id, to, btn) {
         else { alert(d.message || 'Failed.'); btn.disabled = false; }
     }).catch(() => { alert('Error.'); btn.disabled = false; });
 }
+
+// ─── MERGE DUPLICATES ───────────────────────────────────────
+function mergeDupes(idA, idB, btn) {
+    const which = confirm('Merge these duplicates?\n\nKeep A (record ' + idA + ') and remove B (record ' + idB + ')?\n\nClick OK to keep the FIRST record, or Cancel to keep the SECOND.');
+    const keeperId = which ? idA : idB;
+    const removeId = which ? idB : idA;
+    if (!confirm('Keep record ' + keeperId + ' and delete record ' + removeId + '? This moves all related records (documents, guardians, RFID, etc.) to the keeper. This cannot be undone.')) return;
+    btn.disabled = true;
+    aiToolsPost('merge', { keeper_id: keeperId, remove_id: removeId }).then(d => {
+        if (d.success) { showToast('Merged', 'Records merged.', 'success'); setTimeout(() => window.location.reload(), 800); }
+        else { alert(d.message || 'Merge failed.'); btn.disabled = false; }
+    }).catch(() => { alert('Merge error.'); btn.disabled = false; });
+}
+
+// ─── SECTION SUGGESTION ─────────────────────────────────────
+function suggestSection() {
+    const course = document.getElementById('addCourse').value;
+    const year = document.getElementById('addYearLevel').value;
+    const sem = document.getElementById('addSemester').value;
+    if (!course || !year) { alert('Choose a course and year level first.'); return; }
+    const btn = event.target.closest('button');
+    if (btn) btn.disabled = true;
+    aiPost('suggest_section', { course, year_level: year, semester: sem }).then(d => {
+        if (d.success && d.data && d.data.suggestion) {
+            document.getElementById('addSection').value = d.data.suggestion;
+            showToast('Suggested', 'Section ' + d.data.suggestion, 'success');
+        } else {
+            alert(d.message || 'Could not suggest a section.');
+        }
+    }).catch(() => alert('Error suggesting section.'))
+      .finally(() => { if (btn) btn.disabled = false; });
+}
+
+// ─── GUARDIAN AUTO-FILL ─────────────────────────────────────
+function guardianAutoFill() {
+    const ln = document.getElementById('addLastName').value.trim();
+    const g = document.getElementById('addGuardianName');
+    if (!ln || g.value.trim()) return; // only fill if guardian name is empty
+    // Common PH convention: guardian shares the student's surname.
+    g.value = ln;
+}
+document.getElementById('addLastName').addEventListener('blur', guardianAutoFill);
 
 // ─── QUICK STATUS ────────────────────────────────────────────
 function toggleQuickMenu(id) { document.getElementById('qsm_'+id).classList.toggle('show'); }

@@ -118,34 +118,21 @@ document.addEventListener('DOMContentLoaded', function() {
         searchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Searching...';
 
         try {
-            const response = await fetch('../api/students.php');
-            const students = await response.json();
-
-            // Simple AI search logic - expand as needed
-            const queryLower = query.toLowerCase();
-            let results = [];
-            let interpretation = '';
-
-            // Status detection
-            if (queryLower.includes('at-risk') || queryLower.includes('risk') || queryLower.includes('struggling')) {
-                results = students.data.filter(s => s.status === 'at-risk' || s.status === 'probation');
-                interpretation = 'Showing at-risk and probationary students';
-            } else if (queryLower.includes('expired') || queryLower.includes('expire')) {
-                results = students.data.filter(s => s.status === 'expired' || s.status === 'dropped');
-                interpretation = 'Showing expired/dropped students';
-            } else if (queryLower.includes('active')) {
-                results = students.data.filter(s => s.status === 'active');
-                interpretation = 'Showing active students';
-            } else if (queryLower.includes('graduating') || queryLower.includes('graduate')) {
-                results = students.data.filter(s => s.status === 'graduated');
-                interpretation = 'Showing graduated students';
-            } else {
-                // Keyword search
-                results = students.data.filter(s => {
-                    const searchable = (s.first_name + ' ' + s.last_name + ' ' + s.student_number + ' ' + s.course).toLowerCase();
-                    return searchable.includes(queryLower);
-                });
-                interpretation = results.length > 0 ? 'Showing matching students' : 'No results found';
+            // Ask the LLM to interpret the query into a structured filter,
+            // then filter the student list server-side.
+            const res = await fetch('../api/ai-tools.php?action=nl_search', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query })
+            });
+            const data = await res.json();
+            if (!data.success || !data.data) {
+                throw new Error(data.message || 'Search failed.');
+            }
+            const results = data.data.students || [];
+            let interpretation = 'AI interpreted your search as: ' + JSON.stringify(data.data.filter || {});
+            if (data.data.filter && data.data.filter.keywords) {
+                interpretation = 'Searching for: "' + data.data.filter.keywords.join('", "') + '"';
             }
 
             // Display results

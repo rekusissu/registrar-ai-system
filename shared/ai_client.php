@@ -115,6 +115,88 @@ function aiGenerate($systemPrompt, $userPrompt, array $opts = []) {
 }
 
 /**
+ * Send a vision-capable request with an image to the gateway.
+ * Uses a model from AI_MODELS that supports vision (minimax-m3 does).
+ * Returns the assistant text, or '' on failure. Cached like aiGenerate.
+ *
+ * @param string $systemPrompt
+ * @param string $userText     Text prompt accompanying the image
+ * @param string $imageBase64  Raw image bytes (base64-encoded)
+ * @param string $mimeType     e.g. image/png, image/jpeg
+ * @param array  $opts
+ * @return string
+ */
+function aiGenerateVision(string $systemPrompt, string $userText, string $imageBase64, string $mimeType = 'image/png', array $opts = []) {
+    $db = Database::getInstance();
+    $ttl  = (int)   ($opts['ttl']  ?? AI_CACHE_TTL);
+    $maxTok = (int) ($opts['max_tokens'] ?? 800);
+    $temp = (float) ($opts['temperature'] ?? 0.2);
+    $force = !empty($opts['forceRefresh']);
+
+    $models = (defined('AI_MODELS') && is_array(AI_MODELS) && count(AI_MODELS) > 0)
+        ? array_map('strval', AI_MODELS)
+        : [(string) AI_MODEL];
+
+    // Prefer a vision-capable model first (minimax-m3 has vision).
+    $preferred = array_filter($models, fn($m) => strpos($m, 'minimax') !== false || strpos($m, 'kimi') !== false);
+    $models = array_merge(array_values($preferred), array_values(array_diff($models, $preferred)));
+
+    $dataUri = 'data:' . $mimeType . ';base64,' . $imageBase64;
+    $cacheKey = 'vis:' . md5($systemPrompt . "\0" . $userText . "\0" . md5($imageBase64));
+
+    if (!$force) {
+        $cached = $db->fetchOne(
+            "SELECT response FROM ai_cache WHERE prompt_hash = ? AND (expires_at IS NULL OR expires_at > NOW())",
+            [$cacheKey]
+        );
+        if ($cached && isset($cached['response'])) {
+            return $cached['response'];
+        }
+    }
+
+    foreach ($models as $model) {
+        $payload = [
+            'model' => $model,
+            'messages' => [[
+                'role'    => 'user',
+                'content' => [
+                    ['type' => 'text', 'text' => $userText],
+                    ['type' => 'image_url', 'image_url' => ['url' => $dataUri]],
+                ],
+            ]],
+            'max_tokens'  => $maxTok,
+            'temperature' => $temp,
+        ];
+
+        $response = aiHttpChat($payload);
+        if ($response === null) {
+            error_log('ai_client: vision model "' . $model . '" failed, trying next.');
+            continue;
+        }
+        $text = trim((string) ($response['choices'][0]['message']['content'] ?? ''));
+        if ($text === '') {
+            error_log('ai_client: vision model "' . $model . '" returned empty, trying next.');
+            continue;
+        }
+
+        try {
+            $db->insert('ai_cache', [
+                'prompt_hash' => $cacheKey,
+                'prompt'      => mb_substr($userText, 0, 4000),
+                'response'    => $text,
+                'model'       => $model,
+                'created_at'  => date('Y-m-d H:i:s'),
+                'expires_at'  => $ttl > 0 ? date('Y-m-d H:i:s', time() + $ttl) : null,
+            ]);
+        } catch (Exception $e) {}
+
+        return $text;
+    }
+
+    return '';
+}
+
+/**
  * Ask the model for a JSON object and parse it. Falls back to $fallback
  * on any failure (network, model error, or unparseable JSON).
  *

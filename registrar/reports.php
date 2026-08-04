@@ -45,7 +45,8 @@ td:last-child { text-align:right; font-weight:600; }
 @media(max-width:768px){ .dashboard-main{margin-left:0;padding:16px;width:100%;max-width:100%} .summary-row{grid-template-columns:repeat(2,1fr)} }
 </style>
 <main class="dashboard-main">
-<header class="header"><div class="title"><h1>Reports</h1><p>Student population summary</p></div></header>
+<header class="header"><div class="title"><h1>Reports</h1><p>Student population summary</p></div><div class="header-actions"><button class="btn btn-primary" onclick="generateAIReport()"><i class="fas fa-brain"></i> Generate AI Report</button></div></header>
+<div id="aiReportBox" style="display:none;margin-bottom:18px;background:linear-gradient(135deg,#eef4ff,#f5f3ff);border:1px solid #dbeafe;border-radius:12px;padding:16px 18px;"></div>
 
 <div class="summary-row">
 <div class="summary-card"><div class="num"><?= $totalStudents ?></div><div class="lbl">Total Students</div></div>
@@ -73,4 +74,25 @@ td:last-child { text-align:right; font-weight:600; }
 </div>
 </div>
 </main>
+
+<script>
+function generateAIReport() {
+    const box = document.getElementById('aiReportBox');
+    const btn = event.target.closest('.btn');
+    box.style.display = 'block';
+    box.innerHTML = '<span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#3b82f6;"><i class="fas fa-brain"></i> AI Report</span> <span style="color:#64748b;font-size:12px;margin-left:4px;"><i class="fas fa-spinner fa-spin"></i> Analyzing student population...</span>';
+    if (btn) { btn.disabled = true; }
+    fetch('../api/ai-tools.php?action=report', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+    .then(r => r.json())
+    .then(d => {
+        if (d.success && d.data && d.data.report) {
+            box.innerHTML = '<span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#3b82f6;"><i class="fas fa-brain"></i> AI Report</span><p style="margin:8px 0 0;color:#1e40af;font-size:14px;line-height:1.5;">' + d.data.report + '</p>';
+        } else {
+            box.innerHTML = '<span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#3b82f6;"><i class="fas fa-brain"></i> AI Report</span><p style="margin:8px 0 0;color:#94a3b8;">Unable to generate report right now.</p>';
+        }
+    })
+    .catch(() => { box.innerHTML = '<span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#3b82f6;"><i class="fas fa-brain"></i> AI Report</span><p style="margin:8px 0 0;color:#94a3b8;">Error generating report.</p>'; })
+    .finally(() => { if (btn) { btn.disabled = false; } });
+}
+</script>
 <?php include '../includes/footer.php'; ?>

@@ -23,6 +23,26 @@ if (defined('NORMALIZE_LOADED')) {
 define('NORMALIZE_LOADED', true);
 
 /**
+ * Normalize extracted/originally-typed fields into clean stored values.
+ * Shared by paste_fill, extract_doc (text + vision), and the form.
+ *
+ * @param array $data
+ * @return array
+ */
+function aiNormalizeExtracted(array $data): array {
+    if (isset($data['first_name']))  $data['first_name']  = normalizeNameCase((string) $data['first_name']);
+    if (isset($data['last_name']))   $data['last_name']   = normalizeNameCase((string) $data['last_name']);
+    if (isset($data['middle_name'])) $data['middle_name'] = normalizeNameCase((string) $data['middle_name']);
+    if (isset($data['contact_number'])) $data['contact_number'] = normalizePhone((string) $data['contact_number']);
+    if (isset($data['course']))      $data['course']      = courseStandardize((string) $data['course']);
+    if (isset($data['nationality']) && strtolower(trim((string) $data['nationality'])) === 'filipino') {
+        $data['nationality'] = 'Filipino';
+    }
+    if (isset($data['email']))       $data['email']       = strtolower(trim((string) $data['email']));
+    return $data;
+}
+
+/**
  * Canonical course map: any common abbreviation/nickname → the official
  * name used by getOfferedCourses(). Keeps masterlist grouping consistent.
  */
@@ -248,6 +268,92 @@ function studentDataQualityFlags(array $s): array {
         $std = courseStandardize((string) $s['course']);
         if ($std !== trim((string) $s['course'])) {
             $flags[] = 'Course name not standardized';
+        }
+    }
+
+    return $flags;
+}
+
+/**
+ * 0–100 completeness score for a student record. Each missing/incorrect
+ * field deducts from a perfect score. Used for the per-row quality dot.
+ *
+ * @param array $s Student row
+ * @return int
+ */
+function studentQualityScore(array $s): int {
+    $score = 100;
+    $missing = [
+        'student_number' => 10,
+        'first_name'     => 10,
+        'last_name'      => 10,
+        'address'        => 8,
+        'gender'         => 8,
+        'birth_date'     => 10,
+        'course'         => 12,
+        'contact_number' => 8,
+        'email'          => 6,
+        'nationality'    => 4,
+        'religion'       => 4,
+        'section'        => 5,
+        'school_year'    => 5,
+    ];
+    foreach ($missing as $field => $pts) {
+        if (empty(trim((string) ($s[$field] ?? '')))) {
+            $score -= $pts;
+        }
+    }
+    // Invalid email / phone
+    if (!empty($s['email']) && !isValidEmail(trim($s['email']))) $score -= 3;
+    if (!empty($s['contact_number']) && !preg_match('/^09\d{9}$/', preg_replace('/[^0-9]/', '', $s['contact_number']))) $score -= 3;
+    // Future birth date
+    if (!empty($s['birth_date'])) {
+        $bd = strtotime((string) $s['birth_date']);
+        if ($bd !== false && $bd > time()) $score -= 5;
+    }
+    return max(0, min(100, $score));
+}
+
+/**
+ * Anomaly flags for a student record: things worth a registrar's attention.
+ * Returns a list of short machine-readable keys.
+ *
+ * @param array $s Student row
+ * @return array<int, string>
+ */
+function studentAnomalies(array $s): array {
+    $flags = [];
+
+    // Age vs year-level mismatch (e.g. 40-year-old 1st year is worth a look).
+    if (!empty($s['birth_date']) && !empty($s['year_level'])) {
+        $age = floor((time() - strtotime((string) $s['birth_date'])) / (365.25 * 24 * 3600));
+        $yl = (int) $s['year_level'];
+        if ($age >= 0 && $yl >= 1 && $yl <= 4) {
+            $expectedMax = 21 + $yl; // generous: typical + buffer
+            if ($age > $expectedMax + 10) {
+                $flags[] = 'age_mismatch';
+            }
+        }
+    }
+
+    // Future birth date.
+    if (!empty($s['birth_date'])) {
+        $bd = strtotime((string) $s['birth_date']);
+        if ($bd !== false && $bd > time()) {
+            $flags[] = 'future_birthdate';
+        }
+    }
+
+    // Blank critical field.
+    if (empty(trim((string) ($s['address'] ?? ''))))      $flags[] = 'no_address';
+    if (empty(trim((string) ($s['contact_number'] ?? '')))) $flags[] = 'no_contact';
+    if (empty(trim((string) ($s['gender'] ?? ''))))       $flags[] = 'no_gender';
+
+    // Course not standardized (may be truncated or off-list).
+    if (!empty($s['course'])) {
+        $std = courseStandardize((string) $s['course']);
+        if ($std !== trim((string) $s['course'])) {
+            $flags[] = 'course_nonstandard';
         }
     }
 

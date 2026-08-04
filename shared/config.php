@@ -42,7 +42,16 @@ define('AI_MODELS', [
     'nvidia/minimaxai/minimax-m3',
     'nvidia/z-ai/glm-5.2',
 ]);
-define('AI_API_KEY', 'sk-0e90f5fb364ec285-9rcjw3-5bc5bf60');
+// API key: read from env var first, then from a local (git-ignored) file.
+// Never hardcode a real key in this committed file.
+$__aiKey = getenv('AI_API_KEY') ?: '';
+if ($__aiKey === '') {
+    $__aiKeyFile = __DIR__ . '/ai_key.local';
+    if (is_file($__aiKeyFile)) {
+        $__aiKey = trim((string) file_get_contents($__aiKeyFile));
+    }
+}
+define('AI_API_KEY', $__aiKey);
 define('AI_CACHE_TTL', 86400); // seconds (1 day)
 
 // Timezone
