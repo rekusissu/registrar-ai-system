@@ -224,6 +224,31 @@ code{background:#f1f5f9;padding:3px 8px;border-radius:5px;font-size:12px}
 .modal-overlay select.form-control,
 .modal-overlay select { cursor:pointer !important; appearance:auto !important; -webkit-appearance:auto !important; }
 .delete-icon{width:60px;height:60px;border-radius:50%;background:#fee2e2;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:26px;color:#dc2626}
+/* ─── Department selection: scrollable dropdown (mirrors students course) ─── */
+.dept-select-wrap{ position:relative; }
+.dept-select-wrap select.form-control{
+  appearance:none;-webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+  background-position:right 12px center;
+  background-repeat:no-repeat;
+  background-size:14px;
+  padding-right:32px;
+  cursor:pointer;
+}
+.dept-select-list{
+  position:absolute;top:100%;left:0;right:0;z-index:100;
+  margin-top:2px;background:#fff;border:1.5px solid #e2e8f0;
+  border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.1);
+  max-height:170px;overflow-y:auto;
+}
+.dept-select-list .ds-option{
+  padding:7px 12px;font-size:13px;color:#1e293b;cursor:pointer;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  border-bottom:1px solid #f1f5f9;
+}
+.dept-select-list .ds-option:last-child{border-bottom:none;}
+.dept-select-list .ds-option:hover{ background:#eef4ff; color:#2563eb; }
+.dept-select-list .ds-option.active{ background:#eef4ff; color:#2563eb; font-weight:600; }
 /* Responsive */
 @media(max-width:992px){.dashboard-stats{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:768px){.dashboard-main{margin-left:0;padding:16px}.dashboard-stats{grid-template-columns:repeat(2,1fr);gap:12px}.search-bar{flex-direction:column;align-items:stretch}.search-bar .search-wrapper{flex:1 1 auto;min-width:0;width:100%}.search-bar .search-actions{width:100%;justify-content:flex-end;flex-wrap:wrap}.table-responsive th,.table-responsive td{padding:8px 8px;font-size:12px}}
@@ -304,7 +329,7 @@ $loadClass = $activeStudents >= $avg && $avg > 0 ? 'full' : 'open';
 <div class="form-row"><div class="form-group"><label>Full Name <span style="color:#dc2626;">*</span></label><input type="text" name="full_name" class="form-control" required></div><div class="form-group"><label>Email <span style="color:#dc2626;">*</span></label><input type="email" name="email" class="form-control" required></div></div>
 <div class="form-row"><div class="form-group"><label>Password</label><input type="password" name="password" class="form-control" placeholder="Leave blank to auto-generate"></div><div class="form-group"><label>RFID UID (optional)</label><input type="text" name="rfid_uid" class="form-control" maxlength="10" placeholder="10-digit UID"></div></div>
 <div class="form-row"><div class="form-group"><label>Employee Number</label><input type="text" name="employee_number" class="form-control" placeholder="e.g. 2026-0142"></div><div class="form-group"><label>Designation</label><select name="designation" class="form-control"><option value="Faculty">Faculty</option><option value="Part-time">Part-time</option><option value="Adjunct">Adjunct</option><option value="Admin-Faculty">Admin-Faculty</option></select></div></div>
-<div class="form-row"><div class="form-group"><label>Department</label><select name="department" class="form-control"><option value="">— Select —</option><?php foreach (getOfferedCourses() as $cn => $majors): ?><option value="<?= htmlspecialchars($cn) ?>"><?= htmlspecialchars($cn) ?></option><?php endforeach; ?></select></div><div class="form-group"><label>Highest Degree</label><input type="text" name="highest_degree" class="form-control" placeholder="e.g. MSIT"></div></div>
+<div class="form-row"><div class="form-group"><label>Department</label><div class="dept-select-wrap"><select name="department" class="form-control"><option value="">— Select —</option><?php foreach (getOfferedCourses() as $cn => $majors): ?><option value="<?= htmlspecialchars($cn) ?>"><?= htmlspecialchars($cn) ?></option><?php endforeach; ?></select><div class="dept-select-list" style="display:none;"></div></div></div><div class="form-group"><label>Highest Degree</label><input type="text" name="highest_degree" class="form-control" placeholder="e.g. MSIT"></div></div>
 <div class="form-row"><div class="form-group" style="flex:2;"><label>Specialization</label><input type="text" name="specialization" class="form-control" placeholder="e.g. Data Structures, Web Development"></div></div>
 <div class="form-check"><input type="checkbox" name="auto_password" id="addAutoPw" checked style="width:16px;height:16px;cursor:pointer;accent-color:#2563eb;"><label for="addAutoPw" style="font-size:13px;cursor:pointer;">Auto-generate a strong password</label></div>
 <div class="modal-footer"><button type="button" class="btn btn-light" onclick="document.getElementById('addModal').classList.remove('active');document.body.style.overflow='';">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save</button></div>
@@ -315,7 +340,7 @@ $loadClass = $activeStudents >= $avg && $avg > 0 ? 'full' : 'open';
 <div class="form-row"><div class="form-group"><label>Full Name</label><input type="text" name="full_name" id="editName" class="form-control" required></div><div class="form-group"><label>Email</label><input type="email" name="email" id="editEmail" class="form-control" required></div></div>
 <div class="form-row"><div class="form-group"><label>New Password (leave blank to keep)</label><input type="password" name="password" class="form-control"></div><div class="form-group"><label>RFID UID</label><input type="text" name="rfid_uid" id="editRfid" class="form-control" maxlength="10"></div></div>
 <div class="form-row"><div class="form-group"><label>Employee Number</label><input type="text" name="employee_number" id="editEmpNo" class="form-control"></div><div class="form-group"><label>Designation</label><select name="designation" id="editDesignation" class="form-control"><option value="Faculty">Faculty</option><option value="Part-time">Part-time</option><option value="Adjunct">Adjunct</option><option value="Admin-Faculty">Admin-Faculty</option></select></div></div>
-<div class="form-row"><div class="form-group"><label>Department</label><select name="department" id="editDepartment" class="form-control"><option value="">— Select —</option><?php foreach (getOfferedCourses() as $cn => $majors): ?><option value="<?= htmlspecialchars($cn) ?>"><?= htmlspecialchars($cn) ?></option><?php endforeach; ?></select></div><div class="form-group"><label>Highest Degree</label><input type="text" name="highest_degree" id="editDegree" class="form-control"></div></div>
+<div class="form-row"><div class="form-group"><label>Department</label><div class="dept-select-wrap"><select name="department" id="editDepartment" class="form-control"><option value="">— Select —</option><?php foreach (getOfferedCourses() as $cn => $majors): ?><option value="<?= htmlspecialchars($cn) ?>"><?= htmlspecialchars($cn) ?></option><?php endforeach; ?></select><div class="dept-select-list" style="display:none;"></div></div></div><div class="form-group"><label>Highest Degree</label><input type="text" name="highest_degree" id="editDegree" class="form-control"></div></div>
 <div class="form-row"><div class="form-group"><label>Specialization</label><input type="text" name="specialization" id="editSpecialization" class="form-control"></div></div>
 <div class="form-check"><input type="checkbox" name="auto_password" id="editAutoPw" style="width:16px;height:16px;cursor:pointer;accent-color:#2563eb;"><label for="editAutoPw" style="font-size:13px;cursor:pointer;">Reset to a new auto-generated password</label></div>
 <div class="form-group"><div style="display:flex;align-items:center;gap:8px;"><input type="checkbox" name="is_active" id="editActive" checked style="width:16px;height:16px;cursor:pointer;accent-color:#2563eb;"><label for="editActive" style="cursor:pointer;font-size:13px;">Active</label></div></div>
@@ -418,6 +443,49 @@ function printTable() {
 
 function openAdd() { document.getElementById('addModal').classList.add('active'); document.body.style.overflow = 'hidden'; }
 document.getElementById('addModal').addEventListener('click', function(e) { if (e.target === this) { this.classList.remove('active'); document.body.style.overflow = ''; }});
+
+// ─── DEPARTMENT SELECT: scrollable list (mirrors students course) ──
+['add', 'edit'].forEach(prefix => {
+    const wrap = document.querySelector('#' + prefix + 'Modal .dept-select-wrap');
+    const sel = wrap ? wrap.querySelector('select') : null;
+    const list = wrap ? wrap.querySelector('.dept-select-list') : null;
+    if (!wrap || !sel || !list) return;
+
+    function renderOptions() {
+        const opts = Array.from(sel.options);
+        list.innerHTML = opts.map((o, i) =>
+            '<div class="ds-option" data-idx="' + i + '">' +
+              o.text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;') +
+            '</div>'
+        ).join('');
+        list.querySelectorAll('.ds-option').forEach(opt => {
+            opt.addEventListener('click', () => {
+                const idx = parseInt(opt.dataset.idx, 10);
+                sel.selectedIndex = idx;
+                sel.dispatchEvent(new Event('change'));
+                list.style.display = 'none';
+            });
+        });
+    }
+    function syncActive() {
+        list.querySelectorAll('.ds-option').forEach(o =>
+            o.classList.toggle('active', parseInt(o.dataset.idx, 10) === sel.selectedIndex));
+    }
+
+    renderOptions();
+
+    sel.addEventListener('mousedown', e => e.preventDefault());
+    sel.addEventListener('click', () => {
+        const open = list.style.display === 'block';
+        document.querySelectorAll('.dept-select-list').forEach(l => { if (l !== list) l.style.display = 'none'; });
+        list.style.display = open ? 'none' : 'block';
+        if (list.style.display === 'block') syncActive();
+    });
+    sel.addEventListener('change', () => { list.style.display = 'none'; });
+    document.addEventListener('click', e => {
+        if (!wrap.contains(e.target)) list.style.display = 'none';
+    });
+});
 
 // ─── SUBJECT PICKER ────────────────────────────────────────
 let SUBJECTS = []; // master catalog
@@ -590,23 +658,6 @@ function viewTeacher(id) {
             }
         }
     });
-
-    // AI summary (non-blocking, cached).
-    const aiSum = document.getElementById('viewAiSummary');
-    aiSum.style.display = 'block';
-    aiSum.innerHTML = '<span style="font-size:11px;font-weight:700;text-transform:uppercase;color:#3b82f6;"><i class="fas fa-brain"></i> AI Summary</span> <span style="color:#64748b;font-size:12px;"><i class="fas fa-spinner fa-spin"></i> Generating...</span>';
-    fetch('../api/ai-tools.php?action=teacher_profile', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: t.id }) })
-    .then(r => r.json()).then(d => {
-        if (d.success && d.data && d.data.summary) {
-            aiSum.innerHTML = '<span style="font-size:11px;font-weight:700;text-transform:uppercase;color:#3b82f6;"><i class="fas fa-brain"></i> AI Summary</span><p style="margin:6px 0 0;color:#334155;">' + d.data.summary + '</p>';
-        } else {
-            aiSum.innerHTML = '<span style="font-size:11px;font-weight:700;text-transform:uppercase;color:#3b82f6;"><i class="fas fa-brain"></i> AI Summary</span><p style="margin:6px 0 0;color:#94a3b8;">AI summary unavailable right now.</p>';
-        }
-    }).catch(() => { aiSum.innerHTML = '<span style="font-size:11px;font-weight:700;text-transform:uppercase;color:#3b82f6;"><i class="fas fa-brain"></i> AI Summary</span><p style="margin:6px 0 0;color:#94a3b8;">AI summary unavailable right now.</p>'; });
-}
-
-    document.getElementById('viewModal').classList.add('active');
-    document.body.style.overflow = 'hidden';
 
     // AI summary (non-blocking, cached).
     const aiSum = document.getElementById('viewAiSummary');
