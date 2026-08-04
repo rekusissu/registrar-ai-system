@@ -35,6 +35,13 @@ define('JWT_SECRET', 'your-super-secret-key-change-in-production');
 // Bearer key. Endpoint verified live at /v1/models (OpenAI format).
 define('AI_API_URL', 'http://localhost:20128/v1/chat/completions');
 define('AI_MODEL', 'nvidia/deepseek-ai/deepseek-v4-flash');
+// Ordered fallback list: the gateway tries each model in turn until one
+// succeeds (handles transient 529/5xx overloads on a single backend).
+define('AI_MODELS', [
+    'nvidia/deepseek-ai/deepseek-v4-flash',
+    'nvidia/minimaxai/minimax-m3',
+    'nvidia/z-ai/glm-5.2',
+]);
 define('AI_API_KEY', 'sk-0e90f5fb364ec285-9rcjw3-5bc5bf60');
 define('AI_CACHE_TTL', 86400); // seconds (1 day)
 

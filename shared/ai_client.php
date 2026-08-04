@@ -30,60 +30,88 @@ define('AI_CLIENT_LOADED', true);
  */
 function aiGenerate($systemPrompt, $userPrompt, array $opts = []) {
     $db = Database::getInstance();
-    $model    = (string) ($opts['model']    ?? AI_MODEL);
     $ttl      = (int)   ($opts['ttl']      ?? AI_CACHE_TTL);
     $maxTok   = (int)   ($opts['max_tokens'] ?? 1024);
     $temp     = (float) ($opts['temperature'] ?? 0.2);
     $force    = !empty($opts['forceRefresh']);
 
-    $cacheKey = 'ai:' . $model . ':' . md5($systemPrompt . "\0" . $userPrompt);
-
-    if (!$force) {
-        $cached = $db->fetchOne(
-            "SELECT response FROM ai_cache
-             WHERE prompt_hash = ? AND (expires_at IS NULL OR expires_at > NOW())",
-            [$cacheKey]
-        );
-        if ($cached && isset($cached['response'])) {
-            return $cached['response'];
+    // Models to try, in order. If $opts['model'] is set, use only it;
+    // otherwise use the configured fallback list (AI_MODELS, defaulting to
+    // AI_MODEL). This handles transient overloads on a single backend.
+    if (!empty($opts['model'])) {
+        $models = [(string) $opts['model']];
+    } elseif (defined('AI_MODELS') && is_array(AI_MODELS) && count(AI_MODELS) > 0) {
+        $models = array_map('strval', AI_MODELS);
+        if (!in_array((string) AI_MODEL, $models, true)) {
+            array_unshift($models, (string) AI_MODEL);
         }
+    } else {
+        $models = [(string) AI_MODEL];
     }
 
-    $payload = [
-        'model'       => $model,
-        'messages'    => [
-            ['role' => 'system', 'content' => $systemPrompt],
-            ['role' => 'user',   'content' => $userPrompt],
-        ],
-        'max_tokens'  => $maxTok,
-        'temperature' => $temp,
-    ];
+    $lastResponse = null;
+    $usedModel    = null;
 
-    $response = aiHttpChat($payload);
-    if ($response === null) {
+    foreach ($models as $model) {
+        $cacheKey = 'ai:' . $model . ':' . md5($systemPrompt . "\0" . $userPrompt);
+
+        if (!$force) {
+            $cached = $db->fetchOne(
+                "SELECT response FROM ai_cache
+                 WHERE prompt_hash = ? AND (expires_at IS NULL OR expires_at > NOW())",
+                [$cacheKey]
+            );
+            if ($cached && isset($cached['response'])) {
+                return $cached['response'];
+            }
+        }
+
+        $payload = [
+            'model'       => $model,
+            'messages'    => [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user',   'content' => $userPrompt],
+            ],
+            'max_tokens'  => $maxTok,
+            'temperature' => $temp,
+        ];
+
+        $response = aiHttpChat($payload);
+        if ($response === null) {
+            error_log('ai_client: model "' . $model . '" failed, trying next.');
+            continue; // try next model
+        }
+
+        $text = trim((string) ($response['choices'][0]['message']['content'] ?? ''));
+        if ($text === '') {
+            error_log('ai_client: model "' . $model . '" returned empty content, trying next.');
+            continue;
+        }
+
+        $lastResponse = $text;
+        $usedModel    = $model;
+        break;
+    }
+
+    if ($lastResponse === null) {
         return '';
     }
 
-    // Streaming returns a JSON line ending with "data: [DONE]". The parsed
-    // result may already contain the full content (non-streaming fallback).
-    $text = trim((string) ($response['choices'][0]['message']['content'] ?? ''));
-
-    if ($text !== '') {
-        try {
-            $db->insert('ai_cache', [
-                'prompt_hash' => $cacheKey,
-                'prompt'      => mb_substr($userPrompt, 0, 4000),
-                'response'    => $text,
-                'model'       => $model,
-                'created_at'  => date('Y-m-d H:i:s'),
-                'expires_at'  => $ttl > 0 ? date('Y-m-d H:i:s', time() + $ttl) : null,
-            ]);
-        } catch (Exception $e) {
-            // Cache write failure should not break the caller.
-        }
+    // Cache the successful result.
+    try {
+        $db->insert('ai_cache', [
+            'prompt_hash' => 'ai:' . $usedModel . ':' . md5($systemPrompt . "\0" . $userPrompt),
+            'prompt'      => mb_substr($userPrompt, 0, 4000),
+            'response'    => $lastResponse,
+            'model'       => $usedModel,
+            'created_at'  => date('Y-m-d H:i:s'),
+            'expires_at'  => $ttl > 0 ? date('Y-m-d H:i:s', time() + $ttl) : null,
+        ]);
+    } catch (Exception $e) {
+        // Cache write failure should not break the caller.
     }
 
-    return $text;
+    return $lastResponse;
 }
 
 /**
@@ -123,50 +151,36 @@ function aiHttpChat(array $payload) {
         $headers[] = 'Authorization: Bearer ' . AI_API_KEY;
     }
 
-    $maxAttempts = 3;
-    for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
-        $ch = curl_init($url);
+    $ch = curl_init($url);
 
-        // Buffer the streamed/regular body via this callback.
-        $buffer = '';
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => json_encode($payload),
-            CURLOPT_HTTPHEADER     => $headers,
-            CURLOPT_TIMEOUT        => 60,
-            CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_WRITEFUNCTION  => function ($ch, $data) use (&$buffer) {
-                $buffer .= $data;
-                return strlen($data);
-            },
-        ]);
+    // Buffer the streamed/regular body via this callback.
+    $buffer = '';
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => json_encode($payload),
+        CURLOPT_HTTPHEADER     => $headers,
+        CURLOPT_TIMEOUT        => 60,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_WRITEFUNCTION  => function ($ch, $data) use (&$buffer) {
+            $buffer .= $data;
+            return strlen($data);
+        },
+    ]);
 
-        $result = curl_exec($ch);
-        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $err = curl_error($ch);
-        curl_close($ch);
+    $result = curl_exec($ch);
+    $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err = curl_error($ch);
+    curl_close($ch);
 
-        if ($result === false) {
-            error_log('ai_client: curl error: ' . $err);
-            return null;
-        }
+    if ($result === false) {
+        error_log('ai_client: curl error: ' . $err);
+        return null;
+    }
 
-        if ($status < 200 || $status >= 300) {
-            // Transient overload (529) or 5xx — retry with short backoff.
-            if ($status === 529 || $status >= 500) {
-                error_log('ai_client: HTTP ' . $status . ' (attempt ' . $attempt . '/' . $maxAttempts . '), retrying');
-                if ($attempt < $maxAttempts) {
-                    usleep(1500000 * $attempt); // 1.5s, 3s
-                    continue;
-                }
-            }
-            error_log('ai_client: HTTP ' . $status . ' from gateway: ' . mb_substr($buffer, 0, 500));
-            return null;
-        }
-
-        // Success — break out of the loop.
-        break;
+    if ($status < 200 || $status >= 300) {
+        error_log('ai_client: HTTP ' . $status . ' from gateway: ' . mb_substr($buffer, 0, 500));
+        return null;
     }
 
     // If the gateway streamed (SSE), extract the final content fragment.
