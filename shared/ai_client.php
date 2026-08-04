@@ -30,10 +30,10 @@ define('AI_CLIENT_LOADED', true);
  */
 function aiGenerate($systemPrompt, $userPrompt, array $opts = []) {
     $db = Database::getInstance();
-    $model    = $opts['model']    ?? AI_MODEL;
-    $ttl      = $opts['ttl']      ?? AI_CACHE_TTL;
-    $maxTok   = $opts['max_tokens'] ?? 1024;
-    $temp     = $opts['temperature'] ?? 0.2;
+    $model    = (string) ($opts['model']    ?? AI_MODEL);
+    $ttl      = (int)   ($opts['ttl']      ?? AI_CACHE_TTL);
+    $maxTok   = (int)   ($opts['max_tokens'] ?? 1024);
+    $temp     = (float) ($opts['temperature'] ?? 0.2);
     $force    = !empty($opts['forceRefresh']);
 
     $cacheKey = 'ai:' . $model . ':' . md5($systemPrompt . "\0" . $userPrompt);
@@ -123,36 +123,50 @@ function aiHttpChat(array $payload) {
         $headers[] = 'Authorization: Bearer ' . AI_API_KEY;
     }
 
-    $ch = curl_init($url);
+    $maxAttempts = 3;
+    for ($attempt = 1; $attempt <= $maxAttempts; $attempt++) {
+        $ch = curl_init($url);
 
-    // Buffer the streamed/regular body via this callback.
-    $buffer = '';
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => json_encode($payload),
-        CURLOPT_HTTPHEADER     => $headers,
-        CURLOPT_TIMEOUT        => 60,
-        CURLOPT_CONNECTTIMEOUT => 10,
-        CURLOPT_WRITEFUNCTION  => function ($ch, $data) use (&$buffer) {
-            $buffer .= $data;
-            return strlen($data);
-        },
-    ]);
+        // Buffer the streamed/regular body via this callback.
+        $buffer = '';
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode($payload),
+            CURLOPT_HTTPHEADER     => $headers,
+            CURLOPT_TIMEOUT        => 60,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_WRITEFUNCTION  => function ($ch, $data) use (&$buffer) {
+                $buffer .= $data;
+                return strlen($data);
+            },
+        ]);
 
-    $result = curl_exec($ch);
-    $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $err = curl_error($ch);
-    curl_close($ch);
+        $result = curl_exec($ch);
+        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err = curl_error($ch);
+        curl_close($ch);
 
-    if ($result === false) {
-        error_log('ai_client: curl error: ' . $err);
-        return null;
-    }
+        if ($result === false) {
+            error_log('ai_client: curl error: ' . $err);
+            return null;
+        }
 
-    if ($status < 200 || $status >= 300) {
-        error_log('ai_client: HTTP ' . $status . ' from gateway: ' . mb_substr($buffer, 0, 500));
-        return null;
+        if ($status < 200 || $status >= 300) {
+            // Transient overload (529) or 5xx — retry with short backoff.
+            if ($status === 529 || $status >= 500) {
+                error_log('ai_client: HTTP ' . $status . ' (attempt ' . $attempt . '/' . $maxAttempts . '), retrying');
+                if ($attempt < $maxAttempts) {
+                    usleep(1500000 * $attempt); // 1.5s, 3s
+                    continue;
+                }
+            }
+            error_log('ai_client: HTTP ' . $status . ' from gateway: ' . mb_substr($buffer, 0, 500));
+            return null;
+        }
+
+        // Success — break out of the loop.
+        break;
     }
 
     // If the gateway streamed (SSE), extract the final content fragment.

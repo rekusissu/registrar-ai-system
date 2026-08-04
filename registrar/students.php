@@ -444,11 +444,17 @@ $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' :
 </div><div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeAddModal()">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Enroll</button></div></form></div></div>
 
 <!-- AI Document Reader / Paste-to-Fill Modal -->
-<div class="modal-overlay" id="pasteModal"><div class="modal-content" style="max-width:640px;"><div class="modal-header"><h2><i class="fas fa-file-import"></i> AI Document Reader</h2><button class="modal-close" onclick="closePasteModal()"><i class="fas fa-times"></i></button></div><div class="modal-body">
-<p style="font-size:13px;color:#64748b;margin-bottom:12px;">Upload a PDF, Word (.docx), or text file, <em>or</em> paste text. AI will extract the student details for you to review and apply.</p>
-<label class="btn btn-secondary" style="cursor:pointer;margin-bottom:12px;"><i class="fas fa-upload"></i> Upload PDF / Word <input type="file" id="pasteFile" accept=".pdf,.docx,.txt" style="display:none;"></label>
-<div id="pasteFileName" style="font-size:12px;color:#64748b;margin-bottom:8px;"></div>
-<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;color:#94a3b8;font-size:12px;"><span style="flex:1;border-top:1px solid #e2e8f0;"></span> or <span style="flex:1;border-top:1px solid #e2e8f0;"></span></div>
+<div class="modal-overlay" id="pasteModal"><div class="modal-content" style="max-width:680px;"><div class="modal-header"><h2><i class="fas fa-file-import"></i> AI Document Reader</h2><button class="modal-close" onclick="closePasteModal()"><i class="fas fa-times"></i></button></div><div class="modal-body">
+<p style="font-size:13px;color:#64748b;margin-bottom:12px;">Download the form template, have the student fill it out, then <strong>drop the file here</strong> (PDF, Word, or text). AI extracts the details for you to review and apply.</p>
+<div style="display:flex;gap:10px;margin-bottom:12px;"><a href="../api/student-template.php" class="btn btn-secondary" style="cursor:pointer;"><i class="fas fa-file-word"></i> Download Word Template</a></div>
+<div id="pasteDropzone" style="border:2px dashed #cbd5e1;border-radius:12px;padding:26px 16px;text-align:center;color:#64748b;background:#f8fafc;cursor:pointer;transition:all .15s;margin-bottom:8px;">
+<i class="fas fa-cloud-arrow-up" style="font-size:26px;display:block;margin-bottom:8px;color:#94a3b8;"></i>
+<div style="font-size:13px;"><strong>Drag &amp; drop a file here</strong> or <span style="color:#2563eb;text-decoration:underline;">click to browse</span></div>
+<div style="font-size:12px;color:#94a3b8;margin-top:4px;">PDF, DOCX, or TXT · up to 15 MB</div>
+<input type="file" id="pasteFile" accept=".pdf,.docx,.txt" style="display:none;">
+</div>
+<div id="pasteFileName" style="font-size:12px;color:#16a34a;margin-bottom:8px;"></div>
+<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;color:#94a3b8;font-size:12px;"><span style="flex:1;border-top:1px solid #e2e8f0;"></span> or paste text <span style="flex:1;border-top:1px solid #e2e8f0;"></span></div>
 <textarea id="pasteText" class="form-control" rows="5" placeholder="Paste student info text here..." style="margin-bottom:12px;"></textarea>
 <div id="pastePreview" style="display:none;border:1px solid #dbeafe;background:#f8fbff;border-radius:10px;padding:14px;margin-bottom:12px;"></div>
 </div><div class="modal-footer"><button type="button" class="btn btn-light" onclick="closePasteModal()">Cancel</button><button id="pasteExtractBtn" type="button" class="btn btn-primary" onclick="extractPaste()"><i class="fas fa-magic"></i> Extract</button><button id="pasteApplyBtn" type="button" class="btn btn-primary" style="display:none;" onclick="applyPaste()"><i class="fas fa-check"></i> Apply to Form</button></div></div></div>
@@ -935,9 +941,31 @@ function openPasteModal() {
 }
 function closePasteModal() { document.getElementById('pasteModal').classList.remove('active'); document.body.style.overflow = ''; }
 document.getElementById('pasteModal').addEventListener('click', function(e) { if (e.target === this) closePasteModal(); });
-document.getElementById('pasteFile').addEventListener('change', function() {
-    document.getElementById('pasteFileName').textContent = this.files.length ? 'Selected: ' + this.files[0].name : '';
-});
+
+// Drag & drop dropzone
+(function() {
+    const dz = document.getElementById('pasteDropzone');
+    const fileInput = document.getElementById('pasteFile');
+    const nameEl = document.getElementById('pasteFileName');
+    function showName() { nameEl.textContent = fileInput.files.length ? 'Selected: ' + fileInput.files[0].name : ''; }
+    dz.addEventListener('click', function() { fileInput.click(); });
+    fileInput.addEventListener('change', showName);
+    ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, function(e) {
+        e.preventDefault(); e.stopPropagation();
+        dz.style.borderColor = '#2563eb'; dz.style.background = '#eef4ff';
+    }));
+    ['dragleave','drop'].forEach(ev => dz.addEventListener(ev, function(e) {
+        e.preventDefault(); e.stopPropagation();
+        dz.style.borderColor = ''; dz.style.background = '';
+    }));
+    dz.addEventListener('drop', function(e) {
+        const files = e.dataTransfer && e.dataTransfer.files;
+        if (files && files.length) {
+            fileInput.files = files;
+            showName();
+        }
+    });
+})();
 
 let pasteData = null;
 async function extractPaste() {
