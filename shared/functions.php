@@ -33,6 +33,26 @@ function randomString($length = 32) {
 }
 
 /**
+ * Generate a strong human-readable password (letters + digits).
+ */
+function generateStrongPassword($length = 10) {
+    $lower = 'abcdefghjkmnpqrstuvwxyz';
+    $upper = 'ABCDEFGHJKMNPQRSTUVWXYZ';
+    $digits = '23456789';
+    $all = $lower . $upper . $digits;
+    $chars = [];
+    // Ensure at least one of each class, then fill randomly.
+    $chars[] = $lower[random_int(0, strlen($lower) - 1)];
+    $chars[] = $upper[random_int(0, strlen($upper) - 1)];
+    $chars[] = $digits[random_int(0, strlen($digits) - 1)];
+    for ($i = 3; $i < $length; $i++) {
+        $chars[] = $all[random_int(0, strlen($all) - 1)];
+    }
+    shuffle($chars);
+    return implode('', $chars);
+}
+
+/**
  * Generate a slug from a string
  */
 function slugify($string) {

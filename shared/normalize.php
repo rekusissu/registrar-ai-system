@@ -369,6 +369,43 @@ function studentAnomalies(array $s): array {
  * @param string|null $birthDate (YYYY-MM-DD)
  * @return array<int, array{id:int, name:string, student_number:string, score:float}>
  */
+function teacherDataQualityFlags(array $t, array $allUsers, ?int $studentLoad): array {
+    $flags = [];
+    $id = (int) ($t['id'] ?? 0);
+
+    if (empty(trim((string) ($t['email'] ?? ''))))                 $flags[] = 'Missing email';
+    if (empty(trim((string) ($t['full_name'] ?? ''))))             $flags[] = 'Missing name';
+    if (empty(trim((string) ($t['rfid_uid'] ?? ''))))              $flags[] = 'No RFID assigned';
+    if (empty(trim((string) ($t['password_hash'] ?? ''))))         $flags[] = 'No password set';
+
+    // Inactive but still advising students.
+    if (empty($t['is_active']) && $studentLoad > 0) {
+        $flags[] = 'Inactive but advises students';
+    }
+
+    // Duplicate email or RFID across other accounts.
+    foreach ($allUsers as $u) {
+        if ((int) ($u['id'] ?? 0) === $id) continue;
+        if (($u['email'] ?? '') !== '' && strtolower((string)$u['email']) === strtolower((string)($t['email'] ?? ''))) {
+            $flags[] = 'Email conflicts with another account';
+        }
+        if (($u['rfid_uid'] ?? '') !== '' && (string)$u['rfid_uid'] === (string)($t['rfid_uid'] ?? '')) {
+            $flags[] = 'RFID already in use';
+        }
+    }
+
+    return $flags;
+}
+
+/**
+ * Fuzzy duplicate detection against existing students.
+ * Returns a list of candidates with a similarity score.
+ *
+ * @param string $firstName
+ * @param string $lastName
+ * @param string|null $birthDate (YYYY-MM-DD)
+ * @return array<int, array{id:int, name:string, student_number:string, score:float}>
+ */
 function findDuplicateStudents(string $firstName, string $lastName, ?string $birthDate = null): array {
     $db = Database::getInstance();
     $results = [];

@@ -236,6 +236,40 @@ switch ($action) {
         echo json_encode(['success' => true, 'data' => ['summary' => $summary]]);
         exit;
 
+    // ─── TEACHER PROFILE SUMMARY ─────────────────────────────
+    case 'teacher_profile':
+        $id = (int) ($input['id'] ?? 0);
+        if (!$id) {
+            echo json_encode(['success' => false, 'message' => 'Teacher ID required.']);
+            exit;
+        }
+        $t = $db->fetchOne("SELECT id, full_name, email, role, rfid_uid, is_active FROM users WHERE id = ?", [$id]);
+        if (!$t) {
+            echo json_encode(['success' => false, 'message' => 'Teacher not found.']);
+            exit;
+        }
+
+        $load = $db->fetchColumn("SELECT COUNT(*) FROM students WHERE adviser_id = ?", [$id]);
+        $sections = $db->fetchColumn("SELECT COUNT(DISTINCT CONCAT(COALESCE(course,''),'|',COALESCE(year_level,''),'|',COALESCE(section,''))) FROM students WHERE adviser_id = ?", [$id]);
+        $hasRfid = !empty($t['rfid_uid']);
+        $status = $t['is_active'] ? 'active' : 'inactive';
+
+        $system = "You are a registrar's assistant. Write a concise 2-3 sentence profile summary of a teacher, highlighting anything noteworthy (advising load, RFID status, account status). Do not invent data.";
+        $facts = "Teacher: {$t['full_name']}\n"
+            . "Email: {$t['email']}\n"
+            . "Role: {$t['role']}\n"
+            . "Status: {$status}\n"
+            . "Advises {$load} student(s) across {$sections} section(s)\n"
+            . "RFID assigned: " . ($hasRfid ? 'yes' : 'no');
+
+        $summary = aiGenerate($system, $facts, ['max_tokens' => 220]);
+        if ($summary === '') {
+            $summary = ucfirst($t['full_name']) . " advises {$load} student(s) across {$sections} section(s). Account status: {$status}. RFID " . ($hasRfid ? 'assigned' : 'not assigned') . ".";
+        }
+
+        echo json_encode(['success' => true, 'data' => ['summary' => $summary]]);
+        exit;
+
     // ─── NATURAL-LANGUAGE SEARCH ─────────────────────────────
     case 'nl_search':
         $query = trim((string) ($input['query'] ?? ''));
