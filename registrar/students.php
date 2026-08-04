@@ -637,18 +637,32 @@ function viewStudent(id) {
         loadDocuments(s.id);
         loadAcademic(s.id);
         loadHealth(s.id);
-        // AI profile summary
+        // AI profile summary — non-blocking, cached, graceful on slowness.
         const aiSum = document.getElementById('vAiSummary');
-        aiSum.style.display = 'none';
+        aiSum.style.display = 'block';
         aiSum.innerHTML = '<span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#3b82f6;"><i class="fas fa-brain"></i> AI Summary</span> <span style="color:#64748b;font-size:12px;margin-left:4px;"><i class="fas fa-spinner fa-spin"></i> Generating...</span>';
+        let summaryTimedOut = false;
+        const summaryTimer = setTimeout(() => {
+            if (!summaryTimedOut) {
+                aiSum.innerHTML = '<span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#3b82f6;"><i class="fas fa-brain"></i> AI Summary</span><p style="margin:6px 0 0;color:#94a3b8;">Summary is taking a moment — it will appear when ready.</p>';
+            }
+        }, 4000);
         aiToolsPost('profile', { id: s.id }).then(d => {
+            clearTimeout(summaryTimer);
+            summaryTimedOut = true;
             if (d.success && d.data && d.data.summary) {
                 aiSum.innerHTML = '<span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#3b82f6;"><i class="fas fa-brain"></i> AI Summary</span><p style="margin:6px 0 0;color:#334155;">' + d.data.summary + '</p>';
                 aiSum.style.display = 'block';
             } else {
-                aiSum.style.display = 'none';
+                aiSum.innerHTML = '<span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#3b82f6;"><i class="fas fa-brain"></i> AI Summary</span><p style="margin:6px 0 0;color:#94a3b8;">AI summary unavailable for this student.</p>';
+                aiSum.style.display = 'block';
             }
-        }).catch(() => { aiSum.style.display = 'none'; });
+        }).catch(() => {
+            clearTimeout(summaryTimer);
+            summaryTimedOut = true;
+            aiSum.innerHTML = '<span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#3b82f6;"><i class="fas fa-brain"></i> AI Summary</span><p style="margin:6px 0 0;color:#94a3b8;">AI summary unavailable right now.</p>';
+            aiSum.style.display = 'block';
+        });
         // Reset to profile tab
         document.querySelectorAll('.vtab').forEach(t=>t.classList.remove('active'));
         document.querySelector('.vtab[data-tab="profile"]')?.classList.add('active');
