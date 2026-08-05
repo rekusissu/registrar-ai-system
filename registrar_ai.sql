@@ -70,6 +70,21 @@ CREATE TABLE `authorized_cards` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Indexes for table `authorized_cards`
+--
+
+ALTER TABLE `authorized_cards`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `card_uid` (`card_uid`);
+
+--
+-- AUTO_INCREMENT for table `authorized_cards`
+--
+
+ALTER TABLE `authorized_cards`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
 -- --------------------------------------------------------
 
 --
@@ -208,37 +223,6 @@ CREATE TABLE `rfid_cards` (
 
 INSERT INTO `rfid_cards` (`id`, `student_id`, `card_uid`, `card_type`, `status`, `issued_date`, `expiry_date`, `notes`, `created_at`) VALUES
 (9, 1, '0006929950', 'rfid', 'active', '2026-07-14', '2026-07-15', '', '2026-07-14 09:26:57');
-
--- --------------------------------------------------------
-
---
--- Table structure for table `authorized_cards`
---
-
-CREATE TABLE `authorized_cards` (
-  `id` int(11) NOT NULL,
-  `card_uid` varchar(50) NOT NULL,
-  `name` varchar(100) NOT NULL,
-  `role` varchar(50) DEFAULT 'registrar',
-  `can_change_station` tinyint(1) DEFAULT 1,
-  `status` enum('active','inactive') DEFAULT 'active',
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Indexes for table `authorized_cards`
---
-
-ALTER TABLE `authorized_cards`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `card_uid` (`card_uid`);
-
---
--- AUTO_INCREMENT for table `authorized_cards`
---
-
-ALTER TABLE `authorized_cards`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 -- --------------------------------------------------------
 
