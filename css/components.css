@@ -18,6 +18,11 @@ body {
     color: #1e293b;
 }
 
+/* ── Visible text caret everywhere ── */
+input, textarea {
+    caret-color: #0f172a;
+}
+
 .dashboard-main {
     background: transparent;
 }

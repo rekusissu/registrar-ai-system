@@ -6,10 +6,28 @@ if (defined('SESSION_CONFIG_LOADED')) {
 }
 define('SESSION_CONFIG_LOADED', true);
 
+// config.php provides SESSION_IDLE_TIMEOUT (and DB constants used by pages).
+// Load it here so this file works standalone regardless of include order.
+require_once __DIR__ . '/config.php';
+
 // Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
     session_name('BCP_REGISTRAR_SESSION');
     session_start();
+}
+
+// ─── Idle session timeout ────────────────────────────────────
+// Log the user out if they've been inactive past SESSION_IDLE_TIMEOUT.
+// Touching last_activity on every request keeps the window sliding.
+$idleTimeout = defined('SESSION_IDLE_TIMEOUT') ? SESSION_IDLE_TIMEOUT : 1200;
+if (!empty($_SESSION['user_id'])) {
+    if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) > $idleTimeout) {
+        $_SESSION = array();
+        session_destroy();
+        header('Location: login.php?timeout=1');
+        exit;
+    }
+    $_SESSION['last_activity'] = time();
 }
 
 // Helper functions

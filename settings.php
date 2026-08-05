@@ -12,6 +12,8 @@ if (empty($_SESSION['user_id'])) {
     header('Location: login.php');
     exit;
 }
+// Settings is admin-only
+requireRole('admin');
 
 // Set page variables
 $page_title = 'Settings';

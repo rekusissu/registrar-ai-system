@@ -18,6 +18,11 @@ if (!isLoggedIn()) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized.']);
     exit;
 }
+// Admin + registrar only
+if (!in_array(getCurrentUserRole(), ['admin', 'registrar'], true)) {
+    echo json_encode(['success' => false, 'message' => 'Forbidden.']);
+    exit;
+}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['success' => false, 'message' => 'Method not allowed.']);
@@ -178,6 +183,6 @@ try {
     ]);
 
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'message' => 'Search failed: ' . $e->getMessage()]);
+    json_error($e);
 }
 ?>

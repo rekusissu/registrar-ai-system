@@ -11,6 +11,7 @@ if (empty($_SESSION['user_id'])) {
     header('Location: ../login.php');
     exit;
 }
+requireRole('registrar');
 
 require_once __DIR__ . '/../shared/database.php';
 
@@ -23,7 +24,7 @@ $documents = $db->fetchAll("
         s.student_number
     FROM document_requests dr
     LEFT JOIN students s ON dr.student_id = s.id
-    WHERE dr.status IN ('approved', 'completed', 'denied')
+    WHERE dr.status IN ('approved', 'completed', 'released', 'denied')
     ORDER BY dr.id DESC
 ");
 

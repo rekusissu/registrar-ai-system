@@ -20,6 +20,11 @@ if (!isLoggedIn()) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized.']);
     exit;
 }
+// Admin + registrar only
+if (!in_array(getCurrentUserRole(), ['admin', 'registrar'], true)) {
+    echo json_encode(['success' => false, 'message' => 'Forbidden.']);
+    exit;
+}
 
 $method = $_SERVER['REQUEST_METHOD'];
 $id = isset($_GET['id']) ? intval($_GET['id']) : null;
@@ -114,6 +119,76 @@ try {
         exit;
     }
 
+    // ─── SAVE ACADEMIC HISTORY ─────────────────────────────────
+    if ($method === 'POST' && isset($_GET['action']) && $_GET['action'] === 'save-academic') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $studentId = intval($input['student_id'] ?? 0);
+        $schoolName = trim($input['school_name'] ?? '');
+        if (!$studentId || $schoolName === '') {
+            echo json_encode(['success' => false, 'message' => 'Student and school name are required.']);
+            exit;
+        }
+        $data = [
+            'student_id'        => $studentId,
+            'school_name'       => $schoolName,
+            'school_year'       => $input['school_year'] ?? null,
+            'grade_level'       => $input['grade_level'] ?? null,
+            'gwa'               => ($input['gwa'] ?? '') !== '' ? (float) $input['gwa'] : null,
+            'subjects_completed'=> ($input['subjects_completed'] ?? '') !== '' ? (int) $input['subjects_completed'] : null,
+            'remarks'           => $input['remarks'] ?? null
+        ];
+        $recordId = intval($input['id'] ?? 0);
+        if ($recordId) {
+            $db->update('academic_history', $data, 'id = ?', [$recordId]);
+        } else {
+            $recordId = $db->insert('academic_history', $data);
+        }
+        echo json_encode(['success' => true, 'message' => 'Academic record saved.', 'data' => ['id' => $recordId]]);
+        exit;
+    }
+
+    // ─── DELETE ACADEMIC HISTORY ───────────────────────────────
+    if ($method === 'POST' && isset($_GET['action']) && $_GET['action'] === 'delete-academic') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $recordId = intval($input['id'] ?? 0);
+        if (!$recordId) {
+            echo json_encode(['success' => false, 'message' => 'Record ID required.']);
+            exit;
+        }
+        $db->delete('academic_history', 'id = ?', [$recordId]);
+        echo json_encode(['success' => true, 'message' => 'Academic record deleted.']);
+        exit;
+    }
+
+    // ─── SAVE HEALTH RECORD ────────────────────────────────────
+    if ($method === 'POST' && isset($_GET['action']) && $_GET['action'] === 'save-health') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $studentId = intval($input['student_id'] ?? 0);
+        if (!$studentId) {
+            echo json_encode(['success' => false, 'message' => 'Student ID is required.']);
+            exit;
+        }
+        $data = [
+            'blood_type'              => $input['blood_type'] ?? null,
+            'allergies'               => $input['allergies'] ?? null,
+            'pre_existing_conditions' => $input['pre_existing_conditions'] ?? null,
+            'immunization_records'    => $input['immunization_records'] ?? null,
+            'height'                  => ($input['height'] ?? '') !== '' ? (float) $input['height'] : null,
+            'weight'                  => ($input['weight'] ?? '') !== '' ? (float) $input['weight'] : null,
+            'notes'                   => $input['notes'] ?? null
+        ];
+        $existing = $db->fetchOne("SELECT id FROM health_records WHERE student_id = ?", [$studentId]);
+        if ($existing) {
+            $db->update('health_records', $data, 'student_id = ?', [$studentId]);
+            $recordId = $existing['id'];
+        } else {
+            $data['student_id'] = $studentId;
+            $recordId = $db->insert('health_records', $data);
+        }
+        echo json_encode(['success' => true, 'message' => 'Health record saved.', 'data' => ['id' => $recordId]]);
+        exit;
+    }
+
     // ─── BULK STATUS UPDATE ────────────────────────────────────
     if ($method === 'POST' && isset($_GET['action']) && $_GET['action'] === 'bulk-status') {
         $input = json_decode(file_get_contents('php://input'), true);
@@ -125,6 +200,7 @@ try {
         }
         foreach ($ids as $sid) {
             $db->update('students', ['status' => $status], 'id = ?', [intval($sid)]);
+            trackStatusChange(intval($sid), $status, 'Bulk status update');
         }
         echo json_encode(['success' => true, 'message' => count($ids) . ' student(s) updated.']);
         exit;
@@ -273,6 +349,10 @@ try {
         }
 
         $db->update('students', $data, 'id = ?', [$id]);
+        // Track status change in status_tracker
+        if (array_key_exists('status', $data)) {
+            trackStatusChange($id, $data['status'], $input['status_reason'] ?? null);
+        }
         // Update guardian if provided
         $guardianName = trim($input['guardian_name'] ?? '');
         if ($guardianName !== '') {
@@ -303,6 +383,7 @@ try {
         }
 
         $db->update('students', ['status' => 'archived'], 'id = ?', [$id]);
+        trackStatusChange($id, 'archived', 'Student deactivated');
         echo json_encode(['success' => true, 'message' => 'Student deactivated.']);
         exit;
     }
@@ -311,6 +392,6 @@ try {
     echo json_encode(['success' => false, 'message' => 'Invalid request.']);
 
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+    json_error($e);
 }
 ?>

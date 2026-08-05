@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../shared/security_headers.php';
 require_once __DIR__ . '/../shared/session_config.php';
 if (empty($_SESSION['user_id'])) { header('Location: ../login.php'); exit; }
+requireRole('registrar');
 require_once __DIR__ . '/../shared/database.php';
 $db = Database::getInstance();
 

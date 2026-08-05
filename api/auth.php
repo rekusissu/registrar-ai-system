@@ -76,7 +76,7 @@ if ($method === 'POST' && $action === 'login') {
         ]);
 
     } catch (Exception $e) {
-        echo json_encode(['success' => false, 'message' => 'An error occurred: ' . $e->getMessage()]);
+        json_error($e, 'Login failed. Please try again.');
     }
     exit;
 }

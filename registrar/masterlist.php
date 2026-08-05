@@ -12,6 +12,7 @@ if (empty($_SESSION['user_id'])) {
     header('Location: ../login.php');
     exit;
 }
+requireRole('registrar');
 
 require_once __DIR__ . '/../shared/database.php';
 require_once __DIR__ . '/../shared/functions.php';

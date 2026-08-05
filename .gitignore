@@ -3,10 +3,22 @@ shared/ai_key.local
 .env
 *.local
 
+# Composer dependencies (managed via composer.lock)
+/vendor/
+
+# Composer installer (local build tool)
+/composer.phar
+/composer.phar.old
+
 # Runtime / uploads
 uploads/ai_docs/
 uploads/students/*
 !uploads/students/.htaccess
+uploads/ids/*
+!uploads/ids/.htaccess
+
+# Local per-station config (reader mapping per scanning PC)
+/shared/config.local.php
 
 # OS / editor
 .DS_Store

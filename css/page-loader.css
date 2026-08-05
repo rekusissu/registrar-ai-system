@@ -25,6 +25,12 @@
   pointer-events: none;
 }
 
+/* Even before JS adds .hide, never block clicks while still visible.
+   Keeps the caret/focus working if the loader ever lingers. */
+#page-loader {
+  pointer-events: none;
+}
+
 #page-loader .pl-logo {
   width: 90px;
   height: auto;

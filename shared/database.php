@@ -22,7 +22,12 @@ class Database {
                 PDO::ATTR_EMULATE_PREPARES => false
             ]);
         } catch (PDOException $e) {
-            die("Database Connection Failed: " . $e->getMessage());
+            // Log the real reason server-side; never echo it to the browser.
+            error_log('[db] Connection failed: ' . $e->getMessage());
+            http_response_code(500);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Database connection failed.']);
+            exit;
         }
     }
 
