@@ -70,21 +70,6 @@ CREATE TABLE `authorized_cards` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Indexes for table `authorized_cards`
---
-
-ALTER TABLE `authorized_cards`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `card_uid` (`card_uid`);
-
---
--- AUTO_INCREMENT for table `authorized_cards`
---
-
-ALTER TABLE `authorized_cards`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
 -- --------------------------------------------------------
 
 --
@@ -133,6 +118,25 @@ INSERT INTO `document_requests` (`id`, `student_id`, `document_type`, `purpose`,
 (1, 1, 'form137', 'Transfer to UP Manila', NULL, 'pending', NULL, NULL, NULL, '2026-07-07 10:42:46', NULL, NULL),
 (2, 2, 'good_moral', 'Job application', NULL, 'approved', NULL, NULL, NULL, '2026-07-06 10:42:46', NULL, NULL),
 (3, 3, 'transcript', 'Scholarship application', NULL, 'processing', NULL, NULL, NULL, '2026-07-05 10:42:46', NULL, NULL);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `documents`
+--
+
+CREATE TABLE `documents` (
+  `id` int(11) NOT NULL,
+  `student_id` int(11) NOT NULL,
+  `doc_type` enum('enrollment','transcript','health','photo','clearance','other') NOT NULL,
+  `filename` varchar(255) NOT NULL,
+  `file_path` varchar(500) NOT NULL,
+  `file_size` bigint(20) DEFAULT NULL,
+  `file_type` varchar(50) DEFAULT NULL,
+  `description` text DEFAULT NULL,
+  `uploaded_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -401,6 +405,15 @@ ALTER TABLE `document_requests`
   ADD KEY `idx_document_type` (`document_type`);
 
 --
+-- Indexes for table `documents`
+--
+ALTER TABLE `documents`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `uploaded_by` (`uploaded_by`),
+  ADD KEY `idx_student_id` (`student_id`),
+  ADD KEY `idx_doc_type` (`doc_type`);
+
+--
 -- Indexes for table `guardians`
 --
 ALTER TABLE `guardians`
@@ -516,6 +529,12 @@ ALTER TABLE `document_requests`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
+-- AUTO_INCREMENT for table `documents`
+--
+ALTER TABLE `documents`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `guardians`
 --
 ALTER TABLE `guardians`
@@ -591,6 +610,13 @@ ALTER TABLE `audit_logs`
 ALTER TABLE `document_requests`
   ADD CONSTRAINT `document_requests_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `document_requests_ibfk_2` FOREIGN KEY (`processed_by`) REFERENCES `users` (`id`);
+
+--
+-- Constraints for table `documents`
+--
+ALTER TABLE `documents`
+  ADD CONSTRAINT `documents_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `documents_ibfk_2` FOREIGN KEY (`uploaded_by`) REFERENCES `users` (`id`);
 
 --
 -- Constraints for table `guardians`
