@@ -22,6 +22,11 @@ if (!isLoggedIn()) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized.']);
     exit;
 }
+// Admin + registrar only
+if (!in_array(getCurrentUserRole(), ['admin', 'registrar'], true)) {
+    echo json_encode(['success' => false, 'message' => 'Forbidden.']);
+    exit;
+}
 
 $method = $_SERVER['REQUEST_METHOD'];
 $input = json_decode(file_get_contents('php://input'), true);
@@ -45,7 +50,7 @@ if ($method === 'GET') {
         
         echo json_encode(['success' => true, 'data' => $logs]);
     } catch (Exception $e) {
-        echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+        json_error($e);
     }
     exit;
 }
@@ -174,7 +179,7 @@ if ($method === 'POST') {
         echo json_encode($resp);
 
     } catch (Exception $e) {
-        echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+        json_error($e);
     }
     exit;
 }

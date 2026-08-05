@@ -17,6 +17,7 @@ $page_scripts = $page_scripts ?? [];
     <!-- Common Scripts -->
     <script src="<?= $APP_ROOT ?>js/sidebar.js"></script>
     <script src="<?= $APP_ROOT ?>js/auth.js"></script>
+    <script src="<?= $APP_ROOT ?>js/logout.js"></script>
 
     <!-- Chart.js (if needed) -->
     <?php if (isset($use_chart) && $use_chart === true): ?>

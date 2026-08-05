@@ -169,6 +169,12 @@ h2 {
 
 .form-group input:focus { border-color: #2563eb; }
 
+/* Ensure the text cursor (caret) is always visible while typing */
+.form-group input {
+  caret-color: #0f172a;
+  -webkit-text-fill-color: currentColor;
+}
+
 /* ── Buttons ── */
 .btn-done,
 .btn-signin {

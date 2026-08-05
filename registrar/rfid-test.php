@@ -11,6 +11,7 @@ if (empty($_SESSION['user_id'])) {
     header('Location: ../login.php');
     exit;
 }
+requireRole('registrar');
 
 $page_title = 'RFID Scanner Test';
 $APP_ROOT = '../';

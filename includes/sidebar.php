@@ -6,6 +6,7 @@
 
 $APP_ROOT   = $APP_ROOT   ?? '../';
 $ACTIVE_NAV = $ACTIVE_NAV ?? '';
+$USER_ROLE  = $_SESSION['role'] ?? '';
 ?>
 <!-- Sidebar Toggle Button -->
 <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle Sidebar">
@@ -55,10 +56,9 @@ $ACTIVE_NAV = $ACTIVE_NAV ?? '';
             <span class="sidebar-text">Students</span>
         </a>
 
-
-        <a href="<?= $APP_ROOT ?>registrar/teachers.php" class="sidebar-item <?= $ACTIVE_NAV === 'teachers' ? 'active' : '' ?>">
-            <i class="fa-solid fa-chalkboard-user"></i>
-            <span class="sidebar-text">Teachers</span>
+        <a href="<?= $APP_ROOT ?>registrar/student-ids.php" class="sidebar-item <?= $ACTIVE_NAV === 'studentids' ? 'active' : '' ?>">
+            <i class="fa-solid fa-id-badge"></i>
+            <span class="sidebar-text">Student IDs</span>
         </a>
 
         <a href="<?= $APP_ROOT ?>registrar/rfid-cards.php" class="sidebar-item <?= $ACTIVE_NAV === 'rfid' ? 'active' : '' ?>">
@@ -82,19 +82,9 @@ $ACTIVE_NAV = $ACTIVE_NAV ?? '';
             <span class="sidebar-text">Documents</span>
         </a>
 
-        <a href="<?= $APP_ROOT ?>registrar/status-tracker.php" class="sidebar-item <?= $ACTIVE_NAV === 'status' ? 'active' : '' ?>">
-            <i class="fa-solid fa-circle-check"></i>
-            <span class="sidebar-text">Status Tracker</span>
-        </a>
-
         <a href="<?= $APP_ROOT ?>registrar/masterlist.php" class="sidebar-item <?= $ACTIVE_NAV === 'masterlist' ? 'active' : '' ?>">
             <i class="fa-solid fa-table-list"></i>
             <span class="sidebar-text">Masterlist</span>
-        </a>
-
-        <a href="<?= $APP_ROOT ?>registrar/reports.php" class="sidebar-item <?= $ACTIVE_NAV === 'reports' ? 'active' : '' ?>">
-            <i class="fa-solid fa-chart-bar"></i>
-            <span class="sidebar-text">Reports</span>
         </a>
 
         <a href="<?= $APP_ROOT ?>registrar/health-records.php" class="sidebar-item <?= $ACTIVE_NAV === 'health' ? 'active' : '' ?>">
@@ -105,11 +95,6 @@ $ACTIVE_NAV = $ACTIVE_NAV ?? '';
         <a href="<?= $APP_ROOT ?>registrar/academic-history.php" class="sidebar-item <?= $ACTIVE_NAV === 'academic' ? 'active' : '' ?>">
             <i class="fa-solid fa-school"></i>
             <span class="sidebar-text">Academic History</span>
-        </a>
-
-        <a href="<?= $APP_ROOT ?>registrar/audit-log.php" class="sidebar-item <?= $ACTIVE_NAV === 'audit' ? 'active' : '' ?>">
-            <i class="fa-solid fa-list"></i>
-            <span class="sidebar-text">Audit Log</span>
         </a>
 
         <div class="sidebar-divider"></div>
@@ -136,12 +121,14 @@ $ACTIVE_NAV = $ACTIVE_NAV ?? '';
             <div class="brand-title">System</div>
         </div>
 
+        <?php if ($USER_ROLE === 'admin'): ?>
         <a href="<?= $APP_ROOT ?>settings.php" class="sidebar-item <?= $ACTIVE_NAV === 'settings' ? 'active' : '' ?>">
             <i class="fa-solid fa-gear"></i>
             <span class="sidebar-text">Settings</span>
         </a>
+        <?php endif; ?>
 
-        <a href="#" class="sidebar-item" id="logoutBtn">
+        <a href="<?= $APP_ROOT ?>logout.php" class="sidebar-item" id="logoutBtn" data-logout-url="<?= $APP_ROOT ?>logout.php">
             <i class="fa-solid fa-right-from-bracket"></i>
             <span class="sidebar-text">Logout</span>
         </a>
@@ -305,76 +292,7 @@ $ACTIVE_NAV = $ACTIVE_NAV ?? '';
 .notif-time { font-size: 11px; color: #94a3b8; margin-top: 4px; }
 </style>
 
-<!-- Logout Modal JavaScript -->
-<script>
-(function() {
-    'use strict';
-
-    function init() {
-        var logoutBtn = document.getElementById('logoutBtn');
-        var logoutModal = document.getElementById('logoutModal');
-        var logoutCancel = document.getElementById('logoutCancel');
-        var logoutConfirm = document.getElementById('logoutConfirm');
-
-        function openLogoutModal(e) {
-            if (e) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-            if (logoutModal) {
-                logoutModal.classList.add('active');
-                document.body.style.overflow = 'hidden';
-            }
-        }
-
-        function closeLogoutModal() {
-            if (logoutModal) {
-                logoutModal.classList.remove('active');
-                document.body.style.overflow = '';
-            }
-        }
-
-        function performLogout() {
-            closeLogoutModal();
-            window.location.href = '<?= $APP_ROOT ?>logout.php';
-        }
-
-        if (logoutBtn) {
-            logoutBtn.addEventListener('click', openLogoutModal);
-        }
-
-        if (logoutCancel) {
-            logoutCancel.addEventListener('click', closeLogoutModal);
-        }
-
-        if (logoutConfirm) {
-            logoutConfirm.addEventListener('click', performLogout);
-        }
-
-        if (logoutModal) {
-            logoutModal.addEventListener('click', function(e) {
-                if (e.target === this) {
-                    closeLogoutModal();
-                }
-            });
-        }
-
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' && logoutModal && logoutModal.classList.contains('active')) {
-                closeLogoutModal();
-            }
-        });
-    }
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-    } else {
-        init();
-    }
-
-})();
-</script>
-
+<!-- Logout modal wiring moved to js/logout.js -->
 <!-- Notification Modal JavaScript -->
 <script>
 (function() {

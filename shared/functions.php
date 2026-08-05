@@ -671,4 +671,33 @@ function getStatusLabel($status) {
     ];
     return $labels[$status] ?? ucfirst($status);
 }
+
+/**
+ * Record a student status change into the status_tracker table.
+ * Used whenever a student's status changes (quick dropdown, bulk update,
+ * restore). Keeps the dashboard "Recent Activity" and AI insights fed.
+ */
+function trackStatusChange($studentId, $newStatus, $reason = null) {
+    try {
+        $db = Database::getInstance();
+        $old = $db->fetchOne("SELECT status FROM students WHERE id = ?", [intval($studentId)]);
+        $oldStatus = $old['status'] ?? null;
+        if ($oldStatus === $newStatus) {
+            return false; // nothing changed
+        }
+        $db->insert('status_tracker', [
+            'student_id'      => intval($studentId),
+            'previous_status' => $oldStatus,
+            'current_status'  => $newStatus,
+            'reason'          => $reason,
+            'changed_by'      => $_SESSION['user_id'] ?? null,
+            'created_at'      => date('Y-m-d H:i:s')
+        ]);
+        return true;
+    } catch (Exception $e) {
+        // Silent fail — never block the status update because logging broke.
+        error_log('trackStatusChange failed: ' . $e->getMessage());
+        return false;
+    }
+}
 ?>

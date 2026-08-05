@@ -18,6 +18,11 @@ if (!isLoggedIn()) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized.']);
     exit;
 }
+// Admin + registrar only
+if (!in_array(getCurrentUserRole(), ['admin', 'registrar'], true)) {
+    echo json_encode(['success' => false, 'message' => 'Forbidden.']);
+    exit;
+}
 
 $method = $_SERVER['REQUEST_METHOD'];
 
@@ -241,5 +246,5 @@ try {
 
     echo json_encode(['success' => false, 'message' => 'Invalid request.']);
 } catch (Exception $e) {
-    echo json_encode(['success' => false, 'message' => 'Error: ' . $e->getMessage()]);
+    json_error($e);
 }

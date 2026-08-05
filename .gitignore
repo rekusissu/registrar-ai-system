@@ -1,0 +1,22 @@
+# Composer dependencies (managed via composer.lock)
+/vendor/
+
+# Composer installer (local build tool)
+/composer.phar
+/composer.phar.old
+
+# PHP error logs
+*.log
+
+# Local per-station config (reader mapping per scanning PC)
+/shared/config.local.php
+
+# Uploaded files (user data, not source)
+/uploads/students/*
+/uploads/ids/*
+!uploads/students/.htaccess
+!uploads/ids/.htaccess
+
+# OS files
+.DS_Store
+Thumbs.db
