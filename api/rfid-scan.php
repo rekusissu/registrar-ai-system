@@ -87,7 +87,7 @@ if ($method === 'POST') {
 
         // Find the card and student
         $card = $db->fetchOne("
-            SELECT 
+            SELECT
                 rf.*,
                 s.id AS student_id,
                 s.first_name,
@@ -98,6 +98,69 @@ if ($method === 'POST') {
             LEFT JOIN students s ON rf.student_id = s.id
             WHERE rf.card_uid = ?
         ", [$cardUid]);
+
+        // ── QR code fallback (Subsystem 5) ──────────────────────
+        // Student ID QR payloads are JSON: {"type":"student_id","id_number":"...","student_id":N}
+        // A bare scan value may also just BE the student number / id_number.
+        $qrStudent = null;
+        if (!$card) {
+            $decoded = json_decode($cardUid, true);
+            $idNum = '';
+            $studentId = 0;
+            if (is_array($decoded) && ($decoded['type'] ?? '') === 'student_id') {
+                $idNum = (string) ($decoded['id_number'] ?? '');
+                $studentId = (int) ($decoded['student_id'] ?? 0);
+            } else {
+                $idNum = $cardUid;
+            }
+            if ($studentId > 0) {
+                $qrStudent = $db->fetchOne(
+                    "SELECT id AS student_id, first_name, last_name, student_number, course
+                     FROM students WHERE id = ? AND status != 'archived'", [$studentId]);
+            } elseif ($idNum !== '') {
+                // Try student_ids.id_number then students.student_number
+                $qrStudent = $db->fetchOne(
+                    "SELECT s.id AS student_id, s.first_name, s.last_name, s.student_number, s.course
+                     FROM student_ids si
+                     JOIN students s ON s.id = si.student_id
+                     WHERE si.id_number = ? AND s.status != 'archived'
+                     LIMIT 1", [$idNum]);
+                if (!$qrStudent) {
+                    $qrStudent = $db->fetchOne(
+                        "SELECT id AS student_id, first_name, last_name, student_number, course
+                         FROM students WHERE student_number = ? AND status != 'archived'
+                         LIMIT 1", [$idNum]);
+                }
+            }
+            if ($qrStudent) {
+                $status = 'success';
+                $message = 'Access granted (QR).';
+                $studentData = [
+                    'id' => $qrStudent['student_id'],
+                    'first_name' => $qrStudent['first_name'],
+                    'last_name' => $qrStudent['last_name'],
+                    'student_number' => $qrStudent['student_number'],
+                    'course' => $qrStudent['course']
+                ];
+                $card = ['student_id' => $qrStudent['student_id']];
+                // Log QR scans as card_uid = the scanned payload, event logged below
+                $db->insert('rfid_scan_logs', [
+                    'card_uid' => $cardUid,
+                    'student_id' => $qrStudent['student_id'],
+                    'location' => $input['location'] ?? 'Main Gate',
+                    'event_type' => $input['event_type'] ?? 'entry',
+                    'status' => 'success',
+                    'scanner_id' => $input['scanner_id'] ?? 'qr-scan',
+                    'ip_address' => $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'
+                ]);
+                echo json_encode([
+                    'success' => true, 'status' => 'success', 'message' => $message,
+                    'card_uid' => $cardUid, 'event_type' => $input['event_type'] ?? 'entry',
+                    'student' => $studentData
+                ]);
+                exit;
+            }
+        }
 
         if ($card && $card['status'] === 'active') {
             // Check if expired

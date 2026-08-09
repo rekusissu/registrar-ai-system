@@ -107,6 +107,7 @@ tr:hover { background:#f8fafc; }
                 <th>Document Type</th>
                 <th>Purpose</th>
                 <th>Request Date</th>
+                <th>Fee</th>
                 <th>Status</th>
                 <th style="text-align:center;">Actions</th>
             </tr>
@@ -114,7 +115,7 @@ tr:hover { background:#f8fafc; }
         <tbody>
             <?php if (empty($documents)): ?>
                 <tr>
-                    <td colspan="6" style="text-align:center;padding:30px;color:#94a3b8;">No document requests found.</td>
+                    <td colspan="7" style="text-align:center;padding:30px;color:#94a3b8;">No document requests found.</td>
                 </tr>
             <?php else: ?>
                 <?php foreach ($documents as $doc): ?>
@@ -128,7 +129,9 @@ tr:hover { background:#f8fafc; }
                         data-date="<?= date('M d, Y h:i A', strtotime($doc['request_date'])) ?>"
                         data-processedby="<?= htmlspecialchars($doc['processed_by_name'] ?? '', ENT_QUOTES) ?>"
                         data-processed="<?= $doc['processed_date'] ? date('M d, Y h:i A', strtotime($doc['processed_date'])) : '' ?>"
-                        data-denial="<?= htmlspecialchars($doc['denial_reason'] ?? '', ENT_QUOTES) ?>">
+                        data-denial="<?= htmlspecialchars($doc['denial_reason'] ?? '', ENT_QUOTES) ?>"
+                        data-fee="<?= htmlspecialchars($doc['fee_amount'] ?? '', ENT_QUOTES) ?>"
+                        data-receipt="<?= htmlspecialchars($doc['official_receipt'] ?? '', ENT_QUOTES) ?>">
                         <td>
                             <div>
                                 <div class="font-medium" style="font-weight:600;"><?= htmlspecialchars($doc['student_name']) ?></div>
@@ -138,6 +141,7 @@ tr:hover { background:#f8fafc; }
                         <td><?= ucfirst(str_replace('_', ' ', $doc['document_type'])) ?></td>
                         <td><?= htmlspecialchars($doc['purpose'] ?? '—') ?></td>
                         <td><?= date('M d, Y', strtotime($doc['request_date'])) ?></td>
+                        <td><?= $doc['fee_amount'] ? '&#8369;' . number_format((float)$doc['fee_amount'], 2) : '<span style="color:#94a3b8;">—</span>' ?></td>
                         <td><span class="badge <?= htmlspecialchars($doc['status']) ?>"><?= ucfirst($doc['status']) ?></span></td>
                         <td>
                             <div class="action-group">
@@ -196,6 +200,10 @@ tr:hover { background:#f8fafc; }
                     <option value="denied">Deny</option>
                 </select>
             </div>
+            <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="form-group"><label>Fee (₱)</label><input type="number" step="0.01" min="0" id="processFee" class="form-control" placeholder="0.00"></div>
+                <div class="form-group"><label>Official Receipt No.</label><input type="text" id="processReceipt" class="form-control" placeholder="e.g. OR-0001"></div>
+            </div>
             <div class="form-group" id="denialGroup" style="display:none;">
                 <label>Denial Reason</label>
                 <textarea id="processDenial" class="form-control" rows="2" placeholder="Reason for denial"></textarea>
@@ -253,6 +261,8 @@ function processDoc(btn) {
     document.getElementById('pStudent').textContent = d.student;
     document.getElementById('pType').textContent = d.type;
     document.getElementById('processStatus').value = 'processing';
+    document.getElementById('processFee').value = d.fee || '';
+    document.getElementById('processReceipt').value = d.receipt || '';
     document.getElementById('denialGroup').style.display = 'none';
     document.getElementById('processDenial').value = '';
     openModal('processModal');
@@ -266,12 +276,19 @@ function submitProcess() {
     const id = document.getElementById('processId').value;
     const status = document.getElementById('processStatus').value;
     const denialReason = document.getElementById('processDenial').value.trim();
+    const fee = document.getElementById('processFee').value;
+    const receipt = document.getElementById('processReceipt').value.trim();
     const btn = document.getElementById('processSubmit');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
     fetch('../api/documents.php?id=' + id, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, denial_reason: status === 'denied' ? denialReason : undefined })
+        body: JSON.stringify({
+            status,
+            denial_reason: status === 'denied' ? denialReason : undefined,
+            fee_amount: fee,
+            official_receipt: receipt
+        })
     })
     .then(r => r.json())
     .then(d => {

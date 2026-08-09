@@ -72,6 +72,7 @@ tr:hover { background:#f8fafc; }
     data-grade="<?= htmlspecialchars($r['grade_level'] ?? '', ENT_QUOTES) ?>"
     data-gwa="<?= htmlspecialchars($r['gwa'] ?? '', ENT_QUOTES) ?>"
     data-subjects="<?= htmlspecialchars($r['subjects_completed'] ?? '', ENT_QUOTES) ?>"
+    data-semester="<?= htmlspecialchars($r['semester'] ?? '', ENT_QUOTES) ?>"
     data-remarks="<?= htmlspecialchars($r['remarks'] ?? '', ENT_QUOTES) ?>">
 <td><strong><?= htmlspecialchars($r['student_name']) ?></strong><br><span style="font-size:11px;color:#94a3b8;"><?= htmlspecialchars($r['student_number']) ?></span></td>
 <td><?= htmlspecialchars($r['school_name']) ?></td>
@@ -114,9 +115,16 @@ tr:hover { background:#f8fafc; }
             </div>
             <div class="form-row">
                 <div class="form-group"><label>GWA</label><input type="number" step="0.01" min="1" max="5" id="acadGwa" class="form-control" placeholder="e.g., 1.50"></div>
-                <div class="form-group"><label>Subjects Completed</label><input type="number" id="acadSubjects" class="form-control" placeholder="e.g., 8"></div>
+                <div class="form-group"><label>Semester</label><select id="acadSemester" class="form-control"><option value="">—</option><option value="1st">1st Semester</option><option value="2nd">2nd Semester</option><option value="Summer">Summer</option></select></div>
             </div>
             <div class="form-group"><label>Remarks</label><textarea id="acadRemarks" class="form-control" rows="2" placeholder="Notes"></textarea></div>
+
+            <hr style="border:none;border-top:1px solid #f1f5f9;margin:14px 0;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:6px;">Per-Subject Grades (Form 137)</div>
+            <div id="gradeRows"></div>
+            <div style="display:flex;justify-content:flex-end;margin-top:6px;">
+                <button type="button" class="btn btn-light btn-sm" onclick="addGradeRow()"><i class="fas fa-plus"></i> Add Subject</button>
+            </div>
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
@@ -139,10 +147,28 @@ function openAdd() {
     document.getElementById('acadYear').value = '';
     document.getElementById('acadGrade').value = '';
     document.getElementById('acadGwa').value = '';
-    document.getElementById('acadSubjects').value = '';
+    document.getElementById('acadSemester').value = '';
     document.getElementById('acadRemarks').value = '';
+    document.getElementById('gradeRows').innerHTML = '';
     openModal();
 }
+
+// ─── GRADE ROWS (Subsystem 3) ──────────────────────────────
+let gradeSeq = 0;
+function gradeRow(g, seq) {
+    const id = seq || (++gradeSeq);
+    return '<div class="g-row" data-key="' + id + '" style="display:grid;grid-template-columns:1.4fr .5fr .6fr 1fr auto;gap:6px;margin-bottom:6px;align-items:center;">'
+        + '<input class="form-control g-subject" placeholder="Subject" value="' + esc(g ? g.subject : '') + '">'
+        + '<input class="form-control g-units" placeholder="Units" value="' + esc(g ? g.units : '') + '">'
+        + '<input class="form-control g-grade" placeholder="Grade" value="' + esc(g ? g.grade : '') + '">'
+        + '<input class="form-control g-remarks" placeholder="Remarks" value="' + esc(g ? g.remarks : '') + '">'
+        + '<button type="button" class="action-btn delete" onclick="this.closest(\'.g-row\').remove()" title="Remove"><i class="fas fa-trash-alt"></i></button>'
+        + '</div>';
+}
+function addGradeRow(g) {
+    document.getElementById('gradeRows').insertAdjacentHTML('beforeend', gradeRow(g, null));
+}
+function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 function openEdit(btn) {
     const tr = btn.closest('tr'); const d = tr.dataset;
@@ -153,8 +179,14 @@ function openEdit(btn) {
     document.getElementById('acadYear').value = d.year;
     document.getElementById('acadGrade').value = d.grade;
     document.getElementById('acadGwa').value = d.gwa;
-    document.getElementById('acadSubjects').value = d.subjects;
+    document.getElementById('acadSemester').value = d.semester || '';
     document.getElementById('acadRemarks').value = d.remarks;
+    document.getElementById('gradeRows').innerHTML = '';
+    // Load existing grades for this record
+    fetch('../api/students.php?action=grades&record_id=' + d.id).then(r => r.json()).then(gd => {
+        const grades = (gd.success && gd.data) ? gd.data : [];
+        grades.forEach(g => addGradeRow(g));
+    }).catch(() => {});
     openModal();
 }
 
@@ -162,6 +194,13 @@ function saveRecord() {
     const studentId = document.getElementById('acadStudent').value;
     const school = document.getElementById('acadSchool').value.trim();
     if (!studentId || !school) { alert('Select a student and enter the school name.'); return; }
+    // Collect grades
+    const grades = Array.from(document.querySelectorAll('#gradeRows .g-row')).map(row => ({
+        subject: row.querySelector('.g-subject').value,
+        units: row.querySelector('.g-units').value,
+        grade: row.querySelector('.g-grade').value,
+        remarks: row.querySelector('.g-remarks').value
+    })).filter(g => g.subject.trim() !== '');
     const btn = document.getElementById('acadSubmit');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
     fetch('../api/students.php?action=save-academic', {
@@ -174,8 +213,9 @@ function saveRecord() {
             school_year: document.getElementById('acadYear').value,
             grade_level: document.getElementById('acadGrade').value,
             gwa: document.getElementById('acadGwa').value,
-            subjects_completed: document.getElementById('acadSubjects').value,
-            remarks: document.getElementById('acadRemarks').value
+            semester: document.getElementById('acadSemester').value,
+            remarks: document.getElementById('acadRemarks').value,
+            grades: grades
         })
     })
     .then(r => r.json())

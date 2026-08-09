@@ -422,6 +422,7 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 </div>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid #f1f5f9">
 <div class="view-item"><div class="lbl">Status</div><div class="val" id="vStatus">—</div></div>
+<div class="view-item"><div class="lbl">LRN</div><div class="val" id="vLrn">—</div></div>
 <div class="view-item"><div class="lbl">Gender</div><div class="val" id="vGender">—</div></div>
 <div class="view-item"><div class="lbl">Civil Status</div><div class="val" id="vCivilStatus">—</div></div>
 <div class="view-item"><div class="lbl">Birth Date</div><div class="val" id="vBirthDate">—</div></div>
@@ -434,6 +435,8 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 <div class="view-item"><div class="lbl">Adviser</div><div class="val" id="vAdviser">—</div></div>
 <div class="view-item"><div class="lbl">Email</div><div class="val" id="vEmail">—</div></div>
 <div class="view-item"><div class="lbl">Contact</div><div class="val" id="vContact">—</div></div>
+<div class="view-item"><div class="lbl">Father</div><div class="val" id="vFather">—</div></div>
+<div class="view-item"><div class="lbl">Mother</div><div class="val" id="vMother">—</div></div>
 <div class="view-item" style="grid-column:span 2;"><div class="lbl">Address</div><div class="val" id="vAddress">—</div></div>
 </div>
 <div id="vGuardianSection" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid #f1f5f9;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:6px;">Guardian</div><div id="vGuardianInfo" style="font-size:13px;color:#475569;"></div></div>
@@ -460,8 +463,10 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:0 0 12px;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-user"></i> Personal Information</div>
 <div class="form-row"><div class="form-group"><label>First Name <span style="color:#dc2626;">*</span></label><input type="text" id="addFirstName" class="form-control" required></div><div class="form-group"><label>Middle Name</label><input type="text" id="addMiddleName" class="form-control"></div><div class="form-group"><label>Last Name <span style="color:#dc2626;">*</span></label><input type="text" id="addLastName" class="form-control" required></div></div>
-<div class="form-row"><div class="form-group"><label>Gender</label><select id="addGender" class="form-control"><option value="">Select</option><option value="Male">Male</option><option value="Female">Female</option></select></div><div class="form-group"><label>Civil Status</label><select id="addCivilStatus" class="form-control"><option value="">Select</option><option value="Single">Single</option><option value="Married">Married</option><option value="Widowed">Widowed</option><option value="Separated">Separated</option></select></div><div class="form-group"><label>Birth Date</label><input type="date" id="addBirthDate" class="form-control"></div></div>
-<div class="form-row"><div class="form-group"><label>Place of Birth</label><input type="text" id="addBirthPlace" class="form-control" placeholder="City, Province"></div><div class="form-group"><label>Nationality</label><input type="text" id="addNationality" class="form-control" value="Filipino"></div><div class="form-group"><label>Religion</label><input type="text" id="addReligion" class="form-control"></div></div>
+<div class="form-row"><div class="form-group"><label>Name Suffix</label><select id="addSuffix" class="form-control"><option value="">—</option><option value="Jr.">Jr.</option><option value="Sr.">Sr.</option><option value="II">II</option><option value="III">III</option><option value="IV">IV</option></select></div><div class="form-group"><label>LRN (optional)</label><input type="text" id="addLrn" class="form-control" placeholder="12-digit Learner Reference No." maxlength="12"></div><div class="form-group"><label>Gender</label><select id="addGender" class="form-control"><option value="">Select</option><option value="Male">Male</option><option value="Female">Female</option></select></div></div>
+<div class="form-row"><div class="form-group"><label>Civil Status</label><select id="addCivilStatus" class="form-control"><option value="">Select</option><option value="Single">Single</option><option value="Married">Married</option><option value="Widowed">Widowed</option><option value="Separated">Separated</option></select></div><div class="form-group"><label>Birth Date</label><input type="date" id="addBirthDate" class="form-control"></div><div class="form-group"><label>Place of Birth</label><input type="text" id="addBirthPlace" class="form-control" placeholder="City, Province"></div></div>
+<div class="form-row"><div class="form-group"><label>Nationality</label><input type="text" id="addNationality" class="form-control" value="Filipino"></div><div class="form-group"><label>Religion</label><input type="text" id="addReligion" class="form-control"></div><div class="form-group"><label>Father's Name</label><input type="text" id="addFather" class="form-control"></div></div>
+<div class="form-row"><div class="form-group"><label>Mother's Name</label><input type="text" id="addMother" class="form-control"></div></div>
 <div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="addEmail" class="form-control" placeholder="student@school.edu.ph"></div><div class="form-group"><label>Contact No.</label><input type="text" id="addContact" class="form-control" placeholder="0917xxx"></div></div>
 <div class="form-row"><div class="form-group"><label>Address <span style="color:#dc2626;">*</span></label><textarea id="addAddress" class="form-control" rows="2" required></textarea></div></div>
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
@@ -496,8 +501,10 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:0 0 12px;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-user"></i> Personal Information</div>
 <div class="form-row"><div class="form-group"><label>First Name <span style="color:#dc2626;">*</span></label><input type="text" id="editFirstName" class="form-control" required></div><div class="form-group"><label>Middle Name</label><input type="text" id="editMiddleName" class="form-control"></div><div class="form-group"><label>Last Name <span style="color:#dc2626;">*</span></label><input type="text" id="editLastName" class="form-control" required></div></div>
-<div class="form-row"><div class="form-group"><label>Gender</label><select id="editGender" class="form-control"><option value="">Select</option><option value="Male">Male</option><option value="Female">Female</option></select></div><div class="form-group"><label>Civil Status</label><select id="editCivilStatus" class="form-control"><option value="">Select</option><option value="Single">Single</option><option value="Married">Married</option><option value="Widowed">Widowed</option><option value="Separated">Separated</option></select></div><div class="form-group"><label>Birth Date</label><input type="date" id="editBirthDate" class="form-control"></div></div>
-<div class="form-row"><div class="form-group"><label>Place of Birth</label><input type="text" id="editBirthPlace" class="form-control"></div><div class="form-group"><label>Nationality</label><input type="text" id="editNationality" class="form-control"></div><div class="form-group"><label>Religion</label><input type="text" id="editReligion" class="form-control"></div></div>
+<div class="form-row"><div class="form-group"><label>Name Suffix</label><select id="editSuffix" class="form-control"><option value="">—</option><option value="Jr.">Jr.</option><option value="Sr.">Sr.</option><option value="II">II</option><option value="III">III</option><option value="IV">IV</option></select></div><div class="form-group"><label>LRN</label><input type="text" id="editLrn" class="form-control" placeholder="12-digit LRN" maxlength="12"></div><div class="form-group"><label>Gender</label><select id="editGender" class="form-control"><option value="">Select</option><option value="Male">Male</option><option value="Female">Female</option></select></div></div>
+<div class="form-row"><div class="form-group"><label>Civil Status</label><select id="editCivilStatus" class="form-control"><option value="">Select</option><option value="Single">Single</option><option value="Married">Married</option><option value="Widowed">Widowed</option><option value="Separated">Separated</option></select></div><div class="form-group"><label>Birth Date</label><input type="date" id="editBirthDate" class="form-control"></div><div class="form-group"><label>Place of Birth</label><input type="text" id="editBirthPlace" class="form-control"></div></div>
+<div class="form-row"><div class="form-group"><label>Nationality</label><input type="text" id="editNationality" class="form-control"></div><div class="form-group"><label>Religion</label><input type="text" id="editReligion" class="form-control"></div><div class="form-group"><label>Father's Name</label><input type="text" id="editFather" class="form-control"></div></div>
+<div class="form-row"><div class="form-group"><label>Mother's Name</label><input type="text" id="editMother" class="form-control"></div></div>
 <div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="editEmail" class="form-control"></div><div class="form-group"><label>Contact No.</label><input type="text" id="editContact" class="form-control"></div></div>
 <div class="form-row"><div class="form-group"><label>Address <span style="color:#dc2626;">*</span></label><textarea id="editAddress" class="form-control" rows="2" required></textarea></div></div>
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
@@ -632,7 +639,8 @@ function viewStudent(id) {
         document.getElementById('vName').textContent = name;
         document.getElementById('vStudentId').textContent = s.student_number;
         document.getElementById('vStatus').innerHTML = '<span class="status-badge '+(s.status||'active')+'"><span class="status-dot '+(s.status||'active')+'"></span>'+ucfirst(s.status||'Active')+'</span>';
-        document.getElementById('vGender').textContent = s.gender||'—';
+        document.getElementById('vLrn').textContent = s.lrn || '—';
+        document.getElementById('vGender').textContent = s.gender || '—';
         document.getElementById('vCivilStatus').textContent = s.civil_status||'—';
         document.getElementById('vBirthDate').textContent = s.birth_date?new Date(s.birth_date).toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}):'—';
         document.getElementById('vBirthPlace').textContent = s.place_of_birth||'—';
@@ -644,6 +652,8 @@ function viewStudent(id) {
         document.getElementById('vAdviser').textContent = (s.adviser_id && ADVISER_MAP[s.adviser_id]) ? ADVISER_MAP[s.adviser_id] : '—';
         document.getElementById('vEmail').textContent = s.email||'—';
         document.getElementById('vContact').textContent = s.contact_number||'—';
+        document.getElementById('vFather').textContent = s.father_name || '—';
+        document.getElementById('vMother').textContent = s.mother_name || '—';
         document.getElementById('vAddress').textContent = s.address||'—';
         // Guardian
         fetch('../api/students.php?action=guardian&student_id='+s.id).then(r=>r.json()).then(gd=>{
@@ -764,12 +774,16 @@ function editStudent(id) {
         document.getElementById('editFirstName').value = s.first_name;
         document.getElementById('editMiddleName').value = s.middle_name || '';
         document.getElementById('editLastName').value = s.last_name;
+        document.getElementById('editSuffix').value = s.name_suffix || '';
+        document.getElementById('editLrn').value = s.lrn || '';
         document.getElementById('editGender').value = s.gender || '';
         document.getElementById('editCivilStatus').value = s.civil_status || '';
         document.getElementById('editBirthDate').value = s.birth_date || '';
         document.getElementById('editBirthPlace').value = s.place_of_birth || '';
         document.getElementById('editNationality').value = s.nationality || '';
         document.getElementById('editReligion').value = s.religion || '';
+        document.getElementById('editFather').value = s.father_name || '';
+        document.getElementById('editMother').value = s.mother_name || '';
         document.getElementById('editCourse').value = s.course || '';
         refreshMajorOptions('edit');
         document.getElementById('editMajor').value = s.major || '';
@@ -806,6 +820,10 @@ document.getElementById('editForm').addEventListener('submit', async function(e)
                 first_name: document.getElementById('editFirstName').value,
                 middle_name: document.getElementById('editMiddleName').value,
                 last_name: document.getElementById('editLastName').value,
+                name_suffix: document.getElementById('editSuffix').value,
+                lrn: document.getElementById('editLrn').value,
+                father_name: document.getElementById('editFather').value,
+                mother_name: document.getElementById('editMother').value,
                 gender: document.getElementById('editGender').value,
                 civil_status: document.getElementById('editCivilStatus').value,
                 birth_date: document.getElementById('editBirthDate').value,
@@ -937,6 +955,10 @@ document.getElementById('addForm').addEventListener('submit', async function(e) 
                 first_name: document.getElementById('addFirstName').value,
                 middle_name: document.getElementById('addMiddleName').value,
                 last_name: document.getElementById('addLastName').value,
+                name_suffix: document.getElementById('addSuffix').value,
+                lrn: document.getElementById('addLrn').value,
+                father_name: document.getElementById('addFather').value,
+                mother_name: document.getElementById('addMother').value,
                 gender: document.getElementById('addGender').value,
                 civil_status: document.getElementById('addCivilStatus').value,
                 birth_date: document.getElementById('addBirthDate').value,

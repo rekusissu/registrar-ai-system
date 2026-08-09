@@ -210,11 +210,12 @@ tr:hover { background:#f8fafc; }
                     <div class="idcard-qr"><img id="cardQr" src="" alt="QR"></div>
                     <div style="font-size:10px;color:#475569;margin-top:6px;" id="cardType">School ID</div>
                 </div>
-                <div class="idcard-foot">This ID is property of BCP. If found, return to the Registrar's Office.</div>
+                <div class="idcard-foot">This ID is property of Bestlink College of the Philippines. If found, return to the Registrar's Office.</div>
             </div>
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="closeModal('viewModal')">Close</button>
+            <button class="btn btn-primary" onclick="printCard()"><i class="fas fa-print"></i> Print ID</button>
         </div>
     </div>
 </div>
@@ -289,6 +290,7 @@ function viewCard(btn) {
     document.getElementById('cardNumber').textContent = d.idnumber;
     document.getElementById('cardQr').src = d.qr ? d.qr : '';
     document.getElementById('cardType').textContent = d.idtype.replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
+    currentCardData = { name: d.name, photo: d.photo, course: d.course, idnumber: d.idnumber, qr: d.qr, idtype: d.idtype };
     openModal('viewModal');
 }
 
@@ -301,6 +303,53 @@ function editStatus(btn) {
     document.getElementById('editExpiry').value = d.expiry || '';
     openModal('editModal');
 }
+
+// Print a clean official ID card sheet (school logo, photo, QR, signature line)
+function printCard() {
+    const d = currentCardData || {};
+    const w = window.open('', '_blank', 'width=600,height=800');
+    const photo = d.photo || '../assets/images/BCP_LOGO.png';
+    const name = d.name || '—';
+    const course = d.course || '';
+    const id = d.idnumber || '';
+    const qr = d.qr || '';
+    const type = (d.idtype || 'school_id').replace('_', ' ').replace(/\b\w/g, c => c.toUpperCase());
+    const css = ''
+        + '@page { size: 86mm 54mm; margin: 0; } '
+        + 'body { margin: 0; font-family: Arial, sans-serif; -webkit-print-color-adjust: exact; } '
+        + '.card { width: 86mm; height: 54mm; border-radius: 4mm; overflow: hidden; '
+        + 'background: linear-gradient(160deg,#eff6ff,#dbeafe); border: 1.2mm solid #dbeafe; '
+        + 'box-sizing: border-box; position: relative; } '
+        + '.h { background: linear-gradient(135deg,#1d4ed8,#2563eb); color:#fff; padding: 3mm 4mm; '
+        + 'display:flex; align-items:center; gap:3mm; } '
+        + '.h img { width: 8mm; height: 8mm; border-radius: 1.5mm; } '
+        + '.h .s { font-size: 4.2mm; font-weight: 700; letter-spacing: .2mm; line-height:1.1; } '
+        + '.h .s small { display:block; font-size:2.6mm; font-weight:400; opacity:.85; } '
+        + '.b { display:flex; align-items:center; gap:4mm; padding: 3mm 4mm; } '
+        + '.b img.p { width: 14mm; height: 17mm; object-fit: cover; border-radius: 1.5mm; '
+        + 'border: .6mm solid #fff; box-shadow: 0 1mm 2mm rgba(0,0,0,.2); } '
+        + '.i { flex:1; } '
+        + '.i .n { font-size: 4.4mm; font-weight: 700; color:#0f172a; } '
+        + '.i .m { font-size: 2.8mm; color:#475569; margin-top:.6mm; } '
+        + '.i .d { font-size: 3.4mm; font-weight: 700; color:#1d4ed8; letter-spacing:.4mm; margin-top:1mm; } '
+        + '.i .t { font-size:2.6mm; color:#64748b; text-transform:uppercase; letter-spacing:.3mm; margin-top:.6mm; } '
+        + '.qr { text-align:center; } '
+        + '.qr img { width: 16mm; height: 16mm; background:#fff; padding:1mm; border-radius:1.5mm; border:.3mm solid #e2e8f0; } '
+        + '.f { background:#fff; border-top:.3mm solid #e2e8f0; padding:1mm 4mm; text-align:center; '
+        + 'font-size:2.2mm; color:#64748b; } '
+        + '@media print { .card { margin: 0; border: none; } body { -webkit-print-color-adjust: exact; } }';
+    w.document.write('<html><head><title>Student ID — ' + name + '</title><style>' + css + '</style></head><body>');
+    w.document.write('<div class="card">');
+    w.document.write('<div class="h"><img src="../assets/images/BCP_LOGO.png" alt="BCP"><div class="s">BESTLINK COLLEGE OF THE PHILIPPINES<small>Official ' + type + '</small></div></div>');
+    w.document.write('<div class="b"><img class="p" src="' + photo + '" alt="photo"><div class="i"><div class="n">' + name + '</div><div class="m">' + course + '</div><div class="d">' + id + '</div><div class="t">' + type + '</div></div>' + (qr ? '<div class="qr"><img src="' + qr + '" alt="QR"></div>' : '') + '</div>');
+    w.document.write('<div class="f">This ID is property of Bestlink College of the Philippines. If found, return to the Registrar\'s Office.</div>');
+    w.document.write('</div></body></html>');
+    w.document.close();
+    setTimeout(() => { w.focus(); w.print(); }, 250);
+}
+
+// Hold the currently-viewed card for print
+let currentCardData = null;
 
 function submitEdit() {
     const id = document.getElementById('editId').value;

@@ -653,19 +653,49 @@ function downloadBlob(blob, filename) {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-// ─── PRINT ───────────────────────────────────────────────────
+// ─── PRINT (Official Masterlist sheet w/ logo + signature) ────
 function printRows(rows) {
     const w = window.open();
-    w.document.write('<html><head><style>body{font-family:Arial,sans-serif;font-size:12px}table{width:100%;border-collapse:collapse}th,td{padding:6px 8px;border:1px solid #999;text-align:left}th{background:#1a2d4a;color:#fff}</style></head><body>');
-    w.document.write('<h2>Masterlist</h2>');
+    const sy = document.getElementById('filterSchoolYear') ? document.getElementById('filterSchoolYear').value : '';
+    w.document.write('<!DOCTYPE html><html><head><title>Masterlist</title><style>');
+    w.document.write('@page { size: A4 landscape; margin: 12mm; }');
+    w.document.write('body { font-family: Arial, sans-serif; font-size: 11px; color: #0f172a; -webkit-print-color-adjust: exact; }');
+    w.document.write('.letterhead { display:flex; align-items:center; gap:12px; border-bottom:3px double #1a2d4a; padding-bottom:8px; margin-bottom:10px; }');
+    w.document.write('.letterhead img { width:52px; height:52px; object-fit:contain; }');
+    w.document.write('.lh-text { flex:1; text-align:center; }');
+    w.document.write('.lh-text .school { font-size:15px; font-weight:700; letter-spacing:.3px; }');
+    w.document.write('.lh-text .sub { font-size:10px; color:#475569; margin-top:2px; }');
+    w.document.write('.lh-text .title { font-size:12px; font-weight:700; margin-top:6px; }');
+    w.document.write('h3.group { margin:14px 0 6px; font-size:12px; background:#1a2d4a; color:#fff; padding:5px 8px; border-radius:3px; }');
+    w.document.write('table { width:100%; border-collapse:collapse; margin-bottom:6px; }');
+    w.document.write('th,td { padding:5px 7px; border:1px solid #999; text-align:left; font-size:10px; }');
+    w.document.write('th { background:#eef2f7; color:#0f172a; font-weight:700; }');
+    w.document.write('.sig { display:flex; justify-content:space-between; margin-top:26px; padding-top:6px; }');
+    w.document.write('.sig .box { text-align:center; width:44%; }');
+    w.document.write('.sig .line { border-top:1px solid #0f172a; margin-top:28px; padding-top:4px; font-size:10px; }');
+    w.document.write('</style></head><body>');
+    w.document.write('<div class="letterhead"><img src="../assets/images/BCP_LOGO.png" alt="BCP" onerror="this.style.display=\'none\'">' +
+        '<div class="lh-text"><div class="school">BESTLINK COLLEGE OF THE PHILIPPINES</div>' +
+        '<div class="sub">812 A. Luna St., Barangay Tatalon, Quezon City · registrar@bestlink.edu.ph</div>' +
+        '<div class="title">OFFICIAL MASTERLIST OF STUDENTS' + (sy ? ' — S.Y. ' + sy : '') + '</div></div></div>');
+
     if (rows && rows.length) {
         rows.forEach(row => {
             const cols = row.querySelectorAll('td');
             if (cols.length < 11) return;
             const t = i => cols[i].textContent.trim();
-            w.document.write('<table><tr><th>Student ID</th><td>' + t(2) + '</td><th>Name</th><td>' + t(3) + '</td><th>Course</th><td>' + t(4) + '</td></tr></table>');
+            const course = t(4), year = t(5), section = t(6), name = t(3), sn = t(2), gender = t(7), status = t(8);
+            w.document.write('<h3>' + course + ' — Year ' + (year || '—') + ' · Section ' + (section || '—') + '</h3>');
+            w.document.write('<table><tr><th>#</th><th>Student No.</th><th>Name</th><th>Gender</th><th>Status</th></tr>');
+            // Single row per matched row
+            w.document.write('<tr><td>1</td><td>' + sn + '</td><td>' + name + '</td><td>' + gender + '</td><td>' + status + '</td></tr></table>');
         });
+        if (!rows.length) w.document.write('<p>No records to print.</p>');
+    } else {
+        w.document.write('<p>No records to print.</p>');
     }
+    w.document.write('<div class="sig"><div class="box"><div class="line">Prepared by:<br>Registrar</div></div>' +
+        '<div class="box"><div class="line">Approved by:<br>School Head / President</div></div></div>');
     w.document.write('</body></html>');
     w.document.close();
     w.print();

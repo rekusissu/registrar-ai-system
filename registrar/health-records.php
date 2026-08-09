@@ -68,6 +68,7 @@ tr:hover { background:#f8fafc; }
 <tr><td colspan="7" style="text-align:center;padding:30px;color:#94a3b8;">No health records found.</td></tr>
 <?php else: foreach ($records as $r): ?>
 <tr data-id="<?= (int)$r['id'] ?>" data-student-id="<?= (int)$r['student_id'] ?>"
+    data-student-name="<?= htmlspecialchars($r['student_name'], ENT_QUOTES) ?>"
     data-blood="<?= htmlspecialchars($r['blood_type'] ?? '', ENT_QUOTES) ?>"
     data-height="<?= htmlspecialchars($r['height'] ?? '', ENT_QUOTES) ?>"
     data-weight="<?= htmlspecialchars($r['weight'] ?? '', ENT_QUOTES) ?>"
@@ -82,6 +83,7 @@ tr:hover { background:#f8fafc; }
 <td style="max-width:200px;white-space:normal;word-break:break-word;"><?= htmlspecialchars($r['allergies'] ?? 'None') ?></td>
 <td style="max-width:200px;white-space:normal;word-break:break-word;"><?= htmlspecialchars($r['pre_existing_conditions'] ?? 'None') ?></td>
 <td><div class="action-group">
+<button class="action-btn view" onclick="openVisits(this)" title="Clinic Visits"><i class="fas fa-notes-medical"></i></button>
 <button class="action-btn edit" onclick="openEdit(this)" title="Edit"><i class="fas fa-pen"></i></button>
 </div></td>
 </tr>
@@ -123,6 +125,39 @@ tr:hover { background:#f8fafc; }
     </div>
 </div>
 
+<!-- Clinic Visits Modal (timeline) -->
+<div class="modal-overlay" id="visitsModal">
+    <div class="modal-content wide" style="max-width:640px;">
+        <div class="modal-header"><h3><i class="fas fa-notes-medical" style="color:#2563eb;"></i> <span id="visitsTitle">Clinic Visits</span></h3><button class="modal-close" onclick="closeVisitsModal()"><i class="fas fa-times"></i></button></div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label>Student</label>
+                <select id="visitTable" class="form-control" style="border:0;background:none;font-weight:700;color:#0f172a;padding:0;" disabled>
+                </select>
+            </div>
+            <div style="display:flex;gap:12px;margin-bottom:8px;">
+                <input type="date" id="visitDate" class="form-control" style="flex:1;">
+                <input type="text" id="visitComplaint" class="form-control" style="flex:2;" placeholder="Complaint (e.g. fever, headache)" />
+            </div>
+            <div style="display:flex;gap:12px;margin-bottom:8px;">
+                <input type="text" id="visitDiag" class="form-control" style="flex:1;" placeholder="Diagnosis" />
+                <input type="text" id="visitTemp" class="form-control" style="flex:0 0 110px;" placeholder="Temp (°C)" />
+                <input type="text" id="visitBP" class="form-control" style="flex:0 0 120px;" placeholder="BP (e.g. 120/80)" />
+            </div>
+            <div style="display:flex;gap:12px;margin-bottom:8px;">
+                <input type="text" id="visitTreatment" class="form-control" style="flex:1;" placeholder="Treatment given" />
+                <input type="text" id="visitMedication" class="form-control" style="flex:1;" placeholder="Medication" />
+            </div>
+            <div style="display:flex;gap:12px;margin-bottom:12px;">
+                <input type="text" id="visitPhysician" class="form-control" style="flex:1;" placeholder="Attending physician / clinic staff" />
+            </div>
+            <div style="margin-bottom:14px;display:flex;gap:8px;justify-content:flex-end;">
+                <button class="btn btn-primary btn-sm" onclick="logVisit()"><i class="fas fa-plus"></i> Log Visit</button>
+            </div>
+            <div id="visitList" style="max-height:340px;overflow-y:auto;"></div>
+        </div>
+    </div>
+</div>
 <script>
 function closeModal() { document.getElementById('healthModal').classList.remove('active'); document.body.style.overflow = ''; }
 function openModal() { document.getElementById('healthModal').classList.add('active'); document.body.style.overflow = 'hidden'; }
@@ -183,6 +218,84 @@ function saveRecord() {
     .then(d => { if (d.success) window.location.reload(); else alert(d.message || 'Error saving.'); })
     .catch(() => alert('Network error.'))
     .finally(() => { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save'; });
+}
+
+// ─── CLINIC VISITS ─────────────────────────────────────────
+let currentVisitStudent = null;
+function openVisits(btn) {
+    const d = btn.closest('tr').dataset;
+    currentVisitStudent = d.studentId;
+    document.getElementById('visitsTitle').textContent = 'Clinic Visits — ' + (d.studentName || 'Student #' + d.studentId);
+    const tbl = document.getElementById('visitTable');
+    tbl.innerHTML = '<option value="' + d.studentId + '">' + (d.studentName || 'Student #' + d.studentId) + '</option>';
+    document.getElementById('visitDate').value = new Date().toISOString().slice(0,10);
+    ['visitComplaint','visitDiag','visitTemp','visitBP','visitTreatment','visitMedication','visitPhysician'].forEach(id => document.getElementById(id).value = '');
+    loadVisits();
+    document.getElementById('visitsModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeVisitsModal() { document.getElementById('visitsModal').classList.remove('active'); document.body.style.overflow = ''; }
+document.getElementById('visitsModal').addEventListener('click', function(e) { if (e.target === this) closeVisitsModal(); });
+
+function loadVisits() {
+    if (!currentVisitStudent) return;
+    fetch('../api/students.php?action=visits&student_id=' + currentVisitStudent)
+    .then(r => r.json())
+    .then(d => {
+        const el = document.getElementById('visitList');
+        const visits = (d.success && d.data) ? d.data : [];
+        if (!visits.length) {
+            el.innerHTML = '<div class="empty-mini">No clinic visits recorded for this student yet.</div>';
+            return;
+        }
+        el.innerHTML = visits.map(v => {
+            const dt = v.visit_date ? new Date(v.visit_date).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) : '—';
+            const temp = v.temperature ? v.temperature.toFixed ? v.temperature.toFixed(1) + '°C' : v.temperature + '°C' : '';
+            return '<div style="border:1px solid #f1f5f9;border-radius:10px;padding:10px 14px;margin-bottom:8px;background:#fafcfd;">'
+                + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">'
+                + '<div style="font-weight:700;font-size:13px;color:#0f172a;">' + dt + '<span style="font-weight:500;color:#64748b;margin-left:8px;">' + (v.complaint || '—') + '</span></div>'
+                + '<button class="action-btn delete" onclick="deleteVisit(' + v.id + ',this)" title="Delete"><i class="fas fa-trash-alt"></i></button>'
+                + '</div>'
+                + '<div style="font-size:12px;color:#64748b;margin-top:4px;">'
+                + (v.temperature ? '<span style="margin-right:10px;"><i class="fas fa-temperature-high"></i> ' + (v.temperature.toFixed ? v.temperature.toFixed(1) : v.temperature) + '°C</span>' : '')
+                + (v.blood_pressure ? '<span style="margin-right:10px;"><i class="fas fa-heart-pulse"></i> ' + v.blood_pressure + '</span>' : '')
+                + (v.diagnosis ? '<span style="margin-right:10px;"><i class="fas fa-stethoscope"></i> ' + v.diagnosis + '</span>' : '')
+                + (v.treatment ? '<span><i class="fas fa-medkit"></i> ' + v.treatment + '</span>' : '')
+                + (v.physician ? '<div style="margin-top:3px;"><i class="fas fa-user-doctor"></i> ' + v.physician + '</div>' : '')
+                + '</div></div>';
+        }).join('');
+    }).catch(() => { document.getElementById('visitList').innerHTML = '<div class="empty-mini">Error loading visits.</div>'; });
+}
+
+function logVisit() {
+    if (!currentVisitStudent) return;
+    const payload = {
+        student_id: currentVisitStudent,
+        visit_date: document.getElementById('visitDate').value,
+        complaint: document.getElementById('visitComplaint').value,
+        diagnosis: document.getElementById('visitDiag').value,
+        temperature: document.getElementById('visitTemp').value,
+        blood_pressure: document.getElementById('visitBP').value,
+        treatment: document.getElementById('visitTreatment').value,
+        medication: document.getElementById('visitMedication').value,
+        physician: document.getElementById('visitPhysician').value
+    };
+    fetch('../api/students.php?action=add-visit', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+    }).then(r => r.json()).then(d => {
+        if (d.success) { clearVisitForm(); loadVisits(); }
+        else alert(d.message || 'Error logging visit.');
+    }).catch(() => alert('Network error.'));
+}
+function clearVisitForm() {
+    ['visitComplaint','visitDiag','visitTemp','visitBP','visitTreatment','visitMedication','visitPhysician'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('visitDate').value = new Date().toISOString().slice(0,10);
+}
+function deleteVisit(id, btn) {
+    if (!confirm('Delete this clinic visit?')) return;
+    fetch('../api/students.php?action=delete-visit', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id })
+    }).then(r => r.json()).then(d => { if (d.success) loadVisits(); else alert(d.message || 'Delete failed.'); }).catch(() => alert('Network error.'));
 }
 </script>
 <?php include '../includes/footer.php'; ?>

@@ -45,6 +45,7 @@ $APP_ROOT = $APP_ROOT ?? './';
     <link rel="stylesheet" href="<?= $APP_ROOT ?>css/page-loader.css" />
     <link rel="stylesheet" href="<?= $APP_ROOT ?>css/components.css" />
     <link rel="stylesheet" href="<?= $APP_ROOT ?>css/sidebar.css" />
+    <link rel="stylesheet" href="<?= $APP_ROOT ?>css/registrar.css" />
     <link rel="stylesheet" href="<?= $APP_ROOT ?>css/dashboard.css" />
 
     <!-- Loader Script - MUST BE FIRST -->

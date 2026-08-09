@@ -75,6 +75,17 @@ include '../includes/sidebar.php';
                 <input type="text" name="recipient" class="form-control" placeholder="e.g., UP Manila Registrar" />
             </div>
 
+            <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="form-group">
+                    <label>Fee (₱, optional)</label>
+                    <input type="number" name="fee_amount" step="0.01" min="0" class="form-control" placeholder="0.00" />
+                </div>
+                <div class="form-group">
+                    <label>Official Receipt No. (optional)</label>
+                    <input type="text" name="official_receipt" class="form-control" placeholder="e.g. OR-0001" />
+                </div>
+            </div>
+
             <div class="form-actions" style="display: flex; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
                 <a href="documents.php" class="btn btn-secondary">Cancel</a>
                 <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Submit Request</button>

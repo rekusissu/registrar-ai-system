@@ -56,6 +56,11 @@ $USER_ROLE  = $_SESSION['role'] ?? '';
             <span class="sidebar-text">Students</span>
         </a>
 
+        <a href="<?= $APP_ROOT ?>registrar/guardians.php" class="sidebar-item <?= $ACTIVE_NAV === 'guardians' ? 'active' : '' ?>">
+            <i class="fa-solid fa-users"></i>
+            <span class="sidebar-text">Guardians &amp; Contacts</span>
+        </a>
+
         <a href="<?= $APP_ROOT ?>registrar/student-ids.php" class="sidebar-item <?= $ACTIVE_NAV === 'studentids' ? 'active' : '' ?>">
             <i class="fa-solid fa-id-badge"></i>
             <span class="sidebar-text">Student IDs</span>
@@ -85,6 +90,16 @@ $USER_ROLE  = $_SESSION['role'] ?? '';
         <a href="<?= $APP_ROOT ?>registrar/masterlist.php" class="sidebar-item <?= $ACTIVE_NAV === 'masterlist' ? 'active' : '' ?>">
             <i class="fa-solid fa-table-list"></i>
             <span class="sidebar-text">Masterlist</span>
+        </a>
+
+        <a href="<?= $APP_ROOT ?>registrar/file-storage.php" class="sidebar-item <?= $ACTIVE_NAV === 'filestorage' ? 'active' : '' ?>">
+            <i class="fa-solid fa-folder-open"></i>
+            <span class="sidebar-text">File Storage</span>
+        </a>
+
+        <a href="<?= $APP_ROOT ?>registrar/status-tracker.php" class="sidebar-item <?= $ACTIVE_NAV === 'tracker' ? 'active' : '' ?>">
+            <i class="fa-solid fa-arrows-rotate"></i>
+            <span class="sidebar-text">Status Tracker</span>
         </a>
 
         <a href="<?= $APP_ROOT ?>registrar/health-records.php" class="sidebar-item <?= $ACTIVE_NAV === 'health' ? 'active' : '' ?>">
