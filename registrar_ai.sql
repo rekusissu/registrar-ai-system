@@ -73,6 +73,27 @@ CREATE TABLE `authorized_cards` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `card_readers`
+--
+
+CREATE TABLE `card_readers` (
+  `id` int(11) NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `location` varchar(100) DEFAULT NULL,
+  `reader_type` enum('entrance','exit','both') DEFAULT 'both',
+  `reader_code` varchar(50) DEFAULT NULL,
+  `status` enum('active','inactive') DEFAULT 'active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `audit_logs`
 --
 
@@ -387,6 +408,12 @@ ALTER TABLE `authorized_cards`
   ADD UNIQUE KEY `card_uid` (`card_uid`);
 
 --
+-- Indexes for table `card_readers`
+--
+ALTER TABLE `card_readers`
+  ADD PRIMARY KEY (`id`);
+
+--
 -- Indexes for table `audit_logs`
 --
 ALTER TABLE `audit_logs`
@@ -515,6 +542,12 @@ ALTER TABLE `ai_cache`
 -- AUTO_INCREMENT for table `authorized_cards`
 --
 ALTER TABLE `authorized_cards`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `card_readers`
+--
+ALTER TABLE `card_readers`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --

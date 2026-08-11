@@ -228,4 +228,32 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 --     masterlist_cache exists; no schema change. Done.
 -- ────────────────────────────────────────────────
 
+-- ────────────────────────────────────────────────
+-- 11) RFID CARD READERS (scanning stations registry)
+--     Table for physical reader stations (Main Gate, Library, Lab, etc).
+--     Referenced by api/card-readers.php, registrar/rfid-readers.php,
+--     registrar/rfid-kiosk.php and api/rfid-scan.php.
+-- ────────────────────────────────────────────────
+SET @tbl := (SELECT COUNT(*) FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = 'registrar_ai' AND TABLE_NAME = 'card_readers');
+SET @sql := IF(@tbl = 0, 'CREATE TABLE card_readers (
+  id INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  location VARCHAR(100) DEFAULT NULL,
+  reader_type ENUM(''entrance'',''exit'',''both'') DEFAULT ''both'',
+  reader_code VARCHAR(50) DEFAULT NULL,
+  status ENUM(''active'',''inactive'') DEFAULT ''active'',
+  created_at TIMESTAMP NOT NULL DEFAULT current_timestamp(),
+  updated_at TIMESTAMP NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- Seed the default scanning stations (idempotent: only when table is empty)
+SET @cnt := (SELECT COUNT(*) FROM card_readers);
+SET @sql := IF(@cnt = 0, 'INSERT INTO card_readers (name, location, reader_type, reader_code, status) VALUES
+  (''Main Gate'', ''Main Gate'', ''entrance'', ''gate-01'', ''active''),
+  (''Library'', ''Library'', ''both'', ''lib-01'', ''active''),
+  (''CS Lab'', ''CS Laboratory'', ''entrance'', ''lab-01'', ''active'')', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 -- Done. Verify with:  SHOW TABLES LIKE 'health_visits';

@@ -65,7 +65,7 @@ $timeout = isset($_GET['timeout']) ? true : false;
 
                 <div class="form-group">
                     <label><i class="fa-solid fa-lock"></i> Password</label>
-                    <input type="password" id="password" autocomplete="current-password" value="password123" />
+                    <input type="password" id="password" autocomplete="current-password" value="password" />
                 </div>
 
                 <button type="submit" class="btn-signin" id="btnSignin">

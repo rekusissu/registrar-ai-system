@@ -30,6 +30,121 @@ $id = isset($_GET['id']) ? intval($_GET['id']) : null;
 try {
     $db = Database::getInstance();
 
+    // ─── DIGITAL FILE STORAGE (Subsystem 9) ─────────────────────
+    // Routed FIRST so ?section=files requests are never captured by
+    // the generic document-request handlers below.
+    // GET ?section=files&student_id=N            → list student's stored files
+    // GET ?section=files&all=1                   → list all stored files
+    // POST ?section=files (multipart)            → upload a file
+    // POST ?section=files&action=delete          → delete a file
+    if (isset($_GET['section']) && $_GET['section'] === 'files') {
+        $db = Database::getInstance();
+
+        // ── LIST FILES ──
+        if ($method === 'GET') {
+            $studentId = isset($_GET['student_id']) ? intval($_GET['student_id']) : 0;
+            if ($studentId) {
+                $files = $db->fetchAll(
+                    "SELECT d.*, CONCAT(s.first_name,' ',s.last_name) AS student_name, s.student_number
+                     FROM documents d
+                     LEFT JOIN students s ON d.student_id = s.id
+                     WHERE d.student_id = ?
+                     ORDER BY d.created_at DESC",
+                    [$studentId]
+                );
+            } else {
+                $files = $db->fetchAll(
+                    "SELECT d.*, CONCAT(s.first_name,' ',s.last_name) AS student_name, s.student_number
+                     FROM documents d
+                     LEFT JOIN students s ON d.student_id = s.id
+                     ORDER BY d.created_at DESC"
+                );
+            }
+            echo json_encode(['success' => true, 'data' => $files]);
+            exit;
+        }
+
+        // ── UPLOAD FILE ──
+        if ($method === 'POST' && !isset($_GET['action'])) {
+            $studentId = intval($_POST['student_id'] ?? 0);
+            $docType   = trim($_POST['doc_type'] ?? 'other');
+            $category  = trim($_POST['category'] ?? '');
+            $desc      = trim($_POST['description'] ?? '');
+
+            if (!$studentId || !isset($_FILES['file'])) {
+                echo json_encode(['success' => false, 'message' => 'Student and file are required.']);
+                exit;
+            }
+            $file = $_FILES['file'];
+            $allowed = ['pdf','doc','docx','xls','xlsx','jpg','jpeg','png','webp','txt','odt','ods','zip','rar'];
+            $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+            if (!in_array($ext, $allowed, true)) {
+                echo json_encode(['success' => false, 'message' => 'File type not allowed.']);
+                exit;
+            }
+            if ($file['size'] > 25 * 1024 * 1024) {
+                echo json_encode(['success' => false, 'message' => 'File too large (max 25 MB).']);
+                exit;
+            }
+            if (!in_array($docType, ['enrollment','transcript','health','photo','clearance','other'], true)) {
+                $docType = 'other';
+            }
+
+            $dir = __DIR__ . '/../uploads/student_files/' . $studentId;
+            if (!is_dir($dir)) mkdir($dir, 0775, true);
+            $filename = $studentId . '_' . time() . '_' . preg_replace('/[^A-Za-z0-9._-]/', '-', basename($file['name']));
+            $dest = $dir . '/' . $filename;
+
+            if (move_uploaded_file($file['tmp_name'], $dest)) {
+                $filePath = '../uploads/student_files/' . $studentId . '/' . $filename;
+                // Guard against missing columns on older schemas
+                $cols = $db->fetchAll("SHOW COLUMNS FROM documents");
+                $colNames = array_column($cols, 'Field');
+                $ins = [
+                    'student_id'  => $studentId,
+                    'doc_type'    => $docType,
+                    'filename'    => basename($file['name']),
+                    'file_path'   => $filePath,
+                    'file_size'   => $file['size'],
+                    'file_type'   => $ext,
+                    'description' => $desc,
+                    'uploaded_by' => $_SESSION['user_id'] ?? null,
+                    'created_at'  => date('Y-m-d H:i:s')
+                ];
+                if (in_array('category', $colNames, true)) {
+                    $ins['category'] = $category !== '' ? $category : $docType;
+                }
+                $id = $db->insert('documents', $ins);
+                echo json_encode(['success' => true, 'message' => 'File uploaded.', 'data' => ['id' => $id]]);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Upload failed.']);
+            }
+            exit;
+        }
+
+        // ── DELETE FILE ──
+        if ($method === 'POST' && isset($_GET['action']) && $_GET['action'] === 'delete') {
+            $input = json_decode(file_get_contents('php://input'), true);
+            $id = intval($input['id'] ?? 0);
+            if (!$id) {
+                echo json_encode(['success' => false, 'message' => 'File ID required.']);
+                exit;
+            }
+            $row = $db->fetchOne("SELECT file_path FROM documents WHERE id = ?", [$id]);
+            if ($row) {
+                $abs = __DIR__ . '/../' . ltrim($row['file_path'], './');
+                $abs = str_replace(['\\', '//'], ['/', '/'], $abs);
+                if (file_exists($abs)) @unlink($abs);
+                $db->delete('documents', 'id = ?', [$id]);
+            }
+            echo json_encode(['success' => true, 'message' => 'File deleted.']);
+            exit;
+        }
+
+        echo json_encode(['success' => false, 'message' => 'Unknown file action.']);
+        exit;
+    }
+
     // ─── GET ALL DOCUMENT REQUESTS ─────────────────────────────
     if ($method === 'GET' && !$id) {
         $documents = $db->fetchAll("
@@ -159,112 +274,6 @@ try {
     if ($method === 'DELETE' && $id) {
         $db->delete('document_requests', 'id = ?', [$id]);
         echo json_encode(['success' => true, 'message' => 'Document request deleted.']);
-        exit;
-    }
-
-    // ─── DIGITAL FILE STORAGE (Subsystem 9) ─────────────────────
-    // GET ?section=files&student_id=N            → list student's stored files
-    // GET ?section=files&all=1                   → list all stored files
-    // POST ?section=files (multipart)          → upload a file
-    // POST ?section=files&action=delete        → delete a file
-    if (isset($_GET['section']) && $_GET['section'] === 'files') {
-        $db = Database::getInstance();
-
-        // ── LIST FILES ──
-        if ($method === 'GET') {
-            $studentId = isset($_GET['student_id']) ? intval($_GET['student_id']) : 0;
-            if ($studentId) {
-                $files = $db->fetchAll("
-                    SELECT d.*, CONCAT(s.first_name,' ',s.last_name) AS student_name, s.student_number
-                    FROM documents d
-                    LEFT JOIN students s ON d.student_id = s.id
-                    WHERE d.student_id = ?
-                    ORDER BY d.created_at DESC
-                ", [$studentId]);
-            } else {
-                $files = $db->fetchAll("
-                    SELECT d.*, CONCAT(s.first_name,' ',s.last_name) AS student_name, s.student_number
-                    FROM documents d
-                    LEFT JOIN students s ON d.student_id = s.id
-                    ORDER BY d.created_at DESC
-                ");
-            }
-            echo json_encode(['success' => true, 'data' => $files]);
-            exit;
-        }
-
-        // ── UPLOAD FILE ──
-        if ($method === 'POST' && !isset($_GET['action'])) {
-            $studentId = intval($_POST['student_id'] ?? 0);
-            $docType   = trim($_POST['doc_type'] ?? 'other');
-            $category  = trim($_POST['category'] ?? '');
-            $desc      = trim($_POST['description'] ?? '');
-
-            if (!$studentId || !isset($_FILES['file'])) {
-                echo json_encode(['success' => false, 'message' => 'Student and file are required.']);
-                exit;
-            }
-            $file = $_FILES['file'];
-            $allowed = ['pdf','doc','docx','xls','xlsx','jpg','jpeg','png','webp','txt','odt','ods','zip','rar'];
-            $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-            if (!in_array($ext, $allowed, true)) {
-                echo json_encode(['success' => false, 'message' => 'File type not allowed.']);
-                exit;
-            }
-            if ($file['size'] > 25 * 1024 * 1024) {
-                echo json_encode(['success' => false, 'message' => 'File too large (max 25 MB).']);
-                exit;
-            }
-            if (!in_array($docType, ['enrollment','transcript','health','photo','clearance','other'], true)) {
-                $docType = 'other';
-            }
-
-            $dir = __DIR__ . '/../uploads/student_files/' . $studentId;
-            if (!is_dir($dir)) mkdir($dir, 0775, true);
-            $filename = $studentId . '_' . time() . '_' . preg_replace('/[^A-Za-z0-9._-]/', '-', basename($file['name']));
-            $dest = $dir . '/' . $filename;
-
-            if (move_uploaded_file($file['tmp_name'], $dest)) {
-                $filePath = '../uploads/student_files/' . $studentId . '/' . $filename;
-                $id = $db->insert('documents', [
-                    'student_id'  => $studentId,
-                    'doc_type'    => $docType,
-                    'category'    => $category !== '' ? $category : $docType,
-                    'filename'    => basename($file['name']),
-                    'file_path'   => $filePath,
-                    'file_size'   => $file['size'],
-                    'file_type'   => $ext,
-                    'description' => $desc,
-                    'uploaded_by' => $_SESSION['user_id'] ?? null,
-                    'created_at'  => date('Y-m-d H:i:s')
-                ]);
-                echo json_encode(['success' => true, 'message' => 'File uploaded.', 'data' => ['id' => $id]]);
-            } else {
-                echo json_encode(['success' => false, 'message' => 'Upload failed.']);
-            }
-            exit;
-        }
-
-        // ── DELETE FILE ──
-        if ($method === 'POST' && isset($_GET['action']) && $_GET['action'] === 'delete') {
-            $input = json_decode(file_get_contents('php://input'), true);
-            $id = intval($input['id'] ?? 0);
-            if (!$id) {
-                echo json_encode(['success' => false, 'message' => 'File ID required.']);
-                exit;
-            }
-            $row = $db->fetchOne("SELECT file_path FROM documents WHERE id = ?", [$id]);
-            if ($row) {
-                $abs = __DIR__ . '/../' . ltrim($row['file_path'], './');
-                $abs = str_replace(['\\', '//'], ['/', '/'], $abs);
-                if (file_exists($abs)) @unlink($abs);
-                $db->delete('documents', 'id = ?', [$id]);
-            }
-            echo json_encode(['success' => true, 'message' => 'File deleted.']);
-            exit;
-        }
-
-        echo json_encode(['success' => false, 'message' => 'Unknown file action.']);
         exit;
     }
 

@@ -16,14 +16,13 @@ AI-powered registrar management system for **Bestlink College of the Philippines
 
 - **Backend:** PHP 8.x with PDO prepared statements
 - **Database:** MySQL / MariaDB
-- **Frontend:** Vanilla JS, Chart.js, Font Awesome, Tailwind (via npm)
+- **Frontend:** Vanilla JS, Chart.js, Font Awesome, custom CSS
 - **RFID:** Web-based scanning API for USB/HID RFID readers
 
 ## Prerequisites
 
 - [XAMPP](https://www.apachefriends.org/) (Apache + PHP 8.x + MySQL/MariaDB)
 - [Composer](https://getcomposer.org/)
-- Optional: [Node.js](https://nodejs.org/) for Tailwind CSS
 
 ## Quick Start
 
@@ -35,10 +34,7 @@ cd Registrar-AI-powered-system
 # 2. Install PHP dependencies
 composer install
 
-# 3. (Optional) Install frontend deps for Tailwind
-npm install
-
-# 4. Create the database
+# 3. Create the database
 #    Open phpMyAdmin → create a database named `registrar_ai`
 #    Import `registrar_ai.sql` into it
 ```
