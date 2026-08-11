@@ -81,9 +81,10 @@ $recentActivity = $db->fetchAll("
 $page_title = 'Dashboard';
 $APP_ROOT = './';
 $ACTIVE_NAV = 'dashboard';
+$body_page = 'dashboard';
 $userName = $_SESSION['full_name'] ?? 'Admin User';
 $userRole = $_SESSION['role'] ?? 'Registrar';
-$extra_css = ['dashboard.css'];
+$extra_css = ['dashboard.css', 'queue.css'];
 
 include 'includes/header.php';
 include 'includes/sidebar.php';
@@ -286,11 +287,22 @@ include 'includes/sidebar.php';
             <?php endif; ?>
         </div>
 
+        <!-- Live Queue -->
+        <div class="chart-card dashboard-section">
+            <div class="card-header">
+                <div class="card-title"><i class="fas fa-display" style="color: #2563eb;"></i> Live Queue</div>
+                <a href="registrar/queue.php" class="card-badge" style="text-decoration:none;cursor:pointer;">Open Console <i class="fas fa-arrow-right" style="font-size:11px;"></i></a>
+            </div>
+            <div class="live-queue-widget" id="liveQueueWidget">
+                <div style="color:#94a3b8;font-size:14px;padding:12px 2px;">Loading…</div>
+            </div>
+        </div>
+
     </div>
 </main>
 
 <?php
-$page_scripts = ['dashboard.js'];
+$page_scripts = ['dashboard.js', 'queue.js'];
 $use_chart = true;
 include 'includes/footer.php';
 ?>

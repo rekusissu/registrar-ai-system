@@ -65,4 +65,4 @@ $APP_ROOT = $APP_ROOT ?? './';
         </style>
     <?php endif; ?>
 </head>
-<body>
+<body<?= !empty($body_page) ? ' data-page="' . htmlspecialchars($body_page) . '"' : '' ?>>

@@ -260,7 +260,7 @@ CREATE TABLE `rfid_scan_logs` (
   `card_uid` varchar(50) NOT NULL,
   `student_id` int(11) DEFAULT NULL,
   `location` varchar(100) DEFAULT 'Main Gate',
-  `event_type` enum('entry','exit','library','cafeteria','other') DEFAULT 'entry',
+  `event_type` enum('entry','exit','library','cafeteria','other','queue_join') DEFAULT 'entry',
   `status` enum('success','denied','unknown') DEFAULT 'success',
   `scanner_id` varchar(50) DEFAULT 'scanner-01',
   `scanned_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -269,6 +269,32 @@ CREATE TABLE `rfid_scan_logs` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
+
+--
+-- Table structure for table `queue_tickets`
+--
+
+CREATE TABLE `queue_tickets` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `queue_date` date NOT NULL,
+  `ticket_number` int unsigned NOT NULL,
+  `student_id` int(11) DEFAULT NULL,
+  `student_name` varchar(191) NOT NULL,
+  `student_number` varchar(50) DEFAULT NULL,
+  `course` varchar(100) DEFAULT NULL,
+  `status` enum('waiting','serving','completed','no-show','removed') NOT NULL DEFAULT 'waiting',
+  `counter` int unsigned NOT NULL DEFAULT 1,
+  `card_uid` varchar(50) DEFAULT NULL,
+  `joined_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `called_at` datetime DEFAULT NULL,
+  `served_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_ticket_day` (`queue_date`,`ticket_number`),
+  KEY `idx_queue_date_status` (`queue_date`,`status`),
+  KEY `idx_student` (`student_id`),
+  KEY `idx_joined_at` (`joined_at`),
+  CONSTRAINT `fk_queue_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Table structure for table `status_tracker`

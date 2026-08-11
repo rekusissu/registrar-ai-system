@@ -92,6 +92,11 @@ $USER_ROLE  = $_SESSION['role'] ?? '';
             <span class="sidebar-text">Clearance</span>
         </a>
 
+        <a href="<?= $APP_ROOT ?>registrar/queue.php" class="sidebar-item <?= $ACTIVE_NAV === 'queue' ? 'active' : '' ?>">
+            <i class="fa-solid fa-display"></i>
+            <span class="sidebar-text">Queue</span>
+        </a>
+
         <a href="<?= $APP_ROOT ?>registrar/masterlist.php" class="sidebar-item <?= $ACTIVE_NAV === 'masterlist' ? 'active' : '' ?>">
             <i class="fa-solid fa-table-list"></i>
             <span class="sidebar-text">Masterlist</span>
