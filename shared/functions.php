@@ -186,17 +186,40 @@ function getFileMime($path) {
 /**
  * Log user activity
  */
-function logActivity($userId, $action, $details = null) {
+/**
+ * Log an activity to the audit_logs table.
+ *
+ * Schema (registrar_ai.sql): id, user_id, action, table_name, record_id,
+ * old_values, new_values, ip_address, user_agent, created_at.
+ *
+ * @param int|null    $userId     Actor id (null → system)
+ * @param string      $action     Action label, e.g. 'user_create', 'student_status'
+ * @param string|null $details    Human-readable detail text (fallback)
+ * @param string|null $tableName  Affected table, e.g. 'users', 'students'
+ * @param int|null    $recordId   Affected record id
+ * @param mixed       $oldValues  Prior row/values (stored as JSON in old_values)
+ * @param mixed       $newValues  New row/values (stored as JSON in new_values)
+ */
+function logActivity($userId, $action, $details = null, $tableName = null, $recordId = null, $oldValues = null, $newValues = null) {
     try {
         $db = Database::getInstance();
-        $db->insert('audit_logs', [
-            'user_id' => $userId,
-            'action' => $action,
-            'details' => $details,
+        $data = [
+            'user_id'    => $userId ? intval($userId) : 0,
+            'action'     => $action,
             'ip_address' => $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0',
-            'user_agent' => $_SERVER['HTTP_USER_AGENT'] ?? null,
-            'created_at' => date('Y-m-d H:i:s')
-        ]);
+            'user_agent' => isset($_SERVER['HTTP_USER_AGENT']) ? substr($_SERVER['HTTP_USER_AGENT'], 0, 500) : null,
+            'created_at' => date('Y-m-d H:i:s'),
+        ];
+        if ($tableName !== null) $data['table_name'] = $tableName;
+        if ($recordId !== null)  $data['record_id']  = (int) $recordId;
+        if ($oldValues !== null) $data['old_values'] = json_encode($oldValues);
+        if ($newValues !== null) $data['new_values'] = json_encode($newValues);
+        // If no structured values were passed, keep backward compatibility by
+        // storing the human-readable detail into old_values (as text) so it is never lost.
+        if ($oldValues === null && $newValues === null && $details !== null) {
+            $data['old_values'] = json_encode(['details' => $details]);
+        }
+        $db->insert('audit_logs', $data);
     } catch (Exception $e) {
         // Silent fail - log to error log
         error_log('Failed to log activity: ' . $e->getMessage());

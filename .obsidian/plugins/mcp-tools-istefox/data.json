@@ -1,0 +1,34 @@
+{
+  "toolLoading": {
+    "profile": "all",
+    "promoted": [],
+    "profiles": {
+      "default": {
+        "profile": "all",
+        "promoted": [],
+        "allowed": null
+      }
+    }
+  },
+  "mcpTransport": {
+    "tokens": [
+      {
+        "id": "default",
+        "label": "Default",
+        "token": "4jwMT-MLoeMwOBpeIAWbz8w6r8CExBHYX71ERNye534",
+        "createdAt": 1786433588208
+      }
+    ],
+    "bearerToken": "4jwMT-MLoeMwOBpeIAWbz8w6r8CExBHYX71ERNye534",
+    "livePort": 27200
+  },
+  "semanticSearch": {
+    "provider": "auto",
+    "indexingMode": "live",
+    "unloadModelWhenIdle": false
+  },
+  "commandPermissions": {
+    "enabled": true,
+    "allowlist": []
+  }
+}

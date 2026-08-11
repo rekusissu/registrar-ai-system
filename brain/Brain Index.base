@@ -1,0 +1,37 @@
+filters:
+  and:
+    - /^brain\//.matches(file.path)
+    - file.ext == "md"
+formulas:
+  note_type: if(file.hasTag("moc"), "🧭 Hub", if(file.hasTag("table"), "🗄️ Table", if(file.hasTag("api"), "⚙️ API", if(file.hasTag("subsystem"), "🏛️ Subsystem", if(file.hasTag("page"), "📄 Page", if(file.hasTag("architecture"), "🧱 Architecture", if(file.hasTag("reference"), "📚 Reference", "📄 Misc")))))))
+properties:
+  formula.note_type:
+    displayName: Type
+views:
+  - type: table
+    name: All Brain Notes
+    groupBy:
+      property: formula.note_type
+      direction: ASC
+    order:
+      - file.name
+      - formula.note_type
+      - file.folder
+    summaries:
+      formula.note_type: Unique
+  - type: table
+    name: Hubs & Maps of Content
+    filters:
+      and:
+        - file.hasTag("moc")
+    order:
+      - file.name
+      - file.folder
+  - type: cards
+    name: Database Tables
+    filters:
+      and:
+        - file.hasTag("table")
+    order:
+      - file.name
+      - file.folder

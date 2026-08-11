@@ -87,6 +87,11 @@ $USER_ROLE  = $_SESSION['role'] ?? '';
             <span class="sidebar-text">Documents</span>
         </a>
 
+        <a href="<?= $APP_ROOT ?>registrar/clearance.php" class="sidebar-item <?= $ACTIVE_NAV === 'clearance' ? 'active' : '' ?>">
+            <i class="fa-solid fa-file-circle-check"></i>
+            <span class="sidebar-text">Clearance</span>
+        </a>
+
         <a href="<?= $APP_ROOT ?>registrar/masterlist.php" class="sidebar-item <?= $ACTIVE_NAV === 'masterlist' ? 'active' : '' ?>">
             <i class="fa-solid fa-table-list"></i>
             <span class="sidebar-text">Masterlist</span>
@@ -140,6 +145,14 @@ $USER_ROLE  = $_SESSION['role'] ?? '';
         <a href="<?= $APP_ROOT ?>settings.php" class="sidebar-item <?= $ACTIVE_NAV === 'settings' ? 'active' : '' ?>">
             <i class="fa-solid fa-gear"></i>
             <span class="sidebar-text">Settings</span>
+        </a>
+        <a href="<?= $APP_ROOT ?>registrar/users.php" class="sidebar-item <?= $ACTIVE_NAV === 'users' ? 'active' : '' ?>">
+            <i class="fa-solid fa-user-gear"></i>
+            <span class="sidebar-text">Users</span>
+        </a>
+        <a href="<?= $APP_ROOT ?>registrar/audit-logs.php" class="sidebar-item <?= $ACTIVE_NAV === 'audit' ? 'active' : '' ?>">
+            <i class="fa-solid fa-file-shield"></i>
+            <span class="sidebar-text">Audit Logs</span>
         </a>
         <?php endif; ?>
 

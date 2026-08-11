@@ -433,3 +433,31 @@ select.form-control,
     background-size: 14px !important;
     padding-right: 32px !important;
 }
+
+/* ════════════════════════════════════════════════════════════
+   USER ROLE / MISC PILLS + PAGINATION (users, audit-logs,
+   clearance pages) — complements the student/status pills above.
+   ════════════════════════════════════════════════════════════ */
+
+.pill.admin     { background: #eef2ff; color: #4f46e5; }
+.pill.registrar { background: #dbeafe; color: #2563eb; }
+.pill.staff     { background: #dcfce7; color: #16a34a; }
+.pill.teacher   { background: #fef3c7; color: #b45309; }
+.pill.warning   { background: #fef3c7; color: #b45309; }
+.pill.superadmin{ background: #fee2e2; color: #dc2626; }
+
+/* Pagination (audit-logs viewer) */
+.pagination { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.page-btn {
+    min-width: 34px; height: 34px; padding: 0 10px;
+    border: 1px solid #e2e8f0; border-radius: 8px;
+    background: #fff; color: #475569; font-size: 13px; font-weight: 600;
+    cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+    font-family: inherit; transition: all .15s ease;
+}
+.page-btn:hover { background: #f1f5f9; border-color: #cbd5e1; }
+.page-btn.active { background: #2563eb; border-color: #2563eb; color: #fff; }
+.page-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Empty-state inside table rows (modal kv placeholder) */
+.kv-empty { font-size: 13px; color: #94a3b8; font-style: italic; }
