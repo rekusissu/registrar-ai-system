@@ -19,6 +19,13 @@ $page_scripts = $page_scripts ?? [];
     <script src="<?= $APP_ROOT ?>js/auth.js"></script>
     <script src="<?= $APP_ROOT ?>js/logout.js"></script>
 
+    <!-- Idle session warning (auto logout with grace period) -->
+    <script>
+        window.BcpSessionTimeout = <?= defined('SESSION_IDLE_TIMEOUT') ? (int) SESSION_IDLE_TIMEOUT : 1200 ?>;
+        window.BcpAppRoot = "<?= isset($APP_ROOT) ? addslashes((string) $APP_ROOT) : './' ?>";
+    </script>
+    <script src="<?= $APP_ROOT ?>js/session-warning.js"></script>
+
     <!-- Chart.js (if needed) -->
     <?php if (isset($use_chart) && $use_chart === true): ?>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>

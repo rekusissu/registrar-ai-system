@@ -160,77 +160,33 @@ include '../includes/sidebar.php';
         </div>
     <?php endif; ?>
 
-    <!-- Toolbar: search + select all (only when sections exist) -->
-    <?php if (!empty($groups)): ?>
+    <!-- Toolbar: search bar + filter button -->
     <div class="card" style="margin-bottom: 16px; padding: 12px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
         <div style="flex:1; min-width:220px; position:relative;">
             <i class="fas fa-search" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:14px;"></i>
-            <input type="text" id="masterlistSearch" class="form-control" style="padding-left:38px;" placeholder="Search by name, student no., course…">
+            <input type="text" id="masterlistSearch" name="q" class="form-control" style="padding-left:38px;" placeholder="Search by name, student no., course…">
         </div>
+        <button type="button" class="btn btn-secondary" id="aiSearchBtn" style="white-space:nowrap;display:inline-flex;align-items:center;gap:6px;" title="Ask AI to build the filters for you - e.g. 'at-risk BSIT 3rd year'">
+            <i class="fas fa-wand-magic-sparkles" style="color:#7c3aed;"></i> AI
+        </button>
+        <button type="button" class="btn btn-primary" onclick="openFilterSearchModal()" style="display:inline-flex;align-items:center;gap:8px;">
+            <i class="fas fa-sliders"></i> Filter
+            <?php if ($filterCourse !== '' || $filterYear !== '' || $filterSchoolYear !== '' || $filterSemester !== '' || $filterSection !== '' || $filterStatus !== ''): ?>
+                <span style="background:#dc2626;color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;">Active</span>
+            <?php endif; ?>
+        </button>
+        <?php if (!empty($groups)): ?>
         <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:#475569;cursor:pointer;">
             <input type="checkbox" id="selectAllPage" style="width:16px;height:16px;accent-color:#2563eb;"> Select all shown
         </label>
         <span style="font-size:13px;color:#64748b;">Showing <strong id="showingCount"><?= count($students) ?></strong> student(s)</span>
+        <?php endif; ?>
     </div>
-    <?php endif; ?>
 
-    <!-- Filter bar (inline, quick) -->
-    <div class="card" style="margin-bottom: 16px;">
-        <form method="get" style="display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; padding: 16px;">
-            <div style="min-width: 150px;">
-                <label style="display:block;font-size:12px;color:#475569;margin-bottom:4px;font-weight:600;">Course</label>
-                <select name="course" id="filterCourse" class="form-control">
-                    <option value="">All courses</option>
-                    <?php foreach ($courses as $row): ?>
-                        <option value="<?= htmlspecialchars($row['course']) ?>" <?= $filterCourse === $row['course'] ? 'selected' : '' ?>><?= htmlspecialchars($row['course']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div style="min-width: 110px;">
-                <label style="display:block;font-size:12px;color:#475569;margin-bottom:4px;font-weight:600;">Year</label>
-                <select name="year_level" id="filterYear" class="form-control">
-                    <option value="">All years</option>
-                    <?php foreach ($years as $row): ?>
-                        <option value="<?= (int) $row['year_level'] ?>" <?= $filterYear === (string) $row['year_level'] ? 'selected' : '' ?>>Year <?= (int) $row['year_level'] ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div style="min-width: 130px;">
-                <label style="display:block;font-size:12px;color:#475569;margin-bottom:4px;font-weight:600;">School Year</label>
-                <select name="school_year" id="filterSchoolYear" class="form-control">
-                    <option value="">All</option>
-                    <?php foreach ($schoolYears as $row): ?>
-                        <option value="<?= htmlspecialchars($row['school_year']) ?>" <?= $filterSchoolYear === $row['school_year'] ? 'selected' : '' ?>><?= htmlspecialchars($row['school_year']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div style="min-width: 110px;">
-                <label style="display:block;font-size:12px;color:#475569;margin-bottom:4px;font-weight:600;">Semester</label>
-                <select name="semester" id="filterSemester" class="form-control">
-                    <option value="">All</option>
-                    <option value="1st" <?= $filterSemester === '1st' ? 'selected' : '' ?>>1st Sem</option>
-                    <option value="2nd" <?= $filterSemester === '2nd' ? 'selected' : '' ?>>2nd Sem</option>
-                    <option value="summer" <?= $filterSemester === 'summer' ? 'selected' : '' ?>>Summer</option>
-                </select>
-            </div>
-            <div style="min-width: 100px;">
-                <label style="display:block;font-size:12px;color:#475569;margin-bottom:4px;font-weight:600;">Section</label>
-                <input type="text" name="section" id="filterSection" class="form-control" placeholder="A" value="<?= htmlspecialchars($filterSection) ?>" style="max-width:90px;">
-            </div>
-            <div style="min-width: 130px;">
-                <label style="display:block;font-size:12px;color:#475569;margin-bottom:4px;font-weight:600;">Status</label>
-                <select name="status" id="filterStatus" class="form-control">
-                    <option value="">All statuses</option>
-                    <?php foreach ($statusOptions as $st): ?>
-                        <option value="<?= $st ?>" <?= $filterStatus === $st ? 'selected' : '' ?>><?= ucfirst($st) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <button type="submit" class="btn btn-primary"><i class="fas fa-filter"></i> Filter</button>
-            <?php if ($filterCourse !== '' || $filterYear !== '' || $filterSchoolYear !== '' || $filterSemester !== '' || $filterSection !== '' || $filterStatus !== ''): ?>
-                <a href="masterlist.php" class="btn btn-light">Clear</a>
-            <?php endif; ?>
-        </form>
+    <!-- AI interpretation banner (below the search bar) -->
+    <div id="aiInterpretation" style="display:none;padding:10px 14px;background:#eef4ff;border:1px solid #bfdbfe;border-radius:10px;margin-bottom:16px;">
+        <i class="fas fa-brain" style="color:#2563eb;"></i>
+        <span id="aiExplanation" style="color:#1e40af;margin-left:8px;font-size:13px;"></span>
     </div>
 
     <!-- Bulk action bar -->
@@ -353,6 +309,71 @@ include '../includes/sidebar.php';
     </div>
     <?php endif; ?>
 </main>
+
+<!-- Filter Masterlist Modal -->
+<div class="modal-overlay" id="filterSearchModal">
+    <div class="modal-content" style="max-width: 620px;">
+        <div class="modal-header"><h2 style="font-size:18px;font-weight:700;color:#0f172a;display:flex;align-items:center;gap:10px;"><i class="fas fa-filter" style="color:#2563eb;"></i> Filter Masterlist</h2><button class="modal-close" onclick="closeFilterSearchModal()"><i class="fas fa-times"></i></button></div>
+        <div class="modal-body">
+            <form method="get" action="masterlist.php" id="filterSearchForm">
+                
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                    <div class="form-group"><label>Course</label>
+                        <select name="course" id="filterCourse" class="form-control">
+                            <option value="">All courses</option>
+                            <?php foreach ($courses as $row): ?>
+                                <option value="<?= htmlspecialchars($row['course']) ?>" <?= $filterCourse === $row['course'] ? 'selected' : '' ?>><?= htmlspecialchars($row['course']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                
+                    <div class="form-group"><label>Year</label>
+                        <select name="year_level" id="filterYear" class="form-control">
+                            <option value="">All years</option>
+                            <?php foreach ($years as $row): ?>
+                                <option value="<?= (int) $row['year_level'] ?>" <?= $filterYear === (string) $row['year_level'] ? 'selected' : '' ?>>Year <?= (int) $row['year_level'] ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>School Year</label>
+                        <select name="school_year" id="filterSchoolYear" class="form-control">
+                            <option value="">All</option>
+                            <?php foreach ($schoolYears as $row): ?>
+                                <option value="<?= htmlspecialchars($row['school_year']) ?>" <?= $filterSchoolYear === $row['school_year'] ? 'selected' : '' ?>><?= htmlspecialchars($row['school_year']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Semester</label>
+                        <select name="semester" id="filterSemester" class="form-control">
+                            <option value="">All</option>
+                            <option value="1st" <?= $filterSemester === '1st' ? 'selected' : '' ?>>1st Sem</option>
+                            <option value="2nd" <?= $filterSemester === '2nd' ? 'selected' : '' ?>>2nd Sem</option>
+                            <option value="summer" <?= $filterSemester === 'summer' ? 'selected' : '' ?>>Summer</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>Section</label>
+                        <input type="text" name="section" id="filterSection" class="form-control" placeholder="A" value="<?= htmlspecialchars($filterSection) ?>">
+                    </div>
+                    <div class="form-group"><label>Status</label>
+                        <select name="status" id="filterStatus" class="form-control">
+                            <option value="">All statuses</option>
+                            <?php foreach ($statusOptions as $st): ?>
+                                <option value="<?= $st ?>" <?= $filterStatus === $st ? 'selected' : '' ?>><?= ucfirst($st) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeFilterSearchModal()">Cancel</button>
+            <?php if ($filterCourse !== '' || $filterYear !== '' || $filterSchoolYear !== '' || $filterSemester !== '' || $filterSection !== '' || $filterStatus !== ''): ?>
+                <a class="btn btn-light" href="masterlist.php">Clear</a>
+            <?php endif; ?>
+            <button type="submit" form="filterSearchForm" class="btn btn-primary"><i class="fas fa-filter"></i> Filter</button>
+        </div>
+    </div>
+</div>
 
 <!-- Generate Masterlist Modal -->
 <div class="modal-overlay" id="generateModal">
@@ -1005,8 +1026,84 @@ async function assignSelectedToSection() {
 }
 
 // ─── ESC CLOSE ───────────────────────────────────────────────
+// ??? SEARCH & FILTER MODAL ????????????????????????????????
+// SMART SEARCH: natural language -> masterlist filters
+const aiSearchBtn = document.getElementById('aiSearchBtn');
+const aiInterpretation = document.getElementById('aiInterpretation');
+const aiExplanation = document.getElementById('aiExplanation');
+
+function urlParamSafe(val) {
+    return val !== undefined && val !== null && String(val).trim() !== '';
+}
+
+async function runAiSearch() {
+    const query = searchInput.value.trim();
+    if (query.length < 3) {
+        alert('Type at least 3 characters for the AI search.');
+        return;
+    }
+    aiSearchBtn.disabled = true;
+    aiSearchBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> AI';
+    aiInterpretation.style.display = 'none';
+    try {
+        const res = await fetch('../api/masterlist-ai-search.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query })
+        });
+        const data = await res.json();
+        if (!data.success || !data.data) {
+            throw new Error(data.message || 'AI search failed.');
+        }
+        const f = data.data.filter || {};
+        const p = new URLSearchParams();
+        if (urlParamSafe(f.course)) p.set('course', f.course);
+        if (urlParamSafe(f.year_level)) p.set('year_level', f.year_level);
+        if (urlParamSafe(f.school_year)) p.set('school_year', f.school_year);
+        if (urlParamSafe(f.semester)) p.set('semester', f.semester);
+        if (urlParamSafe(f.section)) p.set('section', f.section);
+        if (urlParamSafe(f.status)) p.set('status', f.status);
+        if (Array.isArray(f.keywords) && f.keywords.length) p.set('q', f.keywords.join(' '));
+        aiExplanation.textContent = f.explanation || 'Filters applied.';
+        aiInterpretation.style.display = 'block';
+        const target = 'masterlist.php' + (p.toString() ? '?' + p.toString() : '');
+        setTimeout(() => { window.location.href = target; }, 700);
+    } catch (err) {
+        console.error(err);
+        aiExplanation.textContent = 'AI search failed. Check that the AI server is running, or use the filters below.';
+        aiExplanation.style.color = '#b91c1c';
+        aiInterpretation.style.background = '#fef2f2';
+        aiInterpretation.style.borderColor = '#fecaca';
+        aiInterpretation.style.display = 'block';
+    } finally {
+        aiSearchBtn.disabled = false;
+        aiSearchBtn.innerHTML = '<i class="fas fa-wand-magic-sparkles" style="color:#7c3aed;"></i> AI';
+    }
+}
+
+if (aiSearchBtn) {
+    aiSearchBtn.addEventListener('click', runAiSearch);
+}
+
+// Restore a search query passed via ?q=
+const qParam = new URLSearchParams(window.location.search).get('q');
+if (qParam && searchInput) {
+    searchInput.value = qParam;
+    searchInput.dispatchEvent(new Event('input'));
+}
+
+function openFilterSearchModal() {
+    document.getElementById('filterSearchModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+function closeFilterSearchModal() {
+    document.getElementById('filterSearchModal').classList.remove('active');
+    document.body.style.overflow = '';
+}
+document.getElementById('filterSearchModal').addEventListener('click', function (e) { if (e.target === this) closeFilterSearchModal(); });
+
 document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') { closeViewModal(); closeGenerateModal(); closeCreateSectionModal(); closeSectionWorkspace(); closeEditSection(); }
+    if (e.key === 'Escape') { closeViewModal(); closeGenerateModal(); closeFilterSearchModal(); closeCreateSectionModal(); closeSectionWorkspace(); closeEditSection(); }
 });
 </script>
 

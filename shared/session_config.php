@@ -24,7 +24,25 @@ if (!empty($_SESSION['user_id'])) {
     if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) > $idleTimeout) {
         $_SESSION = array();
         session_destroy();
-        header('Location: login.php?timeout=1');
+
+        // Resolve the app's web base (e.g. '' or '/registrar-ai-system') so the
+        // logout redirect works from any folder, not just the web root.
+        $docRoot = rtrim(str_replace('\\', '/', $_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
+        $appDir  = str_replace('\\', '/', dirname(__DIR__));
+        $appBase = '';
+        if ($docRoot !== '' && strpos($appDir . '/', $docRoot . '/') === 0) {
+            $appBase = substr($appDir, strlen($docRoot));
+        }
+
+        // API calls must receive JSON 401, not an HTML redirect.
+        if (basename(dirname($_SERVER['SCRIPT_NAME'] ?? '')) === 'api') {
+            http_response_code(401);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Session expired. Please log in again.', 'timeout' => true]);
+            exit;
+        }
+
+        header('Location: ' . $appBase . '/login.php?timeout=1');
         exit;
     }
     $_SESSION['last_activity'] = time();

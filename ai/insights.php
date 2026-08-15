@@ -112,6 +112,23 @@ include '../includes/sidebar.php';
         </div>
     </div>
 
+    <!-- AI Registrar Summary -->
+    <div class="card" style="margin-bottom: 24px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+            <div>
+                <h3 class="card-title" style="margin:0;"><i class="fas fa-robot" style="color: var(--primary-500);"></i> AI Registrar Summary</h3>
+                <p class="card-subtitle" style="margin:4px 0 0;">A short AI-written summary of the current student population</p>
+            </div>
+            <button type="button" class="btn btn-primary" id="aiReportBtn" onclick="loadAiReport()">
+                <i class="fas fa-wand-magic-sparkles"></i> Generate Summary
+            </button>
+        </div>
+        <div id="aiReportBox" style="margin-top:14px;display:none;">
+            <div id="aiReportLoading" style="padding:14px 0;color:#64748b;font-size:13px;"><i class="fas fa-spinner fa-spin"></i> Writing summary…</div>
+            <div id="aiReportText" style="padding:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;font-size:14px;line-height:1.7;color:#1e293b;white-space:pre-wrap;display:none;"></div>
+        </div>
+    </div>
+
     <!-- AI Insights Cards -->
     <div class="grid" style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 24px;">
         <!-- Course Distribution -->
@@ -248,5 +265,38 @@ include '../includes/sidebar.php';
         </div>
     </div>
 </main>
+
+<script>
+async function loadAiReport() {
+    const btn = document.getElementById('aiReportBtn');
+    const box = document.getElementById('aiReportBox');
+    const loading = document.getElementById('aiReportLoading');
+    const reportText = document.getElementById('aiReportText');
+    if (!btn || !box) return;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+    box.style.display = 'block';
+    loading.style.display = 'block';
+    reportText.style.display = 'none';
+    try {
+        const res = await fetch('../api/ai-tools.php?action=report', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+        });
+        const data = await res.json();
+        if (!data.success || !data.data) throw new Error(data.message || 'Report failed.');
+        reportText.textContent = data.data.report || '';
+    } catch (err) {
+        console.error(err);
+        reportText.textContent = 'Could not generate the AI summary. Check that the AI server is running and AI_API_KEY is configured, then try again.';
+    } finally {
+        loading.style.display = 'none';
+        reportText.style.display = 'block';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Generate Summary';
+    }
+}
+</script>
 
 <?php include '../includes/footer.php'; ?>
