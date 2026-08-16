@@ -1,0 +1,220 @@
+<?php
+// ============================================================
+//  API/STUDENT-AI-CHAT.PHP
+//  Floating AI chat for the Student Portal.
+//
+//  POST  { message }
+//
+//  Flow:
+//    1. requireStudent() — only a logged-in student (or admin).
+//    2. keyword fast-path → deterministic intent (offline).
+//    3. LLM via shared/ai_client.php (aiGenerateJson) with the
+//       student's own context for personalized answers.
+//    4. low-confidence / empty / unreachable → exact registrar
+//       referral fallback.
+//  Responses are cached in `ai_cache` through aiGenerate().
+//  Nothing here ever writes to student records.
+// ============================================================
+
+header('Content-Type: application/json');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+require_once __DIR__ . '/../shared/config.php';
+require_once __DIR__ . '/../shared/session_config.php';
+require_once __DIR__ . '/../shared/database.php';
+require_once __DIR__ . '/../shared/functions.php';
+require_once __DIR__ . '/../shared/ai_client.php';
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(204);
+    exit;
+}
+
+// Only student-role (or admin) may use the portal chat.
+requireStudent();
+
+// Resolve the caller's own student context (same rule as the portal:
+// never trust a client-supplied id).
+$studentId = getCurrentStudentId();
+$student   = $studentId ? Database::getInstance()->fetchOne("SELECT * FROM students WHERE id = ?", [$studentId]) : null;
+
+$fallback = 'This requires registrar assistance. Please visit the registrar\'s office or contact staff directly.';
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    echo json_encode(['success' => false, 'message' => 'Method not allowed.']);
+    exit;
+}
+
+$input = json_decode(file_get_contents('php://input'), true) ?: [];
+$message = trim((string) ($input['message'] ?? ''));
+if ($message === '') {
+    echo json_encode(['success' => false, 'message' => 'Please type a question.']);
+    exit;
+}
+if (mb_strlen($message) > 500) {
+    $message = mb_substr($message, 0, 500);
+}
+
+$db = Database::getInstance();
+
+// ─── Tier 1 · deterministic keyword fast-path ──────────────────
+// Mirrors the api/rfid-ai-search.php keyword-list pattern. Gives an
+// immediate answer (or a pointer) offline; the LLM is still the
+// primary path for anything unsupported.
+$intents = [
+    'good_moral' => [
+        ['good moral', 'character', 'conduct'],
+        'You can request a Certificate of Good Moral by submitting a document request in the portal (Documents → New Request). Visit the Registrar\'s Office with your ID; it usually takes 1–2 working days.',
+    ],
+    'transcript' => [
+        ['transcript', 'tor', 'record of grades'],
+        'A Transcript of Records (TOR) is available via a document request. Pick "transcript" under Documents → New Request, then follow up at the office for assessment and release.',
+    ],
+    'form137' => [
+        ['form 137', 'form137', 'sf10', 'school form'],
+        'Form 137 (School Form 10) is your permanent academic record. Request it under Documents → New Request and allow a few working days for processing.',
+    ],
+    'certificate' => [
+        ['certificate', 'certification', 'enrollment cert', 'cert of enrollment'],
+        'Certificates (e.g. Certificate of Enrollment) are processed through the Documents module. Select the certificate type, state your purpose and recipient, then pick it up at the office when ready.',
+    ],
+    'enrollment' => [
+        ['enroll', 'enrollment', 'enrolment', 'register for classes'],
+        'Enrollment is handled by the school. Check the announcements and your assigned schedule; for registration issues visit the Registrar\'s Office or your adviser.',
+    ],
+    'queue' => [
+        ['queue', 'line', 'number', 'waiting', 'in line'],
+        'Your current queue ticket and position appear under Queue Management. If you no longer need your ticket, you can cancel it there. New numbers are issued at the kiosk.',
+    ],
+    'schedule' => [
+        ['schedule', 'class time', 'time table'],
+        'Your subject schedule, room, and instructor are listed under Academic Records, per term.',
+    ],
+    'grades' => [
+        ['grade', 'grades', 'midterm', 'final', 'rating'],
+        'Your grades, including midterm and final ratings, are listed under Academic Records per term. For grading concerns, contact the instructor or the Registrar\'s Office.',
+    ],
+    'id' => [
+        ['id card', 'school id', 'library card', 'cafeteria card', 'student id'],
+        'Issued IDs are shown under ID & Status. For a replacement or a new card, visit the Registrar\'s Office or guidance. RFID-related lost-card reports go through the office too.',
+    ],
+    'documents' => [
+        ['document', 'form request', 'request doc', 'get a copy'],
+        'You can request documents (Good Moral, TOR, Form 137, Certificates, Clearance) under Document Requests. Track their status there after submitting.',
+    ],
+    'health' => [
+        ['health', 'medical', 'clinic', 'blood type', 'bmi'],
+        'Your health profile (blood type, height, weight, BMI, medical/surgical history) is under Health Records. Clinic visits are logged by the campus clinic.',
+    ],
+    'contact' => [
+        ['contact', 'office', 'registrar', 'staff', 'where', 'address', 'phone'],
+        'The Registrar\'s Office is on the campus main building. The portal cannot disclose staff contact numbers; please visit or call the school\'s listed hotline.',
+    ],
+    'password' => [
+        ['password', 'forgot', 'login', 'sign in', 'otp'],
+        'To reset your password, use the "Forgot password" link on the login page — it will ask for your email and send a one-time code.',
+    ],
+    'tuition' => [
+        ['tuition', 'payment', 'pay', 'fee', 'balance', 'clearance'],
+        'Tuition and payment concerns are handled by the Finance/Bursar office, not the Registrar. Obtain clearance status under the Clearance module or visit Finance.',
+    ],
+    'graduation' => [
+        ['graduate', 'graduation', 'commencement', 'convocation'],
+        'Your student status shows as Graduated when records are marked. For graduation requirements and TOR release, coordinate with the Registrar\'s Office.',
+    ],
+];
+
+$matchedIntent = null;
+foreach ($intents as $key => [$keywords, $answer]) {
+    foreach ($keywords as $kw) {
+        if (mb_stripos($message, $kw) !== false) {
+            $matchedIntent = $key;
+            break 2;
+        }
+    }
+}
+
+$reply = '';
+if ($matchedIntent !== null) {
+    // Only use the deterministic answer when the wording is tightly matched
+    // (short question) — otherwise let the LLM give a personalized reply.
+    $reply = mb_strlen($message) <= 45 ? $intents[$matchedIntent][1] : '';
+}
+
+$usedTier = 'keyword';
+
+// ─── Tier 2 · LLM ──────────────────────────────────────────────
+if ($reply === '') {
+    $usedTier = 'llm';
+
+    // Personalized system prompt with the student's own context.
+    $ctx = '';
+    if ($student) {
+        $ctx = "- Student: " . trim(($student['first_name'] ?? '') . ' ' . ($student['last_name'] ?? ''))
+             . " [" . ($student['student_number'] ?? '') . "], status " . getStudentStatusLabel($student['status'] ?? '')
+             . ", course " . ($student['course'] ?? '—')
+             . ", AY " . ($student['school_year'] ?? '—') . ' ' . ($student['semester'] ?? '')
+             . ", section " . ($student['section'] ?? '—');
+        // Active queue ticket, if any.
+        $today = date('Y-m-d');
+        $q = $db->fetchOne(
+            "SELECT ticket_number, status, counter FROM queue_tickets
+             WHERE queue_date = ? AND student_id = ? AND status IN ('waiting','serving')
+             ORDER BY joined_at DESC LIMIT 1",
+            [$today, $student['id']]
+        );
+        if ($q) {
+            $ctx .= ". Queue: #" . str_pad((string) $q['ticket_number'], 3, '0', STR_PAD_LEFT) . ' (' . $q['status'] . ')';
+        }
+        // Pending document requests.
+        $pending = (int) $db->fetchColumn(
+            "SELECT COUNT(*) FROM document_requests WHERE student_id = ? AND status = 'pending'",
+            [$student['id']]
+        );
+        if ($pending > 0) {
+            $ctx .= ". $pending pending document request(s)";
+        }
+    }
+
+    $system = "You are the friendly AI assistant for the BCP (Bestlink College of the Philippines) "
+            . "Registrar's Office, answering students inside their portal. Answer ONLY about registrar "
+            . "matters: documents (good moral, transcript/TOR, Form 137, certificates), queue tickets, "
+            . "enrollment, student status, grades, IDs, RFIDs, and general school record procedures.\n"
+            . "Rules:\n"
+            . "- Be concise and helpful, 2-4 short sentences.\n"
+            . "- Do NOT invent office phone numbers, emails, prices, or policies that you are not sure of.\n"
+            . "- If you do not know an answer or it is out of scope, respond with EXACTLY and ONLY the phrase:\n"
+            . "  \"This requires registrar assistance. Please visit the registrar's office or contact staff directly.\"\n"
+            . ($ctx !== '' ? "\nCurrent logged-in student context (you may personalize using it):\n$ctx\n" : '')
+            . "\nReturn JSON: {\"intent\": <short kebab-case label>, \"confidence\": <0.0-1.0>, \"answer\": <your reply>}.";
+
+    $fallbackJson = ['intent' => 'fallback', 'confidence' => 0.0, 'answer' => $fallback];
+    $result = aiGenerateJson($system, $message, $fallbackJson, ['max_tokens' => 300, 'temperature' => 0.3]);
+    $reply  = (string) ($result['answer'] ?? $fallback);
+    $intent = (string) ($result['intent'] ?? 'general');
+    $confidence = (float) ($result['confidence'] ?? 0.0);
+
+    // Refuse obviously empty/off-topic replies → registrar referral.
+    if (trim($reply) === '' || $confidence < 0.25 || !is_string($reply)) {
+        $reply = $fallback;
+    }
+
+    // Never leak raw data the model flagged as unsure.
+    if (preg_match('/\b(I do not know|I don\'t know|not sure|unable to answer)\b/i', $reply)) {
+        $reply = $fallback;
+    }
+    $usedTier = $usedTier . ':' . $intent;
+}
+
+logActivity(getCurrentUserId(), 'student_ai_chat', json_encode(['question' => $message, 'tier' => $usedTier]));
+
+echo json_encode([
+    'success' => true,
+    'data'    => [
+        'answer' => $reply,
+        'tier'   => $usedTier,
+        'fallback_used' => ($reply === $fallback),
+    ],
+]);

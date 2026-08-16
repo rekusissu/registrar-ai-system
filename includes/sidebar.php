@@ -34,6 +34,57 @@ $USER_ROLE  = $_SESSION['role'] ?? '';
 
     <div class="sidebar-nav">
 
+    <?php if ($USER_ROLE === 'student'): ?>
+        <!-- ══════════ STUDENT PORTAL MENU ══════════ -->
+        <div class="sidebar-brand">
+            <div class="brand-title">Main</div>
+        </div>
+
+        <a href="<?= $APP_ROOT ?>student/dashboard.php" class="sidebar-item <?= $ACTIVE_NAV === 'student_dashboard' ? 'active' : '' ?>">
+            <i class="fa-solid fa-gauge-high"></i>
+            <span class="sidebar-text">Dashboard</span>
+        </a>
+
+        <div class="sidebar-divider"></div>
+
+        <div class="sidebar-brand">
+            <div class="brand-title">My Records</div>
+        </div>
+
+        <a href="<?= $APP_ROOT ?>student/profile.php" class="sidebar-item <?= $ACTIVE_NAV === 'student_profile' ? 'active' : '' ?>">
+            <i class="fa-solid fa-id-card"></i>
+            <span class="sidebar-text">Student Profile</span>
+        </a>
+
+        <a href="<?= $APP_ROOT ?>student/queue.php" class="sidebar-item <?= $ACTIVE_NAV === 'student_queue' ? 'active' : '' ?>">
+            <i class="fa-solid fa-display"></i>
+            <span class="sidebar-text">Queue Management</span>
+        </a>
+
+        <a href="<?= $APP_ROOT ?>student/documents.php" class="sidebar-item <?= $ACTIVE_NAV === 'student_documents' ? 'active' : '' ?>">
+            <i class="fa-solid fa-file-lines"></i>
+            <span class="sidebar-text">Document Requests</span>
+        </a>
+
+        <a href="<?= $APP_ROOT ?>student/academic-records.php" class="sidebar-item <?= $ACTIVE_NAV === 'student_academic' ? 'active' : '' ?>">
+            <i class="fa-solid fa-school"></i>
+            <span class="sidebar-text">Academic Records</span>
+        </a>
+
+        <a href="<?= $APP_ROOT ?>student/health-records.php" class="sidebar-item <?= $ACTIVE_NAV === 'student_health' ? 'active' : '' ?>">
+            <i class="fa-solid fa-heart-pulse"></i>
+            <span class="sidebar-text">Health Records</span>
+        </a>
+
+        <div class="sidebar-divider"></div>
+
+        <a href="<?= $APP_ROOT ?>logout.php" class="sidebar-item" id="logoutBtn" data-logout-url="<?= $APP_ROOT ?>logout.php">
+            <i class="fa-solid fa-right-from-bracket"></i>
+            <span class="sidebar-text">Logout</span>
+        </a>
+
+    <?php else: ?>
+
         <!-- GROUP 1 — Main Navigation -->
         <div class="sidebar-brand">
             <div class="brand-title">Main</div>
@@ -54,6 +105,11 @@ $USER_ROLE  = $_SESSION['role'] ?? '';
         <a href="<?= $APP_ROOT ?>registrar/students.php" class="sidebar-item <?= $ACTIVE_NAV === 'students' ? 'active' : '' ?>">
             <i class="fa-solid fa-user-graduate"></i>
             <span class="sidebar-text">Students</span>
+        </a>
+
+        <a href="<?= $APP_ROOT ?>registrar/announcements.php" class="sidebar-item <?= $ACTIVE_NAV === 'announcements' ? 'active' : '' ?>">
+            <i class="fa-solid fa-bullhorn"></i>
+            <span class="sidebar-text">Announcements</span>
         </a>
 
         <a href="<?= $APP_ROOT ?>registrar/guardians.php" class="sidebar-item <?= $ACTIVE_NAV === 'guardians' ? 'active' : '' ?>">
@@ -165,6 +221,8 @@ $USER_ROLE  = $_SESSION['role'] ?? '';
             <i class="fa-solid fa-right-from-bracket"></i>
             <span class="sidebar-text">Logout</span>
         </a>
+
+    <?php endif; ?>
 
     </div><!-- end sidebar-nav -->
 </aside>

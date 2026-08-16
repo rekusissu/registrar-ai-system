@@ -29,6 +29,15 @@ Cross-cutting security + audit logging.
 - Session cookie: httponly, SameSite=Strict, Secure on HTTPS
 - Idle timeout (default 20 min, sliding `last_activity`)
 - `requireRole()` role gate — admin bypasses
+- `requireStudent()` gate + `getCurrentStudentId()` for the `student/*` portal
+- Timeout redirects use `app_url()` (root-relative) so they never 404 from nested `student/` pages
+
+## Phase 5 login security
+
+- **ID/username + password → OTP → session**: password verified before any OTP is issued; session only after `verify_otp`
+- **10-minute lockout** after 5 failed attempts (`users.login_attempts` / `users.locked_until`, see [[shared/auth_security.php]])
+- OTP codes stored as `password_hash` in [[otp_codes]] (never plaintext), 5-min TTL, single-use
+- Email field only in the forgot-password flow (username/ID is the login identifier)
 
 ## Error containment
 

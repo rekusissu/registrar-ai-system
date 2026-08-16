@@ -24,23 +24,26 @@ npm install        # optional, Tailwind
 
 1. phpMyAdmin → create DB `registrar_ai`
 2. Import `registrar_ai.sql`
-3. (Recommended) apply the Phase 1 migration:
-   `mysql -u root registrar_ai < database/registrar_upgrade.sql`
+3. Apply migrations (all idempotent, in order):
+   ```bash
+   mysql -u root registrar_ai < database/registrar_upgrade.sql   # Phase 1
+   mysql -u root registrar_ai < database/security_upgrade.sql    # Phase 5
+   ```
 
 ## Config
 
-Edit `shared/config.php` DB constants (XAMPP default is `root`/empty password).
+Edit `shared/config.php` DB constants (XAMPP default is `root`/empty password). For AI, put the gateway Bearer key in `shared/ai_key.local` (gitignored) — see [[AI Client]].
 
 ## First login
 
-Visit `http://localhost/registrar-ai-system` → `registrar@bestlink.edu.ph` / `password123`
-
-⚠️ Change credentials before going live.
+- Registrar: **ID number** (e.g. `RGS-001`) + password (Phase 5 login: **ID → OTP**; in dev the OTP prints on screen)
+- Student portal: **student number** (e.g. `2026-0001`) + password → OTP → `student/dashboard.php`
+- ⚠️ Change credentials before going live.
 
 ## Verify
 
 - Pages load without PHP errors (dev env shows errors; production hides them)
-- `SHOW TABLES LIKE 'health_visits';` confirms the Phase 1 migration applied
+- `SHOW TABLES LIKE 'otp_codes';` confirms the Phase 5 migration applied
 - RFID stations: copy `config.local.template.php` → `config.local.php`, set `SCANNER_READER_ID`
 
 ## Related

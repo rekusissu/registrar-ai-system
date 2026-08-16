@@ -19,7 +19,11 @@ include 'includes/header.php';
 - Font Awesome 6.5.1 + Google Fonts (Inter) via CDN
 - App CSS: `page-loader.css`, `components.css`, `sidebar.css`, `registrar.css`, `dashboard.css`
 - `js/page-loader.js` (must be first)
-- Supports `$extra_css` array + inline `$page_styles`
+- Supports `$extra_css` array (student pages pass `['student.css']`) + inline `$page_styles`
+
+## Body hooks
+
+- Optional `data-page="<?= $body_page ?>"` for page-specific JS (e.g. `console` queue page)
 
 ## Related
 

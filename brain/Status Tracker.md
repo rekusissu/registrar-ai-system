@@ -9,8 +9,9 @@ Subsystem 8 (Phase 1) — journal of student status changes.
 ## What it does
 
 - Records every status transition: `previous_status → current_status` with a reason and who changed it
-- Statuses: `active`, `probation`, `at-risk`, `loa`, `graduated`, `transferred`, `dropped`
+- Statuses: `active`, `probation`, `at-risk`, `loa`, `enrolled`, `graduated`, `transferred`, `dropped`
 - Phase 1 adds `effective_date` and `end_date` to support LOA / transfer windows
+- Phase 5 adds **`enrolled`** to the enum ([[security_upgrade.sql]]); the portal shows the 5 canonical labels via `getStudentStatusLabel()`
 
 ## Tables
 

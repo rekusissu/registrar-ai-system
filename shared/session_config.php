@@ -24,7 +24,7 @@ if (!empty($_SESSION['user_id'])) {
     if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) > $idleTimeout) {
         $_SESSION = array();
         session_destroy();
-        header('Location: login.php?timeout=1');
+        header('Location: ' . app_url('login.php?timeout=1'));
         exit;
     }
     $_SESSION['last_activity'] = time();
@@ -49,7 +49,7 @@ function getCurrentUserName() {
 
 function requireLogin() {
     if (!isLoggedIn()) {
-        header('Location: login.php?timeout=1');
+        header('Location: ' . app_url('login.php?timeout=1'));
         exit;
     }
 }
@@ -62,5 +62,45 @@ function requireRole($requiredRole) {
     }
     header('Location: dashboard.php?error=access_denied');
     exit;
+}
+
+/**
+ * Guard for student-portal pages. Only a 'student' role (or admin,
+ * which bypasses everything) may proceed. Anything else is bounced.
+ */
+function requireStudent() {
+    requireLogin();
+    $role = getCurrentUserRole();
+    if ($role === 'admin' || $role === 'student') {
+        return;
+    }
+    header('Location: dashboard.php?error=access_denied');
+    exit;
+}
+
+/**
+ * Resolve the linked students.id for the currently logged-in user.
+ * Returns int|null — null when the account has no linked student record.
+ * Requires the database to be available (pages call this after Database::getInstance()).
+ */
+function getCurrentStudentId() {
+    if (!isLoggedIn()) {
+        return null;
+    }
+    static $cached = null;
+    if ($cached !== null) {
+        return $cached;
+    }
+    try {
+        $db = Database::getInstance();
+        $id = $db->fetchColumn(
+            "SELECT student_id FROM users WHERE id = ?",
+            [getCurrentUserId()]
+        );
+        $cached = $id !== null ? (int) $id : null;
+    } catch (Throwable $e) {
+        $cached = null;
+    }
+    return $cached;
 }
 ?>

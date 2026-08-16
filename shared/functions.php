@@ -689,7 +689,9 @@ function getStatusBadgeClass($status) {
         'graduated' => 'graduated',
         'dropped' => 'dropped',
         'transferred' => 'transferred',
-        'loa' => 'loa'
+        'loa' => 'loa',
+        'enrolled' => 'active',
+        'cancelled' => 'denied'
     ];
     return $classes[$status] ?? 'default';
 }
@@ -710,9 +712,30 @@ function getStatusLabel($status) {
         'graduated' => 'Graduated',
         'dropped' => 'Dropped',
         'transferred' => 'Transferred',
-        'loa' => 'LOA'
+        'loa' => 'LOA',
+        'enrolled' => 'Enrolled',
+        'cancelled' => 'Cancelled'
     ];
     return $labels[$status] ?? ucfirst($status);
+}
+
+/**
+ * Canonical student-status label for the student portal.
+ * Legacy values (probation / at-risk / loa) are folded into the
+ * 5-value model: Enrolled, Active, Graduated, Transferred, Dropped.
+ */
+function getStudentStatusLabel($status) {
+    $map = [
+        'enrolled'    => 'Enrolled',
+        'active'      => 'Active',
+        'probation'   => 'Active',
+        'at-risk'     => 'Active',
+        'loa'         => 'Active',
+        'graduated'   => 'Graduated',
+        'transferred' => 'Transferred',
+        'dropped'     => 'Dropped',
+    ];
+    return $map[strtolower((string) $status)] ?? 'Enrolled';
 }
 
 /**

@@ -88,7 +88,7 @@ $years = $db->fetchAll(
 $schoolYears = $db->fetchAll(
     "SELECT DISTINCT school_year FROM students WHERE school_year IS NOT NULL AND school_year != '' ORDER BY school_year DESC"
 );
-$statusOptions = ['active', 'probation', 'at-risk', 'loa', 'graduated', 'transferred', 'dropped'];
+$statusOptions = ['enrolled', 'active', 'probation', 'at-risk', 'loa', 'graduated', 'transferred', 'dropped'];
 
 // Section summaries (all students, not the filtered view) for the target-section picker
 $sectionSummaries = $db->fetchAll(
@@ -329,7 +329,7 @@ include '../includes/sidebar.php';
                                         <td style="padding: 8px 12px;"><?= htmlspecialchars($student['section'] ?? '—') ?></td>
                                         <td style="padding: 8px 12px;"><?= htmlspecialchars($student['adviser_name'] ?? '—') ?></td>
                                         <td style="padding: 8px 12px;">
-                                            <span class="badge badge-<?= $student['status'] === 'active' ? 'success' : ($student['status'] === 'at-risk' || $student['status'] === 'probation' ? 'warning' : 'neutral') ?>">
+                                            <span class="badge badge-<?= in_array($student['status'], ['active', 'enrolled'], true) ? 'success' : ($student['status'] === 'at-risk' || $student['status'] === 'probation' ? 'warning' : 'neutral') ?>">
                                                 <?= ucfirst($student['status'] ?? 'Active') ?>
                                             </span>
                                         </td>

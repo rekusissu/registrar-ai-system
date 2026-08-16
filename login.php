@@ -1,11 +1,16 @@
 <?php
-// login.php - Updated to use email instead of username
+// login.php - Phase 5 hardened sign-in:
+//   Step 1: ID number / username + password
+//   Step 2: one-time code (OTP)
+//   Forgot password: reveal email → OTP → set new password
+//   10-min lockout after 5 failed attempts (handled server-side).
 
 require_once __DIR__ . '/shared/security_headers.php';
 require_once __DIR__ . '/shared/session_config.php';
 
 if (isLoggedIn()) {
-    header('Location: dashboard.php');
+    $role = $_SESSION['role'] ?? '';
+    header('Location: ' . ($role === 'student' ? 'student/dashboard.php' : 'dashboard.php'));
     exit;
 }
 
@@ -17,14 +22,14 @@ $timeout = isset($_GET['timeout']) ? true : false;
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Sign In – BCP Registrar System</title>
-    
+
     <meta name="loader-logo" content="assets/images/BCP_LOGO.png" />
     <link rel="icon" type="image/x-icon" href="assets/images/favicon.ico" />
-    
+
     <link rel="stylesheet" href="css/auth.css" />
     <link rel="stylesheet" href="css/page-loader.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
-    
+
     <script src="js/page-loader.js"></script>
 </head>
 <body>
@@ -47,20 +52,22 @@ $timeout = isset($_GET['timeout']) ? true : false;
         <!-- Right Panel -->
         <div class="right">
             <img class="bcp-logo" src="assets/images/BCP_LOGO.png" alt="BCP Logo" />
-            <h2>Sign In Account</h2>
-            
+            <h2 id="formTitle">Sign In Account</h2>
+
             <?php if ($timeout): ?>
-                <div class="auth-error" style="display:block;">
+                <div class="auth-error" id="timeoutMsg" style="display:block;">
                     <i class="fa-solid fa-clock"></i> Your session has expired. Please log in again.
                 </div>
             <?php endif; ?>
 
             <div class="auth-error" id="authError" style="display:none;"></div>
+            <div class="auth-success" id="authSuccess" style="display:none;"></div>
 
-            <form id="signinForm" style="width:100%">
+            <!-- STEP 1: ID / username + password -->
+            <form id="step1Form" style="width:100%">
                 <div class="form-group">
-                    <label><i class="fa-solid fa-envelope"></i> Email</label>
-                    <input type="email" id="email" autocomplete="email" value="registrar@bestlink.edu.ph" />
+                    <label><i class="fa-solid fa-id-badge"></i> ID Number / Username</label>
+                    <input type="text" id="credential" autocomplete="username" value="RGS-001" />
                 </div>
 
                 <div class="form-group">
@@ -71,58 +78,287 @@ $timeout = isset($_GET['timeout']) ? true : false;
                 <button type="submit" class="btn-signin" id="btnSignin">
                     Sign In <i class="fa-solid fa-arrow-right"></i>
                 </button>
+
+                <div class="register-link" style="text-align:center;">
+                    <a href="#" id="forgotLink"><i class="fa-solid fa-circle-question"></i> Forgot password?</a>
+                </div>
+            </form>
+
+            <!-- STEP 2: OTP -->
+            <form id="otpForm" style="width:100%;display:none;">
+                <p style="font-size:.8rem;color:#64748b;margin-bottom:14px;text-align:center;">
+                    We sent a one-time code to <span id="otpMasked" style="color:#2563eb;font-weight:600;"></span>
+                    <span id="otpResentMsg" style="display:block;color:#16a34a;"></span>
+                </p>
+
+                <div class="form-group">
+                    <label><i class="fa-solid fa-key"></i> One-Time Code</label>
+                    <input type="text" id="otp" inputmode="numeric" maxlength="6" autocomplete="one-time-code"
+                           placeholder="6-digit code" style="letter-spacing:6px;text-align:center;font-size:1.2rem;font-weight:700;" />
+                </div>
+
+                <button type="submit" class="btn-signin" id="btnVerify">
+                    Verify &amp; Continue <i class="fa-solid fa-check"></i>
+                </button>
+
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:.78rem;color:#64748b;">
+                    <span class="resend" id="resendOtp"><i class="fa-solid fa-rotate"></i> Resend code</span>
+                    <a href="#" id="backToLogin" style="color:#2563eb;text-decoration:none;"><i class="fa-solid fa-arrow-left"></i> Back</a>
+                </div>
+            </form>
+
+            <!-- FORGOT: email (this is where the email field appears) -->
+            <form id="forgotForm" style="width:100%;display:none;">
+                <p style="font-size:.8rem;color:#64748b;margin-bottom:14px;text-align:center;">
+                    Enter the email registered to your account and we'll send a reset code.
+                </p>
+
+                <div class="form-group">
+                    <label><i class="fa-solid fa-envelope"></i> Email</label>
+                    <input type="email" id="forgotEmail" autocomplete="email" placeholder="you@bestlink.edu.ph" />
+                </div>
+
+                <button type="submit" class="btn-signin" id="btnForgot">
+                    Send Reset Code <i class="fa-solid fa-paper-plane"></i>
+                </button>
+
+                <div style="text-align:center;margin-top:14px;font-size:.78rem;">
+                    <a href="#" id="backToLogin2" style="color:#2563eb;text-decoration:none;"><i class="fa-solid fa-arrow-left"></i> Back to sign in</a>
+                </div>
+            </form>
+
+            <!-- RESET PASSWORD: new password step -->
+            <form id="resetForm" style="width:100%;display:none;">
+                <p style="font-size:.8rem;color:#64748b;margin-bottom:14px;text-align:center;">
+                    Set a new password for your account.
+                </p>
+
+                <div class="form-group">
+                    <label><i class="fa-solid fa-lock"></i> New Password</label>
+                    <input type="password" id="newPassword" autocomplete="new-password" placeholder="At least 6 characters" />
+                </div>
+
+                <div class="form-group">
+                    <label><i class="fa-solid fa-lock"></i> Confirm Password</label>
+                    <input type="password" id="confirmPassword" autocomplete="new-password" placeholder="Repeat new password" />
+                </div>
+
+                <button type="submit" class="btn-signin" id="btnReset">
+                    Save New Password <i class="fa-solid fa-check"></i>
+                </button>
             </form>
         </div>
     </div>
 </div>
 
 <script>
-document.getElementById('signinForm').addEventListener('submit', async function(e) {
+let session = { user_id: null, purpose: 'login', otp: null, status: 'idle' };
+
+const $ = (id) => document.getElementById(id);
+
+function showForm(which) {
+    $('step1Form').style.display    = which === 'step1'   ? '' : 'none';
+    $('otpForm').style.display      = which === 'otp'     ? '' : 'none';
+    $('forgotForm').style.display   = which === 'forgot'  ? '' : 'none';
+    $('resetForm').style.display    = which === 'reset'   ? '' : 'none';
+
+    const titles = {
+        step1:  'Sign In Account',
+        otp:    'One-Time Code',
+        forgot: 'Forgot Password',
+        reset:  'Reset Password'
+    };
+    $('formTitle').textContent = titles[which] || 'Sign In Account';
+}
+
+function showError(msg) {
+    const e = $('authError');
+    e.innerHTML = msg;
+    e.style.display = 'block';
+    $('authSuccess').style.display = 'none';
+}
+
+function showSuccess(msg) {
+    const s = $('authSuccess');
+    s.textContent = msg;
+    s.style.display = 'block';
+    $('authError').style.display = 'none';
+}
+
+async function post(action, body) {
+    const fd = new FormData();
+    fd.append('action', action);
+    for (const [k, v] of Object.entries(body || {})) fd.append(k, v);
+    const res = await fetch('shared/auth_actions.php', { method: 'POST', body: fd });
+    return res.json();
+}
+
+// ── Step 1: ID/username + password ──
+$('step1Form').addEventListener('submit', async function (e) {
     e.preventDefault();
-    
-    const email = document.getElementById('email').value.trim();
-    const password = document.getElementById('password').value;
-    const errorBox = document.getElementById('authError');
-    const btn = document.getElementById('btnSignin');
+    const credential = $('credential').value.trim();
+    const password = $('password').value;
+    const btn = $('btnSignin');
 
-    errorBox.style.display = 'none';
+    $('authError').style.display = 'none';
+    $('authSuccess').style.display = 'none';
 
-    if (!email || !password) {
-        errorBox.textContent = 'Please enter your email and password.';
-        errorBox.style.display = 'block';
+    if (!credential || !password) {
+        showError('Please enter your ID number / username and password.');
         return;
     }
 
     btn.disabled = true;
     btn.innerHTML = 'Signing in… <i class="fa-solid fa-spinner fa-spin"></i>';
-
-    const fd = new FormData();
-    fd.set('action', 'login');
-    fd.set('email', email);
-    fd.set('password', password);
-
     try {
-        const response = await fetch('shared/auth_actions.php', {
-            method: 'POST',
-            body: fd
-        });
-        const data = await response.json();
-
-        if (data.success) {
-            window.location.href = 'dashboard.php';
+        const data = await post('login', { username: credential, password });
+        if (data.success && data.data && data.data.step === 'otp') {
+            session.user_id  = data.data.user_id;
+            session.purpose  = 'login';
+            session.otp      = data.data.otp || null;
+            $('otpMasked').textContent = data.data.masked_email || 'your email';
+            $('otpResentMsg').textContent = '';
+            if (data.data.otp) {
+                $('otpResentMsg').textContent = '⚠ Dev mode: your code is ' + data.data.otp;
+                $('otp').value = data.data.otp; // prefill for easy testing
+            } else if (!data.data.delivered) {
+                $('otpResentMsg').textContent = 'Email delivery failed — please contact the admin for your code.';
+            }
+            showForm('otp');
+            $('otp').focus();
+        } else if (data.success) {
+            window.location.href = data.data?.redirect || 'dashboard.php';
         } else {
-            errorBox.textContent = data.message || 'Invalid email or password.';
-            errorBox.style.display = 'block';
-            btn.disabled = false;
-            btn.innerHTML = 'Sign In <i class="fa-solid fa-arrow-right"></i>';
+            showError(data.message || 'Invalid ID / username or password.');
         }
-    } catch (error) {
-        errorBox.textContent = 'Request failed. Please try again.';
-        errorBox.style.display = 'block';
+    } catch (err) {
+        showError('Request failed. Please try again.');
+    } finally {
         btn.disabled = false;
         btn.innerHTML = 'Sign In <i class="fa-solid fa-arrow-right"></i>';
     }
 });
+
+// ── Step 2: verify OTP ──
+$('otpForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const otp = $('otp').value.trim();
+    const btn = $('btnVerify');
+
+    if (!otp) { showError('Please enter the one-time code.'); return; }
+
+    btn.disabled = true;
+    btn.innerHTML = 'Verifying… <i class="fa-solid fa-spinner fa-spin"></i>';
+    try {
+        const data = await post('verify_otp', { user_id: session.user_id, otp, purpose: session.purpose });
+        if (data.success && data.data && data.data.step === 'reset_password') {
+            session.user_id = data.data.user_id;
+            session.status = 'reset_pending';
+            showForm('reset');
+            showSuccess('Code verified. Set your new password.');
+            $('newPassword').focus();
+        } else if (data.success) {
+            window.location.href = data.data?.redirect || 'dashboard.php';
+        } else {
+            showError(data.message || 'Invalid code. Please try again.');
+        }
+    } catch (err) {
+        showError('Request failed. Please try again.');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Verify & Continue <i class="fa-solid fa-check"></i>';
+    }
+});
+
+// ── Resend code ──
+$('resendOtp').addEventListener('click', async function (e) {
+    e.preventDefault();
+    this.innerHTML = 'Sending…';
+    try {
+        const data = await post('resend_otp', { user_id: session.user_id, purpose: session.purpose });
+        if (data.success) {
+            if (data.data?.otp) { session.otp = data.data.otp; $('otp').value = data.data.otp; }
+            $('otpResentMsg').textContent = (data.data?.otp ? '⚠ Dev mode: your code is ' + data.data.otp : 'A new code was sent.');
+            $('authError').style.display = 'none';
+        } else {
+            showError(data.message || 'Unable to resend.');
+        }
+    } catch (err) {
+        showError('Unable to resend the code.');
+    } finally {
+        this.innerHTML = '<i class="fa-solid fa-rotate"></i> Resend code';
+    }
+});
+
+// ── Forgot password: reveal email field ──
+$('forgotLink').addEventListener('click', function (e) {
+    e.preventDefault();
+    session.purpose = 'reset';
+    showForm('forgot');
+    $('forgotEmail').focus();
+});
+
+$('forgotForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const email = $('forgotEmail').value.trim();
+    const btn = $('btnForgot');
+
+    if (!email) { showError('Please enter your email address.'); return; }
+
+    btn.disabled = true;
+    btn.innerHTML = 'Sending… <i class="fa-solid fa-spinner fa-spin"></i>';
+    try {
+        const data = await post('forgot', { email });
+        if (data.success && data.data && data.data.step === 'otp') {
+            session.user_id = data.data.user_id;
+            session.purpose = 'reset';
+            $('otpMasked').textContent = data.data.masked_email || 'your email';
+            $('otpResentMsg').textContent = data.data.otp ? ('⚠ Dev mode: your code is ' + data.data.otp) : '';
+            if (data.data.otp) $('otp').value = data.data.otp;
+            showForm('otp');
+            $('otp').focus();
+        } else {
+            showError(data.message || 'Unable to send reset code.');
+        }
+    } catch (err) {
+        showError('Request failed. Please try again.');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Send Reset Code <i class="fa-solid fa-paper-plane"></i>';
+    }
+});
+
+// ── Reset password (after reset OTP) ──
+$('resetForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const np = $('newPassword').value;
+    const cp = $('confirmPassword').value;
+    const btn = $('btnReset');
+
+    if (np.length < 6) { showError('Password must be at least 6 characters.'); return; }
+    if (np !== cp) { showError('Passwords do not match.'); return; }
+
+    btn.disabled = true;
+    btn.innerHTML = 'Saving… <i class="fa-solid fa-spinner fa-spin"></i>';
+    try {
+        const data = await post('reset_password', { user_id: session.user_id, new_password: np, confirm_password: cp });
+        if (data.success) {
+            showSuccess('Password reset. You can now sign in.');
+            setTimeout(() => { showForm('step1'); $('authSuccess').style.display = 'none'; }, 1800);
+        } else {
+            showError(data.message || 'Unable to reset password.');
+        }
+    } catch (err) {
+        showError('Request failed. Please try again.');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Save New Password <i class="fa-solid fa-check"></i>';
+    }
+});
+
+// ── Back links ──
+$('backToLogin').addEventListener('click', function (e) { e.preventDefault(); session.purpose = 'login'; showForm('step1'); });
+$('backToLogin2').addEventListener('click', function (e) { e.preventDefault(); session.purpose = 'login'; showForm('step1'); });
 </script>
 
 </body>

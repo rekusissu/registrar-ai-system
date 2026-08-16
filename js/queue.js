@@ -206,7 +206,8 @@
             var statusTxt = dt.status === 'waiting' ? 'Waiting in line' :
                             dt.status === 'serving' ? 'Now being served' :
                             dt.status === 'completed' ? 'Completed' :
-                            dt.status === 'no-show' ? 'Marked as no-show' : 'Removed';
+                            dt.status === 'no-show' ? 'Marked as no-show' :
+                            dt.status === 'cancelled' ? 'Cancelled' : 'Removed';
             var html = '<div class="q-tile you" style="margin-bottom:12px;">' +
                 '<div class="num">' + esc(dt.display_number) + '</div>' +
                 '<div class="who"><div class="name">' + esc(dt.student_name) + '</div>' +

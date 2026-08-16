@@ -8,7 +8,7 @@ All endpoints are in `api/`, return JSON, and start with `shared/config.php` + `
 
 ## Auth & session
 
-- [[api/auth.php]] — `POST` login/logout/check_session (also via `shared/auth_actions.php`)
+- [[api/auth.php]] — `POST` login (ID+password → OTP) / logout / check_session / forgot / reset_password (also via `shared/auth_actions.php`)
 
 ## Students & documents
 
@@ -17,6 +17,13 @@ All endpoints are in `api/`, return JSON, and start with `shared/config.php` + `
 - [[api/documents.php]] — document file operations
 - [[api/masterlist.php]] — masterlist generation (cached)
 - [[api/student-template.php]] — fillable .docx enrolment form
+
+## Student portal
+
+- [[api/student-ai-chat.php]] — AI chat widget backend (student-gated, LLM + fallback · Phase 5)
+- [[api/student-queue.php]] — portal queue view + self-cancel (`action=cancel`)
+- [[api/student-documents.php]] — portal document requests
+- [[api/announcements.php]] — announcements feed
 
 ## RFID
 

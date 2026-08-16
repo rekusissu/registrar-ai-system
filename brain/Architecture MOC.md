@@ -28,7 +28,8 @@ How the BCP Registrar System fits together. Plain PHP server-rendered app (no fr
 - **Role-based access** — `requireRole()` in [[session_config.php]]; admin bypasses all checks
 - **Server-side error containment** — `json_error()` never leaks schema/connection details to the browser
 - **AI is opt-in real models** — live OpenAI-compatible gateway with a rule-based fallback path for search
-- **Idempotent migrations** — [[registrar_upgrade.sql]] re-runs safely
+- **Idempotent migrations** — [[registrar_upgrade.sql]] + [[security_upgrade.sql]] re-run safely
+- **Student portal is a first-class surface** — `student/*` pages render through a shared guard ([[_guard.php]]) with the AI chat widget on every page ([[includes/student-chat.php]])
 
 ## Security posture
 
@@ -38,11 +39,12 @@ See [[Audit & Security]] for the full list: CSP, HSTS, X-Frame-Options: DENY, no
 
 - **Root:** login, logout, dashboard, settings, index
 - **`registrar/`:** all registrar-facing feature pages
+- **`student/`:** student portal pages (guarded by `student/_guard.php`)
 - **`api/`:** JSON endpoints
-- **`shared/`:** bootstrap + utilities
+- **`shared/`:** bootstrap + utilities (incl. `auth_security.php`)
 - **`ai/`:** AI search + insights pages
-- **`includes/`:** header / sidebar / footer
-- **`database/`:** migration SQL
+- **`includes/`:** header / sidebar / footer / student-chat
+- **`database/`:** migration SQL (registrar_upgrade + security_upgrade)
 
 ## Visual map
 

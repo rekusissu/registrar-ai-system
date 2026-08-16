@@ -18,7 +18,7 @@ tags: [architecture]
 
 ## Key behaviors
 
-- **Model failover** — tries `AI_MODELS` in order until one returns content (handles transient 529/5xx)
+- **Model failover** — tries `AI_MODELS` (`ollama/minimax-m3`, `ollama/gpt-oss:120b`, `ollama/kimi-k2.5`) in order until one returns content (handles transient 529/5xx)
 - **Caching** — every result lands in [[ai_cache]] keyed by `prompt_hash`, honoring `AI_CACHE_TTL`
 - **Cache keys** — `ai:<model>:md5(system\0user)`; vision uses `vis:md5(...)`
 - **Robust parsing** — tolerates the gateway appending a `data: [DONE]` sentinel, or streaming SSE lines

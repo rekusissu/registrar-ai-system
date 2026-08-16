@@ -28,12 +28,16 @@ Master student record. The central table every other student sub-record joins to
 | `school_year` / `semester` | varchar | |
 | `adviser_id` | int | → users (not a FK constraint) |
 | `section` | varchar(20) | |
-| `status` | enum `active/probation/at-risk/loa/graduated/transferred/dropped` | default `active` |
+| `status` | enum `active/probation/at-risk/loa/enrolled/graduated/transferred/dropped` | default `enrolled` (Phase 5 additions see below) |
 | `created_at` / `updated_at` | timestamp | auto |
 
 ### Phase 1 additions ([[registrar_upgrade.sql]])
 
 `lrn` varchar(12), `name_suffix` varchar(10), `mother_name` varchar(100), `father_name` varchar(100), `birth_country` varchar(60) — DepEd/Form 137 fields.
+
+### Phase 5 addition ([[security_upgrade.sql]])
+
+`status` enum extended with **`enrolled`** (default). The 5 **canonical** labels surfaced in the portal: **Enrolled · Active · Graduated · Transferred · Dropped**; legacy `probation / at-risk / loa` map to **Active** via `getStudentStatusLabel()` in [[functions.php]].
 
 ## Indexes
 

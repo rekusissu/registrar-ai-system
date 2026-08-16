@@ -1,0 +1,367 @@
+/* ============================================================
+   STUDENT.CSS — Student portal specific pieces.
+   Loaded via $extra_css = ['student.css'] on student pages.
+   Complements css/components.css + css/registrar.css + css/dashboard.css;
+   never redefines shared classes. Keep the same design tokens.
+   ============================================================ */
+
+:root {
+    --student-sidebar-width: 260px;
+}
+
+/* ── Portal canvas vs. cards ─────────────────────────────────
+   The shared stylesheets paint body #fff and .panel #fff, so on
+   student pages the page and its containers are identical and a
+   single hairline border is all that separates them. Tint the
+   page canvas and lift the panels here so every card reads as a
+   distinct surface — even with the border removed. (student.css
+   loads only on student pages, so body/panel overrides are safe
+   and stay out of the registrar scope.) ─────────────────────── */
+body {
+    background: #eef2f7;
+}
+.dashboard-container .panel {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+}
+/* Give the other white card surfaces on student pages the same
+   lift so status chips / tiles / id cards sit on the tinted
+   canvas as clearly as panels do. (.id-card defines its own
+   shadow — override wins here, load order is last.) */
+.dashboard-container .panel,
+.profile-card,
+.status-strip .s-item,
+.announcement-card {
+    box-shadow:
+        0 1px 2px rgba(15, 23, 42, .04),
+        0 10px 30px -16px rgba(15, 23, 42, .18);
+}
+.id-card {
+    box-shadow:
+        0 1px 2px rgba(15, 23, 42, .04),
+        0 10px 30px -16px rgba(15, 23, 42, .18);
+}
+
+/* ── Page intro / welcome hero ────────────────────────────── */
+.student-intro {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 26px 30px;
+    border-radius: var(--radius-lg, 16px);
+    background: linear-gradient(120deg, #1a3a8c 0%, #2563eb 70%, #3b82f6 100%);
+    color: #fff;
+    margin-bottom: 24px;
+    box-shadow: 0 10px 30px rgba(26, 58, 140, .18);
+    overflow: hidden;
+    position: relative;
+}
+.student-intro::after {
+    content: "";
+    position: absolute;
+    right: -60px;
+    top: -60px;
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.06);
+}
+.student-intro::before {
+    content: "";
+    position: absolute;
+    right: 30px;
+    bottom: -90px;
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.05);
+}
+.student-intro .intro-avatar {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.16);
+    border: 3px solid rgba(255,255,255,.45);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    font-weight: 800;
+    flex-shrink: 0;
+}
+.student-intro .intro-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+.student-intro .intro-body { flex: 1; position: relative; z-index: 1; }
+.student-intro .intro-greet {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: rgba(255,255,255,.75);
+    font-weight: 600;
+}
+.student-intro .intro-title {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -.3px;
+    margin: 2px 0 4px;
+    color: #fff;
+}
+.student-intro .intro-sub {
+    font-size: 13px;
+    color: rgba(255,255,255,.8);
+    line-height: 1.5;
+}
+.student-intro .intro-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+    position: relative;
+    z-index: 1;
+}
+.student-intro .intro-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 9999px;
+    background: rgba(255,255,255,.14);
+    border: 1px solid rgba(255,255,255,.18);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* ── Dashboard two-column grid ─────────────────────────────── */
+.student-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+/* ── Queue quick-status card ───────────────────────────────── */
+.queue-quick {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 18px 20px;
+    border-radius: var(--radius-lg, 14px);
+    background: linear-gradient(120deg, #f8fafc, #eef4ff);
+    border: 1px solid #e0eafc;
+    margin-top: 16px;
+}
+.queue-quick .qq-number {
+    font-size: 42px;
+    font-weight: 800;
+    color: #1a3a8c;
+    line-height: 1;
+    letter-spacing: -1px;
+    flex-shrink: 0;
+}
+.queue-quick .qq-info { flex: 1; }
+.queue-quick .qq-status { color: #2563eb; font-weight: 700; font-size: 14px; }
+.queue-quick .qq-detail { color: #475569; font-size: 13px; margin-top: 3px; }
+
+/* ── ID card composition ───────────────────────────────────── */
+.id-card {
+    background: #fff;
+    border: 1px solid #e8edf4;
+    border-radius: 18px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,.05);
+    transition: all .25s ease;
+    display: flex;
+    flex-direction: column;
+}
+.id-card:hover { transform: translateY(-3px); box-shadow: 0 12px 28px rgba(0,0,0,.08); }
+.id-card .id-header {
+    height: 96px;
+    background: linear-gradient(120deg, #1a3a8c, #2563eb);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+}
+.id-card .id-header::after {
+    content: "";
+    position: absolute; right: -30px; top: -40px;
+    width: 130px; height: 130px; border-radius: 50%;
+    background: rgba(255,255,255,.08);
+}
+.id-card .id-org { font-size: 11px; opacity: .85; letter-spacing: .4px; font-weight: 600; }
+.id-card .id-type { font-size: 15px; font-weight: 800; }
+.id-card .id-pic {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    border: 3px solid rgba(255,255,255,.55);
+    background: rgba(255,255,255,.16);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 800;
+    font-size: 22px;
+    flex-shrink: 0;
+}
+.id-card .id-pic img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.id-card .id-body { padding: 18px 22px 22px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+.id-card .id-number {
+    font-size: 24px;
+    font-weight: 800;
+    color: #2563eb;
+    letter-spacing: -.5px;
+}
+.id-card .id-name-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+.id-card .id-name { font-weight: 700; color: #0f172a; font-size: 15px; }
+.id-card .id-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.id-card .id-meta-item { padding: 8px 10px; background: #f8fafc; border-radius: 8px; }
+.id-card .id-meta-item .m-label { font-size: 10px; text-transform: uppercase; letter-spacing: .4px; color: #94a3b8; font-weight: 600; }
+.id-card .id-meta-item .m-value { font-size: 13px; font-weight: 600; color: #1e293b; margin-top: 1px; }
+.id-card .id-sep { height: 1px; background: #eef0f4; }
+.id-card .id-footer { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.id-card .id-qr img { width: 66px; height: 66px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 4px; background: #fff; }
+
+.id-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+/* ── Queue ticket hero ─────────────────────────────────────── */
+.ticket-hero {
+    max-width: 560px;
+    margin: 0 auto;
+    border-radius: 20px;
+    background: linear-gradient(160deg, #fff, #f5f8ff);
+    border: 1px solid #e0eafc;
+    box-shadow: 0 10px 34px rgba(26,58,140,.08);
+    overflow: hidden;
+}
+.ticket-hero .ticket-top {
+    background: linear-gradient(120deg, #1a3a8c, #2563eb);
+    color: #fff;
+    padding: 26px 30px;
+    text-align: center;
+}
+.ticket-hero .ticket-top .t-label { font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: rgba(255,255,255,.75); font-weight: 600; }
+.ticket-hero .ticket-top .t-number { font-size: 66px; font-weight: 800; line-height: 1.1; color: #fff; letter-spacing: -2px; margin: 4px 0; }
+.ticket-hero .ticket-body { padding: 26px 30px; }
+.ticket-hero .ticket-status-line { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+.ticket-hero .ticket-note { text-align: center; font-size: 14px; color: #475569; margin-top: 16px; line-height: 1.5; }
+.ticket-hero .ticket-serving {
+    margin-top: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: #f8fafc;
+    border: 1px solid #e8edf4;
+    border-radius: 12px;
+    font-size: 13px;
+    color: #94a3b8;
+}
+.ticket-hero .ticket-actions { margin-top: 20px; display: flex; justify-content: center; gap: 10px; }
+
+/* Status accent chips on top of the intro */
+.status-strip {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+}
+.status-strip .s-item {
+    background: #fff;
+    border: 1px solid #e8edf4;
+    border-radius: var(--radius-md, 12px);
+    padding: 16px 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.status-strip .s-icon {
+    width: 42px; height: 42px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; flex-shrink: 0;
+}
+.status-strip .s-icon.blue   { background: #eef4ff; color: #2563eb; }
+.status-strip .s-icon.green  { background: #dcfce7; color: #16a34a; }
+.status-strip .s-icon.purple { background: #f3e8ff; color: #7c3aed; }
+.status-strip .s-icon.yellow { background: #fef3c7; color: #b45309; }
+.status-strip .s-value { font-size: 20px; font-weight: 800; color: #0f172a; line-height: 1.15; }
+.status-strip .s-label { font-size: 12px; color: #64748b; margin-top: 1px; }
+
+/* ── Announcement cards ────────────────────────────────────── */
+.announcement-card {
+    background: #fff;
+    border: 1px solid #e8edf4;
+    border-radius: var(--radius-lg, 16px);
+    padding: 20px 22px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+    margin-bottom: 14px;
+    transition: all .2s ease;
+}
+.announcement-card:hover { box-shadow: 0 6px 18px rgba(0,0,0,.06); border-color: #d0d9e8; }
+.announcement-card .a-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.announcement-card .a-title { font-size: 16px; font-weight: 700; color: #0f172a; margin: 0; }
+.announcement-card .a-date {
+    flex-shrink: 0;
+    font-size: 11px; font-weight: 600;
+    padding: 3px 10px; border-radius: 9999px;
+    background: #eef4ff; color: #2563eb;
+    white-space: nowrap;
+}
+.announcement-card .a-body { color: #475569; font-size: 14px; line-height: 1.7; margin-top: 10px; white-space: pre-wrap; }
+.announcement-card .a-by {
+    display: flex; align-items: center; gap: 8px;
+    color: #94a3b8; font-size: 12px; margin-top: 14px;
+    padding-top: 12px; border-top: 1px solid #f1f5f9;
+}
+
+/* ── Responsive ────────────────────────────────────────────── */
+@media (max-width: 1280px) {
+    .status-strip { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 1024px) {
+    .student-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+    .student-intro { padding: 20px 18px; gap: 14px; }
+    .student-intro .intro-title { font-size: 21px; }
+    .student-intro .intro-avatar { width: 54px; height: 54px; font-size: 20px; }
+    .ticket-hero .ticket-top { padding: 20px; }
+    .ticket-hero .ticket-top .t-number { font-size: 52px; }
+    .ticket-hero .ticket-body { padding: 20px; }
+    .id-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Queue cancel button ──────────────────────────────────── */
+.btn-danger-text {
+    color: #dc2626 !important;
+    border-color: #fecaca !important;
+    background: #fef2f2 !important;
+}
+.btn-danger-text:hover {
+    background: #fee2e2 !important;
+    color: #b91c1c !important;
+}
+
+/* ── Chat widget is fully self-contained in its own <style>; ─
+     no tokens needed here. ────────────────────────────────── */
+@media (max-width: 480px) {
+    .status-strip { grid-template-columns: 1fr; gap: 10px; }
+}

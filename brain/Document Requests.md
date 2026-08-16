@@ -22,6 +22,7 @@ Subsystem 7 (Phase 1) — lifecycle tracking for student document requests.
 - `registrar/documents-add.php` — new request
 - `registrar/documents-archive.php` — archived/processed requests
 - `api/documents.php` — JSON operations
+- `student/documents.php` + `api/student-documents.php` — student request tracking *(Phase 5)*
 
 ## Related
 

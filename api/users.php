@@ -31,26 +31,31 @@ $db = Database::getInstance();
 $id = isset($_GET['id']) ? intval($_GET['id']) : null;
 $input = json_decode(file_get_contents('php://input'), true) ?: [];
 
-$roles = ['admin', 'registrar', 'staff', 'teacher'];
+$roles = ['admin', 'registrar', 'staff', 'teacher', 'student'];
 
 // ─── LIST ─────────────────────────────────────────────────────
 if ($method === 'GET') {
     $q = trim($_GET['q'] ?? '');
     $role = trim($_GET['role'] ?? '');
     $params = [];
-    $sql = "SELECT id, email, full_name, role, rfid_uid, is_active, created_at, updated_at FROM users";
+    $sql = "SELECT u.id, u.email, u.full_name, u.role, u.rfid_uid, u.is_active, u.created_at, u.updated_at,
+                   u.student_id,
+                   CONCAT(s.first_name, ' ', s.last_name) AS student_name,
+                   s.student_number
+            FROM users u
+            LEFT JOIN students s ON s.id = u.student_id";
     $where = [];
     if ($q !== '') {
-        $where[] = "(email LIKE ? OR full_name LIKE ?)";
+        $where[] = "(u.email LIKE ? OR u.full_name LIKE ?)";
         $params[] = "%$q%";
         $params[] = "%$q%";
     }
     if ($role !== '' && in_array($role, $roles, true)) {
-        $where[] = "role = ?";
+        $where[] = "u.role = ?";
         $params[] = $role;
     }
     if ($where) $sql .= " WHERE " . implode(' AND ', $where);
-    $sql .= " ORDER BY id ASC";
+    $sql .= " ORDER BY u.id ASC";
     $users = $db->fetchAll($sql, $params);
     echo json_encode(['success' => true, 'data' => $users]);
     exit;
@@ -80,6 +85,16 @@ if ($method === 'POST') {
         exit;
     }
 
+    // Optional link to a student record (only meaningful for student accounts).
+    $studentId = isset($input['student_id']) && $input['student_id'] !== '' ? (int) $input['student_id'] : null;
+    if ($studentId) {
+        $student = $db->fetchOne("SELECT id FROM students WHERE id = ?", [$studentId]);
+        if (!$student) {
+            echo json_encode(['success' => false, 'message' => 'Linked student record not found.']);
+            exit;
+        }
+    }
+
     $existing = $db->fetchOne("SELECT id FROM users WHERE email = ?", [$email]);
     if ($existing) {
         echo json_encode(['success' => false, 'message' => 'An account with that email already exists.']);
@@ -91,6 +106,7 @@ if ($method === 'POST') {
         'password_hash' => password_hash($password, PASSWORD_DEFAULT),
         'full_name'     => $fullName,
         'role'          => $role,
+        'student_id'    => $studentId,
         'is_active'     => 1,
         'created_at'    => date('Y-m-d H:i:s'),
         'updated_at'    => date('Y-m-d H:i:s'),
@@ -179,6 +195,20 @@ if ($method === 'PUT' || $method === 'PATCH') {
             exit;
         }
     }
+    // Optional relink to a student record (only meaningful for student accounts).
+    $studentId = $user['student_id'];
+    if (array_key_exists('student_id', $input)) {
+        $newStudentId = $input['student_id'] !== '' ? (int) $input['student_id'] : null;
+        if ($newStudentId) {
+            $student = $db->fetchOne("SELECT id FROM students WHERE id = ?", [$newStudentId]);
+            if (!$student) {
+                echo json_encode(['success' => false, 'message' => 'Linked student record not found.']);
+                exit;
+            }
+        }
+        $studentId = $newStudentId;
+    }
+
     // If editing self, keep session name in sync
     if ((int)$user['id'] === (int)$_SESSION['user_id']) {
         $_SESSION['full_name'] = $fullName;
@@ -187,6 +217,7 @@ if ($method === 'PUT' || $method === 'PATCH') {
     $db->update('users', [
         'full_name'  => $fullName,
         'role'       => $role,
+        'student_id' => $studentId,
         'updated_at' => date('Y-m-d H:i:s'),
     ], 'id = ?', [$id]);
     logActivity($_SESSION['user_id'], 'user_update', null, 'users', $id);

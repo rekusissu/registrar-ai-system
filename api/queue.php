@@ -84,7 +84,7 @@ if ($action === 'state') {
 
         $completedRows = $db->fetchAll(
             "SELECT * FROM queue_tickets
-             WHERE queue_date = ? AND status IN ('completed','no-show','removed')
+             WHERE queue_date = ? AND status IN ('completed','no-show','removed','cancelled')
              ORDER BY COALESCE(served_at, joined_at) DESC, id DESC
              LIMIT 10",
             [$today]
@@ -105,6 +105,7 @@ if ($action === 'state') {
             'serving'   => (int) $db->fetchColumn("SELECT COUNT(*) FROM queue_tickets WHERE queue_date = ? AND status = 'serving'", [$today]),
             'completed' => (int) $db->fetchColumn("SELECT COUNT(*) FROM queue_tickets WHERE queue_date = ? AND status = 'completed'", [$today]),
             'no_show'   => (int) $db->fetchColumn("SELECT COUNT(*) FROM queue_tickets WHERE queue_date = ? AND status = 'no-show'", [$today]),
+            'cancelled' => (int) $db->fetchColumn("SELECT COUNT(*) FROM queue_tickets WHERE queue_date = ? AND status = 'cancelled'", [$today]),
         ];
 
         echo json_encode([

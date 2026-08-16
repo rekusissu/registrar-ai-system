@@ -246,7 +246,7 @@ if ($action === 'board') {
 
         $recent = $db->fetchAll(
             "SELECT ticket_number, student_name, status FROM queue_tickets
-             WHERE queue_date = ? AND status IN ('completed','no-show','removed')
+             WHERE queue_date = ? AND status IN ('completed','no-show','removed','cancelled')
              ORDER BY COALESCE(served_at, joined_at) DESC, id DESC
              LIMIT 5",
             [$today]
@@ -300,7 +300,7 @@ if ($action === 'my_ticket') {
             exit;
         }
 
-        $ordering = ['waiting' => 0, 'serving' => 1, 'completed' => 2, 'no-show' => 3, 'removed' => 4];
+        $ordering = ['waiting' => 0, 'serving' => 1, 'completed' => 2, 'no-show' => 3, 'cancelled' => 4, 'removed' => 5];
         $serving = $db->fetchOne(
             "SELECT ticket_number, student_name FROM queue_tickets
              WHERE queue_date = ? AND status = 'serving'

@@ -8,15 +8,18 @@ Domain terminology used across the system.
 
 ## Student statuses (`students.status`)
 
-| Status | Meaning |
-|---|---|
-| `active` | currently enrolled |
-| `probation` | on academic probation |
-| `at-risk` | flagged for risk (used by AI search) |
-| `loa` | leave of absence |
-| `graduated` | completed |
-| `transferred` | moved to another school |
-| `dropped` | withdrawn |
+| Status | Meaning | Portal label |
+|---|---|---|
+| `enrolled` | currently enrolled *(Phase 5, default)* | **Enrolled** |
+| `active` | currently enrolled | **Active** |
+| `probation` | on academic probation | Active |
+| `at-risk` | flagged for risk (used by AI search) | Active |
+| `loa` | leave of absence | Active |
+| `graduated` | completed | **Graduated** |
+| `transferred` | moved to another school | **Transferred** |
+| `dropped` | withdrawn | **Dropped** |
+
+The 5 **canonical** portal labels (Enrolled / Active / Graduated / Transferred / Dropped) come from `getStudentStatusLabel()` in [[functions.php]]; legacy `probation / at-risk / loa` map to **Active**.
 
 ## Document types (`document_requests.document_type`)
 
@@ -32,8 +35,16 @@ Domain terminology used across the system.
 
 ## Roles
 
-- **`users.role`:** `admin` · `registrar` · `staff` · `teacher`
+- **`users.role`:** `admin` · `registrar` · `staff` · `teacher` · `student` *(Phase 5)*
 - **`authorized_cards.role`:** `admin` · `registrar` · `superadmin`
+
+## Queue statuses (`queue_tickets.status`)
+
+`waiting` · `serving` · `completed` · `no-show` · `removed` · `cancelled` *(cancelled = Phase 5 student self-cancel)*
+
+## OTP (`otp_codes.purpose`)
+
+`login` · `reset` — 6-digit, 5-min TTL, single-use; delivered via email or on-screen dev fallback.
 
 ## RFID
 

@@ -36,5 +36,10 @@ $page_scripts = $page_scripts ?? [];
         </script>
     <?php endif; ?>
 
+    <!-- Student AI chat widget (student role only) -->
+    <?php if (($_SESSION['role'] ?? '') === 'student'): ?>
+        <?php include __DIR__ . '/student-chat.php'; ?>
+    <?php endif; ?>
+
 </body>
 </html>

@@ -29,6 +29,7 @@ Operational reference for working on this codebase.
 
 - [[AI Client]] — `aiGenerate()` / `aiGenerateJson()` / vision
 - [[9Router Gateway]] — local OpenAI-compatible model gateway
+- [[api/student-ai-chat.php]] — student portal chat backend (LLM + registrar-referral fallback)
 - [[Document Reader]] — PDF/DOCX/TXT extraction
 - [[Student Template]] — .docx form builder
 

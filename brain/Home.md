@@ -12,9 +12,10 @@ Use this as your entry point. Everything below is linked; navigate with Ctrl+Cli
 
 - **Stack:** PHP 8.x + PDO · MySQL/MariaDB · Vanilla JS + Chart.js + Tailwind
 - **DB:** `registrar_ai` (see [[registrar_ai.sql]] for the canonical schema)
-- **Auth:** session-based (`BCP_REGISTRAR_SESSION`), roles `admin / registrar / staff / teacher`
-- **AI:** local **9Router** OpenAI-compatible gateway → DeepSeek / minimax / GLM models, cached in `ai_cache`
-- **Default login:** `registrar@bestlink.edu.ph` / `password123` (⚠️ change before going live)
+- **Auth:** session-based (`BCP_REGISTRAR_SESSION`) with **ID-number/username + password → OTP → session**; roles `admin / registrar / staff / teacher / student`
+- **AI:** local **9Router** OpenAI-compatible gateway · Ollama/OpenRouter models (`minimax-m3`, `gpt-oss:120b`, `kimi-k2.5`), cached in `ai_cache`
+- **Student portal:** logged-in student hub ([[Student Portal]]) — dashboard, profile, queue, documents, academic & health records, AI chat
+- **Migrations:** [[registrar_ai.sql]] (base) → [[registrar_upgrade.sql]] (Phase 1) → [[security_upgrade.sql]] (Phase 5)
 
 ## Hubs (Maps of Content)
 
@@ -34,10 +35,12 @@ Use this as your entry point. Everything below is linked; navigate with Ctrl+Cli
 | [[Health Records]] | [[health_records]], [[health_visits]] | `registrar/health-records.php` |
 | [[RFID Access]] | [[rfid_cards]], [[rfid_scan_logs]], [[authorized_cards]] | `registrar/rfid-*.php` |
 | [[Student IDs]] | [[student_ids]] | `registrar/student-ids.php` |
-| [[Document Requests]] | [[document_requests]] | `registrar/documents*.php` |
+| [[Document Requests]] | [[document_requests]] | `registrar/documents*.php` · `student/documents.php` |
 | [[Digital File Storage]] | [[documents]] | `registrar/file-storage.php` |
 | [[Masterlist Generation]] | [[masterlist_cache]] | `api/masterlist.php` |
 | [[AI Search & Insights]] | [[ai_cache]] | `ai/search.php`, `ai/insights.php` |
+| [[Student Portal]] | many | `student/*` pages + AI chat |
+| [[Queue Management]] | [[queue_tickets]] | `registrar/queue.php` · `student/queue.php` |
 | [[Audit & Security]] | [[audit_logs]] | `shared/security_headers.php` |
 
 ## Navigation
@@ -45,11 +48,11 @@ Use this as your entry point. Everything below is linked; navigate with Ctrl+Cli
 - **Front door:** [[login.php]] → [[dashboard.php]] → [[sidebar.php]]
 - **Setup:** [[Setup & Verification]] · [[Database Setup]]
 - **Team:** [[Team Workflow]] · [[Source Map]]
-- **Last note:** [[2026-08-11]] (daily)
+- **Last note:** [[2026-08-16]] (daily)
 
 ## 📇 Live index
 
-Self-updating views over all 77 brain notes (tag-driven, no manual upkeep):
+Self-updating views over all 91 brain notes (tag-driven, no manual upkeep):
 
 ![[Brain Index.base]]
 
