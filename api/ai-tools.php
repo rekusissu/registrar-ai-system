@@ -14,6 +14,7 @@
 
 require_once __DIR__ . '/../shared/security_headers.php';
 require_once __DIR__ . '/../shared/session_config.php';
+require_once __DIR__ . '/../shared/csrf_guard.php';
 
 if (empty($_SESSION['user_id'])) {
     http_response_code(401);

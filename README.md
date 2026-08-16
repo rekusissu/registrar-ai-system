@@ -10,7 +10,7 @@ AI-powered registrar management system for **Bestlink College of the Philippines
 - **RFID Access Control** — card registration, reader management, scan logging, and tap-to-check kiosk
 - **RFID Insights Dashboard** — real-time analytics and automated recommendations
 - **Audit Logging** — full action history with old/new value tracking
-- **Security Headers** — CSP, HSTS, X-Frame-Options, session hardening
+- **Security Headers** — CSP, HSTS, X-Frame-Options, session hardening, CSRF tokens, login throttling
 
 ## Tech Stack
 
@@ -37,13 +37,15 @@ composer install
 # 3. Create the database
 #    Open phpMyAdmin → create a database named `registrar_ai`
 #    Import `registrar_ai.sql` into it
+#    Optional: login-security migration (throttling table):
+#    mysql -u root registrar_ai < database/login_security.sql
 ```
 
 Then visit **http://localhost/registrar-ai-system**
 
 ### Default login
 
-The login form is pre-filled with the dev credentials:
+Use the dev credentials below (the login form is no longer pre-filled):
 
 | Email | Password |
 |-------|----------|
@@ -101,9 +103,13 @@ registrar-ai-system/
 
 ## About the AI layer
 
-The "AI" features currently use **rule-based keyword and intent detection** implemented in PHP/JS — they parse natural-language queries and map them to filters (status, course, student name, card UID). There is no external LLM call at this time.
+AI features run through the local **9Router gateway** (`http://localhost:20128`, OpenAI-compatible) via `shared/ai_client.php` — `aiGenerate()`, `aiGenerateJson()`, and `aiGenerateVision()` with `ai_cache` caching and ordered model failover.
 
-The scaffolding for real model integration exists (`ai_cache` table in the schema) but is not wired up. If you want to plug in Ollama, Gemini, or DeepSeek later, the search endpoints are the place to hook it in.
+### AI setup
+
+- Point the gateway with `NINEROUTER_URL` (default `http://localhost:20128`) and set the key via `AI_API_KEY` or `NINEROUTER_KEY`, or create `shared/ai_key.local` (gitignored).
+- Verify: `curl http://localhost:20128/api/health` — returns `{"ok":true}`
+- Model IDs in `shared/config.php` (`AI_MODEL`, `AI_MODELS`) must exist in the gateway's `v1/models` list.
 
 ## Team Workflow
 

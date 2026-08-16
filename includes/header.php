@@ -14,6 +14,13 @@
 $page_title = $page_title ?? 'BCP Registrar System';
 $page_description = $page_description ?? 'AI-Powered Registrar Management System';
 $APP_ROOT = $APP_ROOT ?? './';
+
+// CSRF guard: loads session config, exposes csrfToken(), and enforces
+// tokens on every non-safe HTTP method when a page posts server-side.
+if (!function_exists('csrfToken')) {
+    require_once __DIR__ . '/../shared/csrf_guard.php';
+}
+$__csrfToken = htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -27,6 +34,7 @@ $APP_ROOT = $APP_ROOT ?? './';
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     
     <title><?= htmlspecialchars($page_title) ?> — BCP Registrar System</title>
+    <meta name='csrf-token' content='<?= $__csrfToken ?>' />
 
     <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="<?= $APP_ROOT ?>assets/images/favicon.ico" />
@@ -49,6 +57,7 @@ $APP_ROOT = $APP_ROOT ?? './';
     <link rel="stylesheet" href="<?= $APP_ROOT ?>css/dashboard.css" />
 
     <!-- Loader Script - MUST BE FIRST -->
+    <script src='<?= $APP_ROOT ?>js/csrf.js'></script>
     <script src="<?= $APP_ROOT ?>js/page-loader.js"></script>
 
     <!-- Extra CSS for specific pages -->

@@ -2,7 +2,8 @@
 // ============================================================
 //  API/AUTH.PHP
 //  Authentication API endpoints — mirror of shared/auth_actions.php
-//  for JSON clients. Same Phase 5 hardening.
+//  for JSON clients. Same Phase 5 hardening (OTP + lockout),
+//  plus the session-level CSRF + per-email/IP throttle layers.
 // ============================================================
 
 header('Content-Type: application/json');
@@ -14,6 +15,8 @@ require_once __DIR__ . '/../shared/config.php';
 require_once __DIR__ . '/../shared/session_config.php';
 require_once __DIR__ . '/../shared/database.php';
 require_once __DIR__ . '/../shared/auth_security.php';
+require_once __DIR__ . '/../shared/csrf_guard.php';
+require_once __DIR__ . '/../shared/login_throttle.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
@@ -36,13 +39,24 @@ if ($method === 'POST' && $action === 'login') {
         failJson('ID number / username and password are required.');
     }
 
+    // Per-email/IP throttle (5 failures / 15 min → 15-min block).
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+    $throttleKey = mb_strtolower(trim($credential));
+    $throttle = loginThrottleStatus($throttleKey, (string) $ip);
+    if ($throttle['blocked']) {
+        http_response_code(429);
+        failJson('Too many failed attempts. Try again in ' . (int) ceil($throttle['retry_after'] / 60) . ' minute(s).');
+    }
+
     try {
         $db = Database::getInstance();
         $user = resolveLoginUser($db, $credential);
         if (!$user) {
+            loginThrottleRecord($throttleKey, (string) $ip, false);
             failJson('Invalid ID / username or password.');
         }
         if (!$user['is_active']) {
+            loginThrottleRecord($throttleKey, (string) $ip, false);
             failJson('Your account is disabled. Please contact admin.');
         }
 
@@ -54,10 +68,12 @@ if ($method === 'POST' && $action === 'login') {
 
         if (!password_verify($password, $user['password_hash'])) {
             handleFailedAttempt($db, (int) $user['id']);
+            loginThrottleRecord($throttleKey, (string) $ip, false);
             failJson('Invalid ID / username or password.');
         }
 
         resetLoginLockout($db, (int) $user['id']);
+        loginThrottleClear($throttleKey, (string) $ip);
         $otp = issueOtp($db, (int) $user['id'], 'login', $user['email']);
 
         echo json_encode([

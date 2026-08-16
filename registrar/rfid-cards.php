@@ -763,8 +763,16 @@ foreach ($cards as $i => $c) {
                     </select>
                     <i class="fas fa-chevron-down filter-select-arrow"></i>
                 </div>
+                                <button type="button" id="aiRfidSearchBtn" class="btn btn-secondary" title="Ask AI to search cards - e.g. 'expired cards', 'lost cards', 'BSIT students'">
+                    <i class="fas fa-wand-magic-sparkles" style="color:#7c3aed;"></i> AI
+                </button>
                 <button type="button" id="resetFilterBtn" class="btn btn-light"><i class="fas fa-undo"></i> Reset</button>
             </div>
+        </div>
+
+        <div id="aiRfidInterpretation" style="display:none;padding:10px 14px;background:#eef4ff;border:1px solid #bfdbfe;border-radius:10px;margin-bottom:14px;">
+            <i class="fas fa-brain" style="color:#2563eb;"></i>
+            <span id="aiRfidExplanation" style="color:#1e40af;margin-left:8px;font-size:13px;"></span>
         </div>
 
     <!-- Table -->
@@ -1321,6 +1329,55 @@ if (resetFilterBtn) resetFilterBtn.addEventListener('click', () => {
 });
 
 // ── Assign modal: students from <select> ──
+// AI card search (api/rfid-ai-search.php)
+const aiRfidBtn = document.getElementById('aiRfidSearchBtn');
+const aiRfidInfo = document.getElementById('aiRfidInterpretation');
+const aiRfidText = document.getElementById('aiRfidExplanation');
+
+async function runAiCardSearch() {
+    const query = (rfidSearchInput?.value || '').trim();
+    if (query.length < 3) { alert('Type at least 3 characters for AI search.'); return; }
+    aiRfidBtn.disabled = true;
+    aiRfidBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> AI';
+    if (aiRfidInfo) aiRfidInfo.style.display = 'none';
+    try {
+        const res = await fetch('../api/rfid-ai-search.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query })
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || 'AI search failed.');
+        const uids = new Set((data.results || []).map(r => String(r.card_uid)));
+        let visible = 0;
+        if (rfidTableBody) {
+            rfidTableBody.querySelectorAll('tr[data-card]').forEach(row => {
+                const raw = (row.getAttribute('data-card') || '');
+                let match = false;
+                uids.forEach(uid => { if (raw.indexOf('"' + uid + '"') !== -1) match = true; });
+                row.style.display = match ? '' : 'none';
+                if (match) visible++;
+            });
+        }
+        if (showingCount) showingCount.textContent = visible;
+        if (statusFilter) statusFilter.value = '';
+        if (aiRfidInfo) {
+            aiRfidText.textContent = (data.ai_interpretation || 'Results') + ' - ' + visible + ' card(s) shown.';
+            aiRfidInfo.style.display = 'block';
+        }
+    } catch (err) {
+        console.error(err);
+        if (aiRfidInfo) {
+            aiRfidText.textContent = 'AI search failed. Check the AI server, or use the filters below.';
+            aiRfidInfo.style.display = 'block';
+        }
+    } finally {
+        aiRfidBtn.disabled = false;
+        aiRfidBtn.innerHTML = '<i class="fas fa-wand-magic-sparkles" style="color:#7c3aed;"></i> AI';
+    }
+}
+if (aiRfidBtn) aiRfidBtn.addEventListener('click', runAiCardSearch);
+
 const allStudents = [];
 const studentSelectEl = document.getElementById('studentSelect');
 if (studentSelectEl) {

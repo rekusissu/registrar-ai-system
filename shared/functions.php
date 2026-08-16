@@ -284,8 +284,15 @@ function errorResponse($message = 'Error', $code = 400) {
 /**
  * Generate CSRF token
  */
+if (!defined('CSRF_TOKEN_LENGTH')) {
+    define('CSRF_TOKEN_LENGTH', 64);
+}
 function generateCsrfToken() {
-    if (!isset($_SESSION['csrf_token'])) {
+    // Prefer the guard token so pages and APIs always share one token.
+    if (function_exists('csrfToken')) {
+        return csrfToken();
+    }
+    if (!isset($_SESSION['csrf_token']) || !is_string($_SESSION['csrf_token'])) {
         $_SESSION['csrf_token'] = randomString(CSRF_TOKEN_LENGTH);
     }
     return $_SESSION['csrf_token'];
@@ -295,7 +302,12 @@ function generateCsrfToken() {
  * Validate CSRF token
  */
 function validateCsrfToken($token) {
-    return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
+    if (function_exists('csrfTokenValid')) {
+        return csrfTokenValid($token);
+    }
+    $expected = $_SESSION['csrf_token'] ?? '';
+    return is_string($token) && $token !== '' && is_string($expected)
+        && hash_equals($expected, $token);
 }
 
 /**

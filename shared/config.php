@@ -7,11 +7,13 @@ if (defined('CONFIG_LOADED')) {
 define('CONFIG_LOADED', true);
 
 // Database Configuration
-define('DB_HOST', 'localhost');
-define('DB_NAME', 'registrar_ai');
-define('DB_USER', 'root');
-define('DB_PASSWORD', '');
-define('DB_CHARSET', 'utf8mb4');
+// Database settings can be overridden per environment via env vars
+// (DB_HOST, DB_NAME, DB_USER, DB_PASSWORD, DB_CHARSET).
+define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
+define('DB_NAME', getenv('DB_NAME') ?: 'registrar_ai');
+define('DB_USER', getenv('DB_USER') ?: 'root');
+define('DB_PASSWORD', getenv('DB_PASSWORD') ?: '');
+define('DB_CHARSET', getenv('DB_CHARSET') ?: 'utf8mb4');
 
 // Application Configuration
 define('APP_NAME', 'BCP Registrar System');
@@ -77,26 +79,31 @@ ini_set('error_log', APP_ROOT . 'logs/php_errors.log');
 define('MAX_STUDENTS_PER_SECTION', 50);
 
 // Security
-define('JWT_SECRET', 'your-super-secret-key-change-in-production');
+define('JWT_SECRET', getenv('JWT_SECRET') ?: 'your-super-secret-key-change-in-production');
+// Public RFID kiosk access token (overridable per environment). Set
+// KIOSK_ACCESS_TOKEN on live stations; do not rely on the default.
+define('KIOSK_ACCESS_TOKEN', getenv('KIOSK_ACCESS_TOKEN') ?: 'kiosk-tap-2024');
 
 // ── AI (9Router local gateway, OpenAI-compatible) ──────────────
 // Local 9Router gateway that fronts several free models via a single
 // Bearer key. Endpoint verified live at /v1/models (OpenAI format).
-define('AI_API_URL', 'http://localhost:20128/v1/chat/completions');
+// The 9Router gateway base URL can be overridden with NINEROUTER_URL
+// (e.g. a VPS or tunnel URL); the app appends /v1/chat/completions.
+$__aiBase = rtrim((string) getenv('NINEROUTER_URL') ?: 'http://localhost:20128', '/');
+define('AI_API_URL', $__aiBase . '/v1/chat/completions');
 define('AI_MODEL', 'ollama/minimax-m3');
 // Ordered fallback list: the gateway tries each model in turn until one
 // succeeds (handles transient 529/5xx overloads on a single backend).
-// These are models confirmed live on the local gateway (/v1/models) —
-// minmax-m3 and gpt-oss:120b both stream real answers. Some prior
-// nvidia/* entries were retired upstream (404 "No active credentials").
+// Some older nvidia/* entries were retired upstream (404 "No active credentials").
 define('AI_MODELS', [
-    'ollama/minimax-m3',
-    'ollama/gpt-oss:120b',
-    'ollama/kimi-k2.5',
+    'ollama/minimax-m3',      // vision-capable (documents/vision flows prefer minimax/kimi)
+    'ollama/kimi-k2.5',       // vision-capable
+    'ollama/gpt-oss:120b',    // strong general-purpose fallback
+    'ollama/glm-4.7-flash',   // fast flash-tier fallback
 ]);
 // API key: read from env var first, then from a local (git-ignored) file.
 // Never hardcode a real key in this committed file.
-$__aiKey = getenv('AI_API_KEY') ?: '';
+$__aiKey = getenv('AI_API_KEY') ?: (getenv('NINEROUTER_KEY') ?: '');
 if ($__aiKey === '') {
     $__aiKeyFile = __DIR__ . '/ai_key.local';
     if (is_file($__aiKeyFile)) {

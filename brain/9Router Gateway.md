@@ -9,8 +9,8 @@ Local OpenAI-compatible model gateway the app fronts for AI features.
 ## What it is
 
 - A local service at `http://localhost:20128` exposing `/v1/chat/completions` (OpenAI format)
-- Fronts several **free** Ollama/OpenRouter models behind a single Bearer key (see [[config.php]]): `ollama/minimax-m3`, `ollama/gpt-oss:120b`, `ollama/kimi-k2.5`. (Older `nvidia/*` entries were retired upstream — 404 "No active credentials".)
-- Endpoint verified live via `/v1/models`; some models stream via SSE with text in `delta.reasoning_content`, handled by `aiParseStreamedBody()` in [[AI Client]]
+- Fronts several models behind a single Bearer key: `ollama/minimax-m3`, `ollama/kimi-k2.5`, `ollama/gpt-oss:120b`, `ollama/glm-4.7-flash` (see [[config.php]])
+- Endpoint verified live via `/v1/models`
 
 ## How the app uses it
 
@@ -21,6 +21,8 @@ Local OpenAI-compatible model gateway the app fronts for AI features.
 ## Setup
 
 The API key is read from env `AI_API_KEY`, falling back to `shared/ai_key.local` (gitignored — never commit a real key).
+
+`/v1/models` is public, but chat/completions requires the Bearer key: set `AI_API_KEY` (or `NINEROUTER_KEY`) or create `shared/ai_key.local`.
 
 ## Related
 

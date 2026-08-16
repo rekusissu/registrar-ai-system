@@ -12,6 +12,7 @@ require_once __DIR__ . '/config.php';
 
 // Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
+    ini_set('session.use_strict_mode', '1');
     session_name('BCP_REGISTRAR_SESSION');
     session_start();
 }
@@ -24,6 +25,16 @@ if (!empty($_SESSION['user_id'])) {
     if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) > $idleTimeout) {
         $_SESSION = array();
         session_destroy();
+
+        // API calls must receive JSON 401, not an HTML redirect.
+        if (basename(dirname($_SERVER['SCRIPT_NAME'] ?? '')) === 'api') {
+            http_response_code(401);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Session expired. Please log in again.', 'timeout' => true]);
+            exit;
+        }
+
+        // HTML pages: root-relative redirect so logout lands on Sign In from any depth.
         header('Location: ' . app_url('login.php?timeout=1'));
         exit;
     }
@@ -63,7 +74,6 @@ function requireRole($requiredRole) {
     header('Location: dashboard.php?error=access_denied');
     exit;
 }
-
 /**
  * Guard for student-portal pages. Only a 'student' role (or admin,
  * which bypasses everything) may proceed. Anything else is bounced.

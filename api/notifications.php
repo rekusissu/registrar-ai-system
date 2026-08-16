@@ -12,6 +12,7 @@ header('Access-Control-Allow-Headers: Content-Type');
 require_once __DIR__ . '/../shared/config.php';
 require_once __DIR__ . '/../shared/database.php';
 require_once __DIR__ . '/../shared/session_config.php';
+require_once __DIR__ . '/../shared/csrf_guard.php';
 
 if (!isLoggedIn()) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized.']);

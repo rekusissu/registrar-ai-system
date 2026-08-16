@@ -4,9 +4,11 @@
 //   Step 2: one-time code (OTP)
 //   Forgot password: reveal email → OTP → set new password
 //   10-min lockout after 5 failed attempts (handled server-side).
+//   CSRF tokens are enforced on every POST (see shared/csrf_guard.php).
 
 require_once __DIR__ . '/shared/security_headers.php';
 require_once __DIR__ . '/shared/session_config.php';
+require_once __DIR__ . '/shared/csrf_guard.php';
 
 if (isLoggedIn()) {
     $role = $_SESSION['role'] ?? '';
@@ -23,6 +25,8 @@ $timeout = isset($_GET['timeout']) ? true : false;
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Sign In – BCP Registrar System</title>
 
+    <meta name='csrf-token' content='<?= htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8') ?>' />
+
     <meta name="loader-logo" content="assets/images/BCP_LOGO.png" />
     <link rel="icon" type="image/x-icon" href="assets/images/favicon.ico" />
 
@@ -30,6 +34,7 @@ $timeout = isset($_GET['timeout']) ? true : false;
     <link rel="stylesheet" href="css/page-loader.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
+    <script src='js/csrf.js'></script>
     <script src="js/page-loader.js"></script>
 </head>
 <body>
