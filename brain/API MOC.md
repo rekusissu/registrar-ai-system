@@ -38,5 +38,7 @@ All endpoints are in `api/`, return JSON, and start with `shared/config.php` + `
 - Responses: `{ success: bool, message: string, data?: any }`
 - Errors via `json_error()` in [[config.php]] — generic message to client, real detail to `error_log`
 - CORS headers are set per-endpoint (`*` on the AI search endpoint)
+- **CSRF** — every mutating endpoint validates `X-CSRF-Token` (or `csrf_token` form field) via [[csrf_guard.php]]; public kiosk endpoints are exempt
+- **Login throttling** — 5 failed attempts / 15 min per email+IP locks out for 15 min (`login_attempts` table, see [[login_throttle.php]])
 
 Related: [[Home]] · [[Architecture MOC]]

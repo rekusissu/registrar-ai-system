@@ -11,6 +11,8 @@ header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
 require_once __DIR__ . '/../shared/config.php';
 require_once __DIR__ . '/../shared/database.php';
+require_once __DIR__ . '/../shared/csrf_guard.php';
+require_once __DIR__ . '/../shared/login_throttle.php';
 
 // Get request method and action
 $method = $_SERVER['REQUEST_METHOD'];
@@ -27,6 +29,18 @@ if ($method === 'POST' && $action === 'login') {
         exit;
     }
 
+    // Login throttling: 5 failed attempts / 15 min per email+IP locks out for 15 min.
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+    $throttle = loginThrottleStatus($email, (string) $ip);
+    if ($throttle['blocked']) {
+        http_response_code(429);
+        echo json_encode([
+            'success' => false,
+            'message' => 'Too many failed attempts. Try again in ' . (int) ceil($throttle['retry_after'] / 60) . ' minute(s).',
+        ]);
+        exit;
+    }
+
     try {
         $db = Database::getInstance();
         $user = $db->fetchOne(
@@ -37,16 +51,19 @@ if ($method === 'POST' && $action === 'login') {
         );
 
         if (!$user) {
+            loginThrottleRecord($email, (string) $ip, false);
             echo json_encode(['success' => false, 'message' => 'Invalid email or password.']);
             exit;
         }
 
         if (!$user['is_active']) {
+            loginThrottleRecord($email, (string) $ip, false);
             echo json_encode(['success' => false, 'message' => 'Your account is disabled.']);
             exit;
         }
 
         if (!password_verify($password, $user['password_hash'])) {
+            loginThrottleRecord($email, (string) $ip, false);
             echo json_encode(['success' => false, 'message' => 'Invalid email or password.']);
             exit;
         }
@@ -57,6 +74,8 @@ if ($method === 'POST' && $action === 'login') {
             session_start();
         }
 
+        loginThrottleClear($email, (string) $ip);
+        session_regenerate_id(true);
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['email'] = $user['email'];
         $_SESSION['full_name'] = $user['full_name'];

@@ -22,8 +22,8 @@ Central configuration. Loaded by every page/endpoint.
 ## AI (9Router gateway)
 
 - `AI_API_URL` = `http://localhost:20128/v1/chat/completions`
-- `AI_MODEL` = `nvidia/deepseek-ai/deepseek-v4-flash`
-- `AI_MODELS` = ordered fallback list (deepseek → minimax-m3 → glm-5.2)
+- `AI_MODEL` = `ollama/minimax-m3`
+- `AI_MODELS` = ordered fallback list (minimax-m3 → kimi-k2.5 → gpt-oss:120b → glm-4.7-flash)
 - `AI_API_KEY` = env `AI_API_KEY`, else `shared/ai_key.local` (gitignored)
 - `AI_CACHE_TTL` = 86400s (1 day)
 

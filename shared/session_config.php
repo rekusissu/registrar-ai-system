@@ -12,6 +12,7 @@ require_once __DIR__ . '/config.php';
 
 // Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
+    ini_set('session.use_strict_mode', '1');
     session_name('BCP_REGISTRAR_SESSION');
     session_start();
 }

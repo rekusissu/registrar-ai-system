@@ -7,6 +7,7 @@
 
 require_once __DIR__ . '/../shared/config.php';
 require_once __DIR__ . '/../shared/database.php';
+require_once __DIR__ . '/../shared/csrf_guard.php';
 
 $db = Database::getInstance();
 
@@ -17,7 +18,7 @@ $ipOk = false;
 foreach ($allowedIps as $prefix) {
     if (strpos($remoteIp, $prefix) === 0) { $ipOk = true; break; }
 }
-$validToken = 'kiosk-tap-2024';
+$validToken = defined('KIOSK_ACCESS_TOKEN') ? KIOSK_ACCESS_TOKEN : 'kiosk-tap-2024';
 $tokenOk = isset($_GET['token']) && $_GET['token'] === $validToken;
 if (!$ipOk && !$tokenOk) {
     require_once __DIR__ . '/../shared/security_headers.php';
@@ -44,7 +45,9 @@ $page_title = 'RFID Kiosk';
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BCP RFID Scanner</title>
+    <title>BCP RFID Scanner</title>
+    <meta name='csrf-token' content='<?= csrfToken() ?>' />
+    <script src='../js/csrf.js'></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>

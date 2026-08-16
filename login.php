@@ -3,6 +3,7 @@
 
 require_once __DIR__ . '/shared/security_headers.php';
 require_once __DIR__ . '/shared/session_config.php';
+require_once __DIR__ . '/shared/csrf_guard.php';
 
 if (isLoggedIn()) {
     header('Location: dashboard.php');
@@ -17,6 +18,8 @@ $timeout = isset($_GET['timeout']) ? true : false;
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Sign In – BCP Registrar System</title>
+    <meta name='csrf-token' content='<?= csrfToken() ?>' />
+    <script src='js/csrf.js'></script>
     
     <meta name="loader-logo" content="assets/images/BCP_LOGO.png" />
     <link rel="icon" type="image/x-icon" href="assets/images/favicon.ico" />
@@ -60,12 +63,12 @@ $timeout = isset($_GET['timeout']) ? true : false;
             <form id="signinForm" style="width:100%">
                 <div class="form-group">
                     <label><i class="fa-solid fa-envelope"></i> Email</label>
-                    <input type="email" id="email" autocomplete="email" value="registrar@bestlink.edu.ph" />
+                    <input type="email" id="email" autocomplete="email" />
                 </div>
 
                 <div class="form-group">
                     <label><i class="fa-solid fa-lock"></i> Password</label>
-                    <input type="password" id="password" autocomplete="current-password" value="password" />
+                    <input type="password" id="password" autocomplete="current-password" />
                 </div>
 
                 <button type="submit" class="btn-signin" id="btnSignin">

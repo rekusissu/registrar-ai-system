@@ -4,6 +4,8 @@
 require_once __DIR__ . '/security_headers.php';
 require_once __DIR__ . '/session_config.php';
 require_once __DIR__ . '/database.php';
+require_once __DIR__ . '/csrf_guard.php';
+require_once __DIR__ . '/login_throttle.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -31,6 +33,14 @@ if ($action === 'login') {
         sendResponse(false, 'Please enter your email and password.');
     }
 
+    // Login throttling: 5 failed attempts / 15 min per email+IP locks out for 15 min.
+    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
+    $throttle = loginThrottleStatus($email, (string) $ip);
+    if ($throttle['blocked']) {
+        http_response_code(429);
+        sendResponse(false, 'Too many failed attempts. Try again in ' . (int) ceil($throttle['retry_after'] / 60) . ' minute(s).');
+    }
+
     try {
         $db = Database::getInstance();
         
@@ -43,18 +53,23 @@ if ($action === 'login') {
         );
 
         if (!$user) {
+            loginThrottleRecord($email, (string) $ip, false);
             sendResponse(false, 'Invalid email or password.');
         }
 
         if (!$user['is_active']) {
+            loginThrottleRecord($email, (string) $ip, false);
             sendResponse(false, 'Your account is disabled. Please contact admin.');
         }
 
         if (!password_verify($password, $user['password_hash'])) {
+            loginThrottleRecord($email, (string) $ip, false);
             sendResponse(false, 'Invalid email or password.');
         }
 
         // Login successful
+        loginThrottleClear($email, (string) $ip);
+        session_regenerate_id(true);
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['email'] = $user['email'];
         $_SESSION['full_name'] = $user['full_name'];
