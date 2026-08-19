@@ -16,44 +16,7 @@ include '../includes/header.php';
 include '../includes/sidebar.php';
 ?>
 <style>
-:root { --sidebar-width:260px; }
-.dashboard-main { margin-left:var(--sidebar-width); padding:24px 32px; min-height:100vh; width:calc(100% - var(--sidebar-width)); max-width:calc(100% - var(--sidebar-width)); overflow-x:hidden; box-sizing:border-box; }
-.header { display:flex; align-items:center; justify-content:space-between; margin-bottom:22px; padding-bottom:16px; border-bottom:1px solid #e8eaef; gap:16px; flex-wrap:wrap; }
-.header .title h1 { font-size:22px; font-weight:700; color:#0f172a; margin:0 0 2px; }
-.header .title p { font-size:13px; color:#64748b; margin:0; }
-.header-actions { display:flex; align-items:center; gap:8px; }
-table { width:100%; border-collapse:collapse; background:white; border-radius:14px; overflow:hidden; border:1px solid #e2e8f0; }
-th { text-align:left; padding:10px 14px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:#64748b; background:#f8fafc; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
-td { padding:10px 14px; font-size:13px; color:#1e293b; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
-tr:hover { background:#f8fafc; }
 .badge-blood { display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:600; background:#fee2e2; color:#dc2626; }
-@media(max-width:768px){ .dashboard-main{margin-left:0;padding:16px} }
-.btn { display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid transparent;text-decoration:none;font-family:inherit; }
-.btn-primary { background:linear-gradient(135deg,#2563eb,#1d4ed8); color:white; }
-.btn-primary:hover { transform:translateY(-1px); box-shadow:0 4px 12px rgba(37,99,235,0.3); }
-.btn-secondary { background:white; color:#475569; border-color:#e2e8f0; }
-.btn-secondary:hover { background:#f8fafc; }
-.btn-light { background:#f1f5f9; color:#475569; }
-.btn-light:hover { background:#e2e8f0; }
-.action-group { display:flex; gap:6px; justify-content:center; }
-.action-btn { width:32px; height:32px; border:none; border-radius:8px; cursor:pointer; font-size:13px; color:#64748b; background:#f1f5f9; display:inline-flex; align-items:center; justify-content:center; font-family:inherit; transition:all .15s ease; }
-.action-btn:hover { background:#e2e8f0; color:#1e293b; transform:translateY(-1px); }
-.action-btn.edit:hover { background:#eef4ff; color:#2563eb; }
-.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); backdrop-filter:blur(4px); z-index:9999; align-items:center; justify-content:center; padding:20px; }
-.modal-overlay.active { display:flex; }
-.modal-content { background:white; border-radius:20px; padding:28px 32px; max-width:520px; width:100%; max-height:90vh; overflow-y:auto; box-shadow:0 24px 64px rgba(0,0,0,0.15); animation:modalSlide .3s ease; }
-@keyframes modalSlide { from { opacity:0; transform:translateY(20px) scale(.95); } to { opacity:1; transform:translateY(0) scale(1); } }
-.modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
-.modal-header h3 { font-size:17px; font-weight:700; color:#0f172a; margin:0; }
-.modal-close { width:34px; height:34px; border:none; background:#f1f5f9; border-radius:50%; cursor:pointer; font-size:15px; color:#94a3b8; }
-.modal-close:hover { background:#e2e8f0; color:#1e293b; }
-.form-group { margin-bottom:14px; }
-.form-group label { display:block; font-size:12px; color:#475569; margin-bottom:4px; font-weight:600; }
-.form-control { width:100%; padding:9px 12px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:14px; font-family:inherit; outline:none; background:white; color:#1e293b; box-sizing:border-box; }
-.form-control:focus { border-color:#2563eb; }
-.form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-.modal-footer { display:flex; gap:10px; justify-content:flex-end; padding-top:14px; border-top:1px solid #f1f5f9; }
-@media(max-width:600px){ .form-row { grid-template-columns:1fr; } }
 </style>
 <main class="dashboard-main">
 <header class="header"><div class="title"><h1>Health Records</h1><p>Student health information</p></div>
@@ -61,7 +24,7 @@ tr:hover { background:#f8fafc; }
 <span style="font-size:13px;color:#64748b;"><?= count($records) ?> records</span>
 <button class="btn btn-primary" onclick="openAdd()"><i class="fas fa-plus"></i> Add Record</button>
 </div></header>
-<table>
+<table class="table">
 <thead><tr><th>Student</th><th>Blood</th><th>Height</th><th>Weight</th><th>Allergies</th><th>Conditions</th><th style="text-align:center;">Actions</th></tr></thead>
 <tbody>
 <?php if (empty($records)): ?>

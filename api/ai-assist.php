@@ -216,6 +216,83 @@ switch ($action) {
         echo json_encode(['success' => true, 'data' => $candidates]);
         exit;
 
+    // ── FORM 137 / SF10 SCAN-TO-ENTER ──
+    case 'extract_form137':
+        if (empty($_FILES['file']) || ($_FILES['file']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            echo json_encode(['success' => false, 'message' => 'No file uploaded or upload failed.']);
+            exit;
+        }
+
+        $tmpName = $_FILES['file']['tmp_name'];
+        $origName = (string) ($_FILES['file']['name'] ?? 'form137');
+        $maxBytes = 15 * 1024 * 1024; // 15 MB
+        if ((int) $_FILES['file']['size'] > $maxBytes) {
+            echo json_encode(['success' => false, 'message' => 'File too large (max 15 MB).']);
+            exit;
+        }
+
+        $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+        $imageExt = ['png', 'jpg', 'jpeg', 'webp', 'gif'];
+        if (!in_array($ext, $imageExt, true)) {
+            echo json_encode(['success' => false, 'message' => 'Upload a scan or photo (PNG, JPG, JPEG, WEBP, GIF).']);
+            exit;
+        }
+
+        $imageData = file_get_contents($tmpName);
+        if ($imageData === false || $imageData === '') {
+            echo json_encode(['success' => false, 'message' => 'Could not read the image file.']);
+            exit;
+        }
+        $mimeMap = ['png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'webp' => 'image/webp', 'gif' => 'image/gif'];
+        $mime = $mimeMap[$ext] ?? 'image/' . $ext;
+
+        $system = "You are a data-entry assistant for a Philippine university registrar. " .
+                  "This image is a Form 137 / School Form 10 (permanent academic record) or a transcript page. " .
+                  "Extract the record into JSON with these keys (omit keys you cannot find): " .
+                  "school_name (string), school_year (string like \2024-2025\), grade_level (string), " .
+                  "semester (\1st\, \2nd\, \Summer\ or null), gwa (number or null), remarks (string), " .
+                  "subjects (array of {subject: string, units: number or null, grade: string, remarks: string}). " .
+                  "Grades may be numbers (1.00-5.00) or letters (P, F, INC, NG). " .
+                  "Include every subject row you can read. Be conservative: never invent subjects or grades.";
+
+        $raw = aiGenerateVision($system, 'Extract the Form 137 academic record from this image.', base64_encode($imageData), $mime, ['max_tokens' => 1200]);
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            preg_match('/\{.*\}/s', $raw, $m);
+            if ($m) {
+                $d = json_decode($m[0], true);
+                if (is_array($d)) $decoded = $d;
+            }
+        }
+        if (!is_array($decoded)) $decoded = [];
+
+        // Clean up the subject list for the modal.
+        $subjects = [];
+        foreach ((array) ($decoded['subjects'] ?? []) as $s) {
+            if (!is_array($s)) continue;
+            $subject = trim((string) ($s['subject'] ?? ''));
+            if ($subject === '') continue;
+            $subjects[] = [
+                'subject' => $subject,
+                'units'   => isset($s['units']) && is_numeric($s['units']) ? (float) $s['units'] : null,
+                'grade'   => trim((string) ($s['grade'] ?? '')),
+                'remarks' => trim((string) ($s['remarks'] ?? '')),
+            ];
+        }
+        $decoded['subjects'] = $subjects;
+
+        // Deterministic GWA fallback when the model did not return one.
+        if (empty($decoded['gwa']) && count($subjects) > 0) {
+            $vals = [];
+            foreach ($subjects as $s) {
+                if (is_numeric($s['grade'])) $vals[] = (float) $s['grade'];
+            }
+            if (count($vals)) $decoded['gwa'] = round(array_sum($vals) / count($vals), 2);
+        }
+
+        echo json_encode(['success' => true, 'data' => $decoded]);
+        exit;
+
     default:
         echo json_encode(['success' => false, 'message' => 'Unknown action.']);
         exit;

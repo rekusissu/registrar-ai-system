@@ -14,45 +14,7 @@ include '../includes/header.php';
 include '../includes/sidebar.php';
 ?>
 <style>
-:root { --sidebar-width:260px; }
-.dashboard-main { margin-left:var(--sidebar-width); padding:24px 32px; min-height:100vh; width:calc(100% - var(--sidebar-width)); max-width:calc(100% - var(--sidebar-width)); overflow-x:hidden; box-sizing:border-box; }
-.header { display:flex; align-items:center; justify-content:space-between; margin-bottom:22px; padding-bottom:16px; border-bottom:1px solid #e8eaef; gap:16px; flex-wrap:wrap; }
-.header .title h1 { font-size:22px; font-weight:700; color:#0f172a; margin:0 0 2px; }
-.header .title p { font-size:13px; color:#64748b; margin:0; }
-.header-actions { display:flex; align-items:center; gap:8px; }
-table { width:100%; border-collapse:collapse; background:white; border-radius:14px; overflow:hidden; border:1px solid #e2e8f0; }
-th { text-align:left; padding:10px 14px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:#64748b; background:#f8fafc; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
-td { padding:10px 14px; font-size:13px; color:#1e293b; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
-tr:hover { background:#f8fafc; }
 .gwa-badge { display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:600; background:#eef4ff; color:#2563eb; }
-@media(max-width:768px){ .dashboard-main{margin-left:0;padding:16px} }
-.btn { display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid transparent;text-decoration:none;font-family:inherit; }
-.btn-primary { background:linear-gradient(135deg,#2563eb,#1d4ed8); color:white; }
-.btn-primary:hover { transform:translateY(-1px); box-shadow:0 4px 12px rgba(37,99,235,0.3); }
-.btn-secondary { background:white; color:#475569; border-color:#e2e8f0; }
-.btn-secondary:hover { background:#f8fafc; }
-.btn-light { background:#f1f5f9; color:#475569; }
-.btn-light:hover { background:#e2e8f0; }
-.action-group { display:flex; gap:6px; justify-content:center; }
-.action-btn { width:32px; height:32px; border:none; border-radius:8px; cursor:pointer; font-size:13px; color:#64748b; background:#f1f5f9; display:inline-flex; align-items:center; justify-content:center; font-family:inherit; transition:all .15s ease; }
-.action-btn:hover { background:#e2e8f0; color:#1e293b; transform:translateY(-1px); }
-.action-btn.edit:hover { background:#eef4ff; color:#2563eb; }
-.action-btn.delete:hover { background:#fee2e2; color:#dc2626; }
-.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); backdrop-filter:blur(4px); z-index:9999; align-items:center; justify-content:center; padding:20px; }
-.modal-overlay.active { display:flex; }
-.modal-content { background:white; border-radius:20px; padding:28px 32px; max-width:520px; width:100%; max-height:90vh; overflow-y:auto; box-shadow:0 24px 64px rgba(0,0,0,0.15); animation:modalSlide .3s ease; }
-@keyframes modalSlide { from { opacity:0; transform:translateY(20px) scale(.95); } to { opacity:1; transform:translateY(0) scale(1); } }
-.modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
-.modal-header h3 { font-size:17px; font-weight:700; color:#0f172a; margin:0; }
-.modal-close { width:34px; height:34px; border:none; background:#f1f5f9; border-radius:50%; cursor:pointer; font-size:15px; color:#94a3b8; }
-.modal-close:hover { background:#e2e8f0; color:#1e293b; }
-.form-group { margin-bottom:14px; }
-.form-group label { display:block; font-size:12px; color:#475569; margin-bottom:4px; font-weight:600; }
-.form-control { width:100%; padding:9px 12px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:14px; font-family:inherit; outline:none; background:white; color:#1e293b; box-sizing:border-box; }
-.form-control:focus { border-color:#2563eb; }
-.form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-.modal-footer { display:flex; gap:10px; justify-content:flex-end; padding-top:14px; border-top:1px solid #f1f5f9; }
-@media(max-width:600px){ .form-row { grid-template-columns:1fr; } }
 </style>
 <main class="dashboard-main">
 <header class="header"><div class="title"><h1>Academic History</h1><p>Previous schools and GWA records</p></div>
@@ -60,7 +22,7 @@ tr:hover { background:#f8fafc; }
 <span style="font-size:13px;color:#64748b;"><?= count($rows) ?> records</span>
 <button class="btn btn-primary" onclick="openAdd()"><i class="fas fa-plus"></i> Add Record</button>
 </div></header>
-<table>
+<table class="table">
 <thead><tr><th>Student</th><th>School</th><th>Year</th><th>Grade Level</th><th>GWA</th><th>Remarks</th><th style="text-align:center;">Actions</th></tr></thead>
 <tbody>
 <?php if (empty($rows)): ?>
@@ -120,6 +82,14 @@ tr:hover { background:#f8fafc; }
             <div class="form-group"><label>Remarks</label><textarea id="acadRemarks" class="form-control" rows="2" placeholder="Notes"></textarea></div>
 
             <hr style="border:none;border-top:1px solid #f1f5f9;margin:14px 0;">
+            <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:6px;">Quick-fill from Form 137 (AI scan)</div>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <input type="file" id="acadScanFile" accept="image/*" class="form-control" style="flex:1;padding:6px 10px;">
+                <button type="button" class="btn btn-light" id="acadScanBtn" onclick="scanForm137()"><i class="fas fa-magic"></i> Scan</button>
+            </div>
+            <div id="acadScanStatus" style="font-size:12px;color:#64748b;margin-top:6px;"></div>
+
+            <hr style="border:none;border-top:1px solid #f1f5f9;margin:14px 0;">
             <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:6px;">Per-Subject Grades (Form 137)</div>
             <div id="gradeRows"></div>
             <div style="display:flex;justify-content:flex-end;margin-top:6px;">
@@ -150,6 +120,7 @@ function openAdd() {
     document.getElementById('acadSemester').value = '';
     document.getElementById('acadRemarks').value = '';
     document.getElementById('gradeRows').innerHTML = '';
+    resetScan();
     openModal();
 }
 
@@ -182,6 +153,7 @@ function openEdit(btn) {
     document.getElementById('acadSemester').value = d.semester || '';
     document.getElementById('acadRemarks').value = d.remarks;
     document.getElementById('gradeRows').innerHTML = '';
+    resetScan();
     // Load existing grades for this record
     fetch('../api/students.php?action=grades&record_id=' + d.id).then(r => r.json()).then(gd => {
         const grades = (gd.success && gd.data) ? gd.data : [];
@@ -235,6 +207,50 @@ function deleteRecord(btn) {
     .then(r => r.json())
     .then(d => { if (d.success) window.location.reload(); else alert(d.message || 'Error deleting.'); })
     .catch(() => alert('Network error.'));
+}
+
+// ── FORM 137 AI SCAN ──
+function resetScan() {
+    const fileEl = document.getElementById('acadScanFile');
+    if (fileEl) fileEl.value = '';
+    const status = document.getElementById('acadScanStatus');
+    if (status) status.innerHTML = '';
+}
+
+async function scanForm137() {
+    const fileEl = document.getElementById('acadScanFile');
+    if (!fileEl.files || !fileEl.files.length) { alert('Choose a Form 137 scan or photo first.'); return; }
+    const btn = document.getElementById('acadScanBtn');
+    const status = document.getElementById('acadScanStatus');
+    btn.disabled = true;
+    status.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Scanning with AI...';
+    try {
+        const fd = new FormData();
+        fd.append('file', fileEl.files[0]);
+        const res = await fetch('../api/ai-assist.php?action=extract_form137', { method: 'POST', body: fd });
+        const d = await res.json();
+        if (!d.success) { status.innerHTML = '<span style="color:#dc2626;">' + esc(d.message || 'Scan failed.') + '</span>'; return; }
+        const data = d.data || {};
+        if (data.school_name) document.getElementById('acadSchool').value = data.school_name;
+        if (data.school_year) document.getElementById('acadYear').value = data.school_year;
+        if (data.grade_level) document.getElementById('acadGrade').value = data.grade_level;
+        if (data.semester) {
+            const sel = document.getElementById('acadSemester');
+            const match = Array.from(sel.options).find(o => o.value === data.semester);
+            if (match) sel.value = data.semester;
+        }
+        if (data.gwa !== undefined && data.gwa !== null && data.gwa !== '') document.getElementById('acadGwa').value = data.gwa;
+        if (data.remarks) document.getElementById('acadRemarks').value = data.remarks;
+        document.getElementById('gradeRows').innerHTML = '';
+        (data.subjects || []).forEach(s => addGradeRow({ subject: s.subject, units: s.units != null ? s.units : '', grade: s.grade, remarks: s.remarks }));
+        const n = (data.subjects || []).length;
+        status.innerHTML = '<span style="color:#16a34a;"><i class="fas fa-check-circle"></i> Scanned ' + n + ' subject(s) — review before saving.</span>';
+    } catch (e) {
+        status.innerHTML = '<span style="color:#dc2626;">Scan failed: ' + esc(e.message) + '</span>';
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-magic"></i> Scan';
+    }
 }
 </script>
 <?php include '../includes/footer.php'; ?>

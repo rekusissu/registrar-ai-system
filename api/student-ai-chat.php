@@ -93,7 +93,7 @@ $intents = [
         'Your subject schedule, room, and instructor are listed under Academic Records, per term.',
     ],
     'grades' => [
-        ['grade', 'grades', 'midterm', 'final', 'rating'],
+        ['grade', 'grades', 'gwa', 'midterm', 'final', 'rating'],
         'Your grades, including midterm and final ratings, are listed under Academic Records per term. For grading concerns, contact the instructor or the Registrar\'s Office.',
     ],
     'id' => [
@@ -175,6 +175,40 @@ if ($reply === '') {
         );
         if ($pending > 0) {
             $ctx .= ". $pending pending document request(s)";
+        }
+
+        // Academic history — compact stats so the LLM can answer
+        // questions about the student's own grades/GWA.
+        $acadTerms = $db->fetchAll(
+            "SELECT id, school_name, school_year, semester, gwa FROM academic_history
+             WHERE student_id = ? ORDER BY school_year IS NULL, school_year, semester IS NULL, semester, id ASC",
+            [$student['id']]
+        );
+        if ($acadTerms) {
+            $termIds = array_column($acadTerms, 'id');
+            $ph = implode(',', array_fill(0, count($termIds), '?'));
+            $acadGrades = $db->fetchAll(
+                "SELECT subject, grade FROM academic_grades WHERE academic_history_id IN ($ph)",
+                $termIds
+            );
+            $nums = [];
+            $weak = [];
+            foreach ($acadGrades as $ag) {
+                $subj = trim((string) ($ag['subject'] ?? ''));
+                $gr   = trim((string) ($ag['grade'] ?? ''));
+                if ($subj === '') continue;
+                if (is_numeric($gr)) {
+                    $gv = (float) $gr;
+                    if ($gv >= 1.0 && $gv <= 5.0) $nums[] = $gv;
+                    if ($gv > 3.0) $weak[] = $subj;
+                } else {
+                    $gl = strtolower($gr);
+                    if (in_array($gl, ['f', 'inc', 'ng', 'drp'], true)) $weak[] = $subj;
+                }
+            }
+            $acadGwa = count($nums) ? number_format(array_sum($nums) / count($nums), 2) : null;
+            $ctx .= '. Academic: ' . count($acadTerms) . ' term(s) on file, ' . count($acadGrades) . ' subject(s), computed GWA ' . ($acadGwa ?? 'n/a')
+                 . ($weak ? ', needs attention: ' . implode(', ', array_slice(array_unique($weak), 0, 4)) : '');
         }
     }
 

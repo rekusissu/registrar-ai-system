@@ -55,6 +55,11 @@ $avgGrade = count($gradeValues) ? number_format(array_sum($gradeValues) / count(
 
         <header class="header">
             <div class="title"><h1>Grades &amp; Academic History</h1><p>Your academic record as maintained by the Registrar.</p></div>
+            <?php if (!empty($terms)): ?>
+            <div class="header-actions">
+                <button type="button" class="btn btn-primary" id="gradesAiBtn" onclick="openGradesAi()"><i class="fa-solid fa-wand-magic-sparkles"></i> Ask AI</button>
+            </div>
+            <?php endif; ?>
         </header>
 
         <?php if (empty($terms)): ?>
@@ -151,5 +156,111 @@ $avgGrade = count($gradeValues) ? number_format(array_sum($gradeValues) / count(
 
     </div>
 </main>
+
+<!-- AI Academic Summary Modal -->
+<div id="gradesAiModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,0.45);backdrop-filter:blur(3px);z-index:99999;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:#fff;border-radius:18px;padding:26px 28px;max-width:560px;width:100%;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,0.2);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h3 style="margin:0;font-size:17px;font-weight:700;color:#0f172a;"><i class="fa-solid fa-wand-magic-sparkles" style="color:#2563eb;"></i> AI Academic Summary</h3>
+            <button type="button" onclick="closeGradesAi()" style="width:34px;height:34px;border:none;background:#f1f5f9;border-radius:50%;cursor:pointer;font-size:15px;color:#94a3b8;">&times;</button>
+        </div>
+        <div id="gradesAiContent" style="min-height:120px;display:flex;align-items:center;justify-content:center;color:#64748b;font-size:14px;">
+            <i class="fa-solid fa-spinner fa-spin"></i> Generating your academic summary...
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    'use strict';
+    var modal = document.getElementById('gradesAiModal');
+    var content = document.getElementById('gradesAiContent');
+
+    function esc(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function chip(label, value, color, bg) {
+        return '<span style="display:inline-block;padding:4px 12px;border-radius:999px;font-size:12px;font-weight:600;margin:0 6px 6px 0;color:' + color + ';background:' + bg + ';">'
+            + esc(label) + ': <strong>' + esc(value) + '</strong></span>';
+    }
+
+    window.openGradesAi = function () {
+        if (!modal || !content) return;
+        modal.style.display = 'flex';
+        content.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Generating your academic summary...';
+        fetch('../api/student-grades-ai.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'summary' })
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (!d.success) throw new Error(d.message || 'Failed to generate summary.');
+            render(d.data || {});
+        })
+        .catch(function (e) {
+            content.innerHTML = '<div style="color:#dc2626;font-size:13px;">' + esc(e.message) + '</div>';
+        });
+    };
+
+    window.closeGradesAi = function () { if (modal) modal.style.display = 'none'; };
+
+    function render(data) {
+        var html = '';
+
+        html += '<div style="font-size:14px;color:#1e293b;line-height:1.6;padding:14px 16px;background:#f8fafc;border-radius:12px;border:1px solid #e2e8f0;">'
+             + esc(data.summary || '') + '</div>';
+
+        var chips = '';
+        if (data.computed_gwa !== null && data.computed_gwa !== undefined) {
+            chips += chip('Computed GWA', data.computed_gwa, '#2563eb', '#eef4ff');
+        }
+        chips += chip('Terms', data.terms || 0, '#475569', '#f1f5f9');
+        chips += chip('Subjects', data.subjects || 0, '#475569', '#f1f5f9');
+        if (data.trend) {
+            var trendMap = { improving: ['Improving', '#16a34a', '#f0fdf4'], steady: ['Steady', '#475569', '#f1f5f9'], declining: ['Needs attention', '#dc2626', '#fef2f2'] };
+            var t = trendMap[data.trend] || [data.trend, '#475569', '#f1f5f9'];
+            chips += chip('Trend', t[0], t[1], t[2]);
+        }
+        if (data.honors_hint) {
+            chips += chip('Standing', data.honors_hint, '#b45309', '#fffbeb');
+        }
+        if (chips) {
+            html += '<div style="margin-top:14px;">' + chips + '</div>';
+        }
+
+        if (data.strengths && data.strengths.length) {
+            html += '<div style="margin-top:14px;"><div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#16a34a;margin-bottom:6px;"><i class="fa-solid fa-circle-check"></i> Strengths</div><div style="display:flex;flex-wrap:wrap;gap:6px;">';
+            data.strengths.forEach(function (s) {
+                html += '<span style="display:inline-block;padding:4px 10px;border-radius:8px;font-size:12px;font-weight:600;color:#166534;background:#f0fdf4;">' + esc(s) + '</span>';
+            });
+            html += '</div></div>';
+        }
+
+        if (data.attention && data.attention.length) {
+            html += '<div style="margin-top:14px;"><div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#dc2626;margin-bottom:6px;"><i class="fa-solid fa-triangle-exclamation"></i> Subjects to watch</div><div style="display:flex;flex-wrap:wrap;gap:6px;">';
+            data.attention.forEach(function (s) {
+                html += '<span style="display:inline-block;padding:4px 10px;border-radius:8px;font-size:12px;font-weight:600;color:#991b1b;background:#fef2f2;">' + esc(s) + '</span>';
+            });
+            html += '</div></div>';
+        }
+
+        if (data.advice) {
+            html += '<div style="margin-top:14px;font-size:13px;color:#334155;line-height:1.5;padding:12px 14px;background:#eef4ff;border-radius:10px;border:1px solid #dbeafe;"><i class="fa-solid fa-lightbulb" style="color:#2563eb;"></i> ' + esc(data.advice) + '</div>';
+        }
+
+        content.innerHTML = html || '<p style="color:#94a3b8;">No summary available.</p>';
+    }
+
+    if (modal) {
+        modal.addEventListener('click', function (e) { if (e.target === modal) modal.style.display = 'none'; });
+    }
+})();
+</script>
 
 <?php include '../includes/footer.php'; ?>

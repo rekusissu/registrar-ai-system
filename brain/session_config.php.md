@@ -9,7 +9,7 @@ Session bootstrap + guard helpers. Loads `config.php` first so it works standalo
 ## Session lifecycle
 
 - Session name: `BCP_REGISTRAR_SESSION`
-- Sliding idle timeout: `SESSION_IDLE_TIMEOUT` (default 20 min) — destroys and redirects to `login.php?timeout=1`
+- Sliding idle timeout: `SESSION_IDLE_TIMEOUT` (default 20 min) — destroys and redirects to `login.php?timeout=1`; `0` disables idle logout
 - `last_activity` touched on every request
 
 ## Helper functions

@@ -11,9 +11,9 @@
 (function () {
     'use strict';
 
-    var TIMEOUT = (typeof window.BcpSessionTimeout === 'number' && window.BcpSessionTimeout > 60)
-        ? window.BcpSessionTimeout
-        : 1200;
+    var RAW_TIMEOUT = (typeof window.BcpSessionTimeout === 'number') ? window.BcpSessionTimeout : 1200;
+    if (RAW_TIMEOUT <= 0) return; // idle timeout disabled (SESSION_IDLE_TIMEOUT = 0)
+    var TIMEOUT = RAW_TIMEOUT > 60 ? RAW_TIMEOUT : 1200;
     var APP_ROOT = (typeof window.BcpAppRoot === 'string' && window.BcpAppRoot)
         ? window.BcpAppRoot
         : './';

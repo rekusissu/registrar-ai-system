@@ -63,8 +63,17 @@ function app_url(?string $path = null): string {
 }
 
 // Idle session timeout in seconds. Users are logged out after this long
-// with no activity (default 20 minutes).
-define('SESSION_IDLE_TIMEOUT', 20 * 60);
+// with no activity (default 20 minutes). Override with the
+// SESSION_IDLE_TIMEOUT env var, or a shared/session_timeout.local file
+// (gitignored). Set to 0 to disable idle logout entirely.
+$__sessionTimeout = getenv('SESSION_IDLE_TIMEOUT');
+if ($__sessionTimeout === false || $__sessionTimeout === '') {
+    $__sessionTimeoutFile = __DIR__ . '/session_timeout.local';
+    if (is_file($__sessionTimeoutFile)) {
+        $__sessionTimeout = trim((string) file_get_contents($__sessionTimeoutFile));
+    }
+}
+define('SESSION_IDLE_TIMEOUT', $__sessionTimeout !== false && $__sessionTimeout !== '' ? max(0, (int) $__sessionTimeout) : 20 * 60);
 
 // Error reporting
 error_reporting(E_ALL);

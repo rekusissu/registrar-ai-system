@@ -16,7 +16,7 @@ Central configuration. Loaded by every page/endpoint.
 - `APP_ENV` = `development` (set `production` to hide errors)
 - `APP_ROOT` = project root
 - `app_base_path()` / `app_url()` — root-relative URL helpers used for redirects (never 404 from nested `student/` pages)
-- `SESSION_IDLE_TIMEOUT` = 20 min
+- `SESSION_IDLE_TIMEOUT` = 20 min (override via env `SESSION_IDLE_TIMEOUT` or gitignored `shared/session_timeout.local`; `0` disables idle logout)
 - `MAX_STUDENTS_PER_SECTION` = 50 (section codes `[year][sem][num]`, e.g. 11001)
 - `JWT_SECRET` — dev placeholder, change in production
 

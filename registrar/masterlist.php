@@ -1108,15 +1108,6 @@ document.addEventListener('keydown', e => {
 </script>
 
 <style>
-.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); z-index: 9999; align-items: center; justify-content: center; padding: 20px; }
-.modal-overlay.active { display: flex; }
-.modal-content { background: white; border-radius: 20px; padding: 28px 32px; max-width: 560px; width: 100%; max-height: 90vh; overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,0.15); animation: modalSlide .3s ease; }
-@keyframes modalSlide { from { opacity: 0; transform: translateY(20px) scale(0.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
-.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-.modal-close { width: 34px; height: 34px; border: none; background: #f1f5f9; border-radius: 50%; cursor: pointer; font-size: 15px; color: #94a3b8; }
-.modal-close:hover { background: #e2e8f0; color: #1e293b; }
-.modal-footer { display: flex; gap: 10px; justify-content: flex-end; padding-top: 14px; border-top: 1px solid #e8edf4; }
-.form-control:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.10); }
 .bulk-bar a { text-decoration: none; }
 /* Filter dropdowns should look clickable */
 #filterCourse, #filterYear, #filterSchoolYear, #filterSemester, #filterStatus,

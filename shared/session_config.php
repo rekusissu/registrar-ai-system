@@ -10,9 +10,18 @@ define('SESSION_CONFIG_LOADED', true);
 // Load it here so this file works standalone regardless of include order.
 require_once __DIR__ . '/config.php';
 
+// Idle session timeout (seconds). A value of 0 disables idle logout
+// (and the client-side warning). Touching last_activity on every request
+// keeps the window sliding.
+$idleTimeout = defined('SESSION_IDLE_TIMEOUT') ? (int) SESSION_IDLE_TIMEOUT : 1200;
+$idleLogout  = $idleTimeout > 0;
+
 // Start session if not already started
 if (session_status() === PHP_SESSION_NONE) {
     ini_set('session.use_strict_mode', '1');
+    // Keep PHP's session GC from collecting the file before the idle
+    // timeout fires; use a long lifetime when idle logout is disabled.
+    ini_set('session.gc_maxlifetime', (string) ($idleLogout ? $idleTimeout : 30 * 86400));
     session_name('BCP_REGISTRAR_SESSION');
     session_start();
 }
@@ -20,9 +29,8 @@ if (session_status() === PHP_SESSION_NONE) {
 // ─── Idle session timeout ────────────────────────────────────
 // Log the user out if they've been inactive past SESSION_IDLE_TIMEOUT.
 // Touching last_activity on every request keeps the window sliding.
-$idleTimeout = defined('SESSION_IDLE_TIMEOUT') ? SESSION_IDLE_TIMEOUT : 1200;
 if (!empty($_SESSION['user_id'])) {
-    if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) > $idleTimeout) {
+    if ($idleLogout && isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity']) > $idleTimeout) {
         $_SESSION = array();
         session_destroy();
 

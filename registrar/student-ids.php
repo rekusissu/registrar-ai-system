@@ -28,49 +28,12 @@ include '../includes/header.php';
 include '../includes/sidebar.php';
 ?>
 <style>
-:root { --sidebar-width:260px; }
-.dashboard-main { margin-left:var(--sidebar-width); padding:24px 32px; min-height:100vh; width:calc(100% - var(--sidebar-width)); max-width:calc(100% - var(--sidebar-width)); overflow-x:hidden; box-sizing:border-box; }
-.header { display:flex; align-items:center; justify-content:space-between; margin-bottom:22px; padding-bottom:16px; border-bottom:1px solid #e8eaef; gap:16px; flex-wrap:wrap; }
-.header .title h1 { font-size:22px; font-weight:700; color:#0f172a; margin:0 0 2px; }
-.header .title p { font-size:13px; color:#64748b; margin:0; }
-.header-actions { display:flex; align-items:center; gap:8px; }
-table { width:100%; border-collapse:collapse; background:white; border-radius:14px; overflow:hidden; border:1px solid #e2e8f0; }
-th { text-align:left; padding:10px 14px; font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.5px; color:#64748b; background:#f8fafc; border-bottom:2px solid #e2e8f0; white-space:nowrap; }
-td { padding:10px 14px; font-size:13px; color:#1e293b; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
-tr:hover { background:#f8fafc; }
 .badge { display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:600; }
 .badge.active { background:#dcfce7; color:#16a34a; }
 .badge.inactive { background:#f1f5f9; color:#64748b; }
 .badge.lost { background:#fee2e2; color:#dc2626; }
 .idtype-chip { display:inline-block; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:600; background:#eef4ff; color:#2563eb; }
 .qr-thumb { width:36px; height:36px; border:1px solid #e2e8f0; border-radius:8px; object-fit:contain; background:white; }
-.action-group { display:flex; gap:6px; justify-content:center; }
-.action-btn { width:32px; height:32px; border:none; border-radius:8px; cursor:pointer; font-size:13px; color:#64748b; background:#f1f5f9; display:inline-flex; align-items:center; justify-content:center; font-family:inherit; transition:all .15s ease; }
-.action-btn:hover { background:#e2e8f0; color:#1e293b; transform:translateY(-1px); }
-.action-btn.view:hover { background:#eef4ff; color:#2563eb; }
-.action-btn.edit:hover { background:#fef3c7; color:#b45309; }
-.action-btn.delete:hover { background:#fee2e2; color:#dc2626; }
-.btn { display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid transparent;text-decoration:none;font-family:inherit; }
-.btn-primary { background:linear-gradient(135deg,#2563eb,#1d4ed8); color:white; }
-.btn-primary:hover { transform:translateY(-1px); box-shadow:0 4px 12px rgba(37,99,235,0.3); }
-.btn-secondary { background:white; color:#475569; border-color:#e2e8f0; }
-.btn-secondary:hover { background:#f8fafc; }
-.btn-light { background:#f1f5f9; color:#475569; }
-.btn-light:hover { background:#e2e8f0; }
-.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); backdrop-filter:blur(4px); z-index:9999; align-items:center; justify-content:center; padding:20px; }
-.modal-overlay.active { display:flex; }
-.modal-content { background:white; border-radius:20px; padding:28px 32px; max-width:560px; width:100%; max-height:90vh; overflow-y:auto; box-shadow:0 24px 64px rgba(0,0,0,0.15); animation:modalSlide .3s ease; }
-@keyframes modalSlide { from { opacity:0; transform:translateY(20px) scale(.95); } to { opacity:1; transform:translateY(0) scale(1); } }
-.modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
-.modal-header h3 { font-size:17px; font-weight:700; color:#0f172a; margin:0; }
-.modal-close { width:34px; height:34px; border:none; background:#f1f5f9; border-radius:50%; cursor:pointer; font-size:15px; color:#94a3b8; }
-.modal-close:hover { background:#e2e8f0; color:#1e293b; }
-.form-group { margin-bottom:14px; }
-.form-group label { display:block; font-size:12px; color:#475569; margin-bottom:4px; font-weight:600; }
-.form-control { width:100%; padding:9px 12px; border:1.5px solid #e2e8f0; border-radius:8px; font-size:14px; font-family:inherit; outline:none; background:white; color:#1e293b; box-sizing:border-box; }
-.form-control:focus { border-color:#2563eb; }
-.form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
-.modal-footer { display:flex; gap:10px; justify-content:flex-end; padding-top:14px; border-top:1px solid #f1f5f9; }
 /* ID card preview */
 .idcard { width:340px; margin:0 auto; border-radius:16px; overflow:hidden; border:1px solid #dbeafe; background:linear-gradient(160deg,#eff6ff,#dbeafe); font-family:inherit; }
 .idcard-head { background:linear-gradient(135deg,#1d4ed8,#2563eb); color:white; padding:12px 16px; display:flex; align-items:center; gap:10px; }
@@ -85,7 +48,6 @@ tr:hover { background:#f8fafc; }
 .idcard-qr { margin-top:10px; }
 .idcard-qr img { width:88px; height:88px; background:white; padding:4px; border-radius:8px; border:1px solid #e2e8f0; }
 .idcard-foot { background:white; padding:8px; text-align:center; font-size:9px; color:#94a3b8; border-top:1px solid #e2e8f0; }
-@media(max-width:768px){ .dashboard-main{margin-left:0;padding:16px} .form-row{grid-template-columns:1fr} }
 </style>
 
 <main class="dashboard-main">
@@ -99,8 +61,8 @@ tr:hover { background:#f8fafc; }
         </div>
     </header>
 
-    <table>
-        <thead>
+    <table class="table">
+            <thead>
             <tr>
                 <th>Student</th>
                 <th>ID Number</th>
