@@ -93,22 +93,23 @@ define('JWT_SECRET', getenv('JWT_SECRET') ?: 'your-super-secret-key-change-in-pr
 // KIOSK_ACCESS_TOKEN on live stations; do not rely on the default.
 define('KIOSK_ACCESS_TOKEN', getenv('KIOSK_ACCESS_TOKEN') ?: 'kiosk-tap-2024');
 
-// ── AI (9Router local gateway, OpenAI-compatible) ──────────────
-// Local 9Router gateway that fronts several free models via a single
-// Bearer key. Endpoint verified live at /v1/models (OpenAI format).
-// The 9Router gateway base URL can be overridden with NINEROUTER_URL
+// ── AI (Gateway, OpenAI-compatible via Antigravity / 9Router) ──
+// Local gateway that fronts models via a single Bearer key.
+// Verified live at /v1/models (OpenAI format).
+// Gateway base URL can be overridden with NINEROUTER_URL
 // (e.g. a VPS or tunnel URL); the app appends /v1/chat/completions.
 $__aiBase = rtrim((string) getenv('NINEROUTER_URL') ?: 'http://localhost:20128', '/');
 define('AI_API_URL', $__aiBase . '/v1/chat/completions');
-define('AI_MODEL', 'ollama/minimax-m3');
+define('AI_MODEL', 'ag/gemini-3.7-flash-high');
 // Ordered fallback list: the gateway tries each model in turn until one
 // succeeds (handles transient 529/5xx overloads on a single backend).
-// Some older nvidia/* entries were retired upstream (404 "No active credentials").
 define('AI_MODELS', [
-    'ollama/minimax-m3',      // vision-capable (documents/vision flows prefer minimax/kimi)
-    'ollama/kimi-k2.5',       // vision-capable
-    'ollama/gpt-oss:120b',    // strong general-purpose fallback
-    'ollama/glm-4.7-flash',   // fast flash-tier fallback
+    'ag/gemini-3.7-flash-high',     // Gemini 3.7 Flash High (Google AI via Antigravity)
+    'ag/gemini-3.7-flash-medium',   // Gemini 3.7 Flash Medium fallback
+    'ag/gemini-3.6-flash-high',     // Gemini 3.6 Flash High fallback
+    'ollama/minimax-m3',            // vision-capable fallback
+    'ollama/kimi-k2.5',             // vision-capable fallback
+    'ollama/gpt-oss:120b',          // general-purpose fallback
 ]);
 // API key: read from env var first, then from a local (git-ignored) file.
 // Never hardcode a real key in this committed file.

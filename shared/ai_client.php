@@ -137,8 +137,8 @@ function aiGenerateVision(string $systemPrompt, string $userText, string $imageB
         ? array_map('strval', AI_MODELS)
         : [(string) AI_MODEL];
 
-    // Prefer a vision-capable model first (minimax-m3 has vision).
-    $preferred = array_filter($models, fn($m) => strpos($m, 'minimax') !== false || strpos($m, 'kimi') !== false);
+    // Prefer a vision-capable model first (gemini, minimax-m3, and kimi have vision).
+    $preferred = array_filter($models, fn($m) => strpos($m, 'gemini') !== false || strpos($m, 'minimax') !== false || strpos($m, 'kimi') !== false);
     $models = array_merge(array_values($preferred), array_values(array_diff($models, $preferred)));
 
     $dataUri = 'data:' . $mimeType . ';base64,' . $imageBase64;
