@@ -198,7 +198,7 @@ async function post(action, body) {
     return res.json();
 }
 
-// ── Step 1: ID/username + password ──
+// ── Step 1: ID/username + password (Direct Login) ──
 $('step1Form').addEventListener('submit', async function (e) {
     e.preventDefault();
     const credential = $('credential').value.trim();
@@ -217,21 +217,8 @@ $('step1Form').addEventListener('submit', async function (e) {
     btn.innerHTML = 'Signing in… <i class="fa-solid fa-spinner fa-spin"></i>';
     try {
         const data = await post('login', { username: credential, password });
-        if (data.success && data.data && data.data.step === 'otp') {
-            session.user_id  = data.data.user_id;
-            session.purpose  = 'login';
-            session.otp      = data.data.otp || null;
-            $('otpMasked').textContent = data.data.masked_email || 'your email';
-            $('otpResentMsg').textContent = '';
-            if (data.data.otp) {
-                $('otpResentMsg').textContent = '⚠ Dev mode: your code is ' + data.data.otp;
-                $('otp').value = data.data.otp; // prefill for easy testing
-            } else if (!data.data.delivered) {
-                $('otpResentMsg').textContent = 'Email delivery failed — please contact the admin for your code.';
-            }
-            showForm('otp');
-            $('otp').focus();
-        } else if (data.success) {
+        if (data.success) {
+            showSuccess('Login successful! Redirecting…');
             window.location.href = data.data?.redirect || 'dashboard.php';
         } else {
             showError(data.message || 'Invalid ID / username or password.');

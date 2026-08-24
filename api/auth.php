@@ -39,52 +39,34 @@ if ($method === 'POST' && $action === 'login') {
         failJson('ID number / username and password are required.');
     }
 
-    // Per-email/IP throttle (5 failures / 15 min → 15-min block).
-    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
-    $throttleKey = mb_strtolower(trim($credential));
-    $throttle = loginThrottleStatus($throttleKey, (string) $ip);
-    if ($throttle['blocked']) {
-        http_response_code(429);
-        failJson('Too many failed attempts. Try again in ' . (int) ceil($throttle['retry_after'] / 60) . ' minute(s).');
-    }
-
     try {
         $db = Database::getInstance();
         $user = resolveLoginUser($db, $credential);
         if (!$user) {
-            loginThrottleRecord($throttleKey, (string) $ip, false);
             failJson('Invalid ID / username or password.');
         }
         if (!$user['is_active']) {
-            loginThrottleRecord($throttleKey, (string) $ip, false);
             failJson('Your account is disabled. Please contact admin.');
         }
 
-        $remaining = lockoutRemainingSeconds($db, (int) $user['id']);
-        if ($remaining > 0) {
-            $mins = (int) ceil($remaining / 60);
-            failJson('Account temporarily locked. Try again in about ' . $mins . ' minute(s).', true, ['remaining_seconds' => $remaining]);
-        }
-
         if (!password_verify($password, $user['password_hash'])) {
-            handleFailedAttempt($db, (int) $user['id']);
-            loginThrottleRecord($throttleKey, (string) $ip, false);
             failJson('Invalid ID / username or password.');
         }
 
         resetLoginLockout($db, (int) $user['id']);
-        loginThrottleClear($throttleKey, (string) $ip);
-        $otp = issueOtp($db, (int) $user['id'], 'login', $user['email']);
+        $redirect = signInSession($user);
 
         echo json_encode([
             'success' => true,
-            'message' => 'Password verified. Enter the one-time code to continue.',
+            'message' => 'Login successful.',
             'data' => [
-                'step'          => 'otp',
-                'user_id'       => (int) $user['id'],
-                'masked_email'  => $otp['masked_email'],
-                'delivered'     => $otp['delivered'],
-                'otp'           => $otp['otp'],
+                'user' => [
+                    'id'        => (int) $user['id'],
+                    'email'     => $user['email'],
+                    'full_name' => $user['full_name'],
+                    'role'      => $user['role'],
+                ],
+                'redirect' => $redirect,
             ],
         ]);
     } catch (Exception $e) {

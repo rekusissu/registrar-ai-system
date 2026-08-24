@@ -31,8 +31,7 @@ function sendResponse($success, $message, $data = null) {
 }
 
 // ─── LOGIN ACTION ──────────────────────────────────────────────
-// Step 1: credential + password → on success return an OTP step
-// (session NOT granted yet).
+// Direct credential + password → instant login & session grant
 if ($action === 'login') {
     $credential = trim($_POST['username'] ?? ($_POST['email'] ?? ''));
     $password = $_POST['password'] ?? '';
@@ -42,55 +41,34 @@ if ($action === 'login') {
         sendResponse(false, 'Please enter your ID number / username and password.');
     }
 
-    // Per-email/IP throttle (5 failures / 15 min → 15-min block). Distinct
-    // from the per-account lockout: this is keyed on the *typed credential*
-    // before any user lookup, so it also blunts brute force on unknown IDs.
-    $ip = $_SERVER['REMOTE_ADDR'] ?? '';
-    $throttleKey = mb_strtolower(trim($credential));
-    $throttle = loginThrottleStatus($throttleKey, (string) $ip);
-    if ($throttle['blocked']) {
-        http_response_code(429);
-        sendResponse(false, 'Too many failed attempts. Try again in ' . (int) ceil($throttle['retry_after'] / 60) . ' minute(s).');
-    }
-
     try {
         $db = Database::getInstance();
         $user = resolveLoginUser($db, $credential);
 
         if (!$user) {
-            loginThrottleRecord($throttleKey, (string) $ip, false);
             sendResponse(false, 'Invalid ID / username or password.');
         }
 
         if (!$user['is_active']) {
-            loginThrottleRecord($throttleKey, (string) $ip, false);
             sendResponse(false, 'Your account is disabled. Please contact admin.');
         }
 
-        // Lockout check — if still locked, refuse before any work.
-        $remaining = lockoutRemainingSeconds($db, (int) $user['id']);
-        if ($remaining > 0) {
-            $mins = (int) ceil($remaining / 60);
-            sendResponse(false, 'Account temporarily locked. Try again in about ' . $mins . ' minute(s).', ['locked' => true, 'remaining_seconds' => $remaining]);
-        }
-
         if (!password_verify($password, $user['password_hash'])) {
-            handleFailedAttempt($db, (int) $user['id']);
-            loginThrottleRecord($throttleKey, (string) $ip, false);
             sendResponse(false, 'Invalid ID / username or password.');
         }
 
-        // Password correct — reset lockout/throttle counters, issue an OTP.
+        // Direct sign-in without OTP
         resetLoginLockout($db, (int) $user['id']);
-        loginThrottleClear($throttleKey, (string) $ip);
-        $otp = issueOtp($db, (int) $user['id'], 'login', $user['email']);
+        $redirect = signInSession($user);
 
-        sendResponse(true, 'Password verified. Enter the one-time code to continue.', [
-            'step'          => 'otp',
-            'user_id'       => (int) $user['id'],
-            'masked_email'  => $otp['masked_email'],
-            'delivered'     => $otp['delivered'],
-            'otp'           => $otp['otp'],   // on-screen dev fallback
+        sendResponse(true, 'Login successful.', [
+            'user' => [
+                'id'        => (int) $user['id'],
+                'email'     => $user['email'],
+                'full_name' => $user['full_name'],
+                'role'      => $user['role'],
+            ],
+            'redirect' => $redirect,
         ]);
     } catch (Exception $e) {
         sendResponse(false, 'An error occurred. Please try again.');
