@@ -210,47 +210,69 @@
 
 /* ── Chart Cards ── */
 .chart-card {
-    background: #fff;
+    background: #ffffff;
     border-radius: 16px;
     padding: 24px;
-    border: 1px solid #e8edf4;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08);
     transition: all 0.25s ease;
 }
 
 .chart-card:hover {
-    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+    border-color: #cbd5e1;
+}
+
+.chart-card.premium-gradient,
+.chart-card.premium-gradient:hover {
+    background: #ffffff;
 }
 
 .chart-card .card-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    margin-bottom: 20px;
+    align-items: flex-start;
+    margin-bottom: 22px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #eef2f7;
     flex-wrap: wrap;
     gap: 8px;
 }
 
 .chart-card .card-title {
     font-size: 15px;
-    font-weight: 600;
+    font-weight: 700;
     color: #0f172a;
+    letter-spacing: -0.2px;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 9px;
 }
 
 .chart-card .card-title i {
-    font-size: 16px;
+    font-size: 14px;
+    color: #94a3b8;
+    width: 16px;
+    text-align: center;
+}
+
+.chart-card .card-subtitle {
+    font-size: 12.5px;
+    color: #94a3b8;
+    font-weight: 500;
+    margin-top: 4px;
+    padding-left: 25px;
 }
 
 .chart-card .card-badge {
-    font-size: 12px;
-    font-weight: 500;
+    font-size: 11px;
+    font-weight: 600;
     color: #64748b;
     background: #f1f5f9;
-    padding: 4px 14px;
-    border-radius: 9999px;
+    padding: 5px 11px;
+    border-radius: 7px;
+    letter-spacing: 0.2px;
+    white-space: nowrap;
 }
 
 .chart-card .card-body {
@@ -270,6 +292,20 @@
     display: flex;
     align-items: center;
     gap: 12px;
+}
+
+.progress-item.premium {
+    padding: 0;
+    background: transparent;
+    border-radius: 0;
+    border: none;
+    transition: all 0.2s ease;
+}
+
+.progress-item.premium:hover {
+    background: transparent;
+    border-color: transparent;
+    transform: none;
 }
 
 .progress-item .progress-label {
@@ -297,10 +333,17 @@
     overflow: hidden;
 }
 
+.progress-item .progress-track.premium {
+    height: 8px;
+    background: #f1f5f9;
+    box-shadow: none;
+}
+
 .progress-item .progress-fill {
     height: 100%;
     border-radius: 9999px;
     transition: width 0.8s ease;
+    box-shadow: none;
 }
 
 .progress-fill.blue { background: linear-gradient(90deg, #2563eb, #60a5fa); }
@@ -316,6 +359,190 @@
     min-width: 45px;
     text-align: right;
     flex-shrink: 0;
+}
+
+/* ── Status Distribution (hairline rows, aligned figures) ── */
+.status-distribution {
+    display: flex;
+    flex-direction: column;
+}
+
+.status-row {
+    display: grid;
+    grid-template-columns: 20px 1fr 92px;
+    align-items: center;
+    gap: 14px;
+    padding: 15px 0;
+    border-bottom: 1px solid #eef2f7;
+}
+
+.status-row:first-child { padding-top: 4px; }
+.status-row:last-child { border-bottom: none; padding-bottom: 2px; }
+
+.status-left {
+    display: contents;
+}
+
+.status-left > i {
+    font-size: 14px;
+    text-align: center;
+}
+
+.status-label {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: #1e293b;
+    letter-spacing: -0.1px;
+}
+
+.status-count {
+    font-size: 12px;
+    color: #94a3b8;
+    font-weight: 500;
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+}
+
+.status-right {
+    text-align: right;
+}
+
+.status-percent {
+    font-size: 15px;
+    font-weight: 700;
+    color: #0f172a;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.3px;
+    margin-bottom: 7px;
+}
+
+.status-bar {
+    height: 4px;
+    background: #eef2f7;
+    border-radius: 9999px;
+    overflow: hidden;
+}
+
+.status-fill {
+    height: 100%;
+    border-radius: 9999px;
+    transition: width 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.status-fill.blue { background: #2563eb; }
+.status-fill.green { background: #16a34a; }
+.status-fill.yellow { background: #b45309; }
+.status-fill.purple { background: #7c3aed; }
+.status-fill.red { background: #dc2626; }
+
+/* ── Resource Grid (2×2 tiles) ── */
+.resource-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px 22px;
+    padding-top: 2px;
+}
+
+.resource-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 9px;
+}
+
+.resource-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+}
+
+.resource-stat {
+    font-size: 16px;
+    font-weight: 700;
+    color: #0f172a;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.3px;
+}
+
+.resource-bar {
+    height: 4px;
+    background: #eef2f7;
+    border-radius: 9999px;
+    overflow: hidden;
+}
+
+.resource-fill {
+    height: 100%;
+    border-radius: 9999px;
+    transition: width 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.resource-footer {
+    font-size: 11.5px;
+    color: #94a3b8;
+    font-weight: 500;
+    margin-top: 7px;
+}
+
+/* ── Performance Metrics ── */
+.metrics-container {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding-top: 2px;
+}
+
+.metric-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+
+.metric-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #475569;
+}
+
+.metric-badge {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 3px 8px;
+    border-radius: 6px;
+}
+
+.metric-badge.active { background: #eff6ff; color: #2563eb; }
+.metric-badge.success { background: #f5f3ff; color: #7c3aed; }
+.metric-badge.info { background: #f0fdf4; color: #16a34a; }
+
+.metric-value {
+    font-size: 26px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 9px;
+    letter-spacing: -0.8px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+}
+
+.metric-track {
+    height: 4px;
+    background: #eef2f7;
+    border-radius: 9999px;
+    overflow: hidden;
+}
+
+.metric-progress {
+    height: 100%;
+    border-radius: 9999px;
+    transition: width 0.9s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ── Rings ── */
@@ -460,6 +687,11 @@
     .chart-grid-3 {
         grid-template-columns: 1fr 1fr;
     }
+    .chart-grid-3 .chart-card:last-child .metrics-container {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+    }
 }
 
 @media (max-width: 768px) {
@@ -486,6 +718,14 @@
     .chart-grid-3 {
         grid-template-columns: 1fr;
     }
+    .chart-grid-3 .chart-card:last-child .metrics-container {
+        grid-template-columns: 1fr;
+        display: flex;
+    }
+    .resource-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
     .stat-card {
         padding: 16px 18px;
     }
@@ -494,6 +734,9 @@
     }
     .chart-card {
         padding: 18px;
+    }
+    .chart-card.premium-gradient {
+        padding: 20px;
     }
     .chart-card .card-body {
         height: 220px;

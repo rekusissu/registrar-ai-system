@@ -1,0 +1,388 @@
+/* ============================================================
+   REGISTRAR-PREMIUM.CSS
+   Premium UI enhancements for all registrar pages
+   ============================================================ */
+
+:root {
+    --primary-gradient: linear-gradient(135deg, #1a3a8c 0%, #2563eb 100%);
+    --shadow-xs: 0 2px 8px rgba(15, 23, 42, 0.08);
+    --shadow-sm: 0 4px 12px rgba(15, 23, 42, 0.1);
+    --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.12);
+    --shadow-lg: 0 16px 48px rgba(26, 58, 140, 0.25);
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+    --border-radius: 14px;
+}
+
+/* ── Main Layout ─────────────────────────────────── */
+main.main {
+    background: linear-gradient(180deg, #f9fafb 0%, #f5f7fa 100%);
+    transition: background 0.3s var(--ease);
+}
+
+/* ── Header Section ──────────────────────────────── */
+header.header {
+    background: #fff;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 28px 32px;
+    margin-bottom: 28px;
+    border-radius: 0;
+    box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+header.header .title h1 {
+    font-size: 28px;
+    font-weight: 800;
+    color: #0d1b2e;
+    margin: 0 0 8px;
+    letter-spacing: -0.6px;
+}
+
+header.header .title p {
+    font-size: 14px;
+    color: #64748b;
+    margin: 0;
+    font-weight: 500;
+}
+
+header.header-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+/* ── Buttons ─────────────────────────────────────── */
+.btn {
+    padding: 10px 16px !important;
+    border-radius: 10px !important;
+    font-weight: 700 !important;
+    font-size: 13px !important;
+    letter-spacing: 0.3px !important;
+    border: none !important;
+    cursor: pointer;
+    transition: all 0.2s var(--ease) !important;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-primary {
+    background: var(--primary-gradient) !important;
+    color: #fff !important;
+    box-shadow: 0 4px 12px rgba(26, 58, 140, 0.25) !important;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(26, 58, 140, 0.35) !important;
+}
+
+.btn-primary:active {
+    transform: translateY(0);
+}
+
+.btn-secondary {
+    background: #f1f5f9 !important;
+    color: #2563eb !important;
+    border: 1.5px solid #e2e8f0 !important;
+}
+
+.btn-secondary:hover {
+    background: #e2e8f0 !important;
+    border-color: #cbd5e1 !important;
+    transform: translateY(-1px);
+}
+
+.btn-danger {
+    background: #fee2e2 !important;
+    color: #dc2626 !important;
+}
+
+.btn-danger:hover {
+    background: #fecaca !important;
+}
+
+.btn-sm {
+    padding: 6px 12px !important;
+    font-size: 12px !important;
+}
+
+/* ── Cards & Panels ──────────────────────────────── */
+.panel {
+    background: #fff;
+    border: 1px solid #e8ecf3;
+    border-radius: var(--border-radius);
+    padding: 24px;
+    box-shadow: var(--shadow-xs);
+    margin-bottom: 24px;
+    transition: all 0.3s var(--ease);
+}
+
+.panel:hover {
+    box-shadow: var(--shadow-sm);
+    border-color: #d4dce6;
+}
+
+.panel-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 2px solid #f1f5f9;
+}
+
+.panel-title {
+    font-size: 16px;
+    font-weight: 800;
+    color: #0d1b2e;
+    letter-spacing: -0.3px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.panel-actions {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+/* ── Tables ──────────────────────────────────────── */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+table thead {
+    background: linear-gradient(135deg, #f0f4f8 0%, #e8ecf2 100%);
+}
+
+table thead th {
+    padding: 16px 12px;
+    text-align: left;
+    font-weight: 800;
+    color: #0d1b2e;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    font-size: 11px;
+    border-bottom: 2px solid #d4dce6;
+}
+
+table tbody td {
+    padding: 14px 12px;
+    border-bottom: 1px solid #e8ecf3;
+    color: #1e293b;
+    font-weight: 500;
+}
+
+table tbody tr {
+    transition: background-color 0.2s var(--ease);
+}
+
+table tbody tr:hover {
+    background-color: #f8fafc;
+}
+
+table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* ── Form Elements ───────────────────────────────── */
+input[type="text"],
+input[type="email"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
+select,
+textarea {
+    padding: 10px 14px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: inherit;
+    background: #f8fafc;
+    color: #0d1b2e;
+    transition: all 0.2s var(--ease);
+}
+
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="number"]:focus,
+input[type="date"]:focus,
+input[type="time"]:focus,
+select:focus,
+textarea:focus {
+    outline: none;
+    border-color: #2563eb;
+    background: #fff;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.1);
+}
+
+/* ── Modal Styling ───────────────────────────────── */
+/* Intentionally empty. Modals are owned by registrar.css — the premium
+   layer used to override .modal-header with a blue gradient bar, repad
+   .modal-body, and restyle .modal-close, which changed every modal in the
+   system. Keep modal rules in registrar.css so there is one source. */
+
+/* ── Status Badges ───────────────────────────────── */
+.badge,
+.pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.badge.active,
+.pill.active {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.05));
+    color: #059669;
+    border: 1px solid #86efac;
+}
+
+.badge.pending,
+.pill.pending {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(251, 191, 36, 0.05));
+    color: #d97706;
+    border: 1px solid #fcd34d;
+}
+
+.badge.inactive,
+.pill.inactive {
+    background: linear-gradient(135deg, rgba(107, 114, 128, 0.1), rgba(156, 163, 175, 0.05));
+    color: #4b5563;
+    border: 1px solid #d1d5db;
+}
+
+.badge.danger,
+.pill.danger {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(220, 38, 38, 0.05));
+    color: #dc2626;
+    border: 1px solid #fca5a5;
+}
+
+/* ── Empty State ─────────────────────────────────── */
+.empty-state {
+    text-align: center;
+    padding: 60px 40px;
+    color: #94a3b8;
+}
+
+.empty-state i {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+    display: block;
+}
+
+.empty-state p {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 0 0 8px;
+    color: #475569;
+}
+
+.empty-state span {
+    font-size: 14px;
+    display: block;
+}
+
+/* ── Filter Section ──────────────────────────────── */
+.filter-section {
+    background: #fff;
+    padding: 20px 24px;
+    border-radius: var(--border-radius);
+    margin-bottom: 24px;
+    border: 1px solid #e8ecf3;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.filter-group label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748b;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+/* ── Micro Interactions ──────────────────────────── */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+    from { opacity: 0; transform: translateX(16px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+
+.fade-in {
+    animation: fadeIn 0.3s var(--ease);
+}
+
+.slide-in-right {
+    animation: slideInRight 0.3s var(--ease);
+}
+
+/* ── Responsive Design ───────────────────────────── */
+@media (max-width: 768px) {
+    header.header {
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    header.header-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .filter-section {
+        grid-template-columns: 1fr;
+    }
+
+    table {
+        font-size: 12px;
+    }
+
+    table thead th,
+    table tbody td {
+        padding: 10px 8px;
+    }
+
+    .btn {
+        padding: 8px 12px !important;
+        font-size: 12px !important;
+    }
+}
+
+/* ── Smooth Transitions ──────────────────────────── */
+* {
+    transition: color 0.2s var(--ease), background 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+a {
+    color: #2563eb;
+    text-decoration: none;
+    transition: color 0.2s var(--ease);
+}
+
+a:hover {
+    color: #1d4ed8;
+}

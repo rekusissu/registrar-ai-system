@@ -1,33 +1,61 @@
 /* ============================================================
-   SIDEBAR.CSS - Clean sidebar with collapse support
+   SIDEBAR.CSS - Premium Student Portal Sidebar
    ============================================================ */
 
 /* ── Sidebar Container ── */
+/* Fixed to the viewport with border-box sizing so the 22px padding is
+   counted INSIDE the 100vh, not added on top of it. The container itself
+   never scrolls — the header and footer are pinned and .sidebar-nav is the
+   only scroll area, so Logout stays reachable however long the menu gets. */
 .sidebar {
     width: 260px;
-    background: #1a3a8c;
-    min-height: 100vh;
-    padding: 20px 14px;
+    background: linear-gradient(180deg, #1a3a8c 0%, #163370 100%);
+    height: 100vh;
+    height: 100dvh;         /* mobile: excludes the browser chrome so the footer isn't cut off */
+    padding: 22px 16px;
+    box-sizing: border-box;
     position: fixed;
     top: 0;
     left: 0;
-    bottom: 0;
-    overflow-y: auto;
-    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     z-index: 1000;
-    transition: width 0.3s ease, padding 0.3s ease;
-    box-shadow: 2px 0 20px rgba(0, 0, 0, 0.08);
+    transition: width 0.35s cubic-bezier(0.16, 1, 0.3, 1), padding 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 3px 0 28px rgba(0, 0, 0, 0.15);
 }
 
-.sidebar::-webkit-scrollbar {
-    width: 4px;
+/* ── Scrolling nav region ── */
+.sidebar-nav {
+    flex: 1 1 auto;
+    min-height: 0;          /* lets the flex child actually shrink and scroll */
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
 }
-.sidebar::-webkit-scrollbar-track {
-    background: transparent;
+
+/* ── Pinned footer (Logout) ── */
+.sidebar-footer {
+    flex-shrink: 0;
+    padding-top: 10px;
+    margin-top: 4px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
-.sidebar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.15);
+
+.sidebar-nav::-webkit-scrollbar {
+    width: 5px;
+}
+.sidebar-nav::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+}
+.sidebar-nav::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.18);
     border-radius: 9999px;
+}
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.28);
 }
 
 /* ── Collapsed State ── */
@@ -88,6 +116,7 @@
 
 /* ── Sidebar Header ── */
 .sidebar-header {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -202,30 +231,45 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 14px;
-    border-radius: 8px;
-    color: #ffffff;
+    padding: 11px 14px;
+    border-radius: 10px;
+    color: rgba(255, 255, 255, 0.8);
     text-decoration: none;
     font-size: 14px;
-    font-weight: 500;
-    transition: all 0.15s ease;
+    font-weight: 600;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     cursor: pointer;
     background: none;
     border: none;
     width: 100%;
     font-family: inherit;
     text-align: left;
-    margin-bottom: 2px;
+    margin-bottom: 4px;
+    position: relative;
 }
 
 .sidebar-item:hover {
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.14);
     color: #ffffff;
+    transform: translateX(2px);
 }
 
 .sidebar-item.active {
-    background: rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.2);
     color: #ffffff;
+    font-weight: 700;
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar-item.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 6px;
+    bottom: 6px;
+    width: 3.5px;
+    border-radius: 0 3px 3px 0;
+    background: #60a5fa;
 }
 
 .sidebar-item i {
@@ -233,16 +277,16 @@
     text-align: center;
     font-size: 15px;
     flex-shrink: 0;
-    color: rgba(255, 255, 255, 0.6);
-    transition: color 0.15s ease;
+    color: rgba(255, 255, 255, 0.65);
+    transition: color 0.2s ease;
 }
 
 .sidebar-item:hover i {
-    color: #ffffff;
+    color: rgba(255, 255, 255, 0.95);
 }
 
 .sidebar-item.active i {
-    color: #ffffff;
+    color: #93c5fd;
 }
 
 .sidebar-text {
@@ -255,8 +299,101 @@
     margin-bottom: 2px;
 }
 
-/* ── Mobile Toggle Button ── */
-.sidebar-toggle {
+/* ── Premium Student Profile Card ── */
+.sidebar-profile {
+    margin: 12px 12px 16px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1.5px solid rgba(255, 255, 255, 0.12);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    text-decoration: none;
+    cursor: default;
+    position: relative;
+}
+
+.sidebar-profile:hover {
+    background: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.22);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar-profile-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 15px;
+    flex-shrink: 0;
+    overflow: hidden;
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+}
+
+.sidebar-profile:hover .sidebar-profile-avatar {
+    transform: scale(1.08);
+    border-color: rgba(255, 255, 255, 0.55);
+}
+
+.sidebar-profile-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+
+.sidebar-profile-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.sidebar-profile-name {
+    font-size: 13px;
+    font-weight: 800;
+    color: rgba(255, 255, 255, 0.95);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.3;
+    letter-spacing: -0.2px;
+}
+
+.sidebar-profile-id {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.55);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 2px;
+    font-family: ui-monospace, 'SFMono-Regular', 'Courier New', monospace;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+}
+
+.sidebar-profile-status {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #10b981;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 2.5px rgba(16, 185, 129, 0.3);
+    animation: pulseStatus 2s infinite;
+}
+
+@keyframes pulseStatus {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
     display: none;
     position: fixed;
     top: 12px;
