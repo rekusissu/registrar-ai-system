@@ -17,6 +17,13 @@ uploads/students/*
 uploads/ids/*
 !uploads/ids/.htaccess
 
+# Document request module: requirement uploads + generated digital PDFs.
+# User data / runtime artifacts — never commit (keep the .htaccess guards).
+uploads/document_requirements/*
+!uploads/document_requirements/.htaccess
+uploads/document_pdfs/*
+!uploads/document_pdfs/.htaccess
+
 # Student profile photos written by api/student-upload-photo.php.
 # User data, not source — but keep the .htaccess that blocks script execution.
 assets/uploads/students/*

@@ -59,6 +59,14 @@
         }, 4000);
     }
 
+    // Expose showToast globally. It was only ever callable inside this IIFE,
+    // so every inline handler that relied on the "global 2-arg showToast"
+    // (registrar/documents.php, student/documents.php, documents-add.php, …)
+    // threw ReferenceError mid-success-handler — the toast never showed and
+    // location.reload() never ran, so actions appeared to hang until a manual
+    // refresh. Pages that define their own showToast shadow this one as before.
+    window.showToast = showToast;
+
     // ── Login Handler ──
     if (loginForm) {
         loginForm.addEventListener('submit', async function(e) {

@@ -66,19 +66,19 @@ $db = Database::getInstance();
 $intents = [
     'good_moral' => [
         ['good moral', 'character', 'conduct'],
-        'You can request a Certificate of Good Moral by submitting a document request in the portal (Documents → New Request). Visit the Registrar\'s Office with your ID; it usually takes 1–2 working days.',
+        'Certificate of Good Moral costs ₱150.00. Request it under Document Requests → New Request (needs no pending disciplinary case). Fulfillment options are Pickup, Digital, or Courier.',
     ],
     'transcript' => [
         ['transcript', 'tor', 'record of grades'],
-        'A Transcript of Records (TOR) is available via a document request. Pick "transcript" under Documents → New Request, then follow up at the office for assessment and release.',
+        'A Transcript of Records (TOR) is ₱250.00 per page. Submit it under Document Requests → New Request. Note: a final TOR is held as "Pending Clearance" until exit clearance is complete (Alumni, Dean, Property).',
     ],
     'form137' => [
         ['form 137', 'form137', 'sf10', 'school form'],
-        'Form 137 (School Form 10) is your permanent academic record. Request it under Documents → New Request and allow a few working days for processing.',
+        'Form 137 (School Form 10) is your permanent academic record. Official copies are released through the catalog as a Transcript of Records or Certified True Copy under Document Requests.',
     ],
     'certificate' => [
         ['certificate', 'certification', 'enrollment cert', 'cert of enrollment'],
-        'Certificates (e.g. Certificate of Enrollment) are processed through the Documents module. Select the certificate type, state your purpose and recipient, then pick it up at the office when ready.',
+        'Certificate of Enrollment costs ₱100.00. Request it under Document Requests → New Request and state your purpose and recipient (or office).',
     ],
     'enrollment' => [
         ['enroll', 'enrollment', 'enrolment', 'register for classes'],
@@ -101,8 +101,16 @@ $intents = [
         'Issued IDs are shown under ID & Status. For a replacement or a new card, visit the Registrar\'s Office or guidance. RFID-related lost-card reports go through the office too.',
     ],
     'documents' => [
-        ['document', 'form request', 'request doc', 'get a copy'],
-        'You can request documents (Good Moral, TOR, Form 137, Certificates, Clearance) under Document Requests. Track their status there after submitting.',
+        ['document', 'form request', 'request doc', 'get a copy', 'apply for', 'request a copy', 'diploma', 'course description', 'certified true copy', 'ctc', 'honorable dismissal', 'catalog', 'price', 'cost', 'how much'],
+        'Document Requests covers the priced catalog: TOR ₱250/page, Certificate of Enrollment ₱100, Good Moral ₱150, Diploma Replacement ₱1,000, Certified True Copy ₱50/page, Honorable Dismissal ₱300, Course Description ₱100/syllabus. Pick Pickup, Digital, or Courier, then track: clearance gate → payment → processing → ready/shipped/claimed.',
+    ],
+    'digital_document' => [
+        ['digital', 'pdf', 'download pdf', 'encrypted', 'password for pdf'],
+        'Digital documents are released as encrypted PDFs — the PDF password is your birthdate (YYYY-MM-DD). Each PDF carries a QR code linking to the public verification portal.',
+    ],
+    'exit_clearance' => [
+        ['exit clearance', 'honorable dismissal', 'clearance', 'alumni', 'dean', 'property office', 'clearance to graduate', 'final tor'],
+        'Exit clearance is required for Honorable Dismissal (₱300.00) and a final TOR. The Alumni, Dean, and Property offices must all be CLEARED before the Registrar can approve the document; your request shows "Pending Clearance" until then.',
     ],
     'health' => [
         ['health', 'medical', 'clinic', 'blood type', 'bmi'],
@@ -117,8 +125,8 @@ $intents = [
         'To reset your password, use the "Forgot password" link on the login page — it will ask for your email and send a one-time code.',
     ],
     'tuition' => [
-        ['tuition', 'payment', 'pay', 'fee', 'balance', 'clearance'],
-        'Tuition and payment concerns are handled by the Finance/Bursar office, not the Registrar. Obtain clearance status under the Clearance module or visit Finance.',
+        ['tuition', 'payment', 'pay', 'fee', 'balance', 'bursar', 'finance'],
+        'Tuition and payment concerns are handled by the Finance/Bursar office, not the Registrar. Document requests are held as "Pending Clearance" until any outstanding balance is settled.',
     ],
     'graduation' => [
         ['graduate', 'graduation', 'commencement', 'convocation'],
@@ -168,13 +176,15 @@ if ($reply === '') {
         if ($q) {
             $ctx .= ". Queue: #" . str_pad((string) $q['ticket_number'], 3, '0', STR_PAD_LEFT) . ' (' . $q['status'] . ')';
         }
-        // Pending document requests.
+        // Pending document requests (v2 workflow — anything not yet terminal).
         $pending = (int) $db->fetchColumn(
-            "SELECT COUNT(*) FROM document_requests WHERE student_id = ? AND status = 'pending'",
+            "SELECT COUNT(*) FROM document_requests
+             WHERE student_id = ?
+               AND document_status IN ('Pending_Clearance','Awaiting_Payment','Processing','Ready','Shipped')",
             [$student['id']]
         );
         if ($pending > 0) {
-            $ctx .= ". $pending pending document request(s)";
+            $ctx .= ". $pending active document request(s)";
         }
 
         // Academic history — compact stats so the LLM can answer
@@ -214,8 +224,11 @@ if ($reply === '') {
 
     $system = "You are the friendly AI assistant for the BCP (Bestlink College of the Philippines) "
             . "Registrar's Office, answering students inside their portal. Answer ONLY about registrar "
-            . "matters: documents (good moral, transcript/TOR, Form 137, certificates), queue tickets, "
-            . "enrollment, student status, grades, IDs, RFIDs, and general school record procedures.\n"
+            . "matters: documents (priced catalog — TOR ₱250/page, Certificate of Enrollment ₱100, Good Moral ₱150, "
+            . "Diploma Replacement ₱1,000, Certified True Copy ₱50/page, Honorable Dismissal ₱300, Course Description ₱100/syllabus; "
+            . "workflow clearance gate → mock online payment → processing → ready/shipped/claimed; digital PDFs are encrypted "
+            . "with the birthdate password and verified via QR), exit clearance (Alumni/Dean/Property must all be CLEARED), "
+            . "queue tickets, enrollment, student status, grades, IDs, RFIDs, and general school record procedures.\n"
             . "Rules:\n"
             . "- Be concise and helpful, 2-4 short sentences.\n"
             . "- Do NOT invent office phone numbers, emails, prices, or policies that you are not sure of.\n"

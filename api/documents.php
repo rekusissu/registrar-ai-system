@@ -13,6 +13,7 @@ require_once __DIR__ . '/../shared/config.php';
 require_once __DIR__ . '/../shared/database.php';
 require_once __DIR__ . '/../shared/session_config.php';
 require_once __DIR__ . '/../shared/csrf_guard.php';
+require_once __DIR__ . '/../shared/functions.php';
 
 // Require login
 if (!isLoggedIn()) {
@@ -227,6 +228,126 @@ try {
     // ─── UPDATE DOCUMENT REQUEST STATUS ────────────────────────
     if ($method === 'PUT' && $id) {
         $input = json_decode(file_get_contents('php://input'), true);
+        $v2Action = $input['action'] ?? null;
+
+        // ── v2 workflow transitions (document_status) ──────────────
+        if (in_array($v2Action, ['process', 'ready', 'reject', 'claim'], true)) {
+            $req = $db->fetchOne(
+                "SELECT dr.*, c.triggers_exit_clearance
+                   FROM document_requests dr
+                   LEFT JOIN document_catalog c ON c.id = dr.catalog_id
+                  WHERE dr.id = ?",
+                [$id]
+            );
+            if (!$req) {
+                echo json_encode(['success' => false, 'message' => 'Document request not found.']);
+                exit;
+            }
+            $cur = $req['document_status'];
+            $now = date('Y-m-d H:i:s');
+            $userId = $_SESSION['user_id'];
+
+            $newStatus = null; $legacy = null; $note = null; $reason = null;
+            switch ($v2Action) {
+                case 'process':
+                    if (!in_array($cur, ['Awaiting_Payment', 'Pending_Clearance', 'Processing'], true)) {
+                        echo json_encode(['success' => false, 'message' => 'Only Awaiting Payment / Pending Clearance requests can be processed.']);
+                        exit;
+                    }
+                    $newStatus = 'Processing'; $legacy = 'processing'; $note = 'Started processing';
+                    break;
+                case 'ready':
+                    if ($cur !== 'Processing') {
+                        echo json_encode(['success' => false, 'message' => 'Only Processing requests can be marked Ready.']);
+                        exit;
+                    }
+                    // Exit-clearance hard stop: all three offices must be CLEARED.
+                    if ((int) $req['triggers_exit_clearance'] === 1) {
+                        $pending = (int) $db->fetchColumn(
+                            "SELECT COUNT(*) FROM exit_clearances WHERE request_id = ? AND status = 'PENDING'",
+                            [$id]
+                        );
+                        if ($pending > 0) {
+                            echo json_encode(['success' => false, 'message' => 'Cannot mark ready — exit clearance incomplete (Alumni / Dean / Property must all be CLEARED).']);
+                            exit;
+                        }
+                    }
+                    $newStatus = 'Ready'; $legacy = 'approved'; $note = 'Ready for release';
+                    break;
+                case 'reject':
+                    $reason = trim($input['rejection_reason'] ?? '');
+                    if ($reason === '') {
+                        echo json_encode(['success' => false, 'message' => 'Rejection reason is required.']);
+                        exit;
+                    }
+                    $newStatus = 'Rejected'; $legacy = 'denied'; $note = 'Rejected — ' . $reason;
+                    break;
+                case 'claim':
+                    if (!in_array($cur, ['Ready', 'Shipped'], true)) {
+                        echo json_encode(['success' => false, 'message' => 'Only Ready / Shipped requests can be marked claimed.']);
+                        exit;
+                    }
+                    $newStatus = 'Claimed'; $legacy = 'released'; $note = 'Released / claimed';
+                    break;
+            }
+
+            $data = ['document_status' => $newStatus, 'status' => $legacy];
+            if ($v2Action === 'ready')  $data['ready_at'] = $now;
+            if ($v2Action === 'claim')  $data['claimed_at'] = $now;
+            if ($v2Action === 'reject') $data['rejection_reason'] = $reason;
+            if (in_array($v2Action, ['ready', 'reject', 'claim'], true)) {
+                $data['processed_date'] = $now;
+                $data['processed_by']   = $userId;
+            }
+            if ($v2Action === 'claim') {
+                $data['release_date']   = $now;
+                $data['completed_date'] = $now;
+            }
+
+            // Guard: only update columns that exist in the table.
+            $cols = $db->fetchAll('SHOW COLUMNS FROM document_requests');
+            $colNames = array_column($cols, 'Field');
+            foreach (array_keys($data) as $k) {
+                if (!in_array($k, $colNames, true)) unset($data[$k]);
+            }
+
+            $db->update('document_requests', $data, 'id = ?', [$id]);
+            $db->insert('document_request_events', [
+                'request_id' => $id,
+                'status'     => $newStatus,
+                'note'       => $note,
+                'created_by' => $userId,
+                'created_at' => $now,
+            ]);
+
+            // Cash on Delivery — the money is collected when the student
+            // receives the document, so claiming the request settles the
+            // pending COD transaction.
+            if ($v2Action === 'claim') {
+                $txnCols = array_column($db->fetchAll('SHOW COLUMNS FROM mock_payment_transactions'), 'Field');
+                if (in_array('method', $txnCols, true)) {
+                    $cod = $db->fetchOne(
+                        "SELECT id FROM mock_payment_transactions
+                          WHERE request_id = ? AND method = 'Cash_on_Delivery' AND status = 'pending'
+                          ORDER BY id DESC LIMIT 1",
+                        [$id]
+                    );
+                    if ($cod) {
+                        $db->update('mock_payment_transactions', [
+                            'status'       => 'completed',
+                            'paid_at'      => $now,
+                            'raw_response' => json_encode(['collected_on' => $now, 'collected_by' => $userId, 'note' => 'COD collected at claim']),
+                        ], 'id = ?', [$cod['id']]);
+                    }
+                }
+            }
+
+            logActivity($userId, 'document_request_' . $v2Action, null, 'document_requests', $id);
+
+            echo json_encode(['success' => true, 'message' => 'Request updated.', 'data' => ['id' => $id, 'document_status' => $newStatus]]);
+            exit;
+        }
+
         $status = $input['status'] ?? null;
         $denialReason = $input['denial_reason'] ?? null;
 
