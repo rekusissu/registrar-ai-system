@@ -18,7 +18,9 @@ define('DB_CHARSET', getenv('DB_CHARSET') ?: 'utf8mb4');
 // Application Configuration
 define('APP_NAME', 'BCP Registrar System');
 define('APP_VERSION', '1.0.0');
-define('APP_ENV', 'development');
+// Environment: 'production' or 'development' (default: development)
+// Override with APP_ENV environment variable for deployment
+define('APP_ENV', getenv('APP_ENV') ?: 'development');
 define('APP_ROOT', dirname(__DIR__) . '/');
 
 /**

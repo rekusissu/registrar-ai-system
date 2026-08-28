@@ -173,7 +173,13 @@ if ($method === 'POST' && $action === 'reset_password') {
     $confirm = $input['confirm_password'] ?? '';
     if ($userId <= 0 || $newPassword === '' || $confirm === '') failJson('Please fill in all fields.');
     if ($newPassword !== $confirm) failJson('Passwords do not match.');
-    if (strlen($newPassword) < 6) failJson('Password must be at least 6 characters.');
+
+    // Validate password strength
+    require_once __DIR__ . '/../shared/functions.php';
+    $passwordCheck = validatePassword($newPassword);
+    if (!$passwordCheck['valid']) {
+        failJson($passwordCheck['message']);
+    }
     try {
         $db = Database::getInstance();
         $user = $db->fetchOne("SELECT id, is_active FROM users WHERE id = ?", [$userId]);

@@ -130,10 +130,61 @@ function isValidPhone($phone) {
 }
 
 /**
- * Validate password strength
+ * Minimum password length (enforce strong passwords in production)
+ */
+if (!defined('PASSWORD_MIN_LENGTH')) {
+    define('PASSWORD_MIN_LENGTH', (defined('APP_ENV') && APP_ENV === 'production') ? 12 : 8);
+}
+
+/**
+ * Validate password strength. Returns array with 'valid' (bool) and 'message' (string).
+ * Requirements:
+ *   - Minimum length (8 chars in dev, 12 in production)
+ *   - At least one uppercase letter
+ *   - At least one lowercase letter
+ *   - At least one digit
+ */
+function validatePassword($password) {
+    $minLength = defined('PASSWORD_MIN_LENGTH') ? PASSWORD_MIN_LENGTH : 8;
+    $password = (string) $password;
+
+    if (strlen($password) < $minLength) {
+        return [
+            'valid' => false,
+            'message' => "Password must be at least {$minLength} characters."
+        ];
+    }
+
+    if (!preg_match('/[A-Z]/', $password)) {
+        return [
+            'valid' => false,
+            'message' => 'Password must contain at least one uppercase letter.'
+        ];
+    }
+
+    if (!preg_match('/[a-z]/', $password)) {
+        return [
+            'valid' => false,
+            'message' => 'Password must contain at least one lowercase letter.'
+        ];
+    }
+
+    if (!preg_match('/[0-9]/', $password)) {
+        return [
+            'valid' => false,
+            'message' => 'Password must contain at least one digit.'
+        ];
+    }
+
+    return ['valid' => true, 'message' => 'Password is strong.'];
+}
+
+/**
+ * Legacy compatibility function
  */
 function isValidPassword($password) {
-    return strlen($password) >= PASSWORD_MIN_LENGTH;
+    $result = validatePassword($password);
+    return $result['valid'];
 }
 
 // ─── FILE HELPERS ──────────────────────────────────────────────

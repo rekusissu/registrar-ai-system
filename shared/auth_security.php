@@ -29,7 +29,15 @@ if (!defined('OTP_TTL_SEC'))         define('OTP_TTL_SEC', 300);      // 5 min
 if (!defined('OTP_MAX_VERIFY_ATTEMPTS')) define('OTP_MAX_VERIFY_ATTEMPTS', 3);
 // Show the OTP on screen as a dev/test fallback when mail() is
 // unavailable (bare XAMPP). Turn OFF in production.
-if (!defined('OTP_SHOW_ONSCREEN'))   define('OTP_SHOW_ONSCREEN', true);
+// Override with OTP_SHOW_ONSCREEN env var or APP_ENV setting
+if (!defined('OTP_SHOW_ONSCREEN')) {
+    $showOtpOnScreen = getenv('OTP_SHOW_ONSCREEN');
+    if ($showOtpOnScreen === false) {
+        // Default: disable in production, enable in development
+        $showOtpOnScreen = (defined('APP_ENV') && APP_ENV === 'production') ? 'false' : 'true';
+    }
+    define('OTP_SHOW_ONSCREEN', $showOtpOnScreen === 'true' || $showOtpOnScreen === '1');
+}
 
 /**
  * Resolve a login account by an arbitrary credential string.
