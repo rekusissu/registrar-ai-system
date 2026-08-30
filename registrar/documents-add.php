@@ -50,7 +50,7 @@ include '../includes/sidebar.php';
 
         <div class="form-group">
             <label>Student <span style="color:#dc2626;">*</span></label>
-            <select name="student_id" class="form-control" required>
+            <select name="student_id" class="form-control" data-searchable required>
                 <option value="">Select a student</option>
                 <?php foreach ($students as $student): ?>
                     <option value="<?= $student['id'] ?>">

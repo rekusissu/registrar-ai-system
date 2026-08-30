@@ -58,8 +58,7 @@ if ($method === 'POST' && isset($_GET['action']) && $_GET['action'] === 'update'
     if (!$id) {
         echo json_encode(['success' => false, 'message' => 'ID required.']);
         exit;
-    }
-    $data = [];
+    }    $data = [];
     foreach (['status', 'expiry_date', 'issue_date', 'id_type'] as $f) {
         if (array_key_exists($f, $input)) $data[$f] = $input[$f];
     }
@@ -105,8 +104,7 @@ if ($method === 'POST') {
     if (!$studentId) {
         echo json_encode(['success' => false, 'message' => 'Student is required.']);
         exit;
-    }
-    if (!in_array($idType, ['school_id', 'library', 'cafeteria'], true)) {
+    }    if (!in_array($idType, ['school_id', 'library', 'cafeteria'], true)) {
         $idType = 'school_id';
     }
     if (!in_array($status, ['active', 'inactive', 'lost'], true)) {
@@ -129,9 +127,7 @@ if ($method === 'POST') {
     if ($existingNum) {
         echo json_encode(['success' => false, 'message' => 'ID number already exists.']);
         exit;
-    }
-
-    $data = [
+    }    $data = [
         'student_id'  => $studentId,
         'id_number'   => $idNumber,
         'id_type'     => $idType,

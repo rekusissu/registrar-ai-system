@@ -420,7 +420,7 @@ $hasHeld = $counts['Pending_Clearance'] > 0;
             <div class="form-group">
                 <label>Payment Method <span class="required">*</span></label>
                 <select name="payment_method" id="reqPaymentMethod" class="form-control">
-                    <option value="Online">Pay online (GCash / Maya)</option>
+                    <option value="Online">Pay online (GCash)</option>
                     <option value="Cash_on_Delivery">Cash on delivery</option>
                 </select>
                 <small style="color:#94a3b8;">Cash on delivery — pay the document fee plus delivery fee to the courier when you receive the document.</small>
@@ -467,7 +467,7 @@ $hasHeld = $counts['Pending_Clearance'] > 0;
             <div id="payLoading" style="text-align:center;padding:26px 0;"><i class="fa-solid fa-spinner fa-spin" style="font-size:22px;color:#2563eb;"></i><p style="color:#64748b;font-size:13px;margin-top:8px;">Contacting payment gateway…</p></div>
             <div id="payContent" style="display:none;">
                 <div class="pay-gateway">
-                    <div class="pay-brand"><i class="fa-solid fa-bolt"></i> Mock Payment Gateway · GCash / Maya</div>
+                    <div class="pay-brand" id="payGatewayBrand"><i class="fa-solid fa-bolt"></i> Mock Payment Gateway · GCash / Maya</div>
                     <div class="pay-amount" id="payAmount">₱0.00</div>
                     <div class="pay-row"><span>Document fee</span><b id="payDocFee">—</b></div>
                     <div class="pay-row" id="payDeliveryRow" style="display:none;"><span>Delivery fee (paid by you)</span><b id="payDeliveryFee">—</b></div>
@@ -478,8 +478,12 @@ $hasHeld = $counts['Pending_Clearance'] > 0;
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                     <span class="gateway-chip"><i class="fa-solid fa-link"></i> <span id="payUrl">—</span></span>
                 </div>
-                <p style="font-size:12.5px;color:#64748b;margin:12px 0 4px;">This is a school-project mock gateway. Press the button below to simulate the payment provider confirming your payment.</p>
-                <div class="simulate-actions">
+                <p style="font-size:12.5px;color:#64748b;margin:12px 0 4px;" id="payNote">This is a school-project mock gateway. Press the button below to simulate the payment provider confirming your payment.</p>
+                <div class="simulate-actions" id="paymongoActions" style="display:none;">
+                    <button class="btn btn-primary" style="flex:1;" id="payNowBtn"><i class="fa-solid fa-mobile-screen-button"></i> Pay with GCash</button>
+                    <button class="btn btn-light" id="checkStatusBtn"><i class="fa-solid fa-rotate"></i> I've paid — Check status</button>
+                </div>
+                <div class="simulate-actions" id="mockActions">
                     <button class="btn btn-primary" style="flex:1;" id="simulateSuccessBtn"><i class="fa-solid fa-circle-check"></i> Simulate Successful Payment</button>
                     <button class="btn btn-light" id="simulateFailBtn"><i class="fa-solid fa-xmark"></i> Fail</button>
                 </div>
@@ -635,6 +639,8 @@ function openPaymentModal(requestId, requestLabel, amount, deliveryFee) {
     document.getElementById('payReq').textContent = requestLabel || ('#' + requestId);
     document.getElementById('simulateSuccessBtn').disabled = true;
     document.getElementById('simulateFailBtn').disabled = true;
+    document.getElementById('mockActions').style.display = '';
+    document.getElementById('paymongoActions').style.display = 'none';
 
     fetch('../api/mock/payment.php', {
         method: 'POST',
@@ -647,8 +653,33 @@ function openPaymentModal(requestId, requestLabel, amount, deliveryFee) {
             document.getElementById('payUrl').textContent = d.data.payment_url;
             document.getElementById('payLoading').style.display = 'none';
             document.getElementById('payContent').style.display = 'block';
-            document.getElementById('simulateSuccessBtn').disabled = false;
-            document.getElementById('simulateFailBtn').disabled = false;
+            if (d.data.gateway === 'paymongo') {
+                document.getElementById('payGatewayBrand').textContent = 'PayMongo · GCash (test mode)';
+                document.getElementById('payUrl').textContent = d.data.intent_id || d.data.payment_url;
+                document.getElementById('mockActions').style.display = 'none';
+                document.getElementById('paymongoActions').style.display = '';
+                document.getElementById('payNote').textContent =
+                    'You’ll pay on PayMongo’s hosted GCash page (test mode — no real money). After paying, click “Check status” here.';
+                document.getElementById('payNowBtn').onclick = function () {
+                    window.open(d.data.payment_url, '_blank');
+                    startStatusPolling(currentTxn);
+                };
+                document.getElementById('checkStatusBtn').onclick = function () {
+                    var btn = document.getElementById('checkStatusBtn');
+                    if (btn.disabled) return;
+                    btn.disabled = true;
+                    var orig = btn.innerHTML;
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking…';
+                    pollStatusOnce(currentTxn).finally(function () {
+                        btn.disabled = false;
+                        btn.innerHTML = orig;
+                    });
+                };
+            } else {
+                document.getElementById('payGatewayBrand').textContent = 'Mock Payment Gateway · GCash / Maya';
+                document.getElementById('simulateSuccessBtn').disabled = false;
+                document.getElementById('simulateFailBtn').disabled = false;
+            }
         } else {
             closePayModal();
             showToast(d.message || 'Could not start payment.', 'error');
@@ -656,6 +687,7 @@ function openPaymentModal(requestId, requestLabel, amount, deliveryFee) {
     }).catch(() => { closePayModal(); showToast('Payment gateway unreachable.', 'error'); });
 }
 function closePayModal() {
+    stopStatusPolling();
     document.getElementById('payModal').classList.remove('active');
     document.body.style.overflow = '';
 }
@@ -679,6 +711,47 @@ function simulatePayment(status) {
 }
 document.getElementById('simulateSuccessBtn').addEventListener('click', () => simulatePayment('COMPLETED'));
 document.getElementById('simulateFailBtn').addEventListener('click', () => simulatePayment('FAILED'));
+
+// ── PayMongo (real GCash) status polling ───────────────────────
+// After the student pays on PayMongo's hosted page, this confirms the
+// payment via the shared api/mock/payment.php check_status action.
+let pollTimer = null;
+
+function fetchPaymentStatus(txnId) {
+    return fetch('../api/mock/payment.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'check_status', transaction_id: txnId })
+    }).then(r => r.json());
+}
+function stopStatusPolling() {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+function startStatusPolling(txnId) {
+    stopStatusPolling();
+    pollTimer = setInterval(function () { pollStatusOnce(txnId); }, 4000);
+}
+function pollStatusOnce(txnId) {
+    return fetchPaymentStatus(txnId).then(function (d) {
+        if (!d.success) {
+            // Session expired → stop polling and send the user to login.
+            if (d.timeout) { stopStatusPolling(); window.location.href = '../login.php?timeout=1'; return; }
+            stopStatusPolling();
+            showToast(d.message || 'Could not check payment status.', 'error');
+            return;
+        }
+        const st = d.data && d.data.status;
+        if (st === 'completed') {
+            stopStatusPolling();
+            showToast('Payment confirmed. Your request is now being processed.', 'success');
+            setTimeout(function () { location.reload(); }, 900);
+        } else if (st === 'failed') {
+            stopStatusPolling();
+            showToast('Payment failed. You can try paying again.', 'error');
+        }
+        // 'pending' → keep polling while the PayMongo tab is open.
+    }).catch(function () { /* transient — keep polling */ });
+}
 
 // ── Row detail toggle ──────────────────────────────────────────
 function toggleDetail(id) {

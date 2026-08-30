@@ -18,6 +18,7 @@ $page_scripts = $page_scripts ?? [];
     <script src="<?= $APP_ROOT ?>js/sidebar.js"></script>
     <script src="<?= $APP_ROOT ?>js/auth.js"></script>
     <script src="<?= $APP_ROOT ?>js/logout.js"></script>
+    <script src="<?= $APP_ROOT ?>js/searchable-select.js"></script>
 
     <!-- Idle session warning (auto logout with grace period) -->
     <script>

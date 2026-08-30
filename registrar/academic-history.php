@@ -60,7 +60,7 @@ include '../includes/sidebar.php';
             <input type="hidden" id="acadId">
             <div class="form-group">
                 <label>Student <span style="color:#dc2626;">*</span></label>
-                <select id="acadStudent" class="form-control" required>
+                <select id="acadStudent" class="form-control" data-searchable required>
                     <option value="">Select a student</option>
                     <?php foreach ($students as $st): ?>
                         <option value="<?= (int)$st['id'] ?>"><?= htmlspecialchars($st['student_number'] . ' — ' . $st['name']) ?></option>

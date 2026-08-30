@@ -123,6 +123,75 @@ if ($__aiKey === '') {
 define('AI_API_KEY', $__aiKey);
 define('AI_CACHE_TTL', 86400); // seconds (1 day)
 
+// ── PayMongo (real GCash payments, sandbox/test mode) ─────────
+// Empty secret key ⇒ the document-request payment gateway stays on
+// the built-in mock (the demo works without any keys). Keys are
+// read from env vars first, then from a git-ignored KEY=VALUE file
+// shared/paymongo_secret.local (see .gitignore *.local rule):
+//   PAYMONGO_SECRET_KEY=sk_test_...
+//   PAYMONGO_PUBLIC_KEY=pk_test_...
+//   PAYMONGO_WEBHOOK_SECRET=whsec_...
+function paymongoSecretFromLocal(string $key): string {
+    static $parsed = null;
+    if ($parsed === null) {
+        $parsed = [];
+        $file = __DIR__ . '/paymongo_secret.local';
+        if (is_file($file)) {
+            $lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            foreach (is_array($lines) ? $lines : [] as $line) {
+                $line = trim($line);
+                if ($line === '' || $line[0] === '#') continue;
+                $pair = array_pad(explode('=', $line, 2), 2, '');
+                $parsed[trim($pair[0])] = trim($pair[1]);
+            }
+        }
+    }
+    return $parsed[$key] ?? '';
+}
+define('PAYMONGO_SECRET_KEY',    getenv('PAYMONGO_SECRET_KEY') ?: paymongoSecretFromLocal('PAYMONGO_SECRET_KEY'));
+define('PAYMONGO_PUBLIC_KEY',    getenv('PAYMONGO_PUBLIC_KEY') ?: paymongoSecretFromLocal('PAYMONGO_PUBLIC_KEY'));
+define('PAYMONGO_WEBHOOK_SECRET',getenv('PAYMONGO_WEBHOOK_SECRET') ?: paymongoSecretFromLocal('PAYMONGO_WEBHOOK_SECRET'));
+define('PAYMONGO_API_BASE', rtrim((string) getenv('PAYMONGO_API_BASE') ?: 'https://api.paymongo.com', '/'));
+
+// ── Email (SMTP) — Gmail App Password transport ────────────────
+// Used by the Emergency & Contacts module (shared/mail_client.php)
+// to deliver verification, invoice, grade-snapshot, transcript and
+// emergency-blast emails. Read from env vars first, then from the
+// git-ignored shared/email_secret.local (KEY=VALUE lines, same layout
+// as paymongo_secret.local):
+//   SMTP_HOST=smtp.gmail.com
+//   SMTP_PORT=587
+//   SMTP_USER=you@gmail.com
+//   SMTP_PASS=xxxx xxxx xxxx xxxx   (Gmail App Password, not the login password)
+//   MAIL_FROM=you@gmail.com
+//   MAIL_FROM_NAME=BCP Registrar System
+// Missing credentials ⇒ EMAIL_CONFIGURED=false and every sender no-ops
+// (the app keeps working, exactly like the PayMongo mock fallback).
+function emailSecretFromLocal(string $key): string {
+    static $parsed = null;
+    if ($parsed === null) {
+        $parsed = [];
+        $file = __DIR__ . '/email_secret.local';
+        if (is_file($file)) {
+            $lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            foreach (is_array($lines) ? $lines : [] as $line) {
+                $line = trim($line);
+                if ($line === '' || $line[0] === '#') continue;
+                $pair = array_pad(explode('=', $line, 2), 2, '');
+                $parsed[trim($pair[0])] = trim($pair[1]);
+            }
+        }
+    }
+    return $parsed[$key] ?? '';
+}
+define('SMTP_HOST',     getenv('SMTP_HOST') ?: emailSecretFromLocal('SMTP_HOST'));
+define('SMTP_PORT',     (int) (getenv('SMTP_PORT') ?: emailSecretFromLocal('SMTP_PORT')) ?: 587);
+define('SMTP_USER',     getenv('SMTP_USER') ?: emailSecretFromLocal('SMTP_USER'));
+define('SMTP_PASS',     getenv('SMTP_PASS') ?: emailSecretFromLocal('SMTP_PASS'));
+define('MAIL_FROM',     getenv('MAIL_FROM') ?: emailSecretFromLocal('MAIL_FROM'));
+define('MAIL_FROM_NAME',getenv('MAIL_FROM_NAME') ?: emailSecretFromLocal('MAIL_FROM_NAME'));
+define('EMAIL_CONFIGURED', SMTP_HOST !== '' && SMTP_USER !== '' && SMTP_PASS !== '');
+
 // Timezone
 date_default_timezone_set('Asia/Manila');
 

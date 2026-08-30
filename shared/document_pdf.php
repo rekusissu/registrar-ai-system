@@ -448,3 +448,313 @@ function documentVerifyUrl(string $qrHash): string
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
     return $scheme . '://' . $host . app_url('verify.php?qr=' . urlencode($qrHash));
 }
+
+/**
+ * Draw the shared BCP letterhead (logo + college name + rule) used by the
+ * invoice and transcript builders. Mirrors the block in buildDocumentPdf.
+ * Caller must have called AddPage() first.
+ */
+function _pdf_draw_letterhead(\TCPDF $pdf): void
+{
+    $logoPng = _pdf_flatten_png_rgba(__DIR__ . '/../assets/images/BCP_LOGO.png', [255, 255, 255]);
+    if ($logoPng !== null) {
+        $pdf->Image('@' . $logoPng, 18, 12, 18, 0, 'PNG');
+    } else {
+        $pdf->SetFillColor(120, 40, 30);
+        $pdf->Rect(18, 12, 18, 18, 'F');
+        $pdf->SetTextColor(255, 255, 255);
+        $pdf->SetFont('helvetica', 'B', 10);
+        $pdf->SetXY(18, 15);
+        $pdf->Cell(18, 12, 'BCP', 0, 0, 'C');
+    }
+    $pdf->SetFont('helvetica', 'B', 10);
+    $pdf->SetTextColor(120, 40, 30);
+    $pdf->SetXY(40, 14);
+    $pdf->Cell(0, 5, 'REPUBLIC OF THE PHILIPPINES', 0, 0, 'L');
+    $pdf->SetFont('helvetica', 'B', 15);
+    $pdf->SetTextColor(20, 20, 40);
+    $pdf->SetXY(40, 19);
+    $pdf->Cell(0, 7, 'BESTLINK COLLEGE OF THE PHILIPPINES', 0, 0, 'L');
+    $pdf->SetFont('helvetica', '', 8.5);
+    $pdf->SetTextColor(90, 90, 100);
+    $pdf->SetXY(40, 26);
+    $pdf->Cell(0, 4, 'Office of the Registrar  |  Quezon City, Philippines  |  registrar@bestlink.edu.ph', 0, 0, 'L');
+
+    $pdf->SetDrawColor(120, 40, 30);
+    $pdf->SetLineWidth(0.6);
+    $pdf->Line(18, 34, 192, 34);
+    $pdf->SetLineWidth(0.2);
+    $pdf->SetDrawColor(200, 200, 205);
+    $pdf->Line(18, 35.2, 192, 35.2);
+}
+
+/**
+ * Student full-name helper for the PDF builders (kept local so this file
+ * does not need shared/functions.php).
+ */
+function _pdf_student_name(array $student): string
+{
+    return trim(($student['first_name'] ?? '') . ' ' . ($student['middle_name'] ?? '') . ' ' . ($student['last_name'] ?? '') . ' ' . ($student['name_suffix'] ?? ''));
+}
+
+/**
+ * Build the invoice PDF for a document request (Emergency & Contacts
+ * module, feature A). Encrypted with the student's ID number as the
+ * PDF password (feature D).
+ *
+ * @param array $request  document_requests row (+ catalog join fields)
+ * @param array $student  students row (must include student_number)
+ * @param array|null $catalog document_catalog row (name/sku/base_fee)
+ * @param float $deliveryFee delivery charge to include on the line
+ *
+ * @return array{bytes: string, filename: string}
+ */
+function buildInvoicePdf(array $request, array $student, ?array $catalog, float $deliveryFee = 0.0): array
+{
+    $pdf = new \TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
+    $pdf->SetCreator('BCP Registrar System');
+    $pdf->SetAuthor('Bestlink College of the Philippines — Office of the Registrar');
+    $pdf->SetTitle('Invoice ' . ($request['request_id'] ?? ''));
+    $pdf->SetSubject('Document fee invoice');
+
+    $pdf->SetPrintHeader(false);
+    $pdf->SetPrintFooter(false);
+
+    // Password = student number, AES-256 (mode 3) — Secure PDF feature.
+    $pass = (string) ($student['student_number'] ?? '');
+    if ($pass !== '') {
+        $pdf->setProtection(['print', 'copy'], $pass, null, 3);
+    }
+
+    $pdf->AddPage();
+    $pdf->SetAutoPageBreak(true, 26);
+    $pdf->SetMargins(18, 16, 18);
+
+    _pdf_draw_letterhead($pdf);
+
+    // ── Invoice header ──────────────────────────────────────────
+    $pdf->Ln(14);
+    $pdf->SetFont('times', 'B', 20);
+    $pdf->SetTextColor(120, 40, 30);
+    $pdf->Cell(0, 10, 'INVOICE', 0, 1, 'C');
+    $pdf->SetFont('helvetica', '', 9);
+    $pdf->SetTextColor(110, 110, 120);
+    $pdf->Cell(0, 5, 'Document Fee — Office of the Registrar', 0, 1, 'C');
+    $pdf->Ln(4);
+
+    // Bill-to block + meta on one row.
+    $fee = (float) ($request['fee_amount'] ?? 0);
+    if ($fee <= 0 && $catalog !== null) {
+        $fee = round((float) ($catalog['base_fee'] ?? 0) * max(1, (int) ($request['quantity'] ?? 1)), 2);
+    }
+    $deliveryFee = max(0.0, $deliveryFee);
+    $total = round($fee + $deliveryFee, 2);
+
+    $meta = [
+        'Invoice No.'   => 'INV-' . ($request['request_id'] ?? '—'),
+        'Request No.'   => (string) ($request['request_id'] ?? '—'),
+        'Date Issued'   => date('F d, Y'),
+        'Status'        => 'AWAITING PAYMENT',
+        'Bill To'       => _pdf_student_name($student),
+        'Student No.'   => (string) ($student['student_number'] ?? '—'),
+    ];
+    $pdf->SetFont('helvetica', 'B', 8.5);
+    $pdf->SetTextColor(80, 90, 110);
+    foreach ($meta as $label => $value) {
+        $y = $pdf->GetY();
+        $pdf->SetX(18);
+        $pdf->Cell(40, 6, strtoupper($label), 0, 0, 'L');
+        $pdf->SetFont('helvetica', '', 10);
+        $pdf->SetTextColor(30, 41, 59);
+        $pdf->Cell(0, 6, $value, 0, 1, 'L');
+        $pdf->SetFont('helvetica', 'B', 8.5);
+        $pdf->SetTextColor(80, 90, 110);
+        $pdf->SetDrawColor(235, 238, 243);
+        $pdf->SetLineWidth(0.15);
+        $pdf->Line(18, $y + 6.3, 192, $y + 6.3);
+    }
+    $pdf->Ln(4);
+
+    // ── Line items table ────────────────────────────────────────
+    $catalogName = (string) ($catalog['name'] ?? ucwords(str_replace('_', ' ', (string) ($request['document_type'] ?? 'Document request'))));
+    $qty = max(1, (int) ($request['quantity'] ?? 1));
+
+    $pdf->SetFillColor(120, 40, 30);
+    $pdf->SetTextColor(255, 255, 255);
+    $pdf->SetFont('helvetica', 'B', 9);
+    $pdf->Cell(96, 8, 'DESCRIPTION', 0, 0, 'L', true);
+    $pdf->Cell(24, 8, 'QTY', 0, 0, 'C', true);
+    $pdf->Cell(36, 8, 'AMOUNT', 0, 0, 'R', true);
+    $pdf->Cell(36, 8, 'TOTAL', 0, 1, 'R', true);
+
+    $pdf->SetFillColor(248, 248, 250);
+    $pdf->SetTextColor(30, 41, 59);
+    $pdf->SetFont('helvetica', '', 9.5);
+    $pdf->Cell(96, 8, $catalogName . ' (Request ' . ($request['request_id'] ?? '') . ')', 0, 0, 'L', true);
+    $pdf->Cell(24, 8, (string) $qty, 0, 0, 'C', true);
+    $pdf->Cell(36, 8, number_format($fee / $qty, 2), 0, 0, 'R', true);
+    $pdf->Cell(36, 8, number_format($fee, 2), 0, 1, 'R', true);
+
+    if ($deliveryFee > 0) {
+        $pdf->SetFont('helvetica', '', 9.5);
+        $pdf->SetTextColor(30, 41, 59);
+        $pdf->Cell(120, 8, 'Delivery fee', 0, 0, 'L', true);
+        $pdf->Cell(36, 8, '', 0, 0, 'R', true);
+        $pdf->Cell(36, 8, number_format($deliveryFee, 2), 0, 1, 'R', true);
+    }
+
+    $pdf->SetDrawColor(203, 213, 225);
+    $pdf->SetLineWidth(0.3);
+    $pdf->Line(18, $pdf->GetY(), 192, $pdf->GetY());
+
+    $pdf->SetFillColor(240, 232, 229);
+    $pdf->SetFont('helvetica', 'B', 10.5);
+    $pdf->SetTextColor(120, 40, 30);
+    $pdf->Cell(156, 10, 'TOTAL DUE', 0, 0, 'R', true);
+    $pdf->Cell(36, 10, 'PHP ' . number_format($total, 2), 0, 1, 'R', true);
+
+    $pdf->Ln(6);
+    $pdf->SetFont('helvetica', '', 9);
+    $pdf->SetTextColor(90, 90, 100);
+    $pdf->MultiCell(0, 5, 'This invoice is payable before the document is released. The document fee is charged per the published Office of the Registrar rate sheet. For payment questions, contact the Office of the Registrar.', 0, 'L');
+
+    $bytes = $pdf->Output('', 'S');
+    $pdf->close();
+
+    $filename = 'INV-' . ($request['request_id'] ?? 'DOC') . '.pdf';
+    $filename = preg_replace('/[^A-Za-z0-9._-]/', '-', $filename);
+
+    return ['bytes' => $bytes, 'filename' => $filename];
+}
+
+/**
+ * Build the transcript-of-records PDF for a student (Emergency & Contacts
+ * module — transcript delivery). Encrypted with the student's ID number.
+ *
+ * @param array $student students row (must include student_number)
+ * @param array $terms   academic_history rows, each with a 'subjects' key
+ *                       (academic_grades rows) — same shape as contactBuildTerms()
+ *
+ * @return array{bytes: string, filename: string}
+ */
+function buildTranscriptPdf(array $student, array $terms): array
+{
+    $pdf = new \TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
+    $pdf->SetCreator('BCP Registrar System');
+    $pdf->SetAuthor('Bestlink College of the Philippines — Office of the Registrar');
+    $pdf->SetTitle('Transcript of Records — ' . _pdf_student_name($student));
+    $pdf->SetSubject('Unofficial transcript snapshot');
+
+    $pdf->SetPrintHeader(false);
+    $pdf->SetPrintFooter(false);
+
+    $pass = (string) ($student['student_number'] ?? '');
+    if ($pass !== '') {
+        $pdf->setProtection(['print', 'copy'], $pass, null, 3);
+    }
+
+    $pdf->AddPage();
+    $pdf->SetAutoPageBreak(true, 26);
+    $pdf->SetMargins(18, 16, 18);
+
+    _pdf_draw_letterhead($pdf);
+
+    $pdf->Ln(14);
+    $pdf->SetFont('times', 'B', 17);
+    $pdf->SetTextColor(20, 20, 40);
+    $pdf->Cell(0, 9, 'TRANSCRIPT OF RECORDS', 0, 1, 'C');
+    $pdf->SetFont('helvetica', '', 9);
+    $pdf->SetTextColor(110, 110, 120);
+    $pdf->Cell(0, 5, 'Unofficial copy · generated ' . date('F d, Y h:i A'), 0, 1, 'C');
+    $pdf->Ln(5);
+
+    // Student record strip.
+    $info = [
+        'Student Name' => _pdf_student_name($student),
+        'Student No.'  => (string) ($student['student_number'] ?? '—'),
+        'Course'       => (string) ($student['course'] ?? '—'),
+        'Year Level'   => $student['year_level'] !== '' && $student['year_level'] !== null ? (string) $student['year_level'] : '—',
+        'Section'      => (string) ($student['section'] ?? '—'),
+    ];
+    $pdf->SetFont('helvetica', 'B', 8.5);
+    $pdf->SetTextColor(80, 90, 110);
+    foreach ($info as $label => $value) {
+        $y = $pdf->GetY();
+        $pdf->SetX(18);
+        $pdf->Cell(34, 6, strtoupper($label), 0, 0, 'L');
+        $pdf->SetFont('helvetica', '', 10);
+        $pdf->SetTextColor(30, 41, 59);
+        $pdf->Cell(0, 6, $value, 0, 1, 'L');
+        $pdf->SetFont('helvetica', 'B', 8.5);
+        $pdf->SetTextColor(80, 90, 110);
+        $pdf->SetDrawColor(235, 238, 243);
+        $pdf->SetLineWidth(0.15);
+        $pdf->Line(18, $y + 6.3, 192, $y + 6.3);
+    }
+    $pdf->Ln(5);
+
+    $colW = [42, 84, 22, 26, 18]; // Code / Subject / Units / Final / Remarks
+    $header = ['CODE', 'SUBJECT', 'UNITS', 'FINAL', 'REMARKS'];
+
+    $pdf->SetFillColor(120, 40, 30);
+    $pdf->SetTextColor(255, 255, 255);
+    $pdf->SetFont('helvetica', 'B', 8);
+    $x0 = 18;
+    $pdf->SetX($x0);
+    foreach ($header as $i => $h) {
+        $pdf->Cell($colW[$i], 7, $h, 0, 0, 'C', true);
+    }
+    $pdf->Ln(7);
+
+    $n = 0;
+    foreach ($terms as $t) {
+        $subjects = $t['subjects'] ?? [];
+        if (count($subjects) === 0) continue;
+        $termLabel = trim(($t['school_name'] ?? '') . ' · ' . ($t['school_year'] ?? '') . ($t['semester'] !== '' && $t['semester'] !== null ? ' · ' . $t['semester'] : ''));
+        $pdf->SetFont('helvetica', 'B', 8.5);
+        $pdf->SetTextColor(120, 40, 30);
+        $pdf->SetFillColor(245, 240, 238);
+        $pdf->SetX($x0);
+        $pdf->Cell($colW[0], 6, '', 0, 0, 'L', true);
+        $pdf->Cell($colW[1], 6, $termLabel, 0, 0, 'L', true);
+        $pdf->Cell($colW[2] + $colW[3] + $colW[4], 6, $t['gwa'] !== '' && $t['gwa'] !== null ? 'GWA ' . $t['gwa'] : '', 0, 1, 'R', true);
+        $pdf->Ln(1);
+
+        $pdf->SetFont('helvetica', '', 8.5);
+        $pdf->SetTextColor(30, 41, 59);
+        $rowFill = false;
+        foreach ($subjects as $s) {
+            $g = trim((string) ($s['final_rating'] !== '' && $s['final_rating'] !== null ? $s['final_rating'] : ($s['grade'] ?? '')));
+            $pdf->SetFillColor(248, 248, 250);
+            $pdf->SetX($x0);
+            $pdf->Cell($colW[0], 6, (string) ($s['subject_code'] ?? ''), 0, 0, 'C', $rowFill);
+            $pdf->Cell($colW[1], 6, (string) ($s['subject'] ?? ''), 0, 0, 'L', $rowFill);
+            $pdf->Cell($colW[2], 6, (string) ($s['units'] ?? ''), 0, 0, 'C', $rowFill);
+            $pdf->Cell($colW[3], 6, $g, 0, 0, 'C', $rowFill);
+            $pdf->Cell($colW[4], 6, (string) ($s['remarks'] ?? ''), 0, 1, 'L', $rowFill);
+            $rowFill = !$rowFill;
+        }
+        $pdf->Ln(3);
+        $n++;
+    }
+
+    if ($n === 0) {
+        $pdf->SetFont('helvetica', '', 9.5);
+        $pdf->SetTextColor(110, 110, 120);
+        $pdf->SetX($x0);
+        $pdf->Cell(0, 8, 'No academic records on file for this student.', 0, 1, 'L');
+    }
+
+    $pdf->Ln(2);
+    $pdf->SetFont('helvetica', '', 8.5);
+    $pdf->SetTextColor(90, 90, 100);
+    $pdf->MultiCell(0, 5, 'This is an unofficial transcript snapshot generated from the current academic records. Official transcripts are issued only by the Office of the Registrar.', 0, 'L');
+
+    $bytes = $pdf->Output('', 'S');
+    $pdf->close();
+
+    $filename = 'TRANSCRIPT-' . ($student['student_number'] ?? 'student') . '.pdf';
+    $filename = preg_replace('/[^A-Za-z0-9._-]/', '-', $filename);
+
+    return ['bytes' => $bytes, 'filename' => $filename];
+}

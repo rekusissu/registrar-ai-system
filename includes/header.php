@@ -66,7 +66,11 @@ $__csrfToken = htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8');
     <!-- Extra CSS for specific pages -->
     <?php if (isset($extra_css)): ?>
         <?php foreach ($extra_css as $css_file): ?>
-            <link rel="stylesheet" href="<?= $APP_ROOT ?>css/<?= $css_file ?>" />
+            <?php
+            $_cssPath = __DIR__ . '/../css/' . $css_file;
+            $_cssVer  = (is_file($_cssPath)) ? '?v=' . filemtime($_cssPath) : '';
+            ?>
+            <link rel="stylesheet" href="<?= $APP_ROOT ?>css/<?= $css_file ?><?= $_cssVer ?>" />
         <?php endforeach; ?>
     <?php endif; ?>
 

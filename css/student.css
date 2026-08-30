@@ -1045,3 +1045,342 @@ body {
 @media (max-width: 480px) {
     .status-strip { grid-template-columns: 1fr; gap: 10px; }
 }
+
+
+/* ── Status strip extra colours ────────────────────── */
+.status-strip .s-icon.red   { background:#fee2e2; color:#dc2626; }
+.status-strip .s-icon.green { background:#dcfce7; color:#16a34a; }
+.status-strip .s-icon.amber { background:#fef3c7; color:#d97706; }
+.status-strip .s-icon.purple{ background:#f3e8ff; color:#7c3aed; }
+
+/* ── Panel header icon line ──────────────────────── */
+.panel-hd-icon-line {
+    display:flex; align-items:center; gap:8px;
+    font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.6px;
+    color:#64748b; margin:0 0 12px;
+}
+.panel-hd-icon-line i { color:#2563eb; font-size:13px; }
+.panel-hd-icon.hd-purple { background:#f3e8ff; color:#7c3aed; }
+.panel-hd-icon.hd-amber  { background:#fef3c7; color:#d97706; }
+
+/* ── Contact rows ──────────────────────────────── */
+.contact-row {
+    display:flex; gap:14px; align-items:flex-start;
+    border:1px solid #e8ecf3; border-radius:14px; padding:14px 16px;
+    background:#fff; box-shadow:0 2px 8px rgba(15,23,42,.05);
+    transition:all .2s cubic-bezier(.16,1,.3,1);
+}
+.contact-row:hover { transform:translateY(-2px); box-shadow:0 8px 20px rgba(26,58,140,.1); border-color:#d4dce6; }
+.contact-avatar {
+    width:42px; height:42px; border-radius:12px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; font-size:17px;
+}
+.contact-avatar.green  { background:#dcfce7; color:#15803d; }
+.contact-avatar.amber  { background:#fef3c7; color:#b45309; }
+.contact-avatar.blue   { background:#eef4ff; color:#2563eb; }
+.contact-avatar.purple { background:#f3e8ff; color:#7c3aed; }
+.contact-main { flex:1; min-width:0; }
+.contact-name { font-weight:800; color:#0d1b2e; font-size:14.5px; letter-spacing:-.2px; }
+.contact-sub  { font-size:12px; color:#64748b; margin-top:2px; line-height:1.5; }
+.contact-perms { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:8px; }
+.contact-perms .perm-pill {
+    display:inline-flex; align-items:center; gap:4px;
+    font-size:10.5px; font-weight:700; padding:3px 9px;
+    border-radius:999px; letter-spacing:.3px; text-transform:uppercase;
+    background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0;
+}
+.contact-perms .perm-pill.on {
+    background:linear-gradient(135deg,#2563eb,#1d4ed8); border-color:transparent; color:#fff;
+    box-shadow:0 3px 10px rgba(37,99,235,.28);
+}
+.contact-perms .perm-pill.on i { color:inherit; }
+.contact-perms .perm-pill.static { cursor:default; }
+.perm-note { font-size:11px; color:#94a3b8; font-style:italic; margin-top:4px; }
+.muted-sep { height:1px; background:#f1f5f9; margin:12px 0; }
+
+/* ── Change request rows ───────────────────────── */
+.req-list { display:flex; flex-direction:column; gap:12px; }
+.req-row {
+    display:flex; gap:14px; align-items:flex-start;
+    border:1px solid #e8ecf3; border-radius:14px; padding:14px 16px;
+    background:#fff; box-shadow:0 2px 8px rgba(15,23,42,.05);
+    transition:all .2s cubic-bezier(.16,1,.3,1);
+}
+.req-row:hover { transform:translateY(-2px); box-shadow:0 8px 20px rgba(26,58,140,.1); border-color:#d4dce6; }
+.req-ico {
+    width:38px; height:38px; border-radius:11px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; font-size:15px;
+}
+.req-ico.green  { background:#dcfce7; color:#15803d; }
+.req-ico.red    { background:#fee2e2; color:#dc2626; }
+.req-ico.amber  { background:#fef3c7; color:#d97706; }
+.req-main { flex:1; min-width:0; }
+.req-top { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+.req-summary { font-weight:800; color:#0d1b2e; font-size:14px; letter-spacing:-.2px; }
+.req-date { font-size:11.5px; color:#94a3b8; font-weight:600; flex-shrink:0; }
+.req-chips { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:8px; }
+.req-status {
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:11px; font-weight:800; padding:4px 10px; border-radius:999px; letter-spacing:.3px; text-transform:uppercase;
+}
+.req-status.green { background:#dcfce7; color:#15803d; }
+.req-status.red   { background:#fee2e2; color:#dc2626; }
+.req-status.amber { background:#fef3c7; color:#b45309; }
+.req-reason {
+    margin-top:10px; font-size:12.5px; color:#334155; background:#f8fafc;
+    border-left:3px solid #cbd5e1; border-radius:6px; padding:7px 11px;
+    display:flex; gap:8px; align-items:flex-start;
+}
+.req-reason i { color:#94a3b8; margin-top:2px; }
+.req-note {
+    margin-top:8px; font-size:12.5px; color:#92400e; background:#fffbeb;
+    border:1px solid #fde68a; border-radius:8px; padding:7px 11px;
+    display:flex; gap:8px; align-items:flex-start;
+}
+.req-note i { color:#d97706; margin-top:2px; }
+
+/* ── Request modal ─────────────────────────────── */
+#reqModal .modal-content.rq-modal {
+    max-width:560px; padding:0; border-radius:22px; overflow:hidden;
+    display:flex; flex-direction:column; max-height:90vh;
+}
+/* The <form> sits between .modal-content and the body/footer — it must
+   participate in the flex column (and be allowed to shrink) or the
+   body never gets a bounded height and the modal can't scroll. */
+#reqModal .rq-modal > form {
+    display:flex; flex-direction:column;
+    flex:1 1 auto; min-height:0; overflow:hidden; margin:0;
+}
+#reqModal .rq-modal-header {
+    display:flex; align-items:center; justify-content:space-between; gap:14px;
+    padding:22px 26px; margin:0; flex-shrink:0;
+    background:linear-gradient(135deg,#1a3a8c 0%,#2563eb 100%);
+}
+#reqModal .rq-head-left { display:flex; align-items:center; gap:14px; min-width:0; }
+#reqModal .rq-head-icon {
+    width:48px; height:48px; border-radius:14px; flex-shrink:0;
+    background:rgba(255,255,255,.18); color:#fff; font-size:20px;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 6px 16px rgba(15,23,42,.18);
+}
+#reqModal .rq-modal-header h2 { color:#fff; font-size:19px; margin:0; letter-spacing:.2px; }
+#reqModal .rq-head-sub { margin:3px 0 0; color:rgba(255,255,255,.82); font-size:13px; }
+#reqModal .modal-close { background:rgba(255,255,255,.15); color:#fff; }
+#reqModal .modal-close:hover { background:rgba(255,255,255,.3); color:#fff; }
+#reqModal .rq-body {
+    flex:1 1 auto; overflow-y:auto; min-height:0;
+    padding:24px 26px 6px; overscroll-behavior:contain;
+}
+#reqModal .rq-body::-webkit-scrollbar { width:8px; }
+#reqModal .rq-body::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:999px; }
+#reqModal .modal-footer { padding:16px 26px 22px; border-top:1px solid #f1f5f9; flex-shrink:0; }
+#reqModal .form-row { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+#reqModal .form-group { margin-bottom:18px; }
+#reqModal .form-group label { margin-bottom:8px; }
+#reqModal .form-group label .optional { font-weight:500; color:#94a3b8; }
+#reqModal .field-wrap { position:relative; }
+#reqModal .field-wrap > i {
+    position:absolute; left:14px; top:50%; transform:translateY(-50%);
+    color:#94a3b8; font-size:15px; pointer-events:none; z-index:1;
+}
+#reqModal .field-wrap input,
+#reqModal .field-wrap select,
+#reqModal .field-wrap textarea {
+    width:100%; box-sizing:border-box;
+    border:1.5px solid #e2e8f0; border-radius:12px; background:#fbfcfe;
+    font-size:14px; font-family:inherit; color:#1e293b; outline:none; transition:all .18s ease;
+}
+#reqModal .field-wrap input  { height:46px; padding:0 14px 0 40px; }
+#reqModal .field-wrap select { height:46px; padding:0 14px 0 40px; }
+#reqModal .field-wrap textarea { padding:11px 14px 11px 40px; resize:vertical; line-height:1.5; }
+#reqModal .field-wrap input::placeholder,
+#reqModal .field-wrap textarea::placeholder { color:#a3b0c2; }
+#reqModal .field-wrap input:hover,
+#reqModal .field-wrap select:hover,
+#reqModal .field-wrap textarea:hover { border-color:#cbd5e1; }
+#reqModal .field-wrap input:focus,
+#reqModal .field-wrap select:focus,
+#reqModal .field-wrap textarea:focus { border-color:#2563eb; background:#fff; box-shadow:0 0 0 4px rgba(37,99,235,.12); }
+#reqModal .rq-field-hd {
+    font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.6px;
+    color:#64748b; margin:4px 0 10px; display:flex; align-items:center; gap:8px;
+}
+#reqModal .rq-field-hd i { color:#2563eb; font-size:12px; }
+#reqModal .rq-toggle {
+    position:relative; display:flex; align-items:center; gap:12px; cursor:pointer;
+    padding:11px 14px; border:1.5px solid #e2e8f0; border-radius:14px; margin-bottom:10px;
+    background:#fbfcfe; transition:all .16s ease;
+}
+#reqModal .rq-toggle:hover { border-color:#cbd5e1; background:#fff; }
+#reqModal .rq-toggle.active { border-color:#2563eb; background:#eff6ff; box-shadow:0 0 0 3px rgba(37,99,235,.08); }
+#reqModal .rq-toggle .rq-toggle-ico {
+    width:38px; height:38px; border-radius:11px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; font-size:16px;
+}
+#reqModal .rq-toggle .rq-toggle-txt { flex:1; min-width:0; }
+#reqModal .rq-toggle .rq-toggle-txt b { display:block; font-size:13.5px; color:#1e293b; }
+#reqModal .rq-toggle .rq-toggle-txt > span { font-size:12px; color:#64748b; }
+#reqModal .rq-toggle input { position:absolute; opacity:0; pointer-events:none; width:1px; height:1px; }
+#reqModal .rq-toggle .switch {
+    width:44px; height:25px; border-radius:999px; background:#cbd5e1; position:relative; flex-shrink:0;
+    transition:background .2s ease; box-shadow:inset 0 1px 3px rgba(15,23,42,.15);
+}
+#reqModal .rq-toggle .switch::after {
+    content:''; position:absolute; top:3px; left:3px; width:19px; height:19px; border-radius:50%;
+    background:#fff; box-shadow:0 2px 4px rgba(15,23,42,.25); transition:transform .2s ease;
+}
+#reqModal .rq-toggle.active .switch { background:#2563eb; }
+#reqModal .rq-toggle.active .switch::after { transform:translateX(19px); }
+#reqModal .rq-note {
+    display:flex; align-items:flex-start; gap:8px;
+    margin:6px 0 4px; padding:11px 12px; border-radius:10px;
+    background:#f8fafc; border:1px dashed #cbd5e1; color:#64748b; font-size:12px; line-height:1.5;
+}
+#reqModal .rq-note i { color:#2563eb; margin-top:1px; }
+#reqModal .rq-save {
+    background:linear-gradient(135deg,#2563eb,#1d4ed8); border:none; color:#fff;
+    box-shadow:0 8px 18px rgba(37,99,235,.35); transition:transform .15s ease, box-shadow .15s ease;
+}
+#reqModal .rq-save:hover { transform:translateY(-1px); box-shadow:0 12px 24px rgba(37,99,235,.4); }
+
+@media (max-width:520px) {
+    #reqModal .form-row { grid-template-columns:1fr; gap:0; }
+    #reqModal .rq-body { padding:20px 18px 4px; }
+    #reqModal .modal-footer { padding:14px 18px 18px; }
+}
+
+/* ── Queue cancel button ──────────────────────── */
+.btn-danger-text {
+    color: #dc2626 !important;
+    border-color: #fecaca !important;
+    background: #fef2f2 !important;
+}
+.btn-danger-text:hover {
+    background: #fee2e2 !important;
+    color: #b91c1c !important;
+}
+
+/* ── Chat widget is fully self-contained in its own <style>; ─
+     no tokens needed here. ────────────────────────────────── */
+@media (max-width: 480px) {
+    .status-strip { grid-template-columns: 1fr; gap: 10px; }
+}
+
+/* ============================================================
+   EMERGENCY & CONTACTS (student/contacts.php)
+   Registrar-portal-aligned: stats, table, change-request feed,
+   and the "Request a Change" modal enhancements.
+   ============================================================ */
+
+/* ── Overview stat cards (gdn-*) ─────────────────────────── */
+.gdn-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-bottom:26px;}
+.gdn-card{background:#fff;border:1px solid #e8ecf3;border-radius:16px;padding:18px 20px;display:flex;align-items:center;gap:14px;box-shadow:0 2px 8px rgba(15,23,42,.05);transition:all .25s cubic-bezier(.16,1,.3,1);}
+.gdn-card:hover{transform:translateY(-2px);box-shadow:0 10px 24px rgba(26,58,140,.12);border-color:#d4dce6;}
+.gdn-ico{width:46px;height:46px;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:19px;}
+.gdn-ico.gdn-teal{background:#ccfbf1;color:#0f766e;}
+.gdn-ico.gdn-purple{background:#f3e8ff;color:#7c3aed;}
+.gdn-ico.gdn-blue{background:#eef4ff;color:#2563eb;}
+.gdn-ico.gdn-amber{background:#fef3c7;color:#b45309;}
+.gdn-val{font-size:24px;font-weight:800;color:#0f172a;line-height:1.05;}
+.gdn-lbl{font-size:12px;color:#64748b;font-weight:600;margin-top:2px;}
+.gdn-panel{background:#fff;border:1px solid #e8ecf3;border-radius:16px;box-shadow:0 2px 8px rgba(15,23,42,.05);overflow:hidden;}
+.gdn-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:16px 20px;border-bottom:1px solid #eef2f7;background:#fbfcfe;}
+.gdn-toolbar-title{display:inline-flex;align-items:center;gap:8px;font-size:15px;font-weight:800;color:#0d1b2e;}
+.gdn-toolbar-title i{color:#2563eb;}
+.gdn-toolbar-sub{font-size:12px;color:#94a3b8;}
+.gdn-pill{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 7px;border-radius:999px;font-size:11px;font-weight:800;color:#2563eb;background:#eef4ff;}
+.gdn-pill.amber{color:#b45309;background:#fef3c7;}
+@media (max-width:1024px){.gdn-stats{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:520px){.gdn-stats{grid-template-columns:1fr;}}
+
+/* ── Organized contacts table (ct-*) ────────────────────── */
+.ct-table{width:100%;border-collapse:collapse;background:#fff;margin:0;}
+.ct-table th{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#64748b;background:#fbfcfe;padding:13px 18px;text-align:left;border-bottom:1px solid #eef2f7;font-weight:800;}
+.ct-table td{padding:16px 18px;border-top:1px solid #eef2f7;color:#334155;font-size:13px;vertical-align:middle;}
+.ct-table tbody tr{transition:background .15s ease;}
+.ct-table tbody tr:hover{background:#f8fafc;}
+.ct-type{display:inline-flex;align-items:center;gap:7px;font-weight:800;font-size:12px;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;}
+.ct-type i{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:13px;}
+.ct-type.guardian i{background:#dcfce7;color:#15803d;}
+.ct-type.emergency i{background:#fee2e2;color:#dc2626;}
+.ct-type.email i{background:#eef4ff;color:#2563eb;}
+.ct-who{display:flex;align-items:center;gap:12px;min-width:190px;}
+.ct-avatar{width:40px;height:40px;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;background:#f1f5f9;color:#475569;}
+.ct-avatar.guardian{background:#dcfce7;color:#15803d;}
+.ct-avatar.emergency{background:#fee2e2;color:#dc2626;}
+.ct-avatar.email{background:#eef4ff;color:#2563eb;}
+.ct-name{font-weight:800;color:#0f172a;font-size:14px;}
+.ct-rel{font-size:12px;color:#64748b;margin-top:2px;}
+.ct-details{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;min-width:220px;}
+.ct-details li{display:flex;align-items:center;gap:9px;font-size:13px;color:#334155;}
+.ct-details li i{width:16px;color:#94a3b8;font-size:12px;flex-shrink:0;}
+.ct-details .ct-empty{font-style:italic;color:#94a3b8;}
+.ct-tags{display:flex;flex-wrap:wrap;gap:6px;min-width:200px;}
+.ct-tag{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px;letter-spacing:.2px;white-space:nowrap;}
+.ct-tag.t-green{background:#dcfce7;color:#15803d;}
+.ct-tag.t-red{background:#fee2e2;color:#dc2626;}
+.ct-tag.t-blue{background:#eef4ff;color:#2563eb;}
+.ct-tag.t-amber{background:#fef3c7;color:#b45309;}
+.ct-tag.t-purple{background:#f3e8ff;color:#7c3aed;}
+.ct-tag.t-gray{background:#f1f5f9;color:#64748b;}
+.std-foot{display:flex;align-items:center;gap:10px;padding:14px 20px;background:#fff8e6;border-top:1px solid #fdeac1;font-size:12.5px;color:#92400e;}
+.std-foot i{color:#d97706;}
+@media (max-width:720px){
+    .ct-table thead{display:none;}
+    .ct-table,.ct-table tbody,.ct-table tr,.ct-table td{display:block;width:100%;}
+    .ct-table tr{border-bottom:2px solid #eef2f7;padding:6px;}
+    .ct-table td{border:none;padding:8px 12px;}
+}
+/* ── Change-request feed (ap-*) ─────────────────────────── */
+.ap-row{border:1px solid #eef2f7;border-radius:14px;padding:16px 18px;margin:14px 20px;background:#fff;transition:all .2s cubic-bezier(.16,1,.3,1);}
+.ap-row:hover{border-color:#d4dce6;box-shadow:0 8px 20px rgba(26,58,140,.08);}
+.ap-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.ap-time{margin-left:auto;font-size:11.5px;color:#94a3b8;font-weight:600;}
+.ap-summary{font-weight:800;color:#0d1b2e;font-size:14px;margin-top:10px;letter-spacing:-.2px;}
+.ap-why{margin-top:10px;font-size:12.5px;color:#334155;background:#f8fafc;border-left:3px solid #cbd5e1;border-radius:6px;padding:7px 11px;display:flex;gap:8px;align-items:flex-start;}
+.ap-why i{color:#94a3b8;margin-top:2px;}
+.ap-office{background:#eff6ff;border-left-color:#2563eb;color:#1e3a8a;}
+.ap-office i{color:#2563eb;}
+.ap-status{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:999px;letter-spacing:.3px;text-transform:uppercase;}
+.ap-status.green{background:#dcfce7;color:#15803d;}
+.ap-status.red{background:#fee2e2;color:#dc2626;}
+.ap-status.amber{background:#fef3c7;color:#b45309;}
+@media (max-width:520px){.ap-row{margin:12px;}}
+.contacts-footnote{display:flex;gap:10px;align-items:flex-start;margin-top:22px;padding:14px 16px;background:#fffbeb;border:1px solid #fde68a;border-radius:12px;font-size:12.5px;color:#92400e;line-height:1.6;}
+.contacts-footnote i{color:#d97706;margin-top:2px;}
+/* ── Request a Change modal — enhancements ─────────────── */
+#reqModal .rq-modal-header{position:relative;background:linear-gradient(135deg,#1a3a8c 0%,#2563eb 60%,#3b82f6 100%);}
+#reqModal .rq-modal-header::after{content:'';position:absolute;right:-40px;top:-40px;width:160px;height:160px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.16) 0%,transparent 70%);pointer-events:none;z-index:0;}
+#reqModal .rq-modal-header .rq-head-left{position:relative;z-index:1;}
+#reqModal .rq-modal-header .modal-close{position:relative;z-index:1;}
+#reqModal .rq-eyebrow{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:#bfdbfe;margin-bottom:4px;}
+#reqModal .rq-eyebrow i{font-size:11px;color:#93c5fd;}
+#reqModal .rq-modal-header .rq-head-icon{background:linear-gradient(135deg,rgba(255,255,255,.30),rgba(255,255,255,.10));border:1px solid rgba(255,255,255,.28);}
+#reqModal .rq-intro{display:flex;align-items:flex-start;gap:10px;padding:13px 14px;border-radius:12px;background:linear-gradient(135deg,#eff6ff,#f8fafc);border:1px solid #dbeafe;margin-bottom:16px;font-size:12.5px;color:#334155;line-height:1.55;}
+#reqModal .rq-intro i{margin-top:2px;color:#2563eb;}
+#reqModal .rq-intro b{color:#1e40af;}
+#reqModal .rq-card{border:1px solid #eef2f7;border-radius:16px;background:#fbfcfe;padding:15px 16px;margin-bottom:18px;}
+#reqModal .rq-card-hd{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.5px;color:#64748b;margin-bottom:8px;}
+#reqModal .rq-card-hd i{color:#2563eb;font-size:12px;}
+#reqModal .rq-card .form-group{margin-bottom:14px;}
+#reqModal .rq-card .form-group:last-child{margin-bottom:0;}
+#reqModal .rq-card label{display:block;font-size:12px;font-weight:700;color:#334155;margin:10px 0 7px;}
+#reqModal .rq-card .rq-field-hd{margin-top:4px;}
+#reqModal .rq-save{display:inline-flex;align-items:center;gap:8px;padding:11px 22px;}
+#reqModal .rq-cancel{display:inline-flex;align-items:center;gap:8px;padding:11px 20px;background:#fff;color:#64748b;border:1px solid #e2e8f0;border-radius:10px;font-weight:700;}
+#reqModal .rq-cancel:hover{background:#f8fafc;color:#1e293b;}
+#reqModal .rq-footer-hint{display:flex;align-items:center;gap:8px;font-size:11.5px;color:#64748b;margin:0 0 2px;}
+#reqModal .rq-footer-hint i{color:#16a34a;}
+@media (max-width:520px){
+    #reqModal .rq-intro{padding:11px 12px;}
+    #reqModal .rq-card{padding:13px 14px;}
+}
+/* ── Request modal — reliable scrolling ──────────────── */
+#reqModal{
+    align-items: flex-start;      /* never clip the top when content is tall */
+    overflow-y: auto;
+    padding: 24px;
+}
+#reqModal .modal-content.rq-modal{
+    margin: auto;                 /* center when it fits, scroll when it doesn't */
+}

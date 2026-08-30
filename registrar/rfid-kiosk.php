@@ -288,56 +288,7 @@ body {
         .then(function(r){return r.json();}).then(function(d){show(d.success,d);}).catch(function(){show(false,{message:'Network error'});});
     });
 
-    // Station modal
-    var authCapture=document.getElementById('authCapture'), confirmBtn=document.getElementById('confirmBtn'),
-        authSuccess=document.getElementById('authSuccess'), authName=document.getElementById('authName'),
-        tapBtn=document.getElementById('tapAuthorizeBtn'), tapBtnText=document.getElementById('tapBtnText');
-    var authOk=false, listening=false;
-
-    window.openStationModal=function(){
-        document.getElementById('stationModal').classList.add('active');
-        authOk=false;listening=false;authSuccess.style.display='none';confirmBtn.disabled=true;
-        tapBtn.className='tap-target';tapBtnText.textContent='Tap to authorize';
-    };
-    window.closeStationModal=function(){
-        document.getElementById('stationModal').classList.remove('active');
-        authCapture.value='';inp.focus();
-    };
-
-    window.startListening=function(){
-        if(listening)return;
-        listening=true;tapBtn.className='tap-target listening';tapBtnText.textContent='Tap card now...';
-        authCapture.value='';authCapture.focus();
-        authSuccess.style.display='none';confirmBtn.disabled=true;authOk=false;
-        // Stop listening after 15 seconds
-        setTimeout(function(){if(listening){listening=false;tapBtn.className='tap-target';tapBtnText.textContent='Tap to authorize';}},15000);
-    };
-
-    authCapture.addEventListener('input',function(){
-        this.value=this.value.replace(/[^0-9]/g,'').slice(0,10);
-        if(this.value.trim().length!==10)return;
-        listening=false;
-        fetch('../api/check-authorized-card.php',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({card_uid:this.value.trim()})})
-        .then(function(r){return r.json();}).then(function(d){
-            if(d.authorized){
-                authOk=true;tapBtn.className='tap-target success';
-                tapBtnText.textContent='✓ Authorized';authSuccess.style.display='block';authName.textContent=d.name;confirmBtn.disabled=false;
-            }else{
-                tapBtn.className='tap-target denied';tapBtn.style.borderColor='#fca5a5';tapBtn.style.background='#fee2e2';tapBtn.style.color='#dc2626';
-                tapBtnText.textContent='✗ Access Denied';
-                setTimeout(function(){tapBtn.className='tap-target';tapBtn.style.borderColor='';tapBtn.style.background='';tapBtn.style.color='';tapBtnText.textContent='Tap to authorize';},2500);
-            }
-        }).catch(function(){tapBtn.className='tap-target';tapBtnText.textContent='Error — try again';});
-    });
-
-    window.confirmStation=function(){
-        if(!authOk)return;
-        var sel=document.getElementById('readerSelect');
-        if(!sel.value){alert('Select a station.');return;}
-        document.cookie='kiosk_reader_id='+sel.value+';path=/;max-age='+(30*24*60*60);
-        location.reload();
-    };
-})();
+    // Station modal functionality removed - kiosk now directly scans cards to api/rfid-scan.php
 </script>
 </body>
 </html>

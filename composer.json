@@ -18,6 +18,7 @@
         "ext-pdo": "*",
         "chillerlan/php-qrcode": "^5.0",
         "chillerlan/php-settings-container": "^2.1.6",
+        "phpmailer/phpmailer": "^7.1",
         "tecnickcom/tcpdf": "^6.11"
     },
     "require-dev": {

@@ -96,6 +96,11 @@ if ($USER_ROLE === 'student') {
             <span class="sidebar-text">Health Records</span>
         </a>
 
+        <a href="<?= $APP_ROOT ?>student/contacts.php" class="sidebar-item <?= $ACTIVE_NAV === 'student_contacts' ? 'active' : '' ?>">
+            <i class="fa-solid fa-people-roof"></i>
+            <span class="sidebar-text">Emergency &amp; Contacts</span>
+        </a>
+
         <div class="sidebar-divider"></div>
 
         <div class="sidebar-brand">
@@ -215,6 +220,11 @@ if ($USER_ROLE === 'student') {
         <a href="<?= $APP_ROOT ?>registrar/academic-history.php" class="sidebar-item <?= $ACTIVE_NAV === 'academic' ? 'active' : '' ?>">
             <i class="fa-solid fa-school"></i>
             <span class="sidebar-text">Academic History</span>
+        </a>
+
+        <a href="<?= $APP_ROOT ?>registrar/communication-log.php" class="sidebar-item <?= $ACTIVE_NAV === 'commlog' ? 'active' : '' ?>">
+            <i class="fa-solid fa-envelope-open-text"></i>
+            <span class="sidebar-text">Communication Log</span>
         </a>
 
         <div class="sidebar-divider"></div>

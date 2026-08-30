@@ -263,6 +263,18 @@ try {
     logActivity($_SESSION['user_id'], 'document_request_submit', null, 'document_requests', $id,
         null, ['request_id' => $requestId, 'catalog_id' => $catalogId, 'fee' => $fee, 'document_status' => $status]);
 
+    // ── Emergency & Contacts: auto-forward the invoice to verified
+    //    billing contacts when the request awaits payment. A mail
+    //    failure must never break the submission response.
+    if ($status === 'Awaiting_Payment') {
+        try {
+            require_once __DIR__ . '/../shared/mail_client.php';
+            contactAutoForwardInvoice((int) $id, (int) $studentId);
+        } catch (Throwable $e) {
+            error_log('auto-invoice-forward: ' . get_class($e) . ': ' . $e->getMessage());
+        }
+    }
+
     echo json_encode([
         'success' => true,
         'message' => $status === 'Pending_Clearance'
