@@ -1,0 +1,242 @@
+/* ============================================================
+   CSS/DOCUMENTS.CSS
+   Document Request Module v2 — status pills, catalog cards,
+   workflow timeline, block banner, payment modal, delivery card.
+   Loaded only on the two documents pages ($extra_css).
+   ============================================================ */
+
+/* ── Status pills (document_status vocabulary) ────────────────── */
+.pill.pending-clearance { background: #fee2e2; color: #dc2626; }
+.pill.awaiting-payment  { background: #fef3c7; color: #b45309; }
+.pill.processing        { background: #dbeafe; color: #2563eb; }
+.pill.ready             { background: #dcfce7; color: #16a34a; }
+.pill.shipped           { background: #ede9fe; color: #6d28d9; }
+.pill.claimed           { background: #ccfbf1; color: #0f766e; }
+.pill.rejected          { background: #fef2f2; color: #dc2626; }
+
+/* Request type / fulfillment chips */
+.chip.express  { background: #dbeafe; color: #1d4ed8; }
+.chip.regular  { background: #f1f5f9; color: #475569; }
+.chip.digital  { background: #e0f2fe; color: #0369a1; }
+.chip.courier  { background: #ede9fe; color: #6d28d9; }
+.chip.pickup   { background: #dcfce7; color: #15803d; }
+
+/* ── Block notification banner ────────────────────────────────── */
+.block-banner {
+    display: flex; align-items: flex-start; gap: 12px;
+    background: linear-gradient(135deg, #fee2e2, #fef2f2);
+    border: 1px solid #fecaca;
+    border-left: 4px solid #dc2626;
+    border-radius: 12px;
+    padding: 14px 18px;
+    margin-bottom: 20px;
+}
+.block-banner .banner-icon {
+    flex: 0 0 auto; width: 38px; height: 38px; border-radius: 50%;
+    background: #dc2626; color: #fff; display: flex; align-items: center;
+    justify-content: center; font-size: 16px;
+}
+.block-banner .banner-title { font-weight: 700; color: #991b1b; font-size: 14px; }
+.block-banner .banner-text  { color: #b91c1c; font-size: 13px; margin-top: 2px; line-height: 1.5; }
+
+/* ── Catalog pricing cards ────────────────────────────────────── */
+.catalog-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 14px; margin-top: 4px;
+}
+.catalog-card {
+    position: relative; background: #fff; border: 1px solid #e2e8f0;
+    border-radius: 14px; padding: 16px 16px 14px; cursor: pointer;
+    transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+    display: flex; flex-direction: column;
+}
+.catalog-card:hover {
+    border-color: #2563eb; box-shadow: 0 6px 18px rgba(37, 99, 235, .10);
+    transform: translateY(-2px);
+}
+.catalog-card .cat-top { display: flex; align-items: flex-start; gap: 10px; }
+.catalog-card .cat-icon {
+    flex: 0 0 auto; width: 42px; height: 42px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px; color: #fff;
+}
+.catalog-card .cat-sku {
+    font-size: 10px; font-weight: 700; letter-spacing: .06em;
+    color: #94a3b8; text-transform: uppercase;
+}
+.catalog-card .cat-name { font-weight: 700; color: #1e293b; font-size: 14px; line-height: 1.25; }
+.catalog-card .cat-desc { color: #64748b; font-size: 12px; margin-top: 6px; line-height: 1.45; flex: 1 1 auto; }
+.catalog-card .cat-meta { margin-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.catalog-card .cat-fee { font-weight: 800; color: #0f172a; font-size: 15px; }
+.catalog-card .cat-fee small { display: block; font-weight: 500; color: #94a3b8; font-size: 10.5px; }
+.catalog-card .cat-req {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; color: #b45309; background: #fef3c7;
+    border-radius: 99px; padding: 3px 9px; margin-top: 10px; width: fit-content;
+}
+.catalog-card .cat-clear {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; color: #b91c1c; background: #fee2e2;
+    border-radius: 99px; padding: 3px 9px; margin-top: 6px; width: fit-content;
+}
+
+/* ── Workflow stepper (per-row expanded view) ─────────────────── */
+.flow-track { display: flex; align-items: center; gap: 0; flex-wrap: wrap; margin: 10px 0 2px; }
+.flow-step { display: flex; align-items: center; gap: 8px; }
+.flow-step .step-dot {
+    width: 26px; height: 26px; border-radius: 50%; flex: 0 0 auto;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; background: #f1f5f9; color: #94a3b8; border: 1px solid #e2e8f0;
+}
+.flow-step.done .step-dot { background: #16a34a; color: #fff; border-color: #16a34a; }
+.flow-step.active .step-dot { background: #2563eb; color: #fff; border-color: #2563eb; box-shadow: 0 0 0 4px rgba(37, 99, 235, .15); }
+.flow-step .step-label { font-size: 11px; color: #64748b; white-space: nowrap; }
+.flow-step.done .step-label, .flow-step.active .step-label { color: #1e293b; font-weight: 600; }
+.flow-link { width: 26px; height: 2px; background: #e2e8f0; margin: 0 6px; }
+.flow-step.done + .flow-link { background: #16a34a; }
+
+/* ── Event timeline ───────────────────────────────────────────── */
+.timeline { list-style: none; margin: 4px 0 0; padding: 0; }
+.timeline li { position: relative; padding: 0 0 16px 26px; }
+.timeline li::before {
+    content: ""; position: absolute; left: 7px; top: 18px; bottom: -2px;
+    width: 2px; background: #e2e8f0;
+}
+.timeline li:last-child::before { display: none; }
+.timeline li .tl-dot {
+    position: absolute; left: 2px; top: 3px; width: 12px; height: 12px;
+    border-radius: 50%; background: #2563eb; border: 3px solid #dbeafe;
+}
+.timeline li .tl-status { font-weight: 700; color: #1e293b; font-size: 12.5px; }
+.timeline li .tl-note { color: #64748b; font-size: 12px; margin-top: 1px; }
+.timeline li .tl-when { color: #94a3b8; font-size: 11px; margin-top: 2px; }
+
+/* ── Delivery card ────────────────────────────────────────────── */
+.delivery-card {
+    background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 12px;
+    padding: 12px 14px; margin-top: 10px; display: flex; gap: 12px; align-items: center;
+}
+.delivery-card .dl-icon {
+    width: 38px; height: 38px; border-radius: 10px; flex: 0 0 auto;
+    background: #ede9fe; color: #6d28d9; display: flex; align-items: center;
+    justify-content: center; font-size: 16px;
+}
+.delivery-card .dl-line { font-size: 12.5px; color: #334155; line-height: 1.5; }
+.delivery-card .dl-line b { color: #1e293b; }
+
+/* ── Payment / gateway modal ──────────────────────────────────── */
+.pay-gateway {
+    background: linear-gradient(135deg, #1e3a8a, #2563eb);
+    border-radius: 14px; color: #fff; padding: 18px; margin: 4px 0 14px;
+}
+.pay-gateway .pay-brand { font-size: 12px; opacity: .85; letter-spacing: .02em; }
+.pay-gateway .pay-amount { font-size: 26px; font-weight: 800; margin-top: 4px; }
+.pay-gateway .pay-row { display: flex; justify-content: space-between; font-size: 12.5px; margin-top: 8px; opacity: .92; }
+.pay-gateway .pay-row b { font-weight: 700; }
+.gateway-chip {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 11px;
+    background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe;
+    border-radius: 99px; padding: 4px 10px;
+}
+.simulate-actions { display: flex; gap: 10px; margin-top: 4px; }
+
+/* ── Download PDF button on list rows ─────────────────────────── */
+.btn-download { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+.btn-download:hover { background: #bbf7d0; }
+
+/* Catalog picker inside the request modal */
+.catalog-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.catalog-option {
+    border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 10px 12px;
+    cursor: pointer; display: flex; flex-direction: column; gap: 2px;
+    transition: border-color .12s ease, background .12s ease;
+}
+.catalog-option:hover { border-color: #93c5fd; }
+.catalog-option.sel { border-color: #2563eb; background: #eff6ff; }
+.catalog-option .co-name { font-weight: 700; color: #1e293b; font-size: 12.5px; }
+.catalog-option .co-fee { color: #64748b; font-size: 11.5px; }
+
+/* Fee preview box in the modal */
+.fee-preview {
+    display: flex; align-items: baseline; justify-content: space-between;
+    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 10px 14px; margin-top: 4px;
+}
+.fee-preview .fp-label { font-size: 12px; color: #64748b; }
+.fee-preview .fp-amount { font-size: 20px; font-weight: 800; color: #0f172a; }
+
+/* Requirement upload hint */
+.req-hint { font-size: 12px; color: #b45309; background: #fffbeb; border: 1px dashed #fcd34d; border-radius: 8px; padding: 8px 10px; margin-top: 4px; display: none; }
+.req-hint.visible { display: block; }
+
+@media (max-width: 640px) {
+    .catalog-picker { grid-template-columns: 1fr; }
+}
+
+/* ── Registrar metrics grid ───────────────────────────────────── */
+.metrics-grid {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;
+}
+.metrics-grid .metric-panel { min-height: 300px; }
+.metric-canvas { position: relative; height: 230px; margin-top: 6px; }
+.range-filter { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.range-filter input { width: 140px; height: 34px; }
+.range-filter .btn { height: 34px; padding: 0 14px; }
+
+@media (max-width: 1100px) {
+    .metrics-grid { grid-template-columns: 1fr; }
+}
+
+/* ── Registrar row action buttons ─────────────────────────────── */
+/* Compact, right-aligned action cluster. Each label stays on one line
+   (no squashing) and the cluster wraps cleanly instead of overflowing. */
+.row-actions {
+    display: flex; gap: 6px; flex-wrap: wrap;
+    justify-content: flex-end; align-items: center;
+}
+.row-actions .btn-sm {
+    padding: 5px 11px !important;   /* beat registrar-premium.css .btn-sm */
+    font-size: 11.5px !important;
+    line-height: 1.5;
+    white-space: nowrap;
+    flex: 0 0 auto;
+    min-height: 28px;
+    box-shadow: none !important;    /* flat resting state */
+    transform: none !important;
+}
+.row-actions .btn-sm i { margin-right: 5px; }
+.row-actions .btn-sm[disabled] { opacity: .5; cursor: not-allowed; }
+
+/* No hover effect on row actions — kill the lift / shadow / gradient /
+   color shift from components.css and registrar-premium.css so the row
+   doesn't jitter or glow. Each variant is frozen to its resting colors. */
+.row-actions .btn-sm:hover,
+.row-actions .btn-sm:active,
+.row-actions .btn-sm:focus {
+    transform: none !important;
+    box-shadow: none !important;
+    filter: none !important;
+    background-image: none !important;
+    transition: none !important;
+}
+.row-actions .btn-primary:hover   { background: var(--primary-gradient) !important; color: #fff !important; border-color: var(--brand-600) !important; }
+.row-actions .btn-secondary:hover { background: #f1f5f9 !important; color: #2563eb !important; border-color: #e2e8f0 !important; }
+.row-actions .btn-danger:hover    { background: #fee2e2 !important; color: #dc2626 !important; }
+.row-actions .btn-success:hover   { background: linear-gradient(135deg, var(--success-500), var(--success-600)) !important; color: #fff !important; border-color: var(--success-600) !important; }
+.row-actions .btn-light:hover     { background: var(--surface-muted) !important; color: var(--text-muted) !important; }
+
+/* Exit-clearance matrix */
+.clearance-matrix { margin-top: 12px; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+.clearance-matrix .cm-head {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 14px; background: #f8fafc; font-size: 12px; font-weight: 700; color: #475569;
+    border-bottom: 1px solid #e2e8f0;
+}
+.clearance-matrix .cm-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 9px 14px; border-bottom: 1px solid #f1f5f9; font-size: 13px;
+}
+.clearance-matrix .cm-row:last-child { border-bottom: none; }
+.clearance-matrix .cm-office { font-weight: 700; color: #1e293b; display: flex; align-items: center; gap: 8px; }
+.clearance-matrix .cm-meta { color: #94a3b8; font-size: 11.5px; }
+

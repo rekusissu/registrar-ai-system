@@ -829,4 +829,27 @@ function trackStatusChange($studentId, $newStatus, $reason = null) {
         return false;
     }
 }
+
+/**
+ * Deterministic mock courier quotation (Lalamove-style) for the
+ * Document Request demo.
+ *
+ * Distance is seeded from the dropoff address so the quote a student
+ * sees at submission always equals the one the registrar sees when
+ * shipping. The delivery fee is borne by the STUDENT (added to the
+ * request total / collected on delivery) — never by the school.
+ *
+ * @param  string $address courier dropoff address (used as the seed)
+ * @return array{total_fee:float, distance_km:float, currency:string}
+ */
+function mockDeliveryQuote(string $address): array
+{
+    // 1.5 – 5.5 km, stable per address.
+    $distanceKm = round(1.5 + ((crc32(trim($address)) % 41)) / 10, 1);
+    return [
+        'total_fee'    => round(50.00 + $distanceKm * 20.00, 2),
+        'distance_km'  => $distanceKm,
+        'currency'     => 'PHP',
+    ];
+}
 ?>

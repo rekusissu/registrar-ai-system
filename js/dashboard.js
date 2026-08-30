@@ -9,6 +9,11 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
 
+    // ─── GLOBAL TYPOGRAPHY ─────────────────────────────────────────
+    Chart.defaults.font.family = "'Inter', 'Segoe UI', -apple-system, sans-serif";
+    Chart.defaults.font.weight = '500';
+    Chart.defaults.color = '#94a3b8';
+
     // ─── HELPERS ────────────────────────────────────────────────
     function getData(el, key) {
         try {
@@ -21,25 +26,84 @@ document.addEventListener('DOMContentLoaded', function() {
         return Array.isArray(arr) && arr.some(v => v > 0);
     }
 
+    // Shared dark tooltip — high contrast, no chartjunk.
+    const tooltipStyle = {
+        backgroundColor: 'rgba(13, 27, 46, 0.94)',
+        titleColor: '#fff',
+        titleFont: { size: 12, weight: '700' },
+        bodyColor: 'rgba(255,255,255,0.82)',
+        bodyFont: { size: 12, weight: '500' },
+        borderWidth: 0,
+        cornerRadius: 9,
+        padding: { top: 9, bottom: 9, left: 12, right: 12 },
+        displayColors: false,
+        caretSize: 5,
+    };
+
     // ─── COLORS ────────────────────────────────────────────────────
     const c = {
         blue: '#2563eb',
-        blueLight: 'rgba(37, 99, 235, 0.15)',
-        blueLighter: 'rgba(37, 99, 235, 0.05)',
         green: '#16a34a',
-        greenLight: 'rgba(22, 163, 74, 0.15)',
         purple: '#7c3aed',
-        purpleLight: 'rgba(124, 58, 237, 0.15)',
         red: '#dc2626',
-        redLight: 'rgba(220, 38, 38, 0.15)',
         yellow: '#b45309',
-        yellowLight: 'rgba(180, 83, 9, 0.15)',
         pink: '#db2777',
-        pinkLight: 'rgba(219, 39, 119, 0.15)',
-        orange: '#b45309',
-        orangeLight: 'rgba(180, 83, 9, 0.15)',
         gray: '#94a3b8',
-        grayLight: 'rgba(148, 163, 184, 0.15)',
+    };
+
+    // ─── PLUGIN · hover crosshair for the line chart ───────────────
+    const crosshair = {
+        id: 'crosshair',
+        afterDatasetsDraw(chart) {
+            const active = chart.getActiveElements();
+            if (!active.length) return;
+            const x = active[0].element.x;
+            const { top, bottom } = chart.chartArea;
+            const ctx = chart.ctx;
+            ctx.save();
+            ctx.beginPath();
+            ctx.setLineDash([4, 4]);
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = 'rgba(37, 99, 235, 0.35)';
+            ctx.moveTo(x, top);
+            ctx.lineTo(x, bottom);
+            ctx.stroke();
+            ctx.restore();
+        }
+    };
+
+    // ─── PLUGIN · centre readout for the doughnut ──────────────────
+    const doughnutCentre = {
+        id: 'doughnutCentre',
+        afterDraw(chart) {
+            const meta = chart.getDatasetMeta(0);
+            if (!meta || !meta.data.length) return;
+
+            const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
+            const label = chart.$centreLabel || 'Students';
+            const arc = meta.data[0];
+            const { x, y } = arc;
+            const ctx = chart.ctx;
+
+            // Scale the readout to the hole so it never overflows the ring
+            // on the shorter mobile card heights.
+            const inner = arc.innerRadius || 40;
+            const big = Math.max(15, Math.min(32, inner * 0.5));
+            const small = Math.max(8, big * 0.34);
+
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            ctx.font = '700 ' + big + "px 'Inter', sans-serif";
+            ctx.fillStyle = '#0f172a';
+            ctx.fillText(chart.$centreValue !== undefined ? chart.$centreValue : total, x, y - small * 0.9);
+
+            ctx.font = '600 ' + small + "px 'Inter', sans-serif";
+            ctx.fillStyle = '#94a3b8';
+            ctx.fillText(String(label).toUpperCase(), x, y + big * 0.48);
+            ctx.restore();
+        }
     };
 
     // ─── 1. ENROLLMENT CHART ──────────────────────────────────────
@@ -50,12 +114,20 @@ document.addEventListener('DOMContentLoaded', function() {
         const has = hasData(data);
         const ctx = enrollEl.getContext('2d');
 
-        const gradient = ctx.createLinearGradient(0, 0, 0, 280);
-        gradient.addColorStop(0, has ? 'rgba(37, 99, 235, 0.25)' : 'rgba(200, 200, 200, 0.1)');
-        gradient.addColorStop(1, has ? 'rgba(37, 99, 235, 0.02)' : 'rgba(200, 200, 200, 0.02)');
+        // Deeper three-stop wash so the area reads as volume, not a flat tint.
+        const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+        if (has) {
+            gradient.addColorStop(0, 'rgba(37, 99, 235, 0.28)');
+            gradient.addColorStop(0.55, 'rgba(37, 99, 235, 0.08)');
+            gradient.addColorStop(1, 'rgba(37, 99, 235, 0)');
+        } else {
+            gradient.addColorStop(0, 'rgba(148, 163, 184, 0.12)');
+            gradient.addColorStop(1, 'rgba(148, 163, 184, 0)');
+        }
 
         new Chart(ctx, {
             type: 'line',
+            plugins: [crosshair],
             data: {
                 labels: labels.length ? labels : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
                 datasets: [{
@@ -64,51 +136,59 @@ document.addEventListener('DOMContentLoaded', function() {
                     borderColor: has ? c.blue : c.gray,
                     backgroundColor: gradient,
                     fill: true,
-                    tension: 0.4,
-                    pointBackgroundColor: has ? c.blue : c.gray,
-                    pointBorderColor: '#fff',
-                    pointBorderWidth: 2,
-                    pointRadius: has ? 5 : 3,
-                    pointHoverRadius: 7,
+                    tension: 0.42,
                     borderWidth: 2.5,
+                    // Points stay hidden until hovered — the single biggest
+                    // difference between a stock chart and a considered one.
+                    pointRadius: 0,
+                    pointHoverRadius: 6,
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: has ? c.blue : c.gray,
+                    pointHoverBorderWidth: 3,
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                layout: { padding: { top: 8, right: 4 } },
+                interaction: { mode: 'index', intersect: false },
+                animation: { duration: 900, easing: 'easeOutQuart' },
                 plugins: {
                     legend: { display: false },
-                    tooltip: {
-                        backgroundColor: 'rgba(255,255,255,0.95)',
-                        titleColor: '#0f172a',
-                        bodyColor: '#475569',
-                        borderColor: '#e2e8f0',
-                        borderWidth: 1,
-                        cornerRadius: 10,
-                        padding: 12,
+                    tooltip: Object.assign({}, tooltipStyle, {
                         callbacks: {
-                            label: function(context) {
-                                return context.parsed.y + ' students';
-                            }
+                            title: items => items[0].label,
+                            label: context => context.parsed.y + ' new students'
                         }
-                    }
+                    })
                 },
                 scales: {
                     y: {
                         beginAtZero: true,
-                        grid: { color: 'rgba(0,0,0,0.04)' },
-                        ticks: { 
-                            stepSize: Math.max(1, Math.ceil(Math.max(...(has ? data : [0])) / 5)),
-                            font: { size: 11 }
+                        border: { display: false },
+                        grid: {
+                            color: '#eef2f7',
+                            drawTicks: false,
+                        },
+                        ticks: {
+                            stepSize: Math.max(1, Math.ceil(Math.max(...(has ? data : [0])) / 4)),
+                            font: { size: 11, weight: '500' },
+                            color: '#a8b3c4',
+                            padding: 10,
                         }
                     },
                     x: {
+                        border: { display: false },
                         grid: { display: false },
-                        ticks: { font: { size: 11 } }
+                        ticks: {
+                            font: { size: 11, weight: '600' },
+                            color: '#a8b3c4',
+                            padding: 6,
+                        }
                     }
                 },
                 elements: {
-                    line: { borderJoinStyle: 'round' }
+                    line: { borderJoinStyle: 'round', borderCapStyle: 'round' }
                 }
             }
         });
@@ -120,99 +200,61 @@ document.addEventListener('DOMContentLoaded', function() {
         const labels = getData(courseEl, 'labels');
         const data = getData(courseEl, 'data');
         const has = hasData(data);
-        const colors = ['#2563eb', '#7c3aed', '#16a34a', '#b45309', '#db2777'];
+        const colors = ['#2563eb', '#7c3aed', '#0ea5e9', '#b45309', '#db2777'];
 
-        new Chart(courseEl.getContext('2d'), {
+        const chart = new Chart(courseEl.getContext('2d'), {
             type: 'doughnut',
+            plugins: [doughnutCentre],
             data: {
                 labels: has ? labels : ['No Data'],
                 datasets: [{
                     data: has ? data : [1],
-                    backgroundColor: has ? colors : ['#e2e8f0'],
-                    borderColor: '#fff',
-                    borderWidth: 3,
-                    hoverOffset: 10,
+                    backgroundColor: has ? colors : ['#eef2f7'],
+                    borderWidth: 0,
+                    // Rounded caps + gaps make the ring read as segments,
+                    // not a sliced pie.
+                    borderRadius: has ? 6 : 0,
+                    spacing: has ? 3 : 0,
+                    hoverOffset: 6,
                 }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                cutout: '70%',
+                cutout: '76%',
+                layout: { padding: { top: 4, bottom: 4 } },
+                animation: { duration: 900, easing: 'easeOutQuart' },
                 plugins: {
                     legend: {
                         position: 'bottom',
                         labels: {
-                            padding: 14,
+                            padding: 16,
+                            boxWidth: 7,
+                            boxHeight: 7,
                             usePointStyle: true,
                             pointStyle: 'circle',
-                            font: { size: 11, weight: '500' },
-                            color: '#1e293b'
+                            font: { size: 11, weight: '600' },
+                            color: '#64748b'
                         }
                     },
-                    tooltip: {
-                        backgroundColor: 'rgba(255,255,255,0.95)',
-                        titleColor: '#0f172a',
-                        bodyColor: '#475569',
-                        borderColor: '#e2e8f0',
-                        borderWidth: 1,
-                        cornerRadius: 10,
-                        padding: 12,
+                    tooltip: Object.assign({}, tooltipStyle, {
                         callbacks: {
                             label: function(context) {
                                 if (!has) return 'No data available';
                                 const total = context.dataset.data.reduce((a, b) => a + b, 0);
                                 const pct = total > 0 ? ((context.parsed / total) * 100).toFixed(1) : 0;
-                                return context.label + ': ' + context.parsed + ' (' + pct + '%)';
+                                return context.parsed + ' students · ' + pct + '%';
                             }
                         }
-                    }
+                    })
                 }
             }
         });
-    }
 
-    // ─── 3. RING CHARTS ───────────────────────────────────────────
-    function createRing(canvasId, value, max, color) {
-        const canvas = document.getElementById(canvasId);
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        const w = canvas.width, h = canvas.height;
-        const cx = w / 2, cy = h / 2;
-        const radius = 30, lineWidth = 7;
-        const pct = max > 0 ? Math.min(value / max, 1) : 0;
-
-        ctx.clearRect(0, 0, w, h);
-
-        // Background
-        ctx.beginPath();
-        ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
-        ctx.strokeStyle = '#e2e8f0';
-        ctx.lineWidth = lineWidth;
-        ctx.stroke();
-
-        // Foreground
-        const start = -Math.PI / 2;
-        const end = start + (2 * Math.PI * pct);
-        ctx.beginPath();
-        ctx.arc(cx, cy, radius, start, end);
-        ctx.strokeStyle = max > 0 ? color : '#d1d5db';
-        ctx.lineWidth = lineWidth;
-        ctx.lineCap = 'round';
-        ctx.stroke();
-    }
-
-    const rc = document.querySelector('.rings-row');
-    if (rc) {
-        const total = parseInt(rc.dataset.ringTotal) || 0;
-        const active = parseInt(rc.dataset.ringActive) || 0;
-        const risk = parseInt(rc.dataset.ringRisk) || 0;
-        const grad = parseInt(rc.dataset.ringGrad) || 0;
-        const maxVal = Math.max(total, 1);
-
-        createRing('ringTotal', total, total, '#2563eb');
-        createRing('ringActive', active, maxVal, '#16a34a');
-        createRing('ringRisk', risk, maxVal, '#dc2626');
-        createRing('ringGrad', grad, maxVal, '#7c3aed');
+        // Centre readout: total enrolled across the listed courses.
+        chart.$centreValue = has ? data.reduce((a, b) => a + b, 0) : '—';
+        chart.$centreLabel = has ? 'Enrolled' : 'No data';
+        chart.update('none');
     }
 
 });

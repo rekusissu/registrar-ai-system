@@ -177,7 +177,7 @@ include '../includes/sidebar.php';
     <form id="uploadForm">
     <div class="modal-body">
         <div class="form-group"><label>Student <span style="color:#dc2626;">*</span></label>
-            <select id="upStudent" class="form-control" required>
+            <select id="upStudent" class="form-control" data-searchable required>
                 <option value="">Select a student</option>
                 <?php foreach ($students as $st): ?>
                     <option value="<?= (int)$st['id'] ?>" <?= $fileStudentId && $st['id'] === $fileStudentId ? 'selected' : '' ?>><?= htmlspecialchars($st['student_number'].' — '.$st['name']) ?></option>

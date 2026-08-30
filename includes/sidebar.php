@@ -7,6 +7,16 @@
 $APP_ROOT   = $APP_ROOT   ?? '../';
 $ACTIVE_NAV = $ACTIVE_NAV ?? '';
 $USER_ROLE  = $_SESSION['role'] ?? '';
+
+// Student profile info for sidebar mini-card (student role only)
+if ($USER_ROLE === 'student') {
+    $_sbFN       = trim(($_SESSION['first_name'] ?? '') . ' ' . ($_SESSION['last_name'] ?? ''));
+    if (empty($_sbFN)) $_sbFN = $_SESSION['full_name'] ?? 'Student';
+    $_sbInitial  = strtoupper(substr(trim($_sbFN), 0, 1));
+    $_sbStudNo   = $_SESSION['student_number'] ?? '';
+    $_sbPhoto    = $_SESSION['photo'] ?? '';
+    $_sbPhotoUrl = $_sbPhoto ? $APP_ROOT . ltrim($_sbPhoto, './') : '';
+}
 ?>
 <!-- Sidebar Toggle Button -->
 <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle Sidebar">
@@ -37,38 +47,48 @@ $USER_ROLE  = $_SESSION['role'] ?? '';
     <?php if ($USER_ROLE === 'student'): ?>
         <!-- ══════════ STUDENT PORTAL MENU ══════════ -->
         <div class="sidebar-brand">
-            <div class="brand-title">Main</div>
+            <div class="brand-title">Navigation</div>
         </div>
 
         <a href="<?= $APP_ROOT ?>student/dashboard.php" class="sidebar-item <?= $ACTIVE_NAV === 'student_dashboard' ? 'active' : '' ?>">
-            <i class="fa-solid fa-gauge-high"></i>
+            <i class="fa-solid fa-house-chimney"></i>
             <span class="sidebar-text">Dashboard</span>
+        </a>
+
+        <a href="<?= $APP_ROOT ?>student/announcements.php" class="sidebar-item <?= $ACTIVE_NAV === 'student_announcements' ? 'active' : '' ?>">
+            <i class="fa-solid fa-bullhorn"></i>
+            <span class="sidebar-text">Announcements</span>
         </a>
 
         <div class="sidebar-divider"></div>
 
         <div class="sidebar-brand">
-            <div class="brand-title">My Records</div>
+            <div class="brand-title">Academics &amp; Records</div>
         </div>
 
         <a href="<?= $APP_ROOT ?>student/profile.php" class="sidebar-item <?= $ACTIVE_NAV === 'student_profile' ? 'active' : '' ?>">
-            <i class="fa-solid fa-id-card"></i>
-            <span class="sidebar-text">Student Profile</span>
+            <i class="fa-solid fa-id-card-clip"></i>
+            <span class="sidebar-text">My Profile</span>
         </a>
 
-        <a href="<?= $APP_ROOT ?>student/queue.php" class="sidebar-item <?= $ACTIVE_NAV === 'student_queue' ? 'active' : '' ?>">
-            <i class="fa-solid fa-display"></i>
-            <span class="sidebar-text">Queue Management</span>
-        </a>
-
-        <a href="<?= $APP_ROOT ?>student/documents.php" class="sidebar-item <?= $ACTIVE_NAV === 'student_documents' ? 'active' : '' ?>">
-            <i class="fa-solid fa-file-lines"></i>
-            <span class="sidebar-text">Document Requests</span>
+        <a href="<?= $APP_ROOT ?>student/grades.php" class="sidebar-item <?= $ACTIVE_NAV === 'student_grades' ? 'active' : '' ?>">
+            <i class="fa-solid fa-chart-simple"></i>
+            <span class="sidebar-text">Grades &amp; History</span>
         </a>
 
         <a href="<?= $APP_ROOT ?>student/academic-records.php" class="sidebar-item <?= $ACTIVE_NAV === 'student_academic' ? 'active' : '' ?>">
-            <i class="fa-solid fa-school"></i>
+            <i class="fa-solid fa-graduation-cap"></i>
             <span class="sidebar-text">Academic Records</span>
+        </a>
+
+        <a href="<?= $APP_ROOT ?>student/documents.php" class="sidebar-item <?= $ACTIVE_NAV === 'student_documents' ? 'active' : '' ?>">
+            <i class="fa-solid fa-folder-closed"></i>
+            <span class="sidebar-text">Document Requests</span>
+        </a>
+
+        <a href="<?= $APP_ROOT ?>student/ids.php" class="sidebar-item <?= $ACTIVE_NAV === 'student_ids' ? 'active' : '' ?>">
+            <i class="fa-solid fa-id-badge"></i>
+            <span class="sidebar-text">Digital ID Cards</span>
         </a>
 
         <a href="<?= $APP_ROOT ?>student/health-records.php" class="sidebar-item <?= $ACTIVE_NAV === 'student_health' ? 'active' : '' ?>">
@@ -76,12 +96,36 @@ $USER_ROLE  = $_SESSION['role'] ?? '';
             <span class="sidebar-text">Health Records</span>
         </a>
 
+        <a href="<?= $APP_ROOT ?>student/contacts.php" class="sidebar-item <?= $ACTIVE_NAV === 'student_contacts' ? 'active' : '' ?>">
+            <i class="fa-solid fa-people-roof"></i>
+            <span class="sidebar-text">Emergency &amp; Contacts</span>
+        </a>
+
         <div class="sidebar-divider"></div>
 
-        <a href="<?= $APP_ROOT ?>logout.php" class="sidebar-item" id="logoutBtn" data-logout-url="<?= $APP_ROOT ?>logout.php">
+        <div class="sidebar-brand">
+            <div class="brand-title">Services &amp; AI</div>
+        </div>
+
+        <a href="<?= $APP_ROOT ?>student/queue.php" class="sidebar-item <?= $ACTIVE_NAV === 'student_queue' ? 'active' : '' ?>">
+            <i class="fa-solid fa-ticket"></i>
+            <span class="sidebar-text">Live Queue System</span>
+        </a>
+
+        <button type="button" class="sidebar-item ai-trigger-item" onclick="if(window.toggleStudentChat) window.toggleStudentChat();">
+            <i class="fa-solid fa-wand-magic-sparkles" style="color: #60a5fa;"></i>
+            <span class="sidebar-text">AI Registrar Assistant</span>
+            <span class="sidebar-badge-ai">AI</span>
+        </button>
+
+    </div><!-- end sidebar-nav -->
+
+    <div class="sidebar-footer">
+        <a href="<?= $APP_ROOT ?>logout.php" class="sidebar-item logout-link" id="logoutBtn" data-logout-url="<?= $APP_ROOT ?>logout.php">
             <i class="fa-solid fa-right-from-bracket"></i>
             <span class="sidebar-text">Logout</span>
         </a>
+    </div>
 
     <?php else: ?>
 
@@ -178,6 +222,11 @@ $USER_ROLE  = $_SESSION['role'] ?? '';
             <span class="sidebar-text">Academic History</span>
         </a>
 
+        <a href="<?= $APP_ROOT ?>registrar/communication-log.php" class="sidebar-item <?= $ACTIVE_NAV === 'commlog' ? 'active' : '' ?>">
+            <i class="fa-solid fa-envelope-open-text"></i>
+            <span class="sidebar-text">Communication Log</span>
+        </a>
+
         <div class="sidebar-divider"></div>
 
         <!-- GROUP 3 — AI Tools -->
@@ -195,14 +244,14 @@ $USER_ROLE  = $_SESSION['role'] ?? '';
             <span class="sidebar-text">AI Search</span>
         </a>
 
+        <?php if ($USER_ROLE === 'admin'): ?>
         <div class="sidebar-divider"></div>
 
-        <!-- GROUP 4 — System -->
+        <!-- GROUP 4 — System (admin only) -->
         <div class="sidebar-brand">
             <div class="brand-title">System</div>
         </div>
 
-        <?php if ($USER_ROLE === 'admin'): ?>
         <a href="<?= $APP_ROOT ?>settings.php" class="sidebar-item <?= $ACTIVE_NAV === 'settings' ? 'active' : '' ?>">
             <i class="fa-solid fa-gear"></i>
             <span class="sidebar-text">Settings</span>
@@ -217,14 +266,16 @@ $USER_ROLE  = $_SESSION['role'] ?? '';
         </a>
         <?php endif; ?>
 
-        <a href="<?= $APP_ROOT ?>logout.php" class="sidebar-item" id="logoutBtn" data-logout-url="<?= $APP_ROOT ?>logout.php">
+    </div><!-- end sidebar-nav -->
+
+    <div class="sidebar-footer">
+        <a href="<?= $APP_ROOT ?>logout.php" class="sidebar-item logout-link" id="logoutBtn" data-logout-url="<?= $APP_ROOT ?>logout.php">
             <i class="fa-solid fa-right-from-bracket"></i>
             <span class="sidebar-text">Logout</span>
         </a>
+    </div>
 
     <?php endif; ?>
-
-    </div><!-- end sidebar-nav -->
 </aside>
 
 <!-- Logout Confirmation Modal -->

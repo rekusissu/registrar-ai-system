@@ -33,67 +33,67 @@ $chatEndpoint = htmlspecialchars($chatAppRoot . 'api/student-ai-chat.php', ENT_Q
         position: fixed;
         right: 22px;
         bottom: 22px;
-        width: 58px;
-        height: 58px;
+        width: 62px;
+        height: 62px;
         border-radius: 50%;
         background: linear-gradient(135deg, #1a3a8c 0%, #2563eb 100%);
         color: #fff;
         border: none;
-        box-shadow: 0 10px 28px rgba(26, 58, 140, .35);
+        box-shadow: 0 12px 32px rgba(26, 58, 140, .36);
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 22px;
+        font-size: 26px;
         cursor: pointer;
         z-index: 9998;
-        transition: transform .2s ease, box-shadow .2s ease, background .2s ease;
+        transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), background 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .chat-fab:hover { transform: translateY(-3px) scale(1.04); box-shadow: 0 14px 34px rgba(26, 58, 140, .42); }
-    .chat-fab.opened { background: #dc2626; transform: rotate(90deg); box-shadow: 0 10px 28px rgba(220, 38, 38, .3); }
+    .chat-fab:hover { transform: translateY(-4px) scale(1.08); box-shadow: 0 16px 40px rgba(26, 58, 140, .45); }
+    .chat-fab.opened { background: #dc2626; transform: rotate(135deg) scale(0.95); box-shadow: 0 12px 32px rgba(220, 38, 38, .35); }
 
     .chat-panel {
         position: fixed;
         right: 22px;
-        bottom: 92px;
-        width: 360px;
+        bottom: 100px;
+        width: 380px;
         max-width: calc(100vw - 44px);
-        height: 480px;
-        max-height: calc(100vh - 140px);
-        background: #fff;
-        border-radius: 18px;
-        box-shadow: 0 24px 60px rgba(15, 23, 42, .22);
+        height: 520px;
+        max-height: calc(100vh - 160px);
+        background: #ffffff;
+        border-radius: 20px;
+        box-shadow: 0 20px 60px rgba(15, 23, 42, .24), 0 0 1px rgba(15, 23, 42, .08);
         display: none;
         flex-direction: column;
         overflow: hidden;
         z-index: 9999;
-        animation: chatPop .22s ease;
-        border: 1px solid rgba(226, 232, 240, .9);
+        animation: chatPop 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        border: 1px solid rgba(226, 232, 240, .8);
     }
     .chat-panel.open { display: flex; }
     @keyframes chatPop {
-        from { opacity: 0; transform: translateY(12px) scale(.97); }
+        from { opacity: 0; transform: translateY(16px) scale(0.95); }
         to   { opacity: 1; transform: translateY(0) scale(1); }
     }
 
     .chat-head {
-        background: linear-gradient(120deg, #1a3a8c 0%, #2563eb 100%);
+        background: linear-gradient(135deg, #1a3a8c 0%, #2563eb 100%);
         color: #fff;
-        padding: 14px 16px;
+        padding: 18px 18px;
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 14px;
     }
     .chat-head .chat-head-avatar {
-        width: 38px; height: 38px;
+        width: 42px; height: 42px;
         border-radius: 50%;
-        background: rgba(255,255,255,.16);
-        border: 2px solid rgba(255,255,255,.35);
+        background: rgba(255,255,255,.18);
+        border: 2px solid rgba(255,255,255,.38);
         display: flex; align-items: center; justify-content: center;
         flex-shrink: 0;
-        font-size: 17px;
+        font-size: 20px;
     }
-    .chat-head .chat-head-title { font-size: 15px; font-weight: 700; }
-    .chat-head .chat-head-sub { font-size: 11px; color: rgba(255,255,255,.75); margin-top: 1px; }
+    .chat-head .chat-head-title { font-size: 15px; font-weight: 800; letter-spacing: -0.2px; }
+    .chat-head .chat-head-sub { font-size: 12px; color: rgba(255,255,255,.72); margin-top: 3px; font-weight: 500; }
     .chat-head .chat-head-close {
         margin-left: auto;
         background: transparent;
@@ -110,103 +110,109 @@ $chatEndpoint = htmlspecialchars($chatAppRoot . 'api/student-ai-chat.php', ENT_Q
     .chat-body {
         flex: 1;
         overflow-y: auto;
-        padding: 14px;
-        background: #f8fafc;
+        padding: 16px;
+        background: linear-gradient(180deg, #fafbfc 0%, #f5f7fa 100%);
         display: flex;
         flex-direction: column;
-        gap: 10px;
+        gap: 12px;
         scroll-behavior: smooth;
     }
     .chat-msg {
         max-width: 84%;
-        padding: 9px 13px;
-        border-radius: 14px;
-        font-size: 13.5px;
-        line-height: 1.5;
+        padding: 11px 15px;
+        border-radius: 16px;
+        font-size: 14px;
+        line-height: 1.6;
         word-wrap: break-word;
         white-space: pre-wrap;
+        font-weight: 500;
     }
     .chat-msg.user {
         align-self: flex-end;
-        background: linear-gradient(135deg, #2563eb, #3b82f6);
+        background: linear-gradient(135deg, #2563eb, #1d4ed8);
         color: #fff;
         border-bottom-right-radius: 4px;
+        box-shadow: 0 4px 14px rgba(37, 99, 235, .28);
     }
     .chat-msg.bot {
         align-self: flex-start;
         background: #fff;
-        color: #1e293b;
+        color: #0f172a;
         border: 1px solid #e2e8f0;
         border-bottom-left-radius: 4px;
-        box-shadow: 0 2px 6px rgba(15, 23, 42, .05);
+        box-shadow: 0 4px 12px rgba(15, 23, 42, .08);
     }
-    .chat-msg.bot.fallback { background: #fef3c7; border-color: #fde68a; color: #78350f; }
+    .chat-msg.bot.fallback { background: #fef3c7; border-color: #fde68a; color: #78350f; box-shadow: 0 4px 12px rgba(251, 191, 36, .12); }
 
     .chat-typing {
         align-self: flex-start;
         display: inline-flex;
-        gap: 4px;
-        padding: 12px 14px;
+        gap: 5px;
+        padding: 13px 16px;
         background: #fff;
         border: 1px solid #e2e8f0;
-        border-radius: 14px;
+        border-radius: 16px;
         border-bottom-left-radius: 4px;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, .08);
     }
     .chat-typing i {
-        width: 7px; height: 7px;
+        width: 8px; height: 8px;
         border-radius: 50%;
-        background: #94a3b8;
-        animation: chatBlink 1s infinite ease-in-out;
+        background: #cbd5e1;
+        animation: chatBlink 1.2s infinite ease-in-out;
     }
-    .chat-typing i:nth-child(2) { animation-delay: .15s; }
-    .chat-typing i:nth-child(3) { animation-delay: .3s; }
+    .chat-typing i:nth-child(2) { animation-delay: .2s; }
+    .chat-typing i:nth-child(3) { animation-delay: .4s; }
     @keyframes chatBlink {
-        0%, 80%, 100% { opacity: .25; transform: translateY(0); }
-        40% { opacity: 1; transform: translateY(-3px); }
+        0%, 80%, 100% { opacity: .3; transform: translateY(0); }
+        40% { opacity: 1; transform: translateY(-4px); }
     }
 
     .chat-disclaimer {
-        padding: 8px 14px;
-        font-size: 11px;
-        color: #94a3b8;
-        background: #fff;
-        border-top: 1px solid #f1f5f9;
+        padding: 12px 16px;
+        font-size: 12px;
+        color: #64748b;
+        background: #f8fafc;
+        border-top: 1px solid #e2e8f0;
         text-align: center;
-        line-height: 1.4;
+        line-height: 1.5;
+        font-weight: 500;
     }
 
     .chat-foot {
         display: flex;
-        gap: 8px;
-        padding: 10px;
-        background: #fff;
+        gap: 10px;
+        padding: 14px;
+        background: #ffffff;
         border-top: 1px solid #e2e8f0;
     }
     .chat-foot input {
         flex: 1;
-        border: 1px solid #e2e8f0;
-        border-radius: 20px;
-        padding: 9px 14px;
-        font-size: 13.5px;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 22px;
+        padding: 11px 16px;
+        font-size: 14px;
         font-family: inherit;
         outline: none;
-        transition: border-color .2s, box-shadow .2s;
-        background: #f8fafc;
+        transition: border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.15s ease;
+        background: #f5f7fa;
+        font-weight: 500;
     }
-    .chat-foot input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, .12); background: #fff; }
+    .chat-foot input:focus { border-color: #2563eb; box-shadow: 0 0 0 4px rgba(37, 99, 235, .14); background: #fff; }
+    .chat-foot input::placeholder { color: #94a3b8; font-weight: 500; }
     .chat-foot button {
-        width: 40px; height: 40px;
+        width: 44px; height: 44px;
         border-radius: 50%;
         border: none;
-        background: linear-gradient(135deg, #2563eb, #3b82f6);
+        background: linear-gradient(135deg, #2563eb, #1d4ed8);
         color: #fff;
         cursor: pointer;
         display: flex; align-items: center; justify-content: center;
-        font-size: 15px;
-        transition: transform .15s, box-shadow .2s;
+        font-size: 16px;
+        transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1);
         flex-shrink: 0;
     }
-    .chat-foot button:hover { transform: scale(1.06); box-shadow: 0 4px 12px rgba(37, 99, 235, .35); }
+    .chat-foot button:hover { transform: scale(1.08); box-shadow: 0 6px 16px rgba(37, 99, 235, .36); }
     .chat-foot button:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
 
     @media (max-width: 480px) {
@@ -230,20 +236,20 @@ $chatEndpoint = htmlspecialchars($chatAppRoot . 'api/student-ai-chat.php', ENT_Q
     fab.className = 'chat-fab';
     fab.id = 'chatFab';
     fab.setAttribute('aria-label', 'Open AI assistant');
-    fab.innerHTML = '<i class="fa-solid fa-robot"></i>';
+    fab.innerHTML = '<i class="fa-solid fa-star"></i>';
 
     var panel = document.createElement('div');
     panel.className = 'chat-panel';
     panel.id = 'chatPanel';
     panel.innerHTML =
         '<div class="chat-head">' +
-            '<div class="chat-head-avatar"><i class="fa-solid fa-graduation-cap"></i></div>' +
+            '<div class="chat-head-avatar"><i class="fa-solid fa-star"></i></div>' +
             '<div>' +
-                '<div class="chat-head-title">BCP Registrar Assistant</div>' +
-                '<div class="chat-head-sub">Ask about documents, queue, grades &amp; more</div>' +
+                '<div class="chat-head-title">Registrar AI Assistant</div>' +
+                '<div class="chat-head-sub">Powered by Gemini 3.7 Flash</div>' +
             '</div>' +
             '<button type="button" class="chat-head-close" id="chatClose" aria-label="Close chat">' +
-                '<i class="fa-solid fa-minus"></i>' +
+                '<i class="fa-solid fa-xmark"></i>' +
             '</button>' +
         '</div>' +
         '<div class="chat-body" id="chatBody">' +
@@ -271,9 +277,10 @@ $chatEndpoint = htmlspecialchars($chatAppRoot . 'api/student-ai-chat.php', ENT_Q
         opened = (typeof open === 'boolean') ? open : !opened;
         panel.classList.toggle('open', opened);
         fab.classList.toggle('opened', opened);
-        fab.innerHTML = opened ? '<i class="fa-solid fa-xmark"></i>' : '<i class="fa-solid fa-robot"></i>';
+        fab.innerHTML = opened ? '<i class="fa-solid fa-xmark"></i>' : '<i class="fa-solid fa-star"></i>';
         if (opened) { chatInput.focus(); scrollBottom(); }
     }
+    window.toggleStudentChat = function() { toggle(true); };
 
     function addMsg(text, who, fallback) {
         var m = document.createElement('div');

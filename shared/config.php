@@ -95,22 +95,23 @@ define('JWT_SECRET', getenv('JWT_SECRET') ?: 'your-super-secret-key-change-in-pr
 // KIOSK_ACCESS_TOKEN on live stations; do not rely on the default.
 define('KIOSK_ACCESS_TOKEN', getenv('KIOSK_ACCESS_TOKEN') ?: 'kiosk-tap-2024');
 
-// ── AI (9Router local gateway, OpenAI-compatible) ──────────────
-// Local 9Router gateway that fronts several free models via a single
-// Bearer key. Endpoint verified live at /v1/models (OpenAI format).
-// The 9Router gateway base URL can be overridden with NINEROUTER_URL
+// ── AI (Gateway, OpenAI-compatible via Antigravity / 9Router) ──
+// Local gateway that fronts models via a single Bearer key.
+// Verified live at /v1/models (OpenAI format).
+// Gateway base URL can be overridden with NINEROUTER_URL
 // (e.g. a VPS or tunnel URL); the app appends /v1/chat/completions.
 $__aiBase = rtrim((string) getenv('NINEROUTER_URL') ?: 'http://localhost:20128', '/');
 define('AI_API_URL', $__aiBase . '/v1/chat/completions');
-define('AI_MODEL', 'ollama/minimax-m3');
+define('AI_MODEL', 'ag/gemini-3.7-flash-high');
 // Ordered fallback list: the gateway tries each model in turn until one
 // succeeds (handles transient 529/5xx overloads on a single backend).
-// Some older nvidia/* entries were retired upstream (404 "No active credentials").
 define('AI_MODELS', [
-    'ollama/minimax-m3',      // vision-capable (documents/vision flows prefer minimax/kimi)
-    'ollama/kimi-k2.5',       // vision-capable
-    'ollama/gpt-oss:120b',    // strong general-purpose fallback
-    'ollama/glm-4.7-flash',   // fast flash-tier fallback
+    'ag/gemini-3.7-flash-high',     // Gemini 3.7 Flash High (Google AI via Antigravity)
+    'ag/gemini-3.7-flash-medium',   // Gemini 3.7 Flash Medium fallback
+    'ag/gemini-3.6-flash-high',     // Gemini 3.6 Flash High fallback
+    'ollama/minimax-m3',            // vision-capable fallback
+    'ollama/kimi-k2.5',             // vision-capable fallback
+    'ollama/gpt-oss:120b',          // general-purpose fallback
 ]);
 // API key: read from env var first, then from a local (git-ignored) file.
 // Never hardcode a real key in this committed file.
@@ -123,6 +124,75 @@ if ($__aiKey === '') {
 }
 define('AI_API_KEY', $__aiKey);
 define('AI_CACHE_TTL', 86400); // seconds (1 day)
+
+// ── PayMongo (real GCash payments, sandbox/test mode) ─────────
+// Empty secret key ⇒ the document-request payment gateway stays on
+// the built-in mock (the demo works without any keys). Keys are
+// read from env vars first, then from a git-ignored KEY=VALUE file
+// shared/paymongo_secret.local (see .gitignore *.local rule):
+//   PAYMONGO_SECRET_KEY=sk_test_...
+//   PAYMONGO_PUBLIC_KEY=pk_test_...
+//   PAYMONGO_WEBHOOK_SECRET=whsec_...
+function paymongoSecretFromLocal(string $key): string {
+    static $parsed = null;
+    if ($parsed === null) {
+        $parsed = [];
+        $file = __DIR__ . '/paymongo_secret.local';
+        if (is_file($file)) {
+            $lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            foreach (is_array($lines) ? $lines : [] as $line) {
+                $line = trim($line);
+                if ($line === '' || $line[0] === '#') continue;
+                $pair = array_pad(explode('=', $line, 2), 2, '');
+                $parsed[trim($pair[0])] = trim($pair[1]);
+            }
+        }
+    }
+    return $parsed[$key] ?? '';
+}
+define('PAYMONGO_SECRET_KEY',    getenv('PAYMONGO_SECRET_KEY') ?: paymongoSecretFromLocal('PAYMONGO_SECRET_KEY'));
+define('PAYMONGO_PUBLIC_KEY',    getenv('PAYMONGO_PUBLIC_KEY') ?: paymongoSecretFromLocal('PAYMONGO_PUBLIC_KEY'));
+define('PAYMONGO_WEBHOOK_SECRET',getenv('PAYMONGO_WEBHOOK_SECRET') ?: paymongoSecretFromLocal('PAYMONGO_WEBHOOK_SECRET'));
+define('PAYMONGO_API_BASE', rtrim((string) getenv('PAYMONGO_API_BASE') ?: 'https://api.paymongo.com', '/'));
+
+// ── Email (SMTP) — Gmail App Password transport ────────────────
+// Used by the Emergency & Contacts module (shared/mail_client.php)
+// to deliver verification, invoice, grade-snapshot, transcript and
+// emergency-blast emails. Read from env vars first, then from the
+// git-ignored shared/email_secret.local (KEY=VALUE lines, same layout
+// as paymongo_secret.local):
+//   SMTP_HOST=smtp.gmail.com
+//   SMTP_PORT=587
+//   SMTP_USER=you@gmail.com
+//   SMTP_PASS=xxxx xxxx xxxx xxxx   (Gmail App Password, not the login password)
+//   MAIL_FROM=you@gmail.com
+//   MAIL_FROM_NAME=BCP Registrar System
+// Missing credentials ⇒ EMAIL_CONFIGURED=false and every sender no-ops
+// (the app keeps working, exactly like the PayMongo mock fallback).
+function emailSecretFromLocal(string $key): string {
+    static $parsed = null;
+    if ($parsed === null) {
+        $parsed = [];
+        $file = __DIR__ . '/email_secret.local';
+        if (is_file($file)) {
+            $lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            foreach (is_array($lines) ? $lines : [] as $line) {
+                $line = trim($line);
+                if ($line === '' || $line[0] === '#') continue;
+                $pair = array_pad(explode('=', $line, 2), 2, '');
+                $parsed[trim($pair[0])] = trim($pair[1]);
+            }
+        }
+    }
+    return $parsed[$key] ?? '';
+}
+define('SMTP_HOST',     getenv('SMTP_HOST') ?: emailSecretFromLocal('SMTP_HOST'));
+define('SMTP_PORT',     (int) (getenv('SMTP_PORT') ?: emailSecretFromLocal('SMTP_PORT')) ?: 587);
+define('SMTP_USER',     getenv('SMTP_USER') ?: emailSecretFromLocal('SMTP_USER'));
+define('SMTP_PASS',     getenv('SMTP_PASS') ?: emailSecretFromLocal('SMTP_PASS'));
+define('MAIL_FROM',     getenv('MAIL_FROM') ?: emailSecretFromLocal('MAIL_FROM'));
+define('MAIL_FROM_NAME',getenv('MAIL_FROM_NAME') ?: emailSecretFromLocal('MAIL_FROM_NAME'));
+define('EMAIL_CONFIGURED', SMTP_HOST !== '' && SMTP_USER !== '' && SMTP_PASS !== '');
 
 // Timezone
 date_default_timezone_set('Asia/Manila');

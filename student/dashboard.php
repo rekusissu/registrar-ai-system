@@ -40,8 +40,6 @@ $docPending = (int) $db->fetchColumn(
 
 // Today's queue ticket (own)
 $today = date('Y-m-d');
-// Active queue only — a ticket that was completed, marked no-show,
-// or removed no longer counts as the student's active queue.
 $queue = $db->fetchOne(
     "SELECT * FROM queue_tickets
      WHERE queue_date = ? AND student_id = ?
@@ -58,23 +56,31 @@ if ($queue && $queue['status'] === 'waiting') {
     );
 }
 
-// Canonical status label (Enrolled / Active / Graduated / Transferred / Dropped)
+// Canonical status label
 $statusLabel = getStudentStatusLabel($student['status'] ?? 'enrolled');
 $enrollmentLabel = ($student['status'] ?? '') === 'enrolled'
     ? 'Currently Enrolled'
     : ucfirst(str_replace('-', ' ', strtolower((string) $student['status'])));
+
 $fullName = trim(trim($student['first_name'] ?? '') . ' ' . trim($student['last_name'] ?? ''));
 if (empty($fullName)) $fullName = htmlspecialchars($_SESSION['full_name'] ?? 'Student');
 $initial  = strtoupper(substr(trim($fullName), 0, 1));
 $photo    = $student['photo'] ?? '';
 $photoUrl = $photo ? $APP_ROOT . ltrim($photo, './') : '';
+
+// Time-aware greeting + dynamic body class
+$hour = (int) date('G');
+if ($hour < 10)       { $timeGreeting = 'Good morning';  $bodyClass = 'dawnday'; }
+elseif ($hour < 16)   { $timeGreeting = 'Good afternoon'; $bodyClass = 'day'; }
+elseif ($hour < 22)   { $timeGreeting = 'Good evening';   $bodyClass = 'dusk'; }
+else                   { $timeGreeting = 'Good night';     $bodyClass = 'night'; }
 ?>
 
 <main class="dashboard-main">
     <div class="dashboard-container">
 
-        <!-- Welcome hero -->
-        <div class="student-intro">
+        <!-- ── Welcome Hero ───────────────────────────────── -->
+        <div class="student-intro" style="background-image: url('<?= $APP_ROOT ?>assets/images/bestlink%20banner.jpg'); background-size: cover; background-position: center;">
             <div class="intro-avatar">
                 <?php if ($photoUrl): ?>
                     <img src="<?= htmlspecialchars($photoUrl) ?>" alt="Student photo">
@@ -83,30 +89,32 @@ $photoUrl = $photo ? $APP_ROOT . ltrim($photo, './') : '';
                 <?php endif; ?>
             </div>
             <div class="intro-body">
-                <div class="intro-greet">Welcome back</div>
+                <div class="intro-greet"><?= $timeGreeting ?></div>
                 <div class="intro-title"><?= htmlspecialchars($fullName) ?> 👋</div>
-                <div class="intro-sub">Your BCP student portal — records, documents, queue, and updates in one place.</div>
                 <div class="intro-meta">
                     <span class="intro-chip"><i class="fa-solid fa-id-card"></i> <?= htmlspecialchars($student['student_number'] ?? '—') ?></span>
                     <span class="intro-chip"><i class="fa-solid fa-graduation-cap"></i> <?= htmlspecialchars($student['course'] ?? '—') ?></span>
                     <span class="intro-chip"><i class="fa-solid fa-calendar-days"></i> Year <?= htmlspecialchars((string)($student['year_level'] ?? '—')) ?></span>
+                    <?php if (!empty($student['section'])): ?>
+                    <span class="intro-chip"><i class="fa-solid fa-people-group"></i> Section <?= htmlspecialchars($student['section']) ?></span>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
 
-        <!-- Status strip -->
+        <!-- ── Stat Strip ─────────────────────────────────── -->
         <div class="status-strip">
             <div class="s-item">
                 <div class="s-icon blue"><i class="fa-solid fa-user-graduate"></i></div>
                 <div>
                     <div class="s-value"><?= htmlspecialchars($statusLabel) ?></div>
-                    <div class="s-label">Student Status · <?= htmlspecialchars($enrollmentLabel) ?></div>
+                    <div class="s-label">Student Status</div>
                 </div>
             </div>
             <div class="s-item">
                 <div class="s-icon green"><i class="fa-solid fa-file-lines"></i></div>
                 <div>
-                    <div class="s-value"><?= $docPending ?> <span style="font-size:14px;font-weight:600;color:#94a3b8;">/ <?= $docTotal ?></span></div>
+                    <div class="s-value"><?= $docPending ?> <span style="font-size:13px;font-weight:600;color:#94a3b8;">/ <?= $docTotal ?></span></div>
                     <div class="s-label">Pending Documents</div>
                 </div>
             </div>
@@ -118,126 +126,154 @@ $photoUrl = $photo ? $APP_ROOT . ltrim($photo, './') : '';
                 </div>
             </div>
             <div class="s-item">
-                <div class="s-icon yellow"><i class="fa-solid fa-id-badge"></i></div>
+                <div class="s-icon amber"><i class="fa-solid fa-id-badge"></i></div>
                 <div>
                     <div class="s-value"><?= $docTotal ?></div>
-                    <div class="s-label">Document Requests</div>
+                    <div class="s-label">Total Requests</div>
                 </div>
             </div>
         </div>
 
-        <!-- Current Status block -->
-        <div class="panel" style="margin-bottom:24px;">
+        <!-- ── Quick Actions ──────────────────────────────── -->
+        <div class="student-quick-actions">
+            <a href="<?= $APP_ROOT ?>student/grades.php" class="action-card ac-blue">
+                <div class="action-icon-wrap"><i class="fa-solid fa-chart-simple"></i></div>
+                <div class="action-title-row">
+                    <span class="action-title">Your Grades</span>
+                    <i class="fa-solid fa-arrow-right action-arrow"></i>
+                </div>
+            </a>
+            <a href="<?= $APP_ROOT ?>student/documents.php" class="action-card ac-purple">
+                <div class="action-icon-wrap"><i class="fa-solid fa-folder-closed"></i></div>
+                <div class="action-title-row">
+                    <span class="action-title">Request Docs</span>
+                    <i class="fa-solid fa-arrow-right action-arrow"></i>
+                </div>
+            </a>
+            <a href="<?= $APP_ROOT ?>student/queue.php" class="action-card ac-amber">
+                <div class="action-icon-wrap"><i class="fa-solid fa-ticket"></i></div>
+                <div class="action-title-row">
+                    <span class="action-title">Queue Ticket</span>
+                    <i class="fa-solid fa-arrow-right action-arrow"></i>
+                </div>
+            </a>
+            <a href="<?= $APP_ROOT ?>student/ids.php" class="action-card ac-emerald">
+                <div class="action-icon-wrap"><i class="fa-solid fa-id-badge"></i></div>
+                <div class="action-title-row">
+                    <span class="action-title">Digital ID</span>
+                    <i class="fa-solid fa-arrow-right action-arrow"></i>
+                </div>
+            </a>
+            <button type="button" class="action-card ac-ai" onclick="if(window.toggleStudentChat) window.toggleStudentChat();">
+                <div class="action-icon-wrap"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+                <div class="action-title-row">
+                    <span class="action-title">Ask AI</span>
+                    <i class="fa-solid fa-arrow-right action-arrow"></i>
+                </div>
+            </button>
+        </div>
+
+        <!-- ── Enrollment Status Panel ─────────────────────── -->
+        <div class="panel" style="margin-bottom:28px;">
             <div class="panel-toolbar">
-                <div class="panel-title"><i class="fa-solid fa-user-graduate" style="color:#2563eb;"></i> Current Status</div>
+                <div class="panel-title"><i class="fa-solid fa-user-graduate" style="color:#2563eb;"></i> Enrollment Status</div>
                 <?php if (($student['status'] ?? '') === 'enrolled'): ?>
-                    <div class="panel-actions"><span class="pill active"><i class="fa-solid fa-circle-check"></i> Currently Enrolled</span></div>
+                    <div class="panel-actions"><span class="pill active"><i class="fa-solid fa-circle-check"></i> Active</span></div>
                 <?php endif; ?>
             </div>
-            <div style="padding:16px 20px;">
-                <div class="status-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;">
-                    <div>
-                        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#94a3b8;font-weight:600;margin-bottom:4px;">Student ID</div>
-                        <div style="font-size:14px;font-weight:600;color:#0f172a;"><?= htmlspecialchars($student['student_number'] ?? '—') ?></div>
-                    </div>
-                    <div>
-                        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#94a3b8;font-weight:600;margin-bottom:4px;">Student Name</div>
-                        <div style="font-size:14px;font-weight:600;color:#0f172a;"><?= htmlspecialchars($fullName) ?></div>
-                    </div>
-                    <div>
-                        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#94a3b8;font-weight:600;margin-bottom:4px;">Current Student Status</div>
-                        <div style="font-size:14px;font-weight:600;color:#0f172a;"><?= htmlspecialchars($statusLabel) ?></div>
-                    </div>
-                    <div>
-                        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#94a3b8;font-weight:600;margin-bottom:4px;">Program / Course</div>
-                        <div style="font-size:14px;font-weight:600;color:#0f172a;"><?= htmlspecialchars($student['course'] ?? '—') ?><?= !empty($student['major']) ? ' · ' . htmlspecialchars($student['major']) : '' ?></div>
-                    </div>
-                    <div>
-                        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#94a3b8;font-weight:600;margin-bottom:4px;">Year Level</div>
-                        <div style="font-size:14px;font-weight:600;color:#0f172a;">Year <?= htmlspecialchars((string)($student['year_level'] ?? '—')) ?></div>
-                    </div>
-                    <div>
-                        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#94a3b8;font-weight:600;margin-bottom:4px;">Section</div>
-                        <div style="font-size:14px;font-weight:600;color:#0f172a;"><?= htmlspecialchars($student['section'] ?? '—') ?></div>
-                    </div>
-                    <div>
-                        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#94a3b8;font-weight:600;margin-bottom:4px;">Academic Year</div>
-                        <div style="font-size:14px;font-weight:600;color:#0f172a;"><?= htmlspecialchars($student['school_year'] ?? '—') ?></div>
-                    </div>
-                    <div>
-                        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#94a3b8;font-weight:600;margin-bottom:4px;">Semester</div>
-                        <div style="font-size:14px;font-weight:600;color:#0f172a;"><?= htmlspecialchars($student['semester'] ?? '—') ?></div>
-                    </div>
-                    <div>
-                        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#94a3b8;font-weight:600;margin-bottom:4px;">Enrollment Status</div>
-                        <div style="font-size:14px;font-weight:600;color:#0f172a;"><?= htmlspecialchars($enrollmentLabel) ?></div>
-                    </div>
+            <div class="status-info-grid">
+                <div class="status-info-cell">
+                    <div class="sic-label">Student ID</div>
+                    <div class="sic-value"><?= htmlspecialchars($student['student_number'] ?? '—') ?></div>
+                </div>
+                <div class="status-info-cell">
+                    <div class="sic-label">Full Name</div>
+                    <div class="sic-value"><?= htmlspecialchars($fullName) ?></div>
+                </div>
+                <div class="status-info-cell">
+                    <div class="sic-label">Status</div>
+                    <div class="sic-value"><?= htmlspecialchars($statusLabel) ?></div>
+                </div>
+                <div class="status-info-cell">
+                    <div class="sic-label">Program / Course</div>
+                    <div class="sic-value"><?= htmlspecialchars($student['course'] ?? '—') ?><?= !empty($student['major']) ? ' · ' . htmlspecialchars($student['major']) : '' ?></div>
+                </div>
+                <div class="status-info-cell">
+                    <div class="sic-label">Year Level</div>
+                    <div class="sic-value">Year <?= htmlspecialchars((string)($student['year_level'] ?? '—')) ?></div>
+                </div>
+                <div class="status-info-cell">
+                    <div class="sic-label">Section</div>
+                    <div class="sic-value"><?= htmlspecialchars($student['section'] ?? '—') ?></div>
+                </div>
+                <div class="status-info-cell">
+                    <div class="sic-label">Academic Year</div>
+                    <div class="sic-value"><?= htmlspecialchars($student['school_year'] ?? '—') ?></div>
+                </div>
+                <div class="status-info-cell">
+                    <div class="sic-label">Semester</div>
+                    <div class="sic-value"><?= htmlspecialchars($student['semester'] ?? '—') ?></div>
                 </div>
             </div>
         </div>
 
+        <!-- ── Bottom Grid: Announcements + Queue ─────────── -->
         <div class="student-grid">
 
             <!-- Announcements -->
             <div class="panel">
                 <div class="panel-toolbar">
-                    <div class="panel-title"><i class="fa-solid fa-bullhorn" style="color:#2563eb;"></i> Announcements</div>
+                    <div class="panel-title"><i class="fa-solid fa-bullhorn" style="color:#2563eb;"></i> Recent Announcements</div>
                     <div class="panel-actions">
-                        <a href="<?= $APP_ROOT ?>student/announcements.php" class="btn btn-sm btn-light"><i class="fa-solid fa-arrow-right"></i> View all</a>
+                        <a href="<?= $APP_ROOT ?>student/announcements.php" class="btn btn-sm btn-light"><i class="fa-solid fa-arrow-right"></i> View All</a>
                     </div>
                 </div>
                 <?php if (empty($announcements)): ?>
                     <div class="empty-state"><i class="fa-solid fa-bullhorn"></i><p>No announcements yet</p><span>Check back soon for updates from the Registrar.</span></div>
                 <?php else: foreach ($announcements as $a): ?>
-                    <div style="padding:14px 20px;border-bottom:1px solid #f1f5f9;">
-                        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
-                            <div style="font-weight:600;color:#0f172a;font-size:14px;"><?= htmlspecialchars($a['title']) ?></div>
-                            <span class="chip blue" style="flex-shrink:0;"><i class="fa-solid fa-clock"></i> <?= date('M d', strtotime($a['created_at'])) ?></span>
-                        </div>
-                        <div style="color:#64748b;font-size:13px;margin-top:5px;line-height:1.5;"><?= htmlspecialchars(mb_strimwidth((string)($a['body'] ?? ''), 0, 140, '…')) ?></div>
+                    <div class="announcement-row">
+                        <div class="ar-title"><?= htmlspecialchars($a['title']) ?></div>
+                        <span class="ar-date"><i class="fa-solid fa-clock"></i> <?= date('M d', strtotime($a['created_at'])) ?></span>
+                        <div class="ar-body"><?= htmlspecialchars(mb_strimwidth((string)($a['body'] ?? ''), 0, 130, '…')) ?></div>
                         <?php if (!empty($a['author_name'])): ?>
-                        <div style="color:#94a3b8;font-size:11px;margin-top:7px;">
-                            <i class="fa-solid fa-user-pen"></i> <?= htmlspecialchars($a['author_name']) ?>
-                        </div>
+                        <div class="ar-meta"><i class="fa-solid fa-user-pen"></i> <?= htmlspecialchars($a['author_name']) ?></div>
                         <?php endif; ?>
                     </div>
                 <?php endforeach; endif; ?>
             </div>
 
-            <!-- Today's queue -->
+            <!-- My Queue -->
             <div class="panel">
                 <div class="panel-toolbar">
-                    <div class="panel-title"><i class="fa-solid fa-display" style="color:#7c3aed;"></i> My Queue</div>
+                    <div class="panel-title"><i class="fa-solid fa-display" style="color:#7c3aed;"></i> Queue Status</div>
                     <div class="panel-actions">
-                        <a href="<?= $APP_ROOT ?>student/queue.php" class="btn btn-sm btn-light"><i class="fa-solid fa-arrow-right"></i> Details</a>
+                        <a href="<?= $APP_ROOT ?>student/queue.php" class="btn btn-sm btn-light"><i class="fa-solid fa-arrow-right"></i> Manage</a>
                     </div>
                 </div>
                 <?php if (!$queue): ?>
-                    <div style="padding:26px 20px;text-align:center;">
-                        <i class="fa-solid fa-ticket" style="font-size:38px;color:#e2e8f0;"></i>
-                        <p style="margin:12px 0 2px;font-size:14px;font-weight:600;color:#64748b;">No queue ticket today</p>
-                        <p style="margin:0;color:#94a3b8;font-size:13px;">Tap your RFID card at the kiosk to join the line.</p>
-                        <a href="<?= $APP_ROOT ?>student/queue.php" class="btn btn-sm btn-primary" style="margin-top:16px;"><i class="fa-solid fa-display"></i> Go to My Queue</a>
+                    <div style="padding:40px 24px;text-align:center;">
+                        <i class="fa-solid fa-ticket" style="font-size:42px;color:#cbd5e1;margin-bottom:18px;display:block;"></i>
+                        <p style="margin:0 0 8px;font-size:16px;font-weight:800;color:#475569;letter-spacing:-0.2px;">No Active Queue Ticket</p>
+                        <p style="margin:0 0 20px;color:#94a3b8;font-size:14px;line-height:1.7;font-weight:500;">Scan your RFID card at any kiosk to join the queue and get a ticket number.</p>
+                        <a href="<?= $APP_ROOT ?>student/queue.php" class="btn btn-sm btn-primary"><i class="fa-solid fa-display"></i> Join Queue</a>
                     </div>
                 <?php else: ?>
-                    <div style="padding:20px;">
-                        <div class="queue-quick">
-                            <div class="qq-number">#<?= str_pad((string)$queue['ticket_number'], 3, '0', STR_PAD_LEFT) ?></div>
-                            <div class="qq-info">
-                                <div class="qq-status">
-                                    <span class="pill <?= $queue['status'] === 'waiting' ? 'pending' : ($queue['status'] === 'serving' ? 'active' : 'inactive') ?>">
-                                        <i class="fa-solid fa-<?= $queue['status'] === 'waiting' ? 'clock' : ($queue['status'] === 'serving' ? 'bell-concierge' : 'circle-check') ?>"></i>
-                                        <?= ucfirst($queue['status']) ?>
-                                    </span>
-                                </div>
-                                <?php if ($queue['status'] === 'waiting'): ?>
-                                    <div class="qq-detail"><?= max(0, $queuePosition - 1) ?> ahead you · <?= $queuePosition === 1 ? 'You are next!' : 'Position ' . $queuePosition . ' in line' ?></div>
-                                <?php elseif ($queue['status'] === 'serving'): ?>
-                                    <div class="qq-detail" style="color:#16a34a;font-weight:600;">It's your turn — proceed to Counter <?= htmlspecialchars((string)$queue['counter']) ?>.</div>
-                                <?php else: ?>
-                                    <div class="qq-detail">Ticket <?= ucfirst($queue['status']) ?> today.</div>
-                                <?php endif; ?>
+                    <div class="queue-quick">
+                        <div class="qq-number">#<?= str_pad((string)$queue['ticket_number'], 3, '0', STR_PAD_LEFT) ?></div>
+                        <div class="qq-info">
+                            <div class="qq-status">
+                                <span class="pill <?= $queue['status'] === 'waiting' ? 'pending' : ($queue['status'] === 'serving' ? 'active' : 'inactive') ?>">
+                                    <i class="fa-solid fa-<?= $queue['status'] === 'waiting' ? 'clock' : ($queue['status'] === 'serving' ? 'bell-concierge' : 'circle-check') ?>"></i>
+                                    <?= ucfirst($queue['status']) ?>
+                                </span>
                             </div>
+                            <?php if ($queue['status'] === 'waiting'): ?>
+                                <div class="qq-detail"><?= max(0, $queuePosition - 1) ?> students ahead · <?= $queuePosition === 1 ? "You're next!" : 'Position ' . $queuePosition ?></div>
+                            <?php elseif ($queue['status'] === 'serving'): ?>
+                                <div class="qq-detail" style="color:#059669;font-weight:800;">Your turn now · Counter <?= htmlspecialchars((string)$queue['counter']) ?></div>
+                            <?php else: ?>
+                                <div class="qq-detail">Completed today.</div>
+                            <?php endif; ?>
                         </div>
                     </div>
                 <?php endif; ?>

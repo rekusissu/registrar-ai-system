@@ -63,7 +63,7 @@ include '../includes/sidebar.php';
             <input type="hidden" id="healthId">
             <div class="form-group">
                 <label>Student <span style="color:#dc2626;">*</span></label>
-                <select id="healthStudent" class="form-control" required>
+                <select id="healthStudent" class="form-control" data-searchable required>
                     <option value="">Select a student</option>
                     <?php foreach ($students as $st): ?>
                         <?php if (in_array($st['id'], $hasRecord)) continue; ?>

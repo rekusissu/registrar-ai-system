@@ -37,3 +37,12 @@
     ExpiresByType font/woff2 "access plus 1 month"
     ExpiresByType font/woff "access plus 1 month"
 </IfModule>
+
+# ── Document verification pretty URLs (spec §7) ───────────────
+# /verify/<qr_hash> → verify.php?qr=<qr_hash>. verify.php?qr=HASH
+# remains the canonical path and always works without rewriting.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^verify/([A-Za-z0-9]{32,64})$ verify.php?qr=$1 [L,QSA]
+</IfModule>
+

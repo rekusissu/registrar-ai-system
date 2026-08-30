@@ -461,3 +461,28 @@ select.form-control,
 
 /* Empty-state inside table rows (modal kv placeholder) */
 .kv-empty { font-size: 13px; color: #94a3b8; font-style: italic; }
+
+/* ── Searchable select (js/searchable-select.js) ─────────────── */
+.ss-wrap { position: relative; }
+.ss-native { display: none !important; }
+.ss-input { width: 100%; box-sizing: border-box; cursor: text; }
+.ss-list {
+    display: none;
+    position: absolute; top: 100%; left: 0; right: 0;
+    margin-top: 4px;
+    background: #fff;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(15,23,42,.14);
+    overflow-y: auto;
+    z-index: 60;
+    overscroll-behavior: contain;
+}
+.ss-list.open { display: block; }
+.ss-item { padding: 9px 14px; font-size: 13.5px; color: #1e293b; cursor: pointer; }
+.ss-item + .ss-item { border-top: 1px solid #f1f5f9; }
+.ss-item:hover, .ss-item.hl { background: #eff6ff; color: #1d4ed8; }
+.ss-more {
+    padding: 8px 14px; font-size: 12px; color: #94a3b8;
+    text-align: center; border-top: 1px solid #f1f5f9;
+}
