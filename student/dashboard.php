@@ -2,7 +2,7 @@
 // ============================================================
 //  STUDENT/DASHBOARD.PHP
 //  Student portal home — welcome hero, quick status,
-//  announcements, and quick actions.
+//  and quick actions.
 // ============================================================
 
 require_once __DIR__ . '/../shared/security_headers.php';
@@ -17,16 +17,6 @@ $extra_css = ['student.css'];
 require_once __DIR__ . '/_guard.php';
 
 $db = Database::getInstance();
-
-// Latest published announcements
-$announcements = $db->fetchAll(
-    "SELECT a.*, u.full_name AS author_name
-     FROM announcements a
-     LEFT JOIN users u ON u.id = a.author_id
-     WHERE a.is_published = 1
-     ORDER BY a.created_at DESC
-     LIMIT 4"
-);
 
 // Document request count + pending count
 $docTotal = (int) $db->fetchColumn(
@@ -217,30 +207,8 @@ else                   { $timeGreeting = 'Good night';     $bodyClass = 'night';
             </div>
         </div>
 
-        <!-- ── Bottom Grid: Announcements + Queue ─────────── -->
+        <!-- ── Queue Status ─────────────────────────────── -->
         <div class="student-grid">
-
-            <!-- Announcements -->
-            <div class="panel">
-                <div class="panel-toolbar">
-                    <div class="panel-title"><i class="fa-solid fa-bullhorn" style="color:#2563eb;"></i> Recent Announcements</div>
-                    <div class="panel-actions">
-                        <a href="<?= $APP_ROOT ?>student/announcements.php" class="btn btn-sm btn-light"><i class="fa-solid fa-arrow-right"></i> View All</a>
-                    </div>
-                </div>
-                <?php if (empty($announcements)): ?>
-                    <div class="empty-state"><i class="fa-solid fa-bullhorn"></i><p>No announcements yet</p><span>Check back soon for updates from the Registrar.</span></div>
-                <?php else: foreach ($announcements as $a): ?>
-                    <div class="announcement-row">
-                        <div class="ar-title"><?= htmlspecialchars($a['title']) ?></div>
-                        <span class="ar-date"><i class="fa-solid fa-clock"></i> <?= date('M d', strtotime($a['created_at'])) ?></span>
-                        <div class="ar-body"><?= htmlspecialchars(mb_strimwidth((string)($a['body'] ?? ''), 0, 130, '…')) ?></div>
-                        <?php if (!empty($a['author_name'])): ?>
-                        <div class="ar-meta"><i class="fa-solid fa-user-pen"></i> <?= htmlspecialchars($a['author_name']) ?></div>
-                        <?php endif; ?>
-                    </div>
-                <?php endforeach; endif; ?>
-            </div>
 
             <!-- My Queue -->
             <div class="panel">

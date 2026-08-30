@@ -94,29 +94,6 @@ LOCK TABLES `academic_history` WRITE;
 /*!40000 ALTER TABLE `academic_history` DISABLE KEYS */;
 /*!40000 ALTER TABLE `academic_history` ENABLE KEYS */;
 UNLOCK TABLES;
-DROP TABLE IF EXISTS `announcements`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `announcements` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `title` varchar(200) NOT NULL,
-  `body` text DEFAULT NULL,
-  `author_id` int(11) DEFAULT NULL,
-  `is_published` tinyint(1) NOT NULL DEFAULT 1,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  PRIMARY KEY (`id`),
-  KEY `idx_author` (`author_id`),
-  KEY `idx_published` (`is_published`,`created_at`),
-  CONSTRAINT `fk_announcement_author` FOREIGN KEY (`author_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
-LOCK TABLES `announcements` WRITE;
-/*!40000 ALTER TABLE `announcements` DISABLE KEYS */;
-INSERT INTO `announcements` VALUES (1,'Midterm Grades Available','Midterm grades are now available. Please check your portal.',2,1,'2026-08-16 18:33:48','2026-08-24 22:13:19');
-/*!40000 ALTER TABLE `announcements` ENABLE KEYS */;
-UNLOCK TABLES;
 DROP TABLE IF EXISTS `audit_logs`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;

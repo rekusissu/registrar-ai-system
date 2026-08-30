@@ -82,7 +82,7 @@ $intents = [
     ],
     'enrollment' => [
         ['enroll', 'enrollment', 'enrolment', 'register for classes'],
-        'Enrollment is handled by the school. Check the announcements and your assigned schedule; for registration issues visit the Registrar\'s Office or your adviser.',
+        'Enrollment is handled by the school. For registration issues visit the Registrar\'s Office or your adviser.',
     ],
     'queue' => [
         ['queue', 'line', 'number', 'waiting', 'in line'],

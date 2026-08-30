@@ -55,11 +55,6 @@ if ($USER_ROLE === 'student') {
             <span class="sidebar-text">Dashboard</span>
         </a>
 
-        <a href="<?= $APP_ROOT ?>student/announcements.php" class="sidebar-item <?= $ACTIVE_NAV === 'student_announcements' ? 'active' : '' ?>">
-            <i class="fa-solid fa-bullhorn"></i>
-            <span class="sidebar-text">Announcements</span>
-        </a>
-
         <div class="sidebar-divider"></div>
 
         <div class="sidebar-brand">
@@ -151,11 +146,6 @@ if ($USER_ROLE === 'student') {
             <span class="sidebar-text">Students</span>
         </a>
 
-        <a href="<?= $APP_ROOT ?>registrar/announcements.php" class="sidebar-item <?= $ACTIVE_NAV === 'announcements' ? 'active' : '' ?>">
-            <i class="fa-solid fa-bullhorn"></i>
-            <span class="sidebar-text">Announcements</span>
-        </a>
-
         <a href="<?= $APP_ROOT ?>registrar/guardians.php" class="sidebar-item <?= $ACTIVE_NAV === 'guardians' ? 'active' : '' ?>">
             <i class="fa-solid fa-users"></i>
             <span class="sidebar-text">Guardians &amp; Contacts</span>
@@ -175,11 +165,6 @@ if ($USER_ROLE === 'student') {
         <a href="<?= $APP_ROOT ?>registrar/rfid-scan-logs.php" class="sidebar-item <?= $ACTIVE_NAV === 'scanlogs' ? 'active' : '' ?>">
             <i class="fa-solid fa-clock-rotate-left"></i>
             <span class="sidebar-text">Scan Logs</span>
-        </a>
-
-        <a href="<?= $APP_ROOT ?>registrar/rfid-authorized-cards.php" class="sidebar-item <?= $ACTIVE_NAV === 'authorized' ? 'active' : '' ?>">
-            <i class="fa-solid fa-shield-halved"></i>
-            <span class="sidebar-text">Authorized Cards</span>
         </a>
 
         <a href="<?= $APP_ROOT ?>registrar/documents.php" class="sidebar-item <?= $ACTIVE_NAV === 'documents' ? 'active' : '' ?>">
