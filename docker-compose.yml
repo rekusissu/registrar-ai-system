@@ -18,10 +18,13 @@ name: registrar-ai
 
 services:
   app:
+    # Prebuilt by CI (.github/workflows/docker-image.yml) and pushed to GHCR —
+    # the VPS pulls this instead of compiling the PHP extensions locally.
+    # The `build:` block is kept so local `docker compose --build` still works.
     build:
       context: .
       dockerfile: Dockerfile
-    image: registrar-ai:latest
+    image: ghcr.io/rekusissu/registrar-ai:latest
     restart: unless-stopped
     environment:
       APP_ENV: ${APP_ENV:-production}

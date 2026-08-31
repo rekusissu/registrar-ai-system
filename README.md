@@ -107,17 +107,17 @@ All are configured via `.env` and are **opt-in** — the app keeps working when 
 
 ### Deploy to your VPS behind your domain
 
-Ready to go live on a server you control (DigitalOcean, Vultr, AWS, …). The build runs entirely on the server — no Docker needed on your laptop.
+Ready to go live on a server you control (DigitalOcean, Vultr, AWS, …). No Docker needed on your laptop, and — thanks to the CI-prebuilt image — **no PHP compilation on your server either**.
 
-**1. On your laptop — commit & push the Docker files to GitHub:**
+**1. Push to GitHub — CI builds the image once and uploads it to GHCR:**
 
 ```bash
-git add Dockerfile docker-compose*.yml docker/ deploy/ .env.example .dockerignore README.md
+git add Dockerfile docker-compose*.yml docker/ deploy/ .github/ .env.example .dockerignore README.md
 git commit -m "chore(docker): add deployment setup"
 git push origin main
 ```
 
-> Your remote is `https://github.com/rekusissu/registrar-ai-system.git` — the deploy script clones from there by default (override with `REPO_URL`).
+> This triggers `.github/workflows/docker-image.yml`, which builds the PHP + Composer image on GitHub's runner and pushes `ghcr.io/rekusissu/registrar-ai:latest` (+ `:main`, `:git-<sha>`). Watch it succeed under the **Actions** tab before proceeding.
 
 **2. In your DNS provider — point the domain at the server:** add an `A` record `your.domain → <VPS IP>`.
 
@@ -129,12 +129,20 @@ cd registrar-ai-system
 bash deploy/server-setup.sh   # installs Docker + Compose; then RELOG
 bash deploy/deploy.sh         # clones/pulls, creates .env, then stops
 nano .env                     # set DOMAIN, strong DB passwords, JWT_SECRET, …
-bash deploy/deploy.sh         # build + start behind HTTPS
+bash deploy/deploy.sh         # pulls the prebuilt image + starts behind HTTPS
 ```
 
-- The deploy script auto-seeds the database from `registrar_ai.sql` on first run and provisions a **Let's Encrypt certificate** for your `DOMAIN` via Caddy (ports 80/443 are the only public entry; the app binds to `127.0.0.1:8080`).
+- The deploy script **pulls the prebuilt image** from GHCR (no `docker compose --build`), auto-seeds the database from `registrar_ai.sql` on first run, and provisions a **Let's Encrypt** certificate for your `DOMAIN` via Caddy (ports 80/443 are the only public entry; the app binds to `127.0.0.1:8080`).
+- The GHCR image is **public by default**; if you make it private, set `GHCR_USER` + `GHCR_TOKEN` (a fine-grained `read:packages` PAT) in `.env`.
 - Login with the seeded dev user, then **change the password** before going live.
-- Everything runs on the server, so there's **no requirement for WSL2/Docker on your machine** to deploy.
+
+### How updates flow (CI → GHCR → VPS)
+
+1. You `git push` to `main`.
+2. **GitHub Actions** builds the multi-stage image and pushes to GHCR.
+3. On the VPS, re-run `bash deploy/deploy.sh` — it pulls `:latest` and recreates containers (your DB/upload volumes persist).
+
+You can also build locally anytime with `docker compose up -d --build` (the `build:` block is still present in `docker-compose.yml`).
 
 ## Configuration
 

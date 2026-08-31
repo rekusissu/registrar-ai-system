@@ -56,12 +56,24 @@ grep -qE '^DB_PASSWORD=change-me' .env && { echo "✘ change DB_PASSWORD in .env
 grep -qE '^DB_ROOT_PASSWORD=change-me' .env && { echo "✘ change DB_ROOT_PASSWORD in .env"; exit 1; }
 grep -qE '^JWT_SECRET=replace-with' .env && { echo "✘ change JWT_SECRET in .env"; exit 1; }
 
-# 4. Build + start ---------------------------------------------------------------
-echo "[deploy] Building and starting the production stack…"
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# 4. Auth to GHCR (for pushing + pulling the prebuilt image) ------------------
+# The image is PUBLIC by default so a pull usually needs no login. If you made
+# the package private, set GHCR_USER + GHCR_TOKEN in .env (a fine-grained PAT
+# with read:packages).
+GHCR_USER="$(grep -E '^GHCR_USER=' .env | cut -d= -f2-)"
+GHCR_TOKEN="$(grep -E '^GHCR_TOKEN=' .env | cut -d= -f2-)"
+if [ -n "$GHCR_USER" ] && [ -n "$GHCR_TOKEN" ]; then
+  echo "[deploy] Logging in to GitHub Container Registry…"
+  echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+fi
+
+# 5. Pull the prebuilt image (no local compile) + start ------------------------
+echo "[deploy] Pulling latest image and starting the production stack…"
+docker compose -f docker-compose.yml -f docker-compose.prod.yml pull app
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --no-build
 
 echo
 echo "✔ Deployed. Give it ~30s on first run to seed the database."
 echo "  https://$(grep -E '^DOMAIN=' .env | cut -d= -f2)"
 echo "  Logs:    docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f app"
-echo "  Update:  re-run `bash deploy.sh` (it pulls + rebuilds)."
+echo "  Update:  re-run `bash deploy.sh` (it pulls the new image + recreates)."
