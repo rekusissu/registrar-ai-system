@@ -19,7 +19,15 @@ FROM php:8.2-apache AS base
 #   gd/fileinfo      → QRs, images, TCPDF   intl       → TCPDF i18n
 #   curl             → AI gateway / payments exif / zip → uploads handling
 #   opcache          → production performance
-RUN apt-get update \
+# Robust install:
+#   - set -eux            → fail fast with a clear line id
+#   - apt retries/timeout → survive flaky mirrors on small/cloud build hosts
+#   - capped -j<N>        → never compile every extension in parallel on a
+#                           many-core/small-RAM host (gd + intl/ICU are heavy,
+#                           parallel builds OOM and the build dies with a
+#                           cryptic "file already closed").
+RUN set -eux \
+    && apt-get update -o Acquire::Retries=5 -o Acquire::http::Timeout=30 \
     && apt-get install -y --no-install-recommends \
         libfreetype6-dev \
         libjpeg62-turbo-dev \
@@ -28,7 +36,7 @@ RUN apt-get update \
         libicu-dev \
         libcurl4-openssl-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j"$(nproc)" \
+    && docker-php-ext-install -j"$( [ "$(nproc)" -gt 2 ] && echo 2 || echo "$(nproc)" )" \
         pdo_mysql \
         mbstring \
         exif \
