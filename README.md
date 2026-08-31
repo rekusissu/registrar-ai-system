@@ -149,6 +149,31 @@ bash deploy/deploy.sh         # pulls the prebuilt image + starts behind HTTPS
 
 Because the heavy PHP compilation happens only in CI (and is cached), the platform build is just COPY steps — it finishes in seconds instead of the ~20 minutes that was blowing past the host's build timeout.
 
+### Deploying to a platform that runs only the Dockerfile
+
+Some managed platforms (which build the `Dockerfile` and probe a `$PORT`) don't run `docker-compose.yml`, so there's **no MariaDB container**. The app handles this:
+
+- **Port:** the entrypoint binds Apache to **both** `:80` and the platform's `$PORT`, so the health check succeeds either way.
+- **Database:** attach the platform's managed MySQL/MariaDB add-on, then set these **environment variables** on the app:
+
+| Variable | Value |
+|---|---|
+| `DB_HOST` | the add-on's hostname |
+| `DB_PORT` | the add-on's port (**needed** — managed DBs rarely use 3306) |
+| `DB_NAME` | e.g. `registrar_ai` |
+| `DB_USER` / `DB_PASSWORD` | the add-on's credentials |
+| `APP_ENV` | `production` |
+| `JWT_SECRET`, `KIOSK_ACCESS_TOKEN` | long random strings |
+| `NINEROUTER_URL`, `AI_API_KEY` | optional — AI gateway |
+
+Then **seed the schema** once into that database:
+
+```bash
+DB_HOST=<host> DB_PORT=<port> DB_USER=<user> DB_PASSWORD=<pass> bash deploy/seed-db.sh
+```
+
+> ⚠️ `registrar_ai.sql` drops and recreates every table. Prefer **MariaDB** over MySQL if the platform offers a choice — the dump was produced by MariaDB.
+
 You can also build locally anytime with `docker compose up -d --build` (the `build:` block is still present in `docker-compose.yml`).
 
 ## Configuration

@@ -8,12 +8,14 @@ define('CONFIG_LOADED', true);
 
 // Database Configuration
 // Database settings can be overridden per environment via env vars
-// (DB_HOST, DB_NAME, DB_USER, DB_PASSWORD, DB_CHARSET).
+// (DB_HOST, DB_NAME, DB_USER, DB_PASSWORD, DB_CHARSET, DB_PORT).
 define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
 define('DB_NAME', getenv('DB_NAME') ?: 'registrar_ai');
 define('DB_USER', getenv('DB_USER') ?: 'root');
 define('DB_PASSWORD', getenv('DB_PASSWORD') ?: '');
 define('DB_CHARSET', getenv('DB_CHARSET') ?: 'utf8mb4');
+// Managed MySQL add-ons frequently listen on a non-default port.
+define('DB_PORT', getenv('DB_PORT') ?: '3306');
 
 // Application Configuration
 define('APP_NAME', 'BCP Registrar System');

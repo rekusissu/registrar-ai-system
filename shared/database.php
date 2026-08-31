@@ -14,7 +14,8 @@ class Database {
 
     private function __construct() {
         try {
-            $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
+            $dsn = "mysql:host=" . DB_HOST . ";port=" . DB_PORT
+                 . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
             
             $this->connection = new PDO($dsn, DB_USER, DB_PASSWORD, [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
