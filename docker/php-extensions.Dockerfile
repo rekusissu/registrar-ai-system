@@ -36,6 +36,7 @@ RUN set -e \
         mbstring \
         gd \
         curl \
+        zip \
         fileinfo \
     && docker-php-ext-enable opcache \
     && a2enmod rewrite headers remoteip \

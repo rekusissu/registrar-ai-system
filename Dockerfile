@@ -16,6 +16,14 @@
 ARG PHP_EXT_TAG=php-8.2
 FROM ghcr.io/rekusissu/php-8.2-apache-ext:${PHP_EXT_TAG} AS vendor
 
+# Composer needs ext-zip OR the unzip binary to download dist archives.
+# unzip is installed here so the app build is self-sufficient even if the
+# pulled extension layer predates the zip addition.
+RUN set -e \
+    && apt-get update -o Acquire::Retries=5 -o Acquire::http::Timeout=30 \
+    && apt-get install -y --no-install-recommends unzip \
+    && rm -rf /var/lib/apt/lists/*
+
 # Composer production dependencies. The vendor stage uses the SAME prebuilt
 # runtime so Composer's platform checks match exactly.
 COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
