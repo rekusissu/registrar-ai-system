@@ -1,0 +1,11 @@
+# Uploaded files are data, never code: block script execution.
+# This guard is re-seeded into upload/log volumes at container boot.
+<FilesMatch \.(?i:php|php3|php4|php5|php7|phar|phtml|pl|py|cgi|sh)$>
+    Require all denied
+</FilesMatch>
+Options -ExecCGI
+RemoveHandler .php .phtml .phar
+
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>

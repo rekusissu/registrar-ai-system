@@ -53,6 +53,89 @@ Use the dev credentials below (the login form is no longer pre-filled):
 
 > ⚠️ Change these before going live. Credentials are configured in `shared/config.php` (database) and the `users` table (login).
 
+## Docker Deployment
+
+The project ships with a full Docker setup (`Dockerfile`, `docker-compose.yml`, `docker-compose.dev.yml`) so you can deploy it anywhere Docker runs — no XAMPP required. The app container includes Apache + PHP 8.2 with the exact extensions the app needs (PDO/MySQL, mbstring, curl, gd, intl, …) and the Composer dependencies baked in. A MariaDB container is auto-seeded with `registrar_ai.sql` on first start.
+
+### Prerequisites
+
+- [Docker](https://www.docker.com/) (Docker Desktop on Windows/macOS) with the Compose plugin (`docker compose`).
+
+### Production / default stack
+
+```bash
+# 1. Configure secrets (edit the values)
+cp .env.example .env
+
+# 2. Build & start (first run imports + seeds the database)
+docker compose up -d --build
+
+# 3. Open the app
+#    http://localhost:8080   (change APP_PORT in .env if 8080 is taken)
+```
+
+- Login with the seeded dev user (see *Default login* above): **`registrar@bestlink.edu.ph` / `password123`**.
+- Logs: `docker compose logs -f app`.
+- Stop: `docker compose down` (keeps the database/upload volumes).
+- **Re-seed the database from scratch:** `docker compose down -v && docker compose up -d --build` (⚠️ this deletes all DB + upload data).
+
+### Local development (live source)
+
+Overlays the repo as a bind mount so your edits are reflected immediately, and auto-installs Composer deps into the host `vendor/` on first boot. The database and runtime data (uploads/logs) stay in the same Docker volumes as the default stack:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+```
+
+`APP_ENV=development` shows errors on screen.
+
+### Optional integrations
+
+All are configured via `.env` and are **opt-in** — the app keeps working when they're unset:
+
+| Component     | Variables                                  | Behaviour when unset                  |
+|---------------|--------------------------------------------|---------------------------------------|
+| AI gateway    | `NINEROUTER_URL`, `AI_API_KEY`             | AI features degrade (no crash)        |
+| Payments      | `PAYMONGO_SECRET_KEY`, `PAYMONGO_PUBLIC_KEY`, `PAYMONGO_WEBHOOK_SECRET` | Built-in mock/COD path |
+| Email         | `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`, `MAIL_FROM_NAME` | Senders no-op           |
+
+> **Remote server note:** point `NINEROUTER_URL` at your gateway or a tunnel (e.g. `https://my-gateway.example.com`) — the app appends `/v1/chat/completions`. The default `http://localhost:20128` only matches the old XAMPP 9Router setup on the same machine.
+
+### How the container starts
+
+`docker/entrypoint.sh` creates the writable runtime dirs (`uploads/…`, `assets/uploads/students`, `logs/`), re-seeds their "no script execution" `.htaccess` guards if they were shadowed by empty volumes, runs `composer install` only in dev bind-mount mode, then starts Apache. The Apache vhost in `docker/apache/000-default.conf` serves the app from the web root with `AllowOverride All` so the repo's `.htaccess` (pretty `/verify/<hash>` URLs, caching headers) works.
+
+### Deploy to your VPS behind your domain
+
+Ready to go live on a server you control (DigitalOcean, Vultr, AWS, …). The build runs entirely on the server — no Docker needed on your laptop.
+
+**1. On your laptop — commit & push the Docker files to GitHub:**
+
+```bash
+git add Dockerfile docker-compose*.yml docker/ deploy/ .env.example .dockerignore README.md
+git commit -m "chore(docker): add deployment setup"
+git push origin main
+```
+
+> Your remote is `https://github.com/rekusissu/registrar-ai-system.git` — the deploy script clones from there by default (override with `REPO_URL`).
+
+**2. In your DNS provider — point the domain at the server:** add an `A` record `your.domain → <VPS IP>`.
+
+**3. SSH into the VPS and run (Ubuntu/Debian):**
+
+```bash
+git clone https://github.com/rekusissu/registrar-ai-system.git
+cd registrar-ai-system
+bash deploy/server-setup.sh   # installs Docker + Compose; then RELOG
+bash deploy/deploy.sh         # clones/pulls, creates .env, then stops
+nano .env                     # set DOMAIN, strong DB passwords, JWT_SECRET, …
+bash deploy/deploy.sh         # build + start behind HTTPS
+```
+
+- The deploy script auto-seeds the database from `registrar_ai.sql` on first run and provisions a **Let's Encrypt certificate** for your `DOMAIN` via Caddy (ports 80/443 are the only public entry; the app binds to `127.0.0.1:8080`).
+- Login with the seeded dev user, then **change the password** before going live.
+- Everything runs on the server, so there's **no requirement for WSL2/Docker on your machine** to deploy.
+
 ## Configuration
 
 ### Database
