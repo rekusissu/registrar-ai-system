@@ -7,15 +7,17 @@ if (defined('CONFIG_LOADED')) {
 define('CONFIG_LOADED', true);
 
 // Database Configuration
-// Database settings can be overridden per environment via env vars
-// (DB_HOST, DB_NAME, DB_USER, DB_PASSWORD, DB_CHARSET, DB_PORT).
-define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
-define('DB_NAME', getenv('DB_NAME') ?: 'registrar_ai');
-define('DB_USER', getenv('DB_USER') ?: 'root');
-define('DB_PASSWORD', getenv('DB_PASSWORD') ?: '');
-define('DB_CHARSET', getenv('DB_CHARSET') ?: 'utf8mb4');
-// Managed MySQL add-ons frequently listen on a non-default port.
-define('DB_PORT', getenv('DB_PORT') ?: '3306');
+// Database settings can be overridden per environment via env vars:
+//   DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_CHARSET, DB_NAME
+// PaaS platforms often use the Laravel-style names instead, so those are
+// accepted as fallbacks: DB_DATABASE (→ DB_NAME), DB_USERNAME (→ DB_USER).
+$host = getenv('DB_HOST') ?: 'localhost';
+$user = getenv('DB_USER') ?: 'root';
+$pass = getenv('DB_PASS') ?: '';
+$db   = getenv('DB_NAME') ?: 'registrar_ai';
+$port = (int)(getenv('DB_PORT') ?: 3306);
+
+$conn = new mysqli($host, $user, $pass, $db, $port);
 
 // Application Configuration
 define('APP_NAME', 'BCP Registrar System');
