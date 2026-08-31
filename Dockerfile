@@ -35,6 +35,7 @@ RUN set -eux \
         libzip-dev \
         libicu-dev \
         libcurl4-openssl-dev \
+        libonig-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j"$( [ "$(nproc)" -gt 2 ] && echo 2 || echo "$(nproc)" )" \
         pdo_mysql \
