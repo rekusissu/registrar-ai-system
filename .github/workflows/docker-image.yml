@@ -22,39 +22,84 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE_NAME: ghcr.io/rekusissu/registrar-ai
+  REGISTRY: ghcr.io
+  ORG: rekusissu
+  APP_IMAGE: ghcr.io/rekusissu/registrar-ai
+  EXT_IMAGE: ghcr.io/rekusissu/php-8.2-apache-ext
+  # Stable tag for the prebuilt extension layer. The app image pulls this.
+  # Bump only when the extension set in docker/php-extensions.Dockerfile changes.
+  EXT_TAG: php-8.2
 
 jobs:
-  build:
+  # Build the PHP extension layer ONCE (fast runners). Platform hosts never
+  # compile these from source; they pull this prebuilt layer instead.
+  extensions:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      # BuildKit / multi-stage needs Buildx for good caching of the base.
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Only attempt registry login when triggered from the main repo
-      # (PRs from forks have no credentials and just need a build check).
       - name: Log in to GitHub Container Registry
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Compute the tag list. Always publish :latest + :main + :git-<sha>;
-      # on a semver tag, add the tag itself (e.g. v1.2.3).
-      - name: Compute image tags
+      - name: Compute extension image tags
         id: meta
         run: |
-          base="${{ env.IMAGE_NAME }}"
+          sha="${GITHUB_SHA::12}"
+          TAGS="${{ env.EXT_IMAGE }}:${{ env.EXT_TAG }},${{ env.EXT_IMAGE }}:latest"
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            TAGS="${TAGS},${{ env.EXT_IMAGE }}:${{ github.ref_name }}"
+          fi
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push extension layer
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/php-extensions.Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Build the actual app image, FROM the prebuilt extension layer, then push
+  # to GHCR. The VPS / platform pulls this and never compiles PHP.
+  app:
+    needs: extensions
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute app image tags
+        id: meta
+        run: |
+          base="${{ env.APP_IMAGE }}"
           sha="${GITHUB_SHA::12}"
           TAGS="${base}:latest,${base}:main,${base}:git-${sha}"
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
@@ -62,15 +107,14 @@ jobs:
           fi
           echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
 
-      - name: Build and push image
+      - name: Build and push app image
         uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile
+          build-args: |
+            PHP_EXT_TAG=${{ env.EXT_TAG }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          # Compile is capped in the Dockerfile, but keep a sane limit here too.
-          build-args: |
-            BUILDKIT_INLINE_CACHE=1

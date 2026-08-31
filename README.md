@@ -55,7 +55,12 @@ Use the dev credentials below (the login form is no longer pre-filled):
 
 ## Docker Deployment
 
-The project ships with a full Docker setup (`Dockerfile`, `docker-compose.yml`, `docker-compose.dev.yml`) so you can deploy it anywhere Docker runs — no XAMPP required. The app container includes Apache + PHP 8.2 with the exact extensions the app needs (PDO/MySQL, mbstring, curl, gd, intl, …) and the Composer dependencies baked in. A MariaDB container is auto-seeded with `registrar_ai.sql` on first start.
+The project ships with a full Docker setup (`Dockerfile`, `docker-compose.yml`, `docker-compose.dev.yml`) so you can deploy it anywhere Docker runs — no XAMPP required. It uses a **two-image** design so even managed Docker platforms (which time out long builds) can deploy in seconds:
+
+- `ghcr.io/rekusissu/php-8.2-apache-ext` — **precompiled** Apache + PHP 8.2 with the exact extensions the app needs (`pdo_mysql`, `mbstring`, `curl`, `gd`, `fileinfo`, `opcache`). CI compiles this **once** on GitHub's fast runners (`docker/php-extensions.Dockerfile`).
+- `ghcr.io/rekusissu/registrar-ai` — the app itself (`Dockerfile`), built `FROM` the extension layer, with the Composer dependencies baked in.
+
+A MariaDB container is auto-seeded with `registrar_ai.sql` on first start.
 
 ### Prerequisites
 
@@ -139,8 +144,10 @@ bash deploy/deploy.sh         # pulls the prebuilt image + starts behind HTTPS
 ### How updates flow (CI → GHCR → VPS)
 
 1. You `git push` to `main`.
-2. **GitHub Actions** builds the multi-stage image and pushes to GHCR.
-3. On the VPS, re-run `bash deploy/deploy.sh` — it pulls `:latest` and recreates containers (your DB/upload volumes persist).
+2. **GitHub Actions** builds two images: first the extension layer (`php-8.2-apache-ext`), then the app image (`registrar-ai`, built `FROM` it), and pushes both to GHCR.
+3. On the VPS, re-run `bash deploy/deploy.sh` — it pulls `registrar-ai:latest` and recreates containers (your DB/upload volumes persist).
+
+Because the heavy PHP compilation happens only in CI (and is cached), the platform build is just COPY steps — it finishes in seconds instead of the ~20 minutes that was blowing past the host's build timeout.
 
 You can also build locally anytime with `docker compose up -d --build` (the `build:` block is still present in `docker-compose.yml`).
 
