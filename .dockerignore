@@ -1,0 +1,31 @@
+# Build context: keep the image lean and never bake in user data/secrets.
+
+# VCS / tooling
+.git
+.gitignore
+.github
+
+# Composer deps are built inside the image (vendor stage), not copied in.
+vendor
+composer.phar
+composer.phar.old
+
+# Environment / secrets
+.env
+*.local
+
+# Runtime / user-generated data (mounted as volumes or gitignored)
+logs
+uploads/*
+!uploads/.htaccess
+assets/uploads/students/*
+brain
+
+# Agent/skill tooling
+.cline
+
+# Editor / OS noise
+.DS_Store
+Thumbs.db
+*.backup
+*.log

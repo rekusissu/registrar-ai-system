@@ -1,0 +1,19 @@
+# Force LF across platforms for files that MUST stay LF (Linux deployment).
+# Without this, Windows Git may check these out as CRLF and break their shebang.
+*.sh       text eol=lf
+*.conf     text eol=lf
+Caddyfile  text eol=lf
+docker/entrypoint.sh text eol=lf
+
+# Everything else uses the platform default; binaries stay untouched.
+*             text=auto
+*.png         binary
+*.jpg         binary
+*.jpeg        binary
+*.gif         binary
+*.ico         binary
+*.woff        binary
+*.woff2       binary
+*.ttf         binary
+*.pdf         binary
+*.sql         text

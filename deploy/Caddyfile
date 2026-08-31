@@ -1,0 +1,24 @@
+# =============================================================================
+#  Caddy reverse proxy — production HTTPS for the Registrar AI System.
+#
+#  DOMAIN / ACME_EMAIL are injected by Compose from .env (see the caddy
+#  service in docker-compose.prod.yml). Caddy automatically provisions and
+#  renews Let's Encrypt certificates for DOMAIN. Ports 80/443 on the host are
+#  the only public entry points; everything else is proxied internally.
+# =============================================================================
+
+{$DOMAIN} {
+    # Compress text assets (works with the app's own caching headers).
+    encode zstd gzip
+
+    # Forward everything to the app's Apache on the container network.
+    reverse_proxy app:80 {
+        # Preserve the original Host header.
+        header_up Host {host}
+    }
+
+    # Optional: add friendly error page instead of raw gateway errors.
+    handle_errors {
+        respond "{err.status_code} {err.status_text}" 503
+    }
+}

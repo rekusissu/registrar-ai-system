@@ -1,0 +1,48 @@
+# =============================================================================
+#  Registrar AI System — PRODUCTION HTTPS override (run on your VPS, behind
+#  your domain).
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+#  Adds a Caddy reverse-proxy that:
+#    - terminates TLS (automatic Let's Encrypt certs for DOMAIN)
+#    - proxies https://DOMAIN -> app:80
+#  so the public attack surface is only ports 80/443.
+#
+#  Required env (from .env): DOMAIN   e.g. registrar.bestlink.edu.ph
+#  Optional env:             ACME_EMAIL
+#  Also override the AI gateway with NINEROUTER_URL for a remote/tunnel URL.
+# =============================================================================
+
+services:
+  app:
+    environment:
+      APP_ENV: production
+      NINEROUTER_URL: ${NINEROUTER_URL:-}
+      # NOTE: to keep the raw app port host-only in production, set
+      #   APP_PORT=127.0.0.1:8080   in .env
+      # so the base `ports: "${APP_PORT:-8080}:80"` binds to localhost only.
+      # The public entry point is Caddy on 80/443.
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN=your_domain in .env}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    networks:
+      - backend
+
+volumes:
+  caddy_data:
+  caddy_config:

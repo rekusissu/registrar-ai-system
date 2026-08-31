@@ -1,0 +1,88 @@
+# =============================================================================
+#  Registrar AI System — production / default stack
+#
+#  Quick start (one command):
+#    1. cp .env.example .env      (edit the secrets)
+#    2. docker compose up -d --build
+#    3. open http://localhost:8080
+#
+#  Local development (auto-reload source, runs composer in the container):
+#    docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+#
+#  On first `up`, MariaDB imports ./registrar_ai.sql into the `registrar_ai`
+#  database and seeds it. To re-seed from scratch:
+#    docker compose down -v && docker compose up -d
+# =============================================================================
+
+name: registrar-ai
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: registrar-ai:latest
+    restart: unless-stopped
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      DB_HOST: db
+      DB_NAME: ${DB_NAME:-registrar_ai}
+      DB_USER: ${DB_USER:-registrar}
+      DB_PASSWORD: ${DB_PASSWORD:-registrar}
+      # Secrets / integrations (all optional in dev):
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      KIOSK_ACCESS_TOKEN: ${KIOSK_ACCESS_TOKEN:-kiosk-tap-2024}
+      # AI gateway (9Router / Antigravity). Leave NINEROUTER_URL empty to run
+      # with AI features degraded gracefully (the app does not crash).
+      NINEROUTER_URL: ${NINEROUTER_URL:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+      PAYMONGO_SECRET_KEY: ${PAYMONGO_SECRET_KEY:-}
+      PAYMONGO_PUBLIC_KEY: ${PAYMONGO_PUBLIC_KEY:-}
+      PAYMONGO_WEBHOOK_SECRET: ${PAYMONGO_WEBHOOK_SECRET:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      MAIL_FROM_NAME: ${MAIL_FROM_NAME:-BCP Registrar System}
+    volumes:
+      - app_uploads:/var/www/html/uploads
+      - app_photos:/var/www/html/assets/uploads/students
+      - app_logs:/var/www/html/logs
+    ports:
+      - "${APP_PORT:-8080}:80"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - backend
+
+  db:
+    image: mariadb:10.11
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ${DB_NAME:-registrar_ai}
+      MARIADB_USER: ${DB_USER:-registrar}
+      MARIADB_PASSWORD: ${DB_PASSWORD:-registrar}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-change-me-root}
+    volumes:
+      - dbdata:/var/lib/mysql
+      # Imported automatically on the FIRST run (only when the data volume is
+      # empty). registrar_ai.sql is a MariaDB 10.4 dump with no CREATE DATABASE.
+      - ./registrar_ai.sql:/docker-entrypoint-initdb.d/00-registrar_ai.sql:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+    networks:
+      - backend
+
+networks:
+  backend:
+
+volumes:
+  dbdata:
+  app_uploads:
+  app_photos:
+  app_logs:

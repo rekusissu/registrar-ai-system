@@ -1,0 +1,26 @@
+# =============================================================================
+#  Registrar AI System — LOCAL DEVELOPMENT override
+#
+#  Use together with docker-compose.yml:
+#    docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+#
+#  Compose merge rules: `environment` maps are MERGED by key and `volumes`
+#  lists are APPENDED, so this file only:
+#    - Flips the app to APP_ENV=development   → errors shown on screen
+#    - Adds RUN_COMPOSER_ON_BOOT=1            → installs Composer deps into the
+#      bind-mounted host vendor/ on first boot (vendor stays gitignored)
+#    - Appends a bind mount of the whole repo → your edits are picked up live
+#
+#  Runtime data (uploads/, logs/) and the DB stay in the same Docker named
+#  volumes as the default stack, so you share the same state between prod and
+#  dev mode.
+# =============================================================================
+
+services:
+  app:
+    environment:
+      APP_ENV: development
+      RUN_COMPOSER_ON_BOOT: "1"
+    volumes:
+      # Whole project from the repo — source edits are live.
+      - ./:/var/www/html
