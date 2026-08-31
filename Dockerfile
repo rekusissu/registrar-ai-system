@@ -61,7 +61,14 @@ COPY . /var/www/html/
 # The app writes to uploads/ and logs/ at runtime. Apache's master runs as
 # root (binds :80) and its workers run as www-data, so make those paths
 # www-data-writable. The entrypoint keeps them correct inside volumes.
-RUN chown -R www-data:www-data /var/www/html/uploads /var/www/html/logs /var/www/html/assets/uploads \
+# mkdir -p is required: .dockerignore excludes logs/ (and its subpaths of
+# uploads/), so these dirs may not exist in the image until we create them.
+RUN set -e \
+    && mkdir -p \
+        /var/www/html/uploads \
+        /var/www/html/logs \
+        /var/www/html/assets/uploads/students \
+    && chown -R www-data:www-data /var/www/html/uploads /var/www/html/logs /var/www/html/assets/uploads \
     && chmod -R u+rwX,g+rwX /var/www/html/uploads /var/www/html/logs /var/www/html/assets/uploads
 
 EXPOSE 80
