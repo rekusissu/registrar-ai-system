@@ -155,13 +155,13 @@ include '../includes/sidebar.php';
     </header>
 
     <?php if ($assignedSuccess): ?>
-        <div class="card" style="margin-bottom: 16px; padding: 12px 16px; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46;">
+        <div class="card" style="margin-bottom: 16px; padding: 12px 16px; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
             <i class="fas fa-check-circle"></i> Sections updated. Each course/year block now has up to <?= (int) $maxPerSection ?> students per section.
         </div>
     <?php endif; ?>
 
     <!-- Toolbar: search bar + filter button -->
-    <div class="card" style="margin-bottom: 16px; padding: 12px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+    <div class="card" style="margin-bottom: 16px; padding: 12px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
         <div style="flex:1; min-width:220px; position:relative;">
             <i class="fas fa-search" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:14px;"></i>
             <input type="text" id="masterlistSearch" name="q" class="form-control" style="padding-left:38px;" placeholder="Search by name, student no., course…">
@@ -184,13 +184,13 @@ include '../includes/sidebar.php';
     </div>
 
     <!-- AI interpretation banner (below the search bar) -->
-    <div id="aiInterpretation" style="display:none;padding:10px 14px;background:#eef4ff;border:1px solid #bfdbfe;border-radius:10px;margin-bottom:16px;">
+    <div id="aiInterpretation" style="display:none;padding:10px 14px;background:#eef4ff;border:1px solid #bfdbfe;border-radius:10px;margin-bottom:16px;box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
         <i class="fas fa-brain" style="color:#2563eb;"></i>
         <span id="aiExplanation" style="color:#1e40af;margin-left:8px;font-size:13px;"></span>
     </div>
 
     <!-- Bulk action bar -->
-    <div class="bulk-bar" id="bulkBar" style="display:none;padding:10px 16px;background:#eef4ff;border:1px solid #bfdbfe;border-radius:12px;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+    <div class="bulk-bar" id="bulkBar" style="display:none;padding:10px 16px;background:#eef4ff;border:1px solid #bfdbfe;border-radius:12px;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
         <span style="font-size:13px;font-weight:600;color:#1d4ed8;" id="bulkCount">0 selected</span>
         <button class="btn btn-secondary btn-sm" onclick="exportSelectedCSV()"><i class="fas fa-file-csv"></i> Export CSV</button>
         <button class="btn btn-secondary btn-sm" onclick="printSelected()"><i class="fas fa-print"></i> Print</button>
@@ -200,7 +200,7 @@ include '../includes/sidebar.php';
 
     <div id="masterlistContent">
         <?php if (empty($groups)): ?>
-            <div class="card">
+            <div class="card" style="box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
                 <div style="padding: 48px 24px; text-align: center; color: #64748b;">
                     <i class="fas fa-layer-group" style="font-size:40px;color:#e2e8f0;display:block;margin-bottom:14px;"></i>
                     <?php if ($unassignedCount > 0 && $filterCourse === '' && $filterYear === '' && $filterSchoolYear === '' && $filterSemester === '' && $filterSection === '' && $filterStatus === ''): ?>
@@ -239,7 +239,7 @@ include '../includes/sidebar.php';
                 $gSy      = $groupFirst['school_year'] ?? '';
                 $gAdviserId = $groupFirst['adviser_id'] ?? '';
             ?>
-                <div class="card masterlist-section-block" style="margin-bottom: 16px;">
+                <div class="card masterlist-section-block" style="margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.12);">
                     <div style="padding: 14px 16px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
                         <h2 style="margin: 0; font-size: 15px; font-weight: 700; color: #0f172a;">
                             <i class="fas fa-users" style="color: #2563eb; margin-right: 8px;"></i><?= $sectionTitle ?>
@@ -254,37 +254,37 @@ include '../includes/sidebar.php';
                         <button class="btn btn-secondary btn-sm" style="padding:5px 12px;font-size:12px;" onclick='openSectionWorkspace(<?= json_encode(['course' => $gCourse, 'year_level' => $gYear, 'semester' => $gSem, 'school_year' => $gSy, 'adviser_id' => $gAdviserId, 'section' => $group['section']], JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'><i class="fas fa-user-plus"></i> Add Student</button>
                         <button class="btn btn-secondary btn-sm" style="padding:5px 12px;font-size:12px;" onclick='openEditSection(<?= json_encode(['course' => $gCourse, 'year_level' => $gYear, 'semester' => $gSem, 'school_year' => $gSy, 'adviser_id' => $gAdviserId, 'section' => $group['section']], JSON_HEX_APOS | JSON_HEX_QUOT) ?>)' title="Edit section"><i class="fas fa-pen"></i> Edit</button>
                     </div>
-                    <div style="overflow-x: auto;">
-                        <table class="masterlist-table" style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                    <div style="overflow-x: auto; border-radius: 12px; overflow: hidden;">
+                        <table class="masterlist-table" style="width: 100%; border-collapse: collapse; font-size: 13px; word-wrap: break-word; word-break: break-word;">
                             <thead>
                                 <tr style="background: #1a2d4a; color: white;">
                                     <th style="padding: 10px 12px; text-align: center; width: 34px;"><input type="checkbox" class="block-select-all" style="width:15px;height:15px;accent-color:#2563eb;" title="Select this block"></th>
-                                    <th style="padding: 10px 12px; text-align: left;">#</th>
-                                    <th style="padding: 10px 12px; text-align: left; cursor:pointer;" data-sort="student_number"><i class="fas fa-sort" style="font-size:10px;margin-right:4px;"></i>Student ID</th>
-                                    <th style="padding: 10px 12px; text-align: left; cursor:pointer;" data-sort="name"><i class="fas fa-sort" style="font-size:10px;margin-right:4px;"></i>Name</th>
-                                    <th style="padding: 10px 12px; text-align: left; cursor:pointer;" data-sort="course"><i class="fas fa-sort" style="font-size:10px;margin-right:4px;"></i>Course</th>
-                                    <th style="padding: 10px 12px; text-align: left; cursor:pointer;" data-sort="year_level"><i class="fas fa-sort" style="font-size:10px;margin-right:4px;"></i>Year</th>
-                                    <th style="padding: 10px 12px; text-align: left;">S.Y.</th>
-                                    <th style="padding: 10px 12px; text-align: left;">Sem</th>
-                                    <th style="padding: 10px 12px; text-align: left; cursor:pointer;" data-sort="section"><i class="fas fa-sort" style="font-size:10px;margin-right:4px;"></i>Section</th>
-                                    <th style="padding: 10px 12px; text-align: left;">Adviser</th>
-                                    <th style="padding: 10px 12px; text-align: left;">Status</th>
+                                    <th style="padding: 10px 12px; text-align: left; white-space: nowrap;">#</th>
+                                    <th style="padding: 10px 12px; text-align: left; cursor:pointer; white-space: nowrap;" data-sort="student_number"><i class="fas fa-sort" style="font-size:10px;margin-right:4px;"></i>Student ID</th>
+                                    <th style="padding: 10px 12px; text-align: left; cursor:pointer; white-space: nowrap;" data-sort="name"><i class="fas fa-sort" style="font-size:10px;margin-right:4px;"></i>Name</th>
+                                    <th style="padding: 10px 12px; text-align: left; cursor:pointer; white-space: nowrap;" data-sort="course"><i class="fas fa-sort" style="font-size:10px;margin-right:4px;"></i>Course</th>
+                                    <th style="padding: 10px 12px; text-align: left; cursor:pointer; white-space: nowrap;" data-sort="year_level"><i class="fas fa-sort" style="font-size:10px;margin-right:4px;"></i>Year</th>
+                                    <th style="padding: 10px 12px; text-align: left; white-space: nowrap;">S.Y.</th>
+                                    <th style="padding: 10px 12px; text-align: left; white-space: nowrap;">Sem</th>
+                                    <th style="padding: 10px 12px; text-align: left; cursor:pointer; white-space: nowrap;" data-sort="section"><i class="fas fa-sort" style="font-size:10px;margin-right:4px;"></i>Section</th>
+                                    <th style="padding: 10px 12px; text-align: left; white-space: nowrap;">Adviser</th>
+                                    <th style="padding: 10px 12px; text-align: left; white-space: nowrap;">Status</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <?php $i = 1; foreach ($group['students'] as $student): ?>
                                     <tr style="border-bottom: 1px solid #e2e8f0;" data-student-id="<?= (int)$student['id'] ?>">
                                         <td style="padding: 8px 12px; text-align: center;"><input type="checkbox" class="student-cb" value="<?= (int)$student['id'] ?>" style="width:15px;height:15px;accent-color:#2563eb;"></td>
-                                        <td style="padding: 8px 12px;"><?= $i++ ?></td>
-                                        <td style="padding: 8px 12px; font-weight:600; font-size:12px;"><?= htmlspecialchars($student['student_number']) ?></td>
-                                        <td style="padding: 8px 12px;"><a href="javascript:void(0)" onclick="viewStudent(<?= (int)$student['id'] ?>)" style="color:#2563eb;font-weight:600;text-decoration:none;cursor:pointer;"><?= htmlspecialchars($student['last_name']) ?>, <?= htmlspecialchars($student['first_name']) ?></a></td>
-                                        <td style="padding: 8px 12px;"><?= htmlspecialchars($student['course'] ?? 'N/A') ?></td>
-                                        <td style="padding: 8px 12px;"><?= htmlspecialchars($student['year_level'] ?? 'N/A') ?></td>
-                                        <td style="padding: 8px 12px;"><?= htmlspecialchars($student['school_year'] ?? '—') ?></td>
-                                        <td style="padding: 8px 12px;"><?= htmlspecialchars($student['semester'] ?? '—') ?></td>
-                                        <td style="padding: 8px 12px;"><?= htmlspecialchars($student['section'] ?? '—') ?></td>
-                                        <td style="padding: 8px 12px;"><?= htmlspecialchars($student['adviser_name'] ?? '—') ?></td>
-                                        <td style="padding: 8px 12px;">
+                                        <td style="padding: 8px 12px; white-space: nowrap;"><?= $i++ ?></td>
+                                        <td style="padding: 8px 12px; font-weight:600; font-size:12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="<?= htmlspecialchars($student['student_number']) ?>"><?= htmlspecialchars($student['student_number']) ?></td>
+                                        <td style="padding: 8px 12px; max-width: 200px; white-space: normal; word-break: break-word;"><a href="javascript:void(0)" onclick="viewStudent(<?= (int)$student['id'] ?>)" style="color:#2563eb;font-weight:600;text-decoration:none;cursor:pointer;"><?= htmlspecialchars($student['last_name']) ?>, <?= htmlspecialchars($student['first_name']) ?></a></td>
+                                        <td style="padding: 8px 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="<?= htmlspecialchars($student['course'] ?? 'N/A') ?>"><?= htmlspecialchars($student['course'] ?? 'N/A') ?></td>
+                                        <td style="padding: 8px 12px; white-space: nowrap;"><?= htmlspecialchars($student['year_level'] ?? 'N/A') ?></td>
+                                        <td style="padding: 8px 12px; white-space: nowrap;"><?= htmlspecialchars($student['school_year'] ?? '—') ?></td>
+                                        <td style="padding: 8px 12px; white-space: nowrap;"><?= htmlspecialchars($student['semester'] ?? '—') ?></td>
+                                        <td style="padding: 8px 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="<?= htmlspecialchars($student['section'] ?? '—') ?>"><?= htmlspecialchars($student['section'] ?? '—') ?></td>
+                                        <td style="padding: 8px 12px; max-width: 150px; white-space: normal; word-break: break-word; overflow: hidden; text-overflow: ellipsis;" title="<?= htmlspecialchars($student['adviser_name'] ?? '—') ?>"><?= htmlspecialchars($student['adviser_name'] ?? '—') ?></td>
+                                        <td style="padding: 8px 12px; white-space: nowrap;">
                                             <span class="badge badge-<?= in_array($student['status'], ['active', 'enrolled'], true) ? 'success' : ($student['status'] === 'at-risk' || $student['status'] === 'probation' ? 'warning' : 'neutral') ?>">
                                                 <?= ucfirst($student['status'] ?? 'Active') ?>
                                             </span>
@@ -300,7 +300,7 @@ include '../includes/sidebar.php';
     </div>
 
     <?php if (!empty($groups)): ?>
-    <div class="card" style="margin-top: 8px;">
+    <div class="card" style="margin-top: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
         <div class="table-footer">
             <div class="info-text">
                 Total: <strong><?= count($students) ?></strong> students in <strong><?= count($groups) ?></strong> section group(s)
@@ -1113,6 +1113,38 @@ document.addEventListener('keydown', e => {
 #filterCourse, #filterYear, #filterSchoolYear, #filterSemester, #filterStatus,
 #genSchoolYear, #genSemester, #genCourse, #genYear, #genStatus,
 select.form-control { cursor: pointer !important; }
+
+/* Masterlist table styling */
+.masterlist-table {
+    color: #1e293b !important;
+    background: #fff !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+}
+.masterlist-table thead th {
+    color: #fff !important;
+    background: #1a2d4a !important;
+}
+.masterlist-table thead th:first-child {
+    border-radius: 12px 0 0 0 !important;
+}
+.masterlist-table thead th:last-child {
+    border-radius: 0 12px 0 0 !important;
+}
+.masterlist-table tbody td {
+    color: #1e293b !important;
+    background: #fff !important;
+}
+.masterlist-table tbody tr:last-child td:first-child {
+    border-radius: 0 0 0 12px !important;
+}
+.masterlist-table tbody tr:last-child td:last-child {
+    border-radius: 0 0 12px 0 !important;
+}
+.masterlist-table tbody tr:hover {
+    background: #f8fafc !important;
+}
+
 @media print {
     .sidebar, .header-actions, .form-row, .btn, .bulk-bar, #masterlistSearch, #selectAllPage, .modal-overlay { display: none !important; }
     .masterlist-section-block { break-inside: avoid; page-break-inside: avoid; }
