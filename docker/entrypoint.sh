@@ -56,5 +56,23 @@ if [ "${RUN_COMPOSER_ON_BOOT:-0}" = "1" ] && [ ! -f "$WWW/vendor/autoload.php" ]
     || echo "[entrypoint] warning: composer install failed, continuing anyway."
 fi
 
+# ── PaaS port support ──────────────────────────────────────────────────────
+# Managed platforms set $PORT and health-check that container port. Apache
+# defaults to :80, so with $PORT set it was listening on the wrong port and
+# the platform reported "not accepting connections on port <PORT>".
+#
+# Bind BOTH ports when $PORT is provided: the vhost accepts multiple
+# addresses, so one <VirtualHost *:80 *:$PORT> serves either. That way the
+# platform's health check works whether it probes $PORT or the mapped :80,
+# and the docker-compose / local setup (no $PORT) is completely unchanged.
+if [ -n "${PORT:-}" ] && [ "$PORT" != "80" ]; then
+  echo "[entrypoint] \$PORT=$PORT detected — Apache will also listen on it"
+  if ! grep -qE "^Listen ${PORT}\$" /etc/apache2/ports.conf; then
+    printf 'Listen %s\n' "$PORT" >> /etc/apache2/ports.conf
+  fi
+  sed -i -E "s|<VirtualHost \*:80>|<VirtualHost *:80 *:${PORT}>|" \
+      /etc/apache2/sites-available/000-default.conf
+fi
+
 echo "[entrypoint] starting Apache…"
 exec apache2-foreground
