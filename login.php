@@ -194,7 +194,7 @@ $timeout = isset($_GET['timeout']) ? true : false;
                 <div class="checkbox-wrapper">
                     <input type="checkbox" id="agreeTerms" />
                     <label for="agreeTerms">
-                        I agree to the <a href="terms-and-conditions.php" target="_blank">Terms and Conditions</a> *
+                        I agree to the <a href="terms-and-conditions.php" target="_blank">Terms and Conditions</a>
                     </label>
                 </div>
 
@@ -345,7 +345,6 @@ $('step1Form').addEventListener('submit', async function (e) {
     e.preventDefault();
     const credential = $('credential').value.trim();
     const password = $('password').value;
-    const agreeTerms = $('agreeTerms').checked;
     const btn = $('btnSignin');
 
     $('authError').style.display = 'none';
@@ -353,11 +352,6 @@ $('step1Form').addEventListener('submit', async function (e) {
 
     if (!credential || !password) {
         showError('Please enter your ID number / username and password.');
-        return;
-    }
-
-    if (!agreeTerms) {
-        showError('You must agree to the Terms and Conditions to continue.');
         return;
     }
 
