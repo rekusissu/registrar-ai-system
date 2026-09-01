@@ -31,7 +31,7 @@ header('Referrer-Policy: strict-origin-when-cross-origin');
 // Allow: self, fonts, CDN, and inline styles/scripts
 header("Content-Security-Policy: " .
     "default-src 'self'; " .
-    "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; " .
+    "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://static.cloudflareinsights.com; " .
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; " .
     "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; " .
     "img-src 'self' data:; " .

@@ -16,6 +16,15 @@ $user = getenv('DB_USER') ?: 'root';
 $pass = getenv('DB_PASS') ?: '';
 $db   = getenv('DB_NAME') ?: 'registrar_ai';
 $port = (int)(getenv('DB_PORT') ?: 3306);
+$charset = getenv('DB_CHARSET') ?: 'utf8mb4';
+
+// Constants used by shared/database.php (PDO layer)
+define('DB_HOST', $host);
+define('DB_USER', $user);
+define('DB_PASS', $pass);
+define('DB_NAME', $db);
+define('DB_PORT', $port);
+define('DB_CHARSET', $charset);
 
 if (!extension_loaded('mysqli')) {
     http_response_code(500);
