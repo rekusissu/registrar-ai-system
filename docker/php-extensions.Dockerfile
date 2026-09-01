@@ -12,7 +12,7 @@
 #
 #  Only the extensions the app actually uses are compiled (see composer.json:
 #  ext-pdo, ext-mbstring, ext-curl; gd for PDF/QRCodes; fileinfo/opcache cheap):
-#    pdo_mysql mbstring gd curl opcache fileinfo
+#    pdo_mysql mysqli mbstring gd curl opcache fileinfo
 #  intl / exif / zip are intentionally NOT built (unused → faster + smaller).
 #
 #  Build (CI does this):  docker build -f docker/php-extensions.Dockerfile -t ghcr.io/rekusissu/php-8.2-apache-ext:php-8.2 .
@@ -33,6 +33,7 @@ RUN set -e \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j"$(nproc)" \
         pdo_mysql \
+        mysqli \
         mbstring \
         gd \
         curl \
