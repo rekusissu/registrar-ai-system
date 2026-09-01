@@ -80,6 +80,13 @@ $timeout = isset($_GET['timeout']) ? true : false;
                     <input type="password" id="password" autocomplete="current-password" />
                 </div>
 
+                <div class="form-group" style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;">
+                    <input type="checkbox" id="agreeTerms" style="margin-top:4px;cursor:pointer;" />
+                    <label style="margin:0;font-size:13px;color:#64748b;cursor:pointer;">
+                        I agree to the <a href="terms-and-conditions.php" target="_blank" style="color:#2563eb;text-decoration:none;font-weight:600;">Terms and Conditions</a> *
+                    </label>
+                </div>
+
                 <button type="submit" class="btn-signin" id="btnSignin">
                     Sign In <i class="fa-solid fa-arrow-right"></i>
                 </button>
@@ -203,6 +210,7 @@ $('step1Form').addEventListener('submit', async function (e) {
     e.preventDefault();
     const credential = $('credential').value.trim();
     const password = $('password').value;
+    const agreeTerms = $('agreeTerms').checked;
     const btn = $('btnSignin');
 
     $('authError').style.display = 'none';
@@ -210,6 +218,11 @@ $('step1Form').addEventListener('submit', async function (e) {
 
     if (!credential || !password) {
         showError('Please enter your ID number / username and password.');
+        return;
+    }
+
+    if (!agreeTerms) {
+        showError('You must agree to the Terms and Conditions to continue.');
         return;
     }
 

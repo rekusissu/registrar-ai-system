@@ -51,3 +51,22 @@ $page_scripts = $page_scripts ?? [];
 
 </body>
 </html>
+<!-- Footer Links (added before closing body) -->
+<style>
+    .page-footer-links {
+        text-align: center;
+        padding: 20px;
+        border-top: 1px solid #e2e8f0;
+        font-size: 12px;
+        color: #64748b;
+        margin-top: 40px;
+    }
+    .page-footer-links a {
+        color: #2563eb;
+        text-decoration: none;
+        margin: 0 8px;
+    }
+    .page-footer-links a:hover {
+        text-decoration: underline;
+    }
+</style>
