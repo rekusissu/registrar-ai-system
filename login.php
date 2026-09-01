@@ -101,6 +101,43 @@ $timeout = isset($_GET['timeout']) ? true : false;
             color: #1d4ed8;
             text-decoration: underline;
         }
+
+        /* Password Toggle Button */
+        .password-field {
+            position: relative;
+            width: 100%;
+        }
+
+        .password-field input {
+            width: 100%;
+            padding-right: 45px;
+        }
+
+        .password-toggle-btn {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: #94a3b8;
+            font-size: 16px;
+            padding: 6px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .password-toggle-btn:hover {
+            color: #2563eb;
+            transform: translateY(-50%) scale(1.1);
+        }
+
+        .password-toggle-btn:active {
+            transform: translateY(-50%) scale(0.95);
+        }
     </style>
 
     <script src='js/csrf.js'></script>
@@ -146,7 +183,12 @@ $timeout = isset($_GET['timeout']) ? true : false;
 
                 <div class="form-group">
                     <label><i class="fa-solid fa-lock"></i> Password</label>
-                    <input type="password" id="password" autocomplete="current-password" />
+                    <div class="password-field">
+                        <input type="password" id="password" autocomplete="current-password" />
+                        <button type="button" class="password-toggle-btn" id="togglePassword" title="Show/Hide Password">
+                            <i class="fa-solid fa-eye"></i>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="checkbox-wrapper">
@@ -236,6 +278,30 @@ $timeout = isset($_GET['timeout']) ? true : false;
 let session = { user_id: null, purpose: 'login', otp: null, status: 'idle' };
 
 const $ = (id) => document.getElementById(id);
+
+// ── Password Toggle ──
+const togglePasswordBtn = $('togglePassword');
+const passwordInput = $('password');
+
+if (togglePasswordBtn && passwordInput) {
+    togglePasswordBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        const isPassword = passwordInput.type === 'password';
+        passwordInput.type = isPassword ? 'text' : 'password';
+
+        // Toggle icon
+        const icon = this.querySelector('i');
+        if (isPassword) {
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+            this.title = 'Hide Password';
+        } else {
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+            this.title = 'Show Password';
+        }
+    });
+}
 
 function showForm(which) {
     $('step1Form').style.display    = which === 'step1'   ? '' : 'none';
