@@ -34,6 +34,75 @@ $timeout = isset($_GET['timeout']) ? true : false;
     <link rel="stylesheet" href="css/page-loader.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
+    <style>
+        /* Custom Checkbox Styling */
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .checkbox-wrapper input[type="checkbox"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            min-width: 18px;
+            min-height: 18px;
+            border: 2px solid #cbd5e1;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .checkbox-wrapper input[type="checkbox"]:hover {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .checkbox-wrapper input[type="checkbox"]:checked {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            border-color: #2563eb;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+        }
+
+        .checkbox-wrapper input[type="checkbox"]:checked::after {
+            content: '✓';
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .checkbox-wrapper label {
+            margin: 0;
+            font-size: 13px;
+            color: #64748b;
+            cursor: pointer;
+            line-height: 1.4;
+            user-select: none;
+        }
+
+        .checkbox-wrapper a {
+            color: #2563eb;
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.2s;
+        }
+
+        .checkbox-wrapper a:hover {
+            color: #1d4ed8;
+            text-decoration: underline;
+        }
+    </style>
+
     <script src='js/csrf.js'></script>
     <script src="js/page-loader.js"></script>
 </head>
@@ -80,10 +149,10 @@ $timeout = isset($_GET['timeout']) ? true : false;
                     <input type="password" id="password" autocomplete="current-password" />
                 </div>
 
-                <div class="form-group" style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;">
-                    <input type="checkbox" id="agreeTerms" style="margin-top:4px;cursor:pointer;" />
-                    <label style="margin:0;font-size:13px;color:#64748b;cursor:pointer;">
-                        I agree to the <a href="terms-and-conditions.php" target="_blank" style="color:#2563eb;text-decoration:none;font-weight:600;">Terms and Conditions</a> *
+                <div class="checkbox-wrapper">
+                    <input type="checkbox" id="agreeTerms" />
+                    <label for="agreeTerms">
+                        I agree to the <a href="terms-and-conditions.php" target="_blank">Terms and Conditions</a> *
                     </label>
                 </div>
 
