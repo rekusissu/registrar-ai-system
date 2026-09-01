@@ -6,6 +6,9 @@
 //   CSRF is enforced on every POST (csrf_guard.php); a second,
 //   per-email/IP throttle layer lives in login_throttle.php.
 
+// Set JSON content-type FIRST so security_headers.php skips its text/html.
+header('Content-Type: application/json; charset=UTF-8');
+
 require_once __DIR__ . '/security_headers.php';
 require_once __DIR__ . '/session_config.php';
 require_once __DIR__ . '/database.php';
@@ -22,6 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $action = $_POST['action'] ?? '';
 
 function sendResponse($success, $message, $data = null) {
+    header('Content-Type: application/json; charset=UTF-8');
     echo json_encode([
         'success' => $success,
         'message' => $message,

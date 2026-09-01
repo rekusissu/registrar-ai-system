@@ -10,6 +10,14 @@ if (!defined('SECURITY_HEADERS_LOADED')) {
     define('SECURITY_HEADERS_LOADED', true);
 }
 
+// ── Detect API / JSON endpoints ──
+// API scripts (auth_actions, api/*.php) set their own Content-Type
+// to application/json.  We must NOT override that with text/html.
+$__isApi = (
+    strpos($_SERVER['SCRIPT_NAME'] ?? '', '/api/') !== false
+    || basename($_SERVER['SCRIPT_NAME'] ?? '') === 'auth_actions.php'
+);
+
 // ── Set X-Content-Type-Options ──
 // Prevents MIME-sniffing (forces browser to respect declared MIME type)
 header('X-Content-Type-Options: nosniff');
@@ -34,7 +42,7 @@ header("Content-Security-Policy: " .
     "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://static.cloudflareinsights.com; " .
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; " .
     "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; " .
-    "img-src 'self' data:; " .
+    "img-src 'self' data: https:; " .
     "connect-src 'self'; " .
     "frame-ancestors 'none';"
 );
@@ -64,7 +72,9 @@ if (strpos($_SERVER['REQUEST_URI'], 'dashboard') !== false ||
 }
 
 // ── Set Content-Type ──
-if (!headers_sent()) {
+// Only set text/html for non-API pages.  API endpoints set their own
+// application/json header BEFORE this file is loaded.
+if (!headers_sent() && !$__isApi) {
     header('Content-Type: text/html; charset=UTF-8');
 }
 
@@ -77,6 +87,7 @@ if (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') {
     ini_set('session.cookie_secure', 1);
 }
 
-// Use strict SameSite policy
-ini_set('session.cookie_samesite', 'Strict');
+// Use Lax SameSite — Strict breaks session cookies when navigating
+// into the app from an external link, email, or hosting-platform proxy.
+ini_set('session.cookie_samesite', 'Lax');
 ?>

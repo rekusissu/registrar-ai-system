@@ -58,18 +58,29 @@ foreach ($db->fetchAll("SELECT student_id, full_name, relationship, contact_numb
 
 // Email recipients (contact_recipients), grouped by student.
 $contactByStudent = [];
-foreach ($db->fetchAll("SELECT * FROM contact_recipients ORDER BY verified DESC, id DESC") as $c) {
-    $contactByStudent[(int) $c['student_id']][] = $c;
+try {
+    foreach ($db->fetchAll("SELECT * FROM contact_recipients ORDER BY verified DESC, id DESC") as $c) {
+        $contactByStudent[(int) $c['student_id']][] = $c;
+    }
+} catch (Throwable $e) {
+    error_log('[guardians] contact_recipients query failed: ' . $e->getMessage());
+    $contactByStudent = [];
 }
 
 // Pending student change requests (contact_change_requests).
-$pendingRequests = $db->fetchAll("
-    SELECT ccr.*, CONCAT(s.first_name,' ',s.last_name) AS student_name, s.student_number
-    FROM contact_change_requests ccr
-    JOIN students s ON s.id = ccr.student_id
-    WHERE ccr.status = 'pending'
-    ORDER BY ccr.id DESC
-");
+$pendingRequests = [];
+try {
+    $pendingRequests = $db->fetchAll("
+        SELECT ccr.*, CONCAT(s.first_name,' ',s.last_name) AS student_name, s.student_number
+        FROM contact_change_requests ccr
+        JOIN students s ON s.id = ccr.student_id
+        WHERE ccr.status = 'pending'
+        ORDER BY ccr.id DESC
+    ");
+} catch (Throwable $e) {
+    error_log('[guardians] contact_change_requests query failed: ' . $e->getMessage());
+    $pendingRequests = [];
+}
 
 // ── Overview counters ─────────────────────────────────────────
 $statStudents = count($byStudent);
