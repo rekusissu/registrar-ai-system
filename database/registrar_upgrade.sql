@@ -196,8 +196,31 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- ────────────────────────────────────────────────
 -- 8) SUBSYSTEM 8 — STUDENT STATUS TRACKER
+--    Create status_tracker table if it doesn't exist.
 --    Add effective dates to status_tracker for LOA / transfers.
 -- ────────────────────────────────────────────────
+SET @tbl := (SELECT COUNT(*) FROM information_schema.TABLES
+             WHERE TABLE_SCHEMA = 'registrar_ai' AND TABLE_NAME = 'status_tracker');
+SET @sql := IF(@tbl = 0, 'CREATE TABLE status_tracker (
+  id INT(11) NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  student_id INT(11) NOT NULL,
+  previous_status VARCHAR(50) DEFAULT NULL,
+  current_status VARCHAR(50) NOT NULL,
+  reason TEXT DEFAULT NULL,
+  changed_by INT(11) DEFAULT NULL,
+  effective_date DATE DEFAULT NULL,
+  end_date DATE DEFAULT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT current_timestamp(),
+  updated_at TIMESTAMP NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  KEY idx_student_id (student_id),
+  KEY idx_created_at (created_at),
+  CONSTRAINT fk_status_tracker_student FOREIGN KEY (student_id)
+    REFERENCES students(id) ON DELETE CASCADE,
+  CONSTRAINT fk_status_tracker_user FOREIGN KEY (changed_by)
+    REFERENCES users(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci', 'SELECT 1');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 SET @exists := (SELECT COUNT(*) FROM information_schema.COLUMNS
                 WHERE TABLE_SCHEMA = 'registrar_ai' AND TABLE_NAME = 'status_tracker' AND COLUMN_NAME = 'effective_date');
 SET @sql := IF(@exists = 0, 'ALTER TABLE status_tracker ADD COLUMN effective_date DATE DEFAULT NULL', 'SELECT 1');

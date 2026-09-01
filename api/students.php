@@ -514,92 +514,102 @@ try {
 
     // ─── UPDATE STUDENT ────────────────────────────────────────
     if ($method === 'PUT' && $id) {
-        $input = json_decode(file_get_contents('php://input'), true);
+        try {
+            $input = json_decode(file_get_contents('php://input'), true);
 
-        if (!is_array($input)) {
-            echo json_encode(['success' => false, 'message' => 'Invalid request payload.']);
+            if (!is_array($input)) {
+                echo json_encode(['success' => false, 'message' => 'Invalid request payload.']);
+                exit;
+            }
+
+            $existing = $db->fetchOne("SELECT id FROM students WHERE id = ?", [$id]);
+            if (!$existing) {
+                echo json_encode(['success' => false, 'message' => 'Student not found.']);
+                exit;
+            }
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => 'Error loading student: ' . $e->getMessage()]);
             exit;
         }
 
-        $existing = $db->fetchOne("SELECT id FROM students WHERE id = ?", [$id]);
-        if (!$existing) {
-            echo json_encode(['success' => false, 'message' => 'Student not found.']);
-            exit;
-        }
+        try {
+            $data = [];
+            $allowedFields = ['first_name', 'middle_name', 'last_name', 'gender', 'civil_status', 'birth_date', 'place_of_birth',
+                              'birth_country', 'lrn', 'name_suffix', 'mother_name', 'father_name',
+                              'nationality', 'religion', 'address', 'contact_number', 'email',
+                              'course', 'major', 'year_level', 'school_year', 'semester', 'section', 'adviser_id', 'status'];
 
-        $data = [];
-        $allowedFields = ['first_name', 'middle_name', 'last_name', 'gender', 'civil_status', 'birth_date', 'place_of_birth',
-                          'birth_country', 'lrn', 'name_suffix', 'mother_name', 'father_name',
-                          'nationality', 'religion', 'address', 'contact_number', 'email',
-                          'course', 'major', 'year_level', 'school_year', 'semester', 'section', 'adviser_id', 'status'];
-
-        foreach ($allowedFields as $field) {
-            if (array_key_exists($field, $input)) {
-                $value = $input[$field];
-                if ($value === '' && in_array($field, ['birth_date', 'middle_name', 'place_of_birth', 'birth_country', 'nationality', 'religion', 'contact_number', 'email', 'course', 'major', 'year_level', 'school_year', 'semester', 'section', 'adviser_id', 'lrn', 'name_suffix', 'mother_name', 'father_name'], true)) {
-                    $value = null;
-                }
-                if ($field === 'birth_date' && $value === '0000-00-00') {
-                    $value = null;
-                }
-                if ($field === 'year_level' && $value !== null && $value !== '') {
-                    $value = (int)$value;
-                } elseif ($field === 'year_level' && $value === '') {
-                    $value = null;
-                }
-                if ($field === 'adviser_id' && $value !== null) {
-                    $value = (int)$value;
-                }
-                if ($field === 'lrn' && $value !== null && $value !== '') {
-                    $value = strtoupper(preg_replace('/[^0-9]/', '', (string)$value));
-                }
-                // B3: normalize text fields before saving.
-                if ($value !== null && $value !== '') {
-                    if (in_array($field, ['first_name', 'middle_name', 'last_name', 'place_of_birth', 'religion', 'mother_name', 'father_name'], true)) {
-                        $value = normalizeNameCase((string) $value);
-                    } elseif ($field === 'contact_number') {
-                        $value = normalizePhone((string) $value);
-                    } elseif ($field === 'email') {
-                        $value = strtolower(trim((string) $value));
-                    } elseif ($field === 'course') {
-                        $value = courseStandardize((string) $value);
-                    } elseif ($field === 'address' || $field === 'nationality' || $field === 'major' || $field === 'school_year' || $field === 'birth_country' || $field === 'name_suffix') {
-                        $value = trim((string) $value);
+            foreach ($allowedFields as $field) {
+                if (array_key_exists($field, $input)) {
+                    $value = $input[$field];
+                    if ($value === '' && in_array($field, ['birth_date', 'middle_name', 'place_of_birth', 'birth_country', 'nationality', 'religion', 'contact_number', 'email', 'course', 'major', 'year_level', 'school_year', 'semester', 'section', 'adviser_id', 'lrn', 'name_suffix', 'mother_name', 'father_name'], true)) {
+                        $value = null;
                     }
+                    if ($field === 'birth_date' && $value === '0000-00-00') {
+                        $value = null;
+                    }
+                    if ($field === 'year_level' && $value !== null && $value !== '') {
+                        $value = (int)$value;
+                    } elseif ($field === 'year_level' && $value === '') {
+                        $value = null;
+                    }
+                    if ($field === 'adviser_id' && $value !== null) {
+                        $value = (int)$value;
+                    }
+                    if ($field === 'lrn' && $value !== null && $value !== '') {
+                        $value = strtoupper(preg_replace('/[^0-9]/', '', (string)$value));
+                    }
+                    // B3: normalize text fields before saving.
+                    if ($value !== null && $value !== '') {
+                        if (in_array($field, ['first_name', 'middle_name', 'last_name', 'place_of_birth', 'religion', 'mother_name', 'father_name'], true)) {
+                            $value = normalizeNameCase((string) $value);
+                        } elseif ($field === 'contact_number') {
+                            $value = normalizePhone((string) $value);
+                        } elseif ($field === 'email') {
+                            $value = strtolower(trim((string) $value));
+                        } elseif ($field === 'course') {
+                            $value = courseStandardize((string) $value);
+                        } elseif ($field === 'address' || $field === 'nationality' || $field === 'major' || $field === 'school_year' || $field === 'birth_country' || $field === 'name_suffix') {
+                            $value = trim((string) $value);
+                        }
+                    }
+                    $data[$field] = $value;
                 }
-                $data[$field] = $value;
             }
-        }
 
-        if (empty($data)) {
-            echo json_encode(['success' => false, 'message' => 'No data to update.']);
+            if (empty($data)) {
+                echo json_encode(['success' => false, 'message' => 'No data to update.']);
+                exit;
+            }
+
+            $db->update('students', $data, 'id = ?', [$id]);
+            // Track status change in status_tracker
+            if (array_key_exists('status', $data)) {
+                trackStatusChange($id, $data['status'], $input['status_reason'] ?? null);
+            }
+            // Update guardian if provided
+            $guardianName = trim($input['guardian_name'] ?? '');
+            if ($guardianName !== '') {
+                $existingGuardian = $db->fetchOne("SELECT id FROM guardians WHERE student_id = ?", [$id]);
+                $gData = [
+                    'full_name' => $guardianName,
+                    'relationship' => $input['guardian_relationship'] ?? 'guardian',
+                    'contact_number' => $input['guardian_contact'] ?? '',
+                    'email' => $input['guardian_email'] ?? null
+                ];
+                if ($existingGuardian) {
+                    $db->update('guardians', $gData, 'student_id = ?', [$id]);
+                } else {
+                    $gData['student_id'] = $id;
+                    $db->insert('guardians', $gData);
+                }
+            }
+            echo json_encode(['success' => true, 'message' => 'Student updated successfully.']);
+            exit;
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => 'Error updating student: ' . $e->getMessage()]);
             exit;
         }
-
-        $db->update('students', $data, 'id = ?', [$id]);
-        // Track status change in status_tracker
-        if (array_key_exists('status', $data)) {
-            trackStatusChange($id, $data['status'], $input['status_reason'] ?? null);
-        }
-        // Update guardian if provided
-        $guardianName = trim($input['guardian_name'] ?? '');
-        if ($guardianName !== '') {
-            $existingGuardian = $db->fetchOne("SELECT id FROM guardians WHERE student_id = ?", [$id]);
-            $gData = [
-                'full_name' => $guardianName,
-                'relationship' => $input['guardian_relationship'] ?? 'guardian',
-                'contact_number' => $input['guardian_contact'] ?? '',
-                'email' => $input['guardian_email'] ?? null
-            ];
-            if ($existingGuardian) {
-                $db->update('guardians', $gData, 'student_id = ?', [$id]);
-            } else {
-                $gData['student_id'] = $id;
-                $db->insert('guardians', $gData);
-            }
-        }
-        echo json_encode(['success' => true, 'message' => 'Student updated successfully.']);
-        exit;
     }
 
     // ─── SOFT DELETE STUDENT ────────────────────────────────────
