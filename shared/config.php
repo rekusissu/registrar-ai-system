@@ -11,9 +11,9 @@ define('CONFIG_LOADED', true);
 //   DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_CHARSET, DB_NAME
 // PaaS platforms often use the Laravel-style names instead, so those are
 // accepted as fallbacks: DB_DATABASE (→ DB_NAME), DB_USERNAME (→ DB_USER).
-$host = getenv('DB_HOST') ?: 'mariadb-n8gxoskz.internal';
-$user = getenv('DB_USER') ?: 'hf_t0khuiemwc';
-$pass = getenv('DB_PASS') ?: 'T3wX4gC8uCzbIINYTs53M4XxB3QywqEz';
+$host = getenv('DB_HOST') ?: 'localhost';
+$user = getenv('DB_USER') ?: 'root';
+$pass = getenv('DB_PASS') ?: '';
 $db   = getenv('DB_NAME') ?: 'registrar_ai';
 $port = (int)(getenv('DB_PORT') ?: 3306);
 
