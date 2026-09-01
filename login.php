@@ -119,17 +119,18 @@ $timeout = isset($_GET['timeout']) ? true : false;
             padding: 24px;
             overflow-y: auto;
             flex: 1;
-            font-size: 14px;
-            line-height: 1.6;
-            color: #334155;
+            font-size: 15px;
+            line-height: 1.8;
+            color: #1f2937;
         }
 
         .tc-modal-body h3 {
-            font-size: 16px;
+            font-size: 17px;
             color: #0f172a;
-            margin-top: 16px;
-            margin-bottom: 8px;
+            margin-top: 18px;
+            margin-bottom: 10px;
             font-weight: 700;
+            letter-spacing: -0.3px;
         }
 
         .tc-modal-body h3:first-child {
@@ -137,17 +138,18 @@ $timeout = isset($_GET['timeout']) ? true : false;
         }
 
         .tc-modal-body p {
-            margin-bottom: 12px;
+            margin-bottom: 14px;
             text-align: justify;
         }
 
         .tc-modal-body ul {
             margin-left: 20px;
-            margin-bottom: 12px;
+            margin-bottom: 14px;
         }
 
         .tc-modal-body li {
-            margin-bottom: 8px;
+            margin-bottom: 10px;
+            color: #1f2937;
         }
 
         .tc-modal-footer {
