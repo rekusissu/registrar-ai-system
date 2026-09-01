@@ -174,6 +174,10 @@ $timeout = isset($_GET['timeout']) ? true : false;
                 <div style="text-align:center;margin-top:14px;font-size:.78rem;">
                     <a href="#" id="backToLogin2" style="color:#2563eb;text-decoration:none;"><i class="fa-solid fa-arrow-left"></i> Back to sign in</a>
                 </div>
+
+                <div style="text-align:center;margin-top:20px;padding-top:14px;border-top:1px solid #e2e8f0;font-size:.75rem;">
+                    <a href="terms-and-conditions.php" target="_blank" style="color:#2563eb;text-decoration:none;"><i class="fa-solid fa-file-contract"></i> Terms and Conditions</a>
+                </div>
             </form>
 
             <!-- RESET PASSWORD: new password step -->
