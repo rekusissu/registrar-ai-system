@@ -24,6 +24,7 @@ RUN set -e \
     && apt-get install -y --no-install-recommends \
         unzip \
         libzip-dev \
+        libmariadb-dev \
     && docker-php-ext-install -j"$(nproc)" mysqli pdo_mysql \
     && rm -rf /var/lib/apt/lists/*
 
@@ -50,7 +51,7 @@ FROM ghcr.io/rekusissu/php-8.2-apache-ext:${PHP_EXT_TAG}
 # extensions exist even if the prebuilt base image is missing them.
 RUN set -e \
     && apt-get update -o Acquire::Retries=5 -o Acquire::http::Timeout=30 \
-    && apt-get install -y --no-install-recommends libzip-dev \
+    && apt-get install -y --no-install-recommends libzip-dev libmariadb-dev \
     && docker-php-ext-install -j"$(nproc)" mysqli pdo_mysql \
     && rm -rf /var/lib/apt/lists/*
 

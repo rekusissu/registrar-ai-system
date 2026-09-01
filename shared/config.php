@@ -13,7 +13,8 @@ define('CONFIG_LOADED', true);
 // accepted as fallbacks: DB_DATABASE (→ DB_NAME), DB_USERNAME (→ DB_USER).
 $host = getenv('DB_HOST') ?: 'localhost';
 $user = getenv('DB_USER') ?: 'root';
-$pass = getenv('DB_PASS') ?: '';
+// Accept DB_PASSWORD (docker-compose / PaaS standard) and DB_PASS (legacy).
+$pass = getenv('DB_PASSWORD') ?: getenv('DB_PASS') ?: '';
 $db   = getenv('DB_NAME') ?: 'registrar_ai';
 $port = (int)(getenv('DB_PORT') ?: 3306);
 $charset = getenv('DB_CHARSET') ?: 'utf8mb4';
@@ -22,21 +23,25 @@ $charset = getenv('DB_CHARSET') ?: 'utf8mb4';
 define('DB_HOST', $host);
 define('DB_USER', $user);
 define('DB_PASS', $pass);
+define('DB_PASSWORD', $pass);   // alias — database.php uses DB_PASSWORD
 define('DB_NAME', $db);
 define('DB_PORT', $port);
 define('DB_CHARSET', $charset);
 
-if (!extension_loaded('mysqli')) {
-    http_response_code(500);
-    echo '<h1>Server Configuration Error</h1>'
-        . '<p>The <code>mysqli</code> PHP extension is not installed or enabled.</p>'
-        . '<p>Please install it: <code>docker-php-ext-install mysqli</code> in the Dockerfile, '
-        . 'or <code>sudo apt install php-mysql && sudo systemctl restart apache2</code> on bare metal.</p>';
-    error_log('[config.php] FATAL: mysqli extension not loaded — cannot connect to database.');
-    exit(1);
+// Legacy mysqli connection ($conn) — used by seed.php and some helpers.
+// The main app uses PDO via shared/database.php, so this is optional.
+// If the mysqli extension is not installed the app still works; only
+// seed.php and any legacy code that touches $conn directly will fail.
+$conn = null;
+if (extension_loaded('mysqli')) {
+    $conn = @new mysqli($host, $user, $pass, $db, $port);
+    if ($conn->connect_error) {
+        error_log('[config.php] mysqli connect error: ' . $conn->connect_error);
+        $conn = null;
+    }
+} else {
+    error_log('[config.php] mysqli extension not loaded — PDO-only mode.');
 }
-
-$conn = new mysqli($host, $user, $pass, $db, $port);
 
 // Application Configuration
 define('APP_NAME', 'BCP Registrar System');
