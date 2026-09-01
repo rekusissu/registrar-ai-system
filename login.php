@@ -106,35 +106,13 @@ $timeout = isset($_GET['timeout']) ? true : false;
             background: linear-gradient(135deg, #1a3a8c 0%, #2563eb 100%);
             color: white;
             padding: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 16px;
+            text-align: center;
         }
 
         .tc-modal-header h2 {
             margin: 0;
             font-size: 20px;
             font-weight: 700;
-        }
-
-        .tc-modal-close {
-            background: rgba(255, 255, 255, 0.2);
-            border: none;
-            color: white;
-            font-size: 24px;
-            cursor: pointer;
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s;
-        }
-
-        .tc-modal-close:hover {
-            background: rgba(255, 255, 255, 0.3);
         }
 
         .tc-modal-body {
@@ -360,7 +338,6 @@ $timeout = isset($_GET['timeout']) ? true : false;
     <div class="tc-modal">
         <div class="tc-modal-header">
             <h2><i class="fa-solid fa-file-contract"></i> Terms and Conditions</h2>
-            <button class="tc-modal-close" id="tcModalClose">&times;</button>
         </div>
         <div class="tc-modal-body">
             <h3>1. Acceptance of Terms</h3>
@@ -451,7 +428,6 @@ if (togglePasswordBtn && passwordInput) {
 
 // ── Terms and Conditions Modal ──
 const tcModal = document.getElementById('tcModal');
-const tcModalClose = document.getElementById('tcModalClose');
 const tcModalCloseBtn = document.getElementById('tcModalCloseBtn');
 
 function openTcModal(e) {
@@ -471,7 +447,6 @@ if (tcLink) {
     tcLink.addEventListener('click', openTcModal);
 }
 
-if (tcModalClose) tcModalClose.addEventListener('click', closeTcModal);
 if (tcModalCloseBtn) tcModalCloseBtn.addEventListener('click', closeTcModal);
 
 // Close modal when clicking outside
