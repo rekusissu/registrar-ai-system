@@ -41,26 +41,36 @@ if ($fQ !== '') {
 }
 $whereSql = $where ? (' WHERE ' . implode(' AND ', $where)) : '';
 
-$logs = $db->fetchAll(
-    "SELECT cl.*, s.student_number,
-            CONCAT(COALESCE(s.first_name,''),' ',COALESCE(s.middle_name,''),' ',COALESCE(s.last_name,'')) AS student_name
-       FROM communication_log cl
-       LEFT JOIN students s ON s.id = cl.student_id
-       $whereSql
-      ORDER BY cl.id DESC
-      LIMIT 300",
-    $params
-);
+$logs = [];
+try {
+    $logs = $db->fetchAll(
+        "SELECT cl.*, s.student_number,
+                CONCAT(COALESCE(s.first_name,''),' ',COALESCE(s.middle_name,''),' ',COALESCE(s.last_name,'')) AS student_name
+           FROM communication_log cl
+           LEFT JOIN students s ON s.id = cl.student_id
+           $whereSql
+          ORDER BY cl.id DESC
+          LIMIT 300",
+        $params
+    );
+} catch (Throwable $e) {
+    error_log('[communication-log] logs query failed: ' . $e->getMessage());
+}
 
 // Students that have verified emergency-flagged contacts (for the blast filter).
-$blastStudents = $db->fetchAll(
-    "SELECT DISTINCT s.id, s.student_number,
-            CONCAT(COALESCE(s.first_name,''),' ',COALESCE(s.last_name,'')) AS student_name
-       FROM contact_recipients cr
-       JOIN students s ON s.id = cr.student_id
-      WHERE cr.verified = 1 AND cr.send_emergency = 1
-      ORDER BY s.last_name, s.first_name"
-);
+$blastStudents = [];
+try {
+    $blastStudents = $db->fetchAll(
+        "SELECT DISTINCT s.id, s.student_number,
+                CONCAT(COALESCE(s.first_name,''),' ',COALESCE(s.last_name,'')) AS student_name
+           FROM contact_recipients cr
+           JOIN students s ON s.id = cr.student_id
+          WHERE cr.verified = 1 AND cr.send_emergency = 1
+          ORDER BY s.last_name, s.first_name"
+    );
+} catch (Throwable $e) {
+    error_log('[communication-log] blastStudents query failed: ' . $e->getMessage());
+}
 
 // ── Overview counters (whole table, not just the page of 300) ──
 $agg = $db->fetchOne(

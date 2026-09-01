@@ -44,14 +44,24 @@ $emergency = $db->fetchAll(
     'SELECT * FROM emergency_contacts WHERE student_id = ? ORDER BY is_primary DESC, id ASC',
     [$sid]
 );
-$contacts = $db->fetchAll(
-    'SELECT * FROM contact_recipients WHERE student_id = ? ORDER BY verified DESC, id DESC',
-    [$sid]
-);
-$requests = $db->fetchAll(
-    'SELECT * FROM contact_change_requests WHERE student_id = ? ORDER BY id DESC LIMIT 100',
-    [$sid]
-);
+$contacts = [];
+$requests = [];
+try {
+    $contacts = $db->fetchAll(
+        'SELECT * FROM contact_recipients WHERE student_id = ? ORDER BY verified DESC, id DESC',
+        [$sid]
+    );
+} catch (Throwable $e) {
+    error_log('[student/contacts] contact_recipients query failed: ' . $e->getMessage());
+}
+try {
+    $requests = $db->fetchAll(
+        'SELECT * FROM contact_change_requests WHERE student_id = ? ORDER BY id DESC LIMIT 100',
+        [$sid]
+    );
+} catch (Throwable $e) {
+    error_log('[student/contacts] contact_change_requests query failed: ' . $e->getMessage());
+}
 
 // ── Overview counters ─────────────────────────────────────────
 $statGuardians = count($guardians);
