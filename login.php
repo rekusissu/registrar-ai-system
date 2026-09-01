@@ -71,6 +71,157 @@ $timeout = isset($_GET['timeout']) ? true : false;
         .password-toggle-btn:active {
             transform: translateY(-50%) scale(0.95);
         }
+
+        /* Terms and Conditions Modal */
+        .tc-modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .tc-modal-overlay.active {
+            display: flex;
+        }
+
+        .tc-modal {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+            max-width: 700px;
+            width: 100%;
+            max-height: 85vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        .tc-modal-header {
+            background: linear-gradient(135deg, #1a3a8c 0%, #2563eb 100%);
+            color: white;
+            padding: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .tc-modal-header h2 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .tc-modal-close {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .tc-modal-close:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .tc-modal-body {
+            padding: 24px;
+            overflow-y: auto;
+            flex: 1;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #334155;
+        }
+
+        .tc-modal-body h3 {
+            font-size: 16px;
+            color: #0f172a;
+            margin-top: 16px;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        .tc-modal-body h3:first-child {
+            margin-top: 0;
+        }
+
+        .tc-modal-body p {
+            margin-bottom: 12px;
+            text-align: justify;
+        }
+
+        .tc-modal-body ul {
+            margin-left: 20px;
+            margin-bottom: 12px;
+        }
+
+        .tc-modal-body li {
+            margin-bottom: 8px;
+        }
+
+        .tc-modal-footer {
+            padding: 16px 24px;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .tc-modal-btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tc-modal-btn-close {
+            background: #e2e8f0;
+            color: #1e293b;
+        }
+
+        .tc-modal-btn-close:hover {
+            background: #cbd5e1;
+        }
+
+        @media (max-width: 640px) {
+            .tc-modal {
+                border-radius: 12px;
+                max-height: 90vh;
+            }
+
+            .tc-modal-header {
+                padding: 16px;
+            }
+
+            .tc-modal-header h2 {
+                font-size: 18px;
+            }
+
+            .tc-modal-body {
+                padding: 16px;
+                font-size: 13px;
+            }
+
+            .tc-modal-footer {
+                padding: 12px 16px;
+            }
+        }
     </style>
 
     <script src='js/csrf.js'></script>
@@ -204,6 +355,71 @@ $timeout = isset($_GET['timeout']) ? true : false;
     </div>
 </div>
 
+<!-- Terms and Conditions Modal -->
+<div class="tc-modal-overlay" id="tcModal">
+    <div class="tc-modal">
+        <div class="tc-modal-header">
+            <h2><i class="fa-solid fa-file-contract"></i> Terms and Conditions</h2>
+            <button class="tc-modal-close" id="tcModalClose">&times;</button>
+        </div>
+        <div class="tc-modal-body">
+            <h3>1. Acceptance of Terms</h3>
+            <p>By accessing and using the Bestlink College of the Philippines (BCP) Registrar Management System ("System"), you acknowledge that you have read, understood, and agree to be bound by these Terms and Conditions.</p>
+
+            <h3>2. System Purpose</h3>
+            <p>The Registrar Management System is provided by Bestlink College of the Philippines for the exclusive purpose of managing student records, academic history, health records, RFID access control, and document requests.</p>
+
+            <h3>3. User Responsibilities</h3>
+            <ul>
+                <li>You are responsible for maintaining the confidentiality of your login credentials</li>
+                <li>You agree not to share your credentials with any other person</li>
+                <li>You agree to immediately notify the IT department if you suspect unauthorized access</li>
+                <li>You are responsible for all activities that occur under your account</li>
+                <li>You agree to use the System only for authorized educational and administrative purposes</li>
+            </ul>
+
+            <h3>4. Prohibited Activities</h3>
+            <p>You agree not to:</p>
+            <ul>
+                <li>Attempt to gain unauthorized access to the System or its data</li>
+                <li>Modify, copy, or distribute System content without authorization</li>
+                <li>Use the System for any illegal, harmful, or harassing purpose</li>
+                <li>Attempt to reverse-engineer, decompile, or discover the source code</li>
+                <li>Interfere with or disrupt the normal operation of the System</li>
+                <li>Attempt to bypass security measures or access controls</li>
+                <li>Use automated tools, scripts, or bots to access the System without authorization</li>
+            </ul>
+
+            <h3>5. Privacy and Data Protection</h3>
+            <p>Your personal information, academic records, and health data are protected under applicable data privacy laws. The System implements industry-standard security measures including encryption, access controls, and audit logging.</p>
+
+            <h3>6. Intellectual Property</h3>
+            <p>All content, design, and functionality of the Registrar Management System are the intellectual property of Bestlink College of the Philippines. You may not reproduce, modify, or distribute any part of the System without explicit written permission.</p>
+
+            <h3>7. Limitation of Liability</h3>
+            <p>The Registrar Management System is provided "as is" without warranties of any kind. Bestlink College of the Philippines shall not be liable for any indirect, incidental, special, or consequential damages arising from your use of or inability to use the System.</p>
+
+            <h3>8. System Availability</h3>
+            <p>While we strive to maintain continuous availability of the System, we make no guarantee of uninterrupted service. The System may be temporarily unavailable for maintenance, updates, or due to unforeseen circumstances.</p>
+
+            <h3>9. Changes to Terms</h3>
+            <p>Bestlink College of the Philippines reserves the right to modify these Terms and Conditions at any time. Your continued use of the System following notification of changes constitutes your acceptance of the revised terms.</p>
+
+            <h3>10. Termination of Access</h3>
+            <p>The college reserves the right to suspend or terminate your access to the System at any time, with or without cause, including but not limited to violations of these Terms and Conditions.</p>
+
+            <h3>11. Governing Law</h3>
+            <p>These Terms and Conditions shall be governed by and construed in accordance with the laws of the Republic of the Philippines.</p>
+
+            <h3>12. Contact Information</h3>
+            <p><strong>Office of the Registrar</strong><br>Bestlink College of the Philippines<br>Email: registrar@bestlink.edu.ph</p>
+        </div>
+        <div class="tc-modal-footer">
+            <button class="tc-modal-btn tc-modal-btn-close" id="tcModalCloseBtn">Close</button>
+        </div>
+    </div>
+</div>
+
 <script>
 let session = { user_id: null, purpose: 'login', otp: null, status: 'idle' };
 
@@ -232,6 +448,45 @@ if (togglePasswordBtn && passwordInput) {
         }
     });
 }
+
+// ── Terms and Conditions Modal ──
+const tcModal = document.getElementById('tcModal');
+const tcModalClose = document.getElementById('tcModalClose');
+const tcModalCloseBtn = document.getElementById('tcModalCloseBtn');
+
+function openTcModal(e) {
+    e.preventDefault();
+    tcModal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeTcModal() {
+    tcModal.classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+// Find T&C link and attach event
+const tcLink = document.querySelector('a[href="terms-and-conditions.php"]');
+if (tcLink) {
+    tcLink.addEventListener('click', openTcModal);
+}
+
+if (tcModalClose) tcModalClose.addEventListener('click', closeTcModal);
+if (tcModalCloseBtn) tcModalCloseBtn.addEventListener('click', closeTcModal);
+
+// Close modal when clicking outside
+if (tcModal) {
+    tcModal.addEventListener('click', function(e) {
+        if (e.target === this) closeTcModal();
+    });
+}
+
+// Close modal on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && tcModal && tcModal.classList.contains('active')) {
+        closeTcModal();
+    }
+});
 
 function showForm(which) {
     $('step1Form').style.display    = which === 'step1'   ? '' : 'none';
