@@ -72,12 +72,12 @@ $timeout = isset($_GET['timeout']) ? true : false;
             <form id="step1Form" style="width:100%">
                 <div class="form-group">
                     <label><i class="fa-solid fa-id-badge"></i> ID Number / Username</label>
-                    <input type="text" id="credential" autocomplete="username" value="RGS-001" />
+                    <input type="text" id="credential" autocomplete="username" />
                 </div>
 
                 <div class="form-group">
                     <label><i class="fa-solid fa-lock"></i> Password</label>
-                    <input type="password" id="password" autocomplete="current-password" value="password" />
+                    <input type="password" id="password" autocomplete="current-password" />
                 </div>
 
                 <button type="submit" class="btn-signin" id="btnSignin">
