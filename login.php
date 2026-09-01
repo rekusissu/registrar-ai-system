@@ -131,6 +131,10 @@ $timeout = isset($_GET['timeout']) ? true : false;
                 <div class="register-link" style="text-align:center;">
                     <a href="#" id="forgotLink"><i class="fa-solid fa-circle-question"></i> Forgot password?</a>
                 </div>
+
+                <div style="text-align:center;margin-top:16px;padding-top:12px;border-top:1px solid #e2e8f0;">
+                    <a href="terms-and-conditions.php" target="_blank" style="font-size:.75rem;color:#2563eb;text-decoration:none;"><i class="fa-solid fa-file-contract"></i> Terms and Conditions</a>
+                </div>
             </form>
 
             <!-- STEP 2: OTP -->
@@ -173,10 +177,6 @@ $timeout = isset($_GET['timeout']) ? true : false;
 
                 <div style="text-align:center;margin-top:14px;font-size:.78rem;">
                     <a href="#" id="backToLogin2" style="color:#2563eb;text-decoration:none;"><i class="fa-solid fa-arrow-left"></i> Back to sign in</a>
-                </div>
-
-                <div style="text-align:center;margin-top:20px;padding-top:14px;border-top:1px solid #e2e8f0;font-size:.75rem;">
-                    <a href="terms-and-conditions.php" target="_blank" style="color:#2563eb;text-decoration:none;"><i class="fa-solid fa-file-contract"></i> Terms and Conditions</a>
                 </div>
             </form>
 
