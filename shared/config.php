@@ -17,6 +17,16 @@ $pass = getenv('DB_PASS') ?: '';
 $db   = getenv('DB_NAME') ?: 'registrar_ai';
 $port = (int)(getenv('DB_PORT') ?: 3306);
 
+if (!extension_loaded('mysqli')) {
+    http_response_code(500);
+    echo '<h1>Server Configuration Error</h1>'
+        . '<p>The <code>mysqli</code> PHP extension is not installed or enabled.</p>'
+        . '<p>Please install it: <code>docker-php-ext-install mysqli</code> in the Dockerfile, '
+        . 'or <code>sudo apt install php-mysql && sudo systemctl restart apache2</code> on bare metal.</p>';
+    error_log('[config.php] FATAL: mysqli extension not loaded — cannot connect to database.');
+    exit(1);
+}
+
 $conn = new mysqli($host, $user, $pass, $db, $port);
 
 // Application Configuration

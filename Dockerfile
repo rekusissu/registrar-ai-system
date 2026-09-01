@@ -16,13 +16,20 @@
 ARG PHP_EXT_TAG=php-8.2
 FROM ghcr.io/rekusissu/php-8.2-apache-ext:${PHP_EXT_TAG} AS vendor
 
+# Safety net: guarantee the extensions the app needs exist even if the
+# prebuilt base image is stale or was rebuilt without them. These installs
+# are no-ops when the extension is already present.
+RUN set -e \
+    && apt-get update -o Acquire::Retries=5 -o Acquire::http::Timeout=30 \
+    && apt-get install -y --no-install-recommends \
+        unzip \
+        libzip-dev \
+    && docker-php-ext-install -j"$(nproc)" mysqli pdo_mysql \
+    && rm -rf /var/lib/apt/lists/*
+
 # Composer needs ext-zip OR the unzip binary to download dist archives.
 # unzip is installed here so the app build is self-sufficient even if the
 # pulled extension layer predates the zip addition.
-RUN set -e \
-    && apt-get update -o Acquire::Retries=5 -o Acquire::http::Timeout=30 \
-    && apt-get install -y --no-install-recommends unzip \
-    && rm -rf /var/lib/apt/lists/*
 
 # Composer production dependencies. The vendor stage uses the SAME prebuilt
 # runtime so Composer's platform checks match exactly.
@@ -38,6 +45,14 @@ RUN composer install \
 
 # ── Runtime (final image) ──────────────────────────────────────────────────
 FROM ghcr.io/rekusissu/php-8.2-apache-ext:${PHP_EXT_TAG}
+
+# Safety net: same guarantee as the vendor stage — ensure critical
+# extensions exist even if the prebuilt base image is missing them.
+RUN set -e \
+    && apt-get update -o Acquire::Retries=5 -o Acquire::http::Timeout=30 \
+    && apt-get install -y --no-install-recommends libzip-dev \
+    && docker-php-ext-install -j"$(nproc)" mysqli pdo_mysql \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV APP_ENV=production
 
