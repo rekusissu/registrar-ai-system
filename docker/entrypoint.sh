@@ -74,5 +74,14 @@ if [ -n "${PORT:-}" ] && [ "$PORT" != "80" ]; then
       /etc/apache2/sites-available/000-default.conf
 fi
 
+# ── Database seed ────────────────────────────────────────────────────────────
+# On a fresh database (no tables) import registrar_ai.sql so the app
+# works out-of-the-box. Safe: checks for an existing table first.
+echo "[entrypoint] checking database…"
+if command -v php >/dev/null 2>&1; then
+  php /var/www/html/seed.php 2>/dev/null && echo "[entrypoint] database seed complete." \
+    || echo "[entrypoint] seed skipped (db may not be ready or already has tables)."
+fi
+
 echo "[entrypoint] starting Apache…"
 exec apache2-foreground
