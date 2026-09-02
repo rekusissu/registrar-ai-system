@@ -105,6 +105,47 @@ if ($__sessionTimeout === false || $__sessionTimeout === '') {
 }
 define('SESSION_IDLE_TIMEOUT', $__sessionTimeout !== false && $__sessionTimeout !== '' ? max(0, (int) $__sessionTimeout) : 20 * 60);
 
+/**
+ * CORS headers for session/cookie-authenticated endpoints.
+ *
+ * These API endpoints authenticate via cookies, so a wildcard
+ * Access-Control-Allow-Origin would let any site read/trigger them
+ * cross-origin. Instead we only echo back a request's Origin when it
+ * matches this app's own host (allowed in development where the app
+ * may be served from a different port/device). Any other origin gets
+ * NO Access-Control-Allow-Origin, which blocks the cross-origin
+ * browser preflight/read entirely while same-origin calls keep working.
+ *
+ * Public endpoints that genuinely need wide CORS (queue kiosk/monitor,
+ * mock services) do not use this and keep their explicit wildcard.
+ */
+function corsSameOrigin(): void {
+    $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+    if ($origin !== '') {
+        $allowed = parse_url($origin, PHP_URL_HOST);
+        $selfHost   = parse_url(app_url('/'), PHP_URL_HOST);
+        $scriptHost = parse_url((string) ($_SERVER['HTTP_HOST'] ?? ''), PHP_URL_HOST);
+        $ok = ($allowed !== null && $allowed === $selfHost)
+            || ($allowed !== null && $scriptHost !== null && $allowed === $scriptHost)
+            || isset($_SERVER['SERVER_ADDR']) && $allowed === $_SERVER['SERVER_ADDR'];
+        // Localhost / dev-loopback origins (http://localhost, http://127.0.0.1)
+        // are always allowed so local front-ends can call the API cross-port.
+        $loopback = in_array($allowed, ['localhost', '127.0.0.1', '::1'], true);
+        if ($ok || $loopback) {
+            header('Access-Control-Allow-Origin: ' . $origin);
+            header('Vary: Origin');
+            header('Access-Control-Allow-Credentials: true');
+        }
+    }
+    header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, PATCH, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, X-CSRF-Token, Authorization');
+    header('Access-Control-Max-Age: 3600');
+    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+        http_response_code(204);
+        exit;
+    }
+}
+
 // Error reporting
 error_reporting(E_ALL);
 // Only show errors on screen in development; log them everywhere else.
@@ -118,10 +159,41 @@ ini_set('error_log', APP_ROOT . 'logs/php_errors.log');
 define('MAX_STUDENTS_PER_SECTION', 50);
 
 // Security
-define('JWT_SECRET', getenv('JWT_SECRET') ?: 'your-super-secret-key-change-in-production');
+// Secrets must come from the environment (or a git-ignored local file).
+// In production we FAIL CLOSED: a missing secret aborts startup loudly
+// instead of silently falling back to a public, filesystem-known value.
+// In development we keep the documented defaults so the app still boots
+// locally (these must never be treated as safe for a live deployment).
+function secretFromEnvOrLocal(string $env, string $defaultDev): string {
+    $v = getenv($env);
+    if ($v !== false && $v !== '') {
+        return $v;
+    }
+    $file = __DIR__ . '/secrets.local';
+    if (is_file($file)) {
+        $lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        foreach (is_array($lines) ? $lines : [] as $line) {
+            $line = trim($line);
+            if ($line === '' || $line[0] === '#') continue;
+            [$k, $val] = array_pad(explode('=', $line, 2), 2, '');
+            if (trim($k) === $env && trim($val) !== '') {
+                return trim($val);
+            }
+        }
+    }
+    if (APP_ENV === 'production') {
+        error_log("[config] FAILING CLOSED: $env is not set for production. Refusing to run with an insecure default.");
+        http_response_code(500);
+        header('Content-Type: text/plain');
+        echo "Server configuration error: $env is not set. Set it before going live.";
+        exit;
+    }
+    return $defaultDev;
+}
+define('JWT_SECRET', secretFromEnvOrLocal('JWT_SECRET', 'your-super-secret-key-change-in-production'));
 // Public RFID kiosk access token (overridable per environment). Set
 // KIOSK_ACCESS_TOKEN on live stations; do not rely on the default.
-define('KIOSK_ACCESS_TOKEN', getenv('KIOSK_ACCESS_TOKEN') ?: 'kiosk-tap-2024');
+define('KIOSK_ACCESS_TOKEN', secretFromEnvOrLocal('KIOSK_ACCESS_TOKEN', 'kiosk-tap-2024'));
 
 // ── AI (Gateway, OpenAI-compatible via Antigravity / 9Router) ──
 // Local gateway that fronts models via a single Bearer key.

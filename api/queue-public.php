@@ -78,44 +78,35 @@ if ($action === 'join') {
         }
 
         // ── 2. Card validation ────────────────────────────────
+        // All validation failures (not found, unlinked, lost, expired,
+        // inactive) return the same generic message to prevent card-UID
+        // enumeration. The specific reason is logged server-side only.
         $card = lookupCardByUid($db, $cardUid);
+        $deniedLogReason = null;
         if (!$card) {
-            $db->insert('rfid_scan_logs', [
-                'card_uid'   => $cardUid,
-                'student_id' => null,
-                'location'   => 'Registrar Kiosk',
-                'event_type' => 'queue_join',
-                'status'     => 'denied',
-                'scanner_id' => 'kiosk',
-                'ip_address' => $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0',
-            ]);
-            echo json_encode(['success' => false, 'code' => 'not_found', 'message' => 'Card not recognized.']);
-            exit;
-        }
-        $cardStatus = $card['status'] ?? '';
-        $deniedMessage = null;
-        if ($card['student_id'] === null) {
-            $deniedMessage = 'Card is not linked to a student.';
-        } elseif ($cardStatus === 'lost') {
-            $deniedMessage = 'Card reported as lost.';
-        } elseif ($cardStatus === 'expired') {
-            $deniedMessage = 'Card has expired.';
-        } elseif ($cardStatus === 'inactive') {
-            $deniedMessage = 'Card is inactive.';
+            $deniedLogReason = 'not_found';
+        } elseif ($card['student_id'] === null) {
+            $deniedLogReason = 'unlinked';
+        } elseif (($card['status'] ?? '') === 'lost') {
+            $deniedLogReason = 'lost';
+        } elseif (($card['status'] ?? '') === 'inactive') {
+            $deniedLogReason = 'inactive';
         } elseif (!empty($card['expiry_date']) && $card['expiry_date'] < date('Y-m-d')) {
-            $deniedMessage = 'Card has expired.';
+            $deniedLogReason = 'expired';
+        } elseif (($card['status'] ?? '') === 'expired') {
+            $deniedLogReason = 'expired';
         }
-        if ($deniedMessage) {
+        if ($deniedLogReason) {
             $db->insert('rfid_scan_logs', [
                 'card_uid'   => $cardUid,
-                'student_id' => $card['student_id'],
+                'student_id' => $card ? ($card['student_id'] ?? null) : null,
                 'location'   => 'Registrar Kiosk',
                 'event_type' => 'queue_join',
                 'status'     => 'denied',
                 'scanner_id' => 'kiosk',
                 'ip_address' => $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0',
             ]);
-            echo json_encode(['success' => false, 'code' => $cardStatus, 'message' => $deniedMessage]);
+            echo json_encode(['success' => false, 'code' => 'denied', 'message' => 'Unable to process this card. Please see the registrar.']);
             exit;
         }
 

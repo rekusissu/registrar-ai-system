@@ -139,10 +139,10 @@
                     icon.className = 'result-icon info fas fa-clock';
                     icon.style.display = '';
                     sub.textContent = d.message;
-                } else if (d.code === 'not_found') {
+                } else if (d.code === 'denied') {
                     icon.className = 'result-icon error fas fa-credit-card';
                     icon.style.display = '';
-                    sub.textContent = d.message + ' Tap again or report to the registrar window.';
+                    sub.textContent = d.message || 'Unable to process this card.';
                 } else {
                     icon.className = 'result-icon error fas fa-ban';
                     icon.style.display = '';

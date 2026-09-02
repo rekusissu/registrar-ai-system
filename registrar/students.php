@@ -464,9 +464,9 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-user"></i> Personal Information</div>
 <div class="form-row"><div class="form-group"><label>First Name <span style="color:#dc2626;">*</span></label><input type="text" id="addFirstName" class="form-control" required></div><div class="form-group"><label>Middle Name</label><input type="text" id="addMiddleName" class="form-control"></div><div class="form-group"><label>Last Name <span style="color:#dc2626;">*</span></label><input type="text" id="addLastName" class="form-control" required></div></div>
 <div class="form-row"><div class="form-group"><label>Name Suffix</label><select id="addSuffix" class="form-control"><option value="">—</option><option value="Jr.">Jr.</option><option value="Sr.">Sr.</option><option value="II">II</option><option value="III">III</option><option value="IV">IV</option></select></div><div class="form-group"><label>LRN (optional)</label><input type="text" id="addLrn" class="form-control" placeholder="12-digit Learner Reference No." maxlength="12"></div><div class="form-group"><label>Gender</label><select id="addGender" class="form-control"><option value="">Select</option><option value="Male">Male</option><option value="Female">Female</option></select></div></div>
-<div class="form-row"><div class="form-group"><label>Civil Status</label><select id="addCivilStatus" class="form-control"><option value="">Select</option><option value="Single">Single</option><option value="Married">Married</option><option value="Widowed">Widowed</option><option value="Separated">Separated</option></select></div><div class="form-group"><label>Birth Date</label><input type="date" id="addBirthDate" class="form-control"></div><div class="form-group"><label>Place of Birth</label><input type="text" id="addBirthPlace" class="form-control" placeholder="City, Province"></div></div>
-<div class="form-row"><div class="form-group"><label>Nationality</label><input type="text" id="addNationality" class="form-control" value="Filipino"></div><div class="form-group"><label>Religion</label><input type="text" id="addReligion" class="form-control"></div><div class="form-group"><label>Father's Name</label><input type="text" id="addFather" class="form-control"></div></div>
-<div class="form-row"><div class="form-group"><label>Mother's Name</label><input type="text" id="addMother" class="form-control"></div></div>
+<div class="form-row"><div class="form-group"><label>Civil Status</label><select id="addCivilStatus" class="form-control"><option value="">Select</option><option value="Single">Single</option><option value="Married">Married</option><option value="Widowed">Widowed</option><option value="Separated">Separated</option></select></div><div class="form-group"><label>Birth Date <span style="color:#dc2626;">*</span></label><input type="date" id="addBirthDate" class="form-control" required></div><div class="form-group"><label>Place of Birth</label><input type="text" id="addBirthPlace" class="form-control" placeholder="City, Province"></div></div>
+<div class="form-row"><div class="form-group"><label>Nationality</label><input type="text" id="addNationality" class="form-control" value="Filipino"></div><div class="form-group"><label>Religion</label><input type="text" id="addReligion" class="form-control"></div></div>
+<div class="form-row"><div class="form-group"><label>Father's Name</label><input type="text" id="addFather" class="form-control" placeholder="Full name of father"></div><div class="form-group"><label>Mother's Name</label><input type="text" id="addMother" class="form-control" placeholder="Full name of mother"></div></div>
 <div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="addEmail" class="form-control" placeholder="student@school.edu.ph"></div><div class="form-group"><label>Contact No.</label><input type="text" id="addContact" class="form-control" placeholder="0917xxx"></div></div>
 <div class="form-row"><div class="form-group"><label>Address <span style="color:#dc2626;">*</span></label><textarea id="addAddress" class="form-control" rows="2" required></textarea></div></div>
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
@@ -478,6 +478,16 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 <div class="form-row"><div class="form-group"><label>Full Name <span style="color:#dc2626;">*</span></label><input type="text" id="addGuardianName" class="form-control" required></div><div class="form-group"><label>Relationship</label><select id="addGuardianRel" class="form-control"><option value="father">Father</option><option value="mother">Mother</option><option value="guardian">Guardian</option></select></div></div>
 <div class="form-row"><div class="form-group"><label>Contact No.</label><input type="text" id="addGuardianContact" class="form-control"></div><div class="form-group"><label>Email (optional)</label><input type="email" id="addGuardianEmail" class="form-control"></div></div>
 </div><div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeAddModal()">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Enroll</button></div></form></div></div>
+
+<!-- Auto-created Student Portal Account Modal -->
+<div class="modal-overlay" id="acctModal"><div class="modal-content" style="max-width:520px;"><div class="modal-header"><h2><i class="fas fa-user-graduate"></i> Student Portal Account Created</h2><button class="modal-close" onclick="closeAcctModal()"><i class="fas fa-times"></i></button></div><div class="modal-body" style="padding:20px;">
+<p style="font-size:13px;color:#64748b;margin-bottom:16px;">A student portal account was automatically created. Share these credentials with the student so they can log in to the <strong>Student Portal</strong>. They can change the password after first login.</p>
+<div id="acctEmailNote" style="display:none;background:#fef3c7;border:1px solid #fde047;color:#92400e;border-radius:8px;padding:10px 12px;font-size:12px;margin-bottom:14px;"><i class="fas fa-triangle-exclamation"></i> The welcome email could not be sent (SMTP not configured) — please share the credentials below with the student manually.</div>
+<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;">
+<div class="form-group" style="margin-bottom:12px;"><label>Username</label><div style="display:flex;gap:8px;align-items:center;"><code id="acctEmail" style="flex:1;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;"></code><button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:12px;" onclick="copyAcct('acctEmail')">Copy</button></div></div>
+<div class="form-group" style="margin-bottom:12px;"><label>Temporary Password</label><div style="display:flex;gap:8px;align-items:center;"><code id="acctPassword" style="flex:1;background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;font-size:13px;"></code><button type="button" class="btn btn-secondary" style="padding:6px 12px;font-size:12px;" onclick="copyAcct('acctPassword')">Copy</button></div></div>
+</div>
+</div><div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeAcctModal()" style="margin-right:auto;border:none;background:none;color:#94a3b8;">Don't show again</button><button type="button" class="btn btn-primary" onclick="closeAcctModal()"><i class="fas fa-check"></i> Done</button></div></div></div>
 
 <!-- AI Document Reader / Paste-to-Fill Modal -->
 <div class="modal-overlay" id="pasteModal"><div class="modal-content" style="max-width:680px;"><div class="modal-header"><h2><i class="fas fa-file-import"></i> AI Document Reader</h2><button class="modal-close" onclick="closePasteModal()"><i class="fas fa-times"></i></button></div><div class="modal-body">
@@ -982,10 +992,35 @@ document.getElementById('addForm').addEventListener('submit', async function(e) 
             })
         });
         const d = await res.json();
-        if (d.success) { showToast('Added', 'Student created successfully.', 'success'); setTimeout(() => window.location.reload(), 800); }
+        if (d.success) {
+            const acct = d.data && d.data.portal_account;
+            if (acct) {
+                // Show portal credentials in a modal so the registrar can
+                // hand them to the student before reloading the page.
+                document.getElementById('acctEmail').textContent = acct.username || acct.email;
+                document.getElementById('acctPassword').textContent = acct.password;
+                document.getElementById('acctEmailNote').style.display = acct.email_sent ? 'none' : '';
+                document.getElementById('acctModal').classList.add('active');
+                document.getElementById('addModal').classList.remove('active');
+            } else {
+                showToast('Added', 'Student created successfully.', 'success');
+                setTimeout(() => window.location.reload(), 800);
+            }
+        }
         else { alert(d.message); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Add Student'; }
     } catch(e) { alert('Network error.'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Add Student'; }
 });
+
+// ─── AUTO PORTAL ACCOUNT MODAL ───────────────────────────────
+function closeAcctModal() {
+    document.getElementById('acctModal').classList.remove('active');
+    setTimeout(() => window.location.reload(), 300);
+}
+function copyAcct(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    navigator.clipboard.writeText(el.textContent.trim()).catch(() => {});
+}
 
 // ─── AI ASSIST ───────────────────────────────────────────────
 async function aiPost(action, body) {

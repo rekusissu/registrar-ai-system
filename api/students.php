@@ -5,11 +5,9 @@
 // ============================================================
 
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE');
-header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
 require_once __DIR__ . '/../shared/config.php';
+corsSameOrigin();
 require_once __DIR__ . '/../shared/database.php';
 require_once __DIR__ . '/../shared/session_config.php';
 require_once __DIR__ . '/../shared/csrf_guard.php';
@@ -431,6 +429,15 @@ try {
             exit;
         }
 
+        // Birth date is required: the auto-created portal password is derived
+        // from the born year (# + first two letters of first name + YYYY).
+        $birthDateRaw = trim((string)($input['birth_date'] ?? ''));
+        if ($birthDateRaw === '' || $birthDateRaw === '0000-00-00' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $birthDateRaw)) {
+            echo json_encode(['success' => false, 'message' => 'Birth date is required.']);
+            exit;
+        }
+        $birthYear = (int) substr($birthDateRaw, 0, 4);
+
         // Generate student number if not provided
         $studentNumber = isset($input['student_number']) && trim($input['student_number']) !== ''
             ? trim($input['student_number'])
@@ -443,8 +450,7 @@ try {
             exit;
         }
 
-        $birthDateRaw = trim((string)($input['birth_date'] ?? ''));
-        $birthDate = ($birthDateRaw !== '' && $birthDateRaw !== '0000-00-00') ? $birthDateRaw : null;
+        $birthDate = $birthDateRaw;
 
         // B3: normalize before save so bad data never lands.
         $firstName = normalizeNameCase($firstName);
@@ -508,7 +514,105 @@ try {
             } catch (Exception $e) {}
         }
 
-        echo json_encode(['success' => true, 'message' => 'Student added successfully.', 'data' => ['id' => $newId, 'student_number' => $studentNumber]]);
+        // ─── AUTO-CREATE STUDENT PORTAL ACCOUNT ────────────────
+        // Automatically create a `users` entry so the student can
+        // log in to the student portal immediately. The registrar
+        // receives the credentials to share with the student.
+        //
+        // Credential scheme (as specified):
+        //   username = first letter of first name + 9-digit student id
+        //             e.g. Juan / 100000001  ->  j100000001
+        //   password = '#' + first 2 letters of first name + 4-digit birth year
+        //             e.g. Juan / 2005        ->  #ju2005
+        $portalAccount = null;
+        try {
+            $fullName = trim($firstName . ' ' . $lastName);
+
+            // Username: keep the last 9 digits of the student id so the rule
+            // holds even if an id ever exceeds 9 digits.
+            $idDigits = preg_replace('/[^0-9]/', '', $studentNumber);
+            $id9 = substr($idDigits, -9);
+            $firstLetter = mb_strtolower(mb_substr($firstName, 0, 1));
+            $username = $firstLetter . $id9;
+
+            // Password: '#' + first 2 letters (lowercase) + birth year.
+            $firstTwo = mb_strtolower(mb_substr($firstName, 0, 2));
+            $password = '#' . $firstTwo . $birthYear;
+
+            // Fall back to the student's email (or generate one) as the
+            // email field — kept separate from the username login.
+            $studentEmail = $data['email'] ?? null;
+            if (!$studentEmail || !isValidEmail($studentEmail)) {
+                $studentEmail = 'student_' . $studentNumber . '@bestlink.edu.ph';
+            }
+            // Ensure email uniqueness — append a suffix if it already exists
+            $emailCheck = $db->fetchOne("SELECT id FROM users WHERE email = ?", [$studentEmail]);
+            if ($emailCheck) {
+                $studentEmail = 'student_' . $studentNumber . '_' . date('ymd') . '@bestlink.edu.ph';
+            }
+            // Ensure username uniqueness — append a suffix if it already exists
+            $userCheck = $db->fetchOne("SELECT id FROM users WHERE username = ?", [$username]);
+            if ($userCheck) {
+                $username = $firstLetter . $id9 . '_' . date('ymd');
+            }
+
+            $db->insert('users', [
+                'username'      => strtolower($username),
+                'email'         => strtolower($studentEmail),
+                'password_hash' => password_hash($password, PASSWORD_DEFAULT),
+                'full_name'     => $fullName,
+                'role'          => 'student',
+                'student_id'    => $newId,
+                'is_active'     => 1,
+                'created_at'    => date('Y-m-d H:i:s'),
+                'updated_at'    => date('Y-m-d H:i:s'),
+            ]);
+            logActivity($_SESSION['user_id'], 'student_portal_auto_create', null, 'users', $newId);
+            $portalAccount = [
+                'username' => $username,
+                'email'    => $studentEmail,
+                'password' => $password,
+                'full_name'=> $fullName,
+            ];
+
+            // ── Welcome email (opportunistic — never breaks enrollment) ──
+            // Send only when the mail library (PHPMailer via vendor/autoload)
+            // AND SMTP are actually configured. Otherwise the registrar just
+            // sees the credentials in the modal and shares them manually.
+            $mailResult = null;
+            $autoload = __DIR__ . '/../vendor/autoload.php';
+            if (is_file($autoload)) {
+                try {
+                    require_once __DIR__ . '/../shared/mail_client.php';
+                    if (function_exists('sendStudentWelcomeEmail') && emailConfigured()) {
+                        $mailResult = sendStudentWelcomeEmail(
+                            ['id' => $newId, 'student_number' => $studentNumber],
+                            $portalAccount,
+                            $_SESSION['user_id'] ?? null
+                        );
+                    }
+                } catch (Throwable $e) {
+                    // Mail layer must never crash enrollment.
+                    error_log('[students.php] Welcome email skipped: ' . $e->getMessage());
+                }
+            }
+            $portalAccount['email_sent'] = $mailResult !== null && !empty($mailResult['sent']);
+        } catch (Exception $e) {
+            // Student was created but portal account failed — log but
+            // don't block the response. The admin can create the account
+            // manually via User Management.
+            error_log('[students.php] Auto portal account failed for student #' . $newId . ': ' . $e->getMessage());
+        }
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'Student added successfully.',
+            'data' => [
+                'id'              => $newId,
+                'student_number'  => $studentNumber,
+                'portal_account'  => $portalAccount,
+            ],
+        ]);
         exit;
     }
 

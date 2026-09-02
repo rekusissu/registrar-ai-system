@@ -121,6 +121,68 @@ function emailAppUrl(string $path): string {
     return $scheme . '://' . $host . app_url($path);
 }
 
+/**
+ * Student portal account welcome email (auto-created on enrollment).
+ * Emails the student their portal credentials. No-ops gracefully when
+ * SMTP is not configured (EMAIL_CONFIGURED=false) — the registrar still
+ * sees the credentials in the UI, just no email goes out.
+ */
+function sendStudentWelcomeEmail(array $student, array $account, ?int $sentBy = null): array {
+    $email = (string) ($account['email'] ?? '');
+    $now   = date('Y-m-d H:i:s');
+    if ($email === '') {
+        return ['sent' => false, 'message' => 'No recipient email.', 'log_id' => null];
+    }
+    if (!emailConfigured()) {
+        contactLog([
+            'student_id'      => (int) ($student['id'] ?? 0),
+            'recipient_email' => $email,
+            'recipient_name'  => ($account['full_name'] ?? null),
+            'message_type'    => 'portal_welcome',
+            'subject'         => 'Your Student Portal account — BCP Registrar',
+            'status'          => 'failed',
+            'detail'          => 'Email is not configured (EMAIL_CONFIGURED=false).',
+            'sent_by'         => $sentBy,
+        ]);
+        return ['sent' => false, 'message' => 'Email sending is not configured yet.', 'log_id' => null];
+    }
+
+    $studentName = getStudentFullName($student);
+    $portalUrl   = emailAppUrl('login.php');
+    $studentNo   = ($student['student_number'] ?? '—');
+    $username    = (string) ($account['username'] ?? '');
+    $html = '<p>Hello <strong>' . e_($studentName) . '</strong>,</p>'
+        . '<p>Your student portal account has been created for the '
+        . '<strong>Bestlink College of the Philippines — Office of the Registrar</strong>.</p>'
+        . '<table cellspacing="0" cellpadding="8" style="border-collapse:collapse;margin:20px 0;width:100%;max-width:440px;border:1px solid #e2e8f0;border-radius:8px;">'
+        . '<tr><td style="background:#f8fafc;font-weight:600;width:40%;">Student No.</td><td>' . e_($studentNo) . '</td></tr>'
+        . '<tr><td style="background:#f8fafc;font-weight:600;">Username</td><td>' . e_($username) . '</td></tr>'
+        . '<tr><td style="background:#f8fafc;font-weight:600;">Temporary password</td><td>' . e_($account['password'] ?? '') . '</td></tr>'
+        . '</table>'
+        . '<p style="margin:20px 0;">Sign in at the Student Portal using the <strong>username</strong> above and the '
+        . 'temporary password. Please <strong>change your password after your first login</strong>.</p>'
+        . '<p style="margin:24px 0;"><a href="' . e_($portalUrl) . '" style="background:#2563eb;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">Open the Student Portal</a></p>'
+        . '<p style="color:#64748b;font-size:13px;">If you did not expect this message, you can safely ignore it.</p>';
+
+    $sent = sendEmail(['email' => $email, 'name' => ($account['full_name'] ?? $studentName)], 'Your Student Portal account — BCP Registrar', $html);
+    $logId = contactLog([
+        'student_id'      => (int) ($student['id'] ?? 0),
+        'recipient_email' => $email,
+        'recipient_name'  => ($account['full_name'] ?? null),
+        'message_type'    => 'portal_welcome',
+        'subject'         => 'Your Student Portal account — BCP Registrar',
+        'status'          => $sent ? 'sent' : 'failed',
+        'detail'          => $sent ? 'Portal welcome email sent.' : 'SMTP send failed.',
+        'sent_by'         => $sentBy,
+    ]);
+
+    return [
+        'sent'    => $sent,
+        'message' => $sent ? 'Welcome email sent to the student.' : 'Account created, but the welcome email could not be sent.',
+        'log_id'  => $logId,
+    ];
+}
+
 // ── Academic data helpers (shared by snapshot + transcript) ─────
 
 /** Terms (academic_history) with their subjects (academic_grades). */

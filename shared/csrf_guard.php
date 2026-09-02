@@ -8,7 +8,8 @@
 //  Token sources, in order:
 //    1. X-CSRF-Token request header  (JS fetch calls)
 //    2. csrf_token POST field         (regular HTML forms)
-//    3. csrf_token GET query param    (rare fallback)
+//    (A GET query-param source is intentionally NOT accepted — tokens
+//     in URLs leak into logs/referrers and enable cross-site smuggling.)
 // ============================================================
 
 if (defined('CSRF_GUARD_LOADED')) {
@@ -51,8 +52,11 @@ function requireCsrf(): void {
     if (in_array($method, ['GET', 'HEAD', 'OPTIONS'], true)) {
         return;
     }
-    $token = $_SERVER['HTTP_X_CSRF_TOKEN']
-        ?? ($_POST['csrf_token'] ?? ($_GET['csrf_token'] ?? null));
+    // Token comes from the X-CSRF-Token header (JS fetch) or the
+    // csrf_token POST field (regular HTML forms). The GET-query param
+    // fallback was removed: tokens in URLs leak into logs/referrers
+    // and made cross-site requests able to smuggle a token.
+    $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? ($_POST['csrf_token'] ?? null);
     if (!csrfTokenValid($token)) {
         rejectCsrf();
     }
