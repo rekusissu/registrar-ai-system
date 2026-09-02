@@ -31,6 +31,50 @@ $id = isset($_GET['id']) ? intval($_GET['id']) : null;
 try {
     $db = Database::getInstance();
 
+    /**
+     * Keep the guardians table in sync with the student's Parent Info.
+     *
+     * When a student is enrolled/updated with a Father's and/or Mother's
+     * Name, those parents should appear as proper `guardians` rows so the
+     * Contacts page lists them — not just sit on the students record.
+     *
+     * For each parent that isn't already on file (matched by relationship
+     * OR full name), a guardian row is inserted. If the optional generic
+     * "guardian" section matches that parent's relationship, its contact
+     * details are reused; otherwise the row is created with blank contact
+     * info so it can be filled in later. Never touches existing rows, so
+     * it is safe to run on every save (no duplicates).
+     */
+    function syncFatherMotherGuardians(int $studentId, ?string $fatherName, ?string $motherName, array $generic = []): int {
+        $db = Database::getInstance();
+        $created = 0;
+        foreach (['father' => $fatherName, 'mother' => $motherName] as $rel => $name) {
+            $name = trim((string) $name);
+            if ($name === '') { continue; }
+            $exists = $db->fetchOne(
+                'SELECT id FROM guardians WHERE student_id = ? AND (relationship = ? OR full_name = ?)',
+                [$studentId, $rel, $name]
+            );
+            if ($exists) { continue; }
+            // Reuse the generic guardian's contact info when it targets this parent.
+            $useGeneric = isset($generic['relationship']) && $generic['relationship'] === $rel;
+            $db->insert('guardians', [
+                'student_id'     => $studentId,
+                'full_name'      => $name,
+                'relationship'   => $rel,
+                'contact_number' => $useGeneric ? trim((string) ($generic['contact_number'] ?? '')) : '',
+                'email'          => $useGeneric && trim((string) ($generic['email'] ?? '')) !== ''
+                    ? trim((string) $generic['email']) : null,
+                'address'        => $useGeneric && trim((string) ($generic['address'] ?? '')) !== ''
+                    ? trim((string) $generic['address']) : null,
+                'is_primary'     => 0,
+                'is_emergency'   => 0,
+            ]);
+            $created++;
+        }
+        return $created;
+    }
+
     // ─── GET GUARDIAN ──────────────────────────────────────────
     if ($method === 'GET' && isset($_GET['action']) && $_GET['action'] === 'guardian' && isset($_GET['student_id'])) {
         $guardian = $db->fetchOne("SELECT * FROM guardians WHERE student_id = ? ORDER BY is_primary DESC, id ASC LIMIT 1", [intval($_GET['student_id'])]);
@@ -514,6 +558,14 @@ try {
             } catch (Exception $e) {}
         }
 
+        // Auto-sync Father/Mother Name → guardian rows so the parents
+        // entered in Personal Info always appear on the Contacts page.
+        syncFatherMotherGuardians($newId, $input['father_name'] ?? null, $input['mother_name'] ?? null, [
+            'relationship'   => $input['guardian_relationship'] ?? 'guardian',
+            'contact_number' => $input['guardian_contact'] ?? '',
+            'email'          => $input['guardian_email'] ?? '',
+        ]);
+
         // ─── AUTO-CREATE STUDENT PORTAL ACCOUNT ────────────────
         // Automatically create a `users` entry so the student can
         // log in to the student portal immediately. The registrar
@@ -708,6 +760,12 @@ try {
                     $db->insert('guardians', $gData);
                 }
             }
+            // Auto-sync Father/Mother Name → guardian rows (same as on enroll).
+            syncFatherMotherGuardians($id, $input['father_name'] ?? null, $input['mother_name'] ?? null, [
+                'relationship'   => $input['guardian_relationship'] ?? 'guardian',
+                'contact_number' => $input['guardian_contact'] ?? '',
+                'email'          => $input['guardian_email'] ?? '',
+            ]);
             echo json_encode(['success' => true, 'message' => 'Student updated successfully.']);
             exit;
         } catch (Exception $e) {
