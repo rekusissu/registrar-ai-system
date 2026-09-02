@@ -157,10 +157,11 @@ include '../includes/sidebar.php';
 /* Empty state */
 .vtab.active{border-bottom-color:#2563eb !important;color:#2563eb !important;}
 .vtab-content.active{display:block}
-.empty-state{text-align:center;padding:30px 20px;color:#94a3b8}
+.empty-state{text-align:center;padding:30px 20px;color:#94a3b8;min-height:200px}
 .empty-state i{font-size:36px;color:#e2e8f0;display:block;margin-bottom:8px}
 .empty-state p{font-size:15px;font-weight:500;color:#94a3b8}
 .empty-state span{font-size:13px;color:#cbd5e1}
+#emptyState{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:50vh;margin:0 auto;padding:40px 20px}
 
 /* Modal */
 .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);backdrop-filter:blur(4px);z-index:9999;align-items:center;justify-content:center;padding:20px}
@@ -320,8 +321,8 @@ select.form-control{cursor:pointer;appearance:auto;-webkit-appearance:auto;}
 <button class="btn btn-secondary" style="height:32px;padding:0 12px;font-size:12px;" onclick="applyBulkAction()"><i class="fas fa-check"></i> Apply</button>
 </div>
 
-<div class="table-responsive">
-<table>
+<div class="table-responsive" id="studentTableWrap">
+<table id="studentTable">
 <thead>
 <tr><th style="width:30px;"><div class="cb-wrap"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></div></th><th>ID</th><th>Name</th><th>Course</th><th>Year</th><th>Section</th><th>Gender</th><th>RFID</th><th>Status</th><th style="text-align:center;">Quality <span class="quality-legend" title=""><i class="fas fa-circle-info" style="cursor:help;"></i><span class="quality-legend-box">Quality score = % of required student fields filled.
 <span style="color:#22c55e;">●</span> 85–100% &nbsp; Complete
@@ -330,9 +331,8 @@ select.form-control{cursor:pointer;appearance:auto;-webkit-appearance:auto;}
 <span style="color:#f59e0b;">⚠</span> Anomaly worth checking (hover the row)</span></span></th><th style="text-align:center;">Actions</th></tr>
 </thead>
 <tbody id="studentTableBody">
-<?php if (empty($students)): ?>
-<tr><td colspan="11" class="empty-state"><i class="fas fa-user-graduate"></i><p>No students found</p><span>Add your first student to get started</span></td></tr>
-<?php else:
+<?php if (!empty($students)): ?>
+<?php
 $avatarColors = ['blue','green','purple','orange','pink'];
 foreach ($students as $i => $s):
 $initials = strtoupper(substr($s['first_name'],0,1).substr($s['last_name'],0,1));
@@ -376,6 +376,11 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 <?php endforeach; endif; ?>
 </tbody>
 </table>
+<div class="empty-state" id="emptyState" style="<?= empty($students) ? 'display:flex' : 'display:none' ?>">
+  <i class="fas fa-user-graduate"></i>
+  <p>No students found</p>
+  <span>Add your first student to get started</span>
+</div>
 </div>
 
 <div class="table-footer">
@@ -554,15 +559,20 @@ function updateTable(students) {
     let visible = 0;
     students.forEach(s => { if (s.element) { s.element.style.display = ''; visible++; } });
     showingCount.textContent = visible;
-    let emptyRow = tableBody.querySelector('.empty-state-row');
-    if (visible === 0 && allStudents.length > 0) {
-        if (!emptyRow) {
-            emptyRow = document.createElement('tr'); emptyRow.className = 'empty-state-row';
-            emptyRow.innerHTML = '<td colspan="10" class="empty-state"><i class="fas fa-search"></i><p>No students found</p><span>Try adjusting search or filters</span></td>';
-            tableBody.appendChild(emptyRow);
+    const emptyState = document.getElementById('emptyState');
+    const tblWrap = document.getElementById('studentTableWrap');
+    if (visible === 0) {
+        if (tblWrap) tblWrap.querySelector('table').style.display = 'none';
+        if (emptyState) {
+            emptyState.style.display = 'flex';
+            emptyState.querySelector('p').textContent = 'No students found';
+            emptyState.querySelector('span').textContent = (allStudents.length > 0) ? 'Try adjusting search or filters' : 'Add your first student to get started';
+            emptyState.querySelector('i').className = (allStudents.length > 0) ? 'fas fa-search' : 'fas fa-user-graduate';
         }
-        emptyRow.style.display = '';
-    } else if (emptyRow) emptyRow.style.display = 'none';
+    } else {
+        if (tblWrap) tblWrap.querySelector('table').style.display = '';
+        if (emptyState) emptyState.style.display = 'none';
+    }
     updateBulkBar();
 }
 
