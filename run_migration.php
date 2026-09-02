@@ -1,41 +1,34 @@
 <?php
-// Quick migration runner
+/**
+ * Run the queue logging migration
+ * This can be accessed via browser to apply the database migration
+ */
+
+header('Content-Type: text/plain');
+
 require_once __DIR__ . '/shared/config.php';
 require_once __DIR__ . '/shared/database.php';
 
+$db = Database::getInstance();
+
 try {
-    $db = Database::getInstance();
-    $conn = $db->getConnection();
+    echo "Starting migration...\n";
 
-    // Read and execute the migration
-    $sql = file_get_contents(__DIR__ . '/database/registrar_upgrade.sql');
+    // Extend event_type ENUM
+    $sql = "ALTER TABLE `rfid_scan_logs`
+MODIFY `event_type` enum('entry','exit','library','cafeteria','other','queue_join','queue_call','queue_serving','queue_completed','queue_no_show','queue_cancelled') DEFAULT 'entry'";
 
-    // Split by semicolon and execute each statement
-    $statements = array_filter(array_map('trim', explode(';', $sql)));
+    $db->query($sql);
+    echo "Migration applied successfully!\n";
 
-    $count = 0;
-    foreach ($statements as $stmt) {
-        if (empty($stmt)) continue;
-        try {
-            $conn->exec($stmt);
-            $count++;
-        } catch (Exception $e) {
-            echo "Statement error: " . $e->getMessage() . "\n";
-            echo "Statement: " . substr($stmt, 0, 100) . "...\n\n";
-        }
-    }
+    // Verify
+    $result = $db->fetchOne("SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = 'registrar_ai' AND TABLE_NAME = 'rfid_scan_logs' AND COLUMN_NAME = 'event_type'");
+    echo "Current event_type: " . $result['COLUMN_TYPE'] . "\n";
 
-    echo "✓ Migration complete! Executed $count statements.\n";
-
-    // Verify status_tracker table exists
-    $result = $conn->query("SHOW TABLES LIKE 'status_tracker'");
-    if ($result->rowCount() > 0) {
-        echo "✓ status_tracker table created successfully.\n";
-    } else {
-        echo "✗ status_tracker table not found.\n";
-    }
+    echo "\nDone!\n";
 
 } catch (Exception $e) {
     echo "Error: " . $e->getMessage() . "\n";
+    echo "File: " . $e->getFile() . "\n";
+    echo "Line: " . $e->getLine() . "\n";
 }
-?>

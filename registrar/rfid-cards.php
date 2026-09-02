@@ -1060,8 +1060,20 @@ foreach ($cards as $i => $c) {
                     </div>
                 </div>
                 <div class="form-group">
-                    <label><i class="fas fa-message" style="margin-right:4px;color:#64748b;"></i>Reason for Change</label>
-                    <input type="text" id="editReason" class="form-control" placeholder="e.g. Student lost card, re-issuing..." />
+                    <label><i class="fas fa-question-circle" style="margin-right:4px;color:#64748b;"></i>Status Reason</label>
+                    <div style="position:relative;">
+                        <select id="editStatusReason" class="form-control">
+                            <option value="">— Select reason —</option>
+                            <option value="active">Active</option>
+                            <option value="graduated">Graduated</option>
+                            <option value="lost_card">Lost Card</option>
+                            <option value="dropped_out">Dropped Out</option>
+                            <option value="transferred">Transferred</option>
+                            <option value="inactive">Inactive</option>
+                            <option value="other">Other</option>
+                        </select>
+                        <i class="fas fa-chevron-down" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:10px;pointer-events:none;"></i>
+                    </div>
                 </div>
             </div>
 
@@ -1149,6 +1161,8 @@ foreach ($cards as $i => $c) {
                             </span>
                         </span>
                     </li>
+                    <li><span class="kv-label">Status Reason</span><span class="kv-value" id="viewStatusReason">—</span></li>
+                    <li><span class="kv-label">Last Updated</span><span class="kv-value" id="viewStatusUpdatedAt">—</span></li>
                     <li><span class="kv-label">Issued</span><span class="kv-value" id="viewIssued">—</span></li>
                     <li><span class="kv-label">Expiry</span><span class="kv-value" id="viewExpiry">—</span></li>
                 </ul>
@@ -1567,9 +1581,9 @@ async function openEditModal(id) {
         document.getElementById('editStudentName').textContent = c.student_name || 'Unassigned';
         document.getElementById('editStudentNumber').textContent = c.student_number || '';
         document.getElementById('editStatus').value = c.status;
+        document.getElementById('editStatusReason').value = c.status_reason || '';
         document.getElementById('editExpiryDate').value = c.expiry_date || '';
         document.getElementById('editNotes').value = c.notes || '';
-        document.getElementById('editReason').value = '';
         const updated = c.updated_at || c.updated_date;
         document.getElementById('editUpdatedAt').textContent = updated ? new Date(updated).toLocaleString(undefined, { year:'numeric', month:'short', day:'2-digit', hour:'2-digit', minute:'2-digit' }) : 'Never';
         m.classList.add('active');
@@ -1592,9 +1606,9 @@ document.getElementById('editCardForm').addEventListener('submit', async functio
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 status: document.getElementById('editStatus').value,
+                status_reason: document.getElementById('editStatusReason').value,
                 expiry_date: document.getElementById('editExpiryDate').value,
-                notes: document.getElementById('editNotes').value,
-                reason: document.getElementById('editReason').value
+                notes: document.getElementById('editNotes').value
             })
         });
         const data = await res.json();
@@ -1641,6 +1655,25 @@ async function openViewDrawer(id) {
         setText('#viewStatus', c.status ? c.status[0].toUpperCase() + c.status.slice(1) : null);
         const badge = document.getElementById('viewStatusBadge');
         if (badge) badge.className = 'rfid-view-status-badge ' + (c.status || '');
+
+        // Status reason (convert underscores to spaces and capitalize)
+        let reasonText = '—';
+        if (c.status_reason) {
+            reasonText = c.status_reason
+                .split('_')
+                .map(word => word[0].toUpperCase() + word.slice(1))
+                .join(' ');
+        }
+        setText('#viewStatusReason', reasonText);
+
+        // Last updated date
+        if (c.status_updated_at) {
+            const updatedDate = new Date(c.status_updated_at);
+            setText('#viewStatusUpdatedAt', updatedDate.toLocaleDateString(undefined, { year:'numeric', month:'short', day:'2-digit', hour:'2-digit', minute:'2-digit' }));
+        } else {
+            setText('#viewStatusUpdatedAt', null);
+        }
+
         setText('#viewIssued', c.issued_date ? new Date(c.issued_date).toLocaleDateString(undefined, { year:'numeric', month:'short', day:'2-digit' }) : null);
         setText('#viewExpiry', c.expiry_date ? new Date(c.expiry_date).toLocaleDateString(undefined, { year:'numeric', month:'short', day:'2-digit' }) : null);
         setText('#viewNotes', c.notes || 'No notes.');

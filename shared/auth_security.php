@@ -164,15 +164,33 @@ function issueOtp($db, int $userId, string $purpose = 'login', ?string $email = 
         'expires_at' => date('Y-m-d H:i:s', time() + OTP_TTL_SEC),
     ]);
 
+    // Prefer SMTP via PHPMailer when email is configured (reliable on
+    // XAMPP where PHP mail() has no transport); fall back to mail().
+    if (!function_exists('sendEmail')) {
+        $mailClient = __DIR__ . '/mail_client.php';
+        if (is_file($mailClient) && is_file(__DIR__ . '/../vendor/autoload.php')) {
+            require_once $mailClient;
+        }
+    }
+
     $delivered = false;
     $to = trim($email);
     if ($to !== '' && filter_var($to, FILTER_VALIDATE_EMAIL)) {
         $subject = 'Your ' . ($purpose === 'reset' ? 'Password Reset' : 'One-Time') . ' Code – BCP Registrar';
-        $body = "Your BCP Registrar " . ($purpose === 'reset' ? 'password reset' : 'verification')
-              . " code is: $otp\n\nThis code expires in " . (int) (OTP_TTL_SEC / 60) . " minutes.\n"
-              . "If you did not request this, please ignore this message.\n";
-        $headers = "From: no-reply@bestlink.edu.ph\r\n";
-        $delivered = @mail($to, $subject, $body, $headers);
+        $escOtp = function_exists('e_') ? e_($otp) : htmlspecialchars($otp, ENT_QUOTES, 'UTF-8');
+        $htmlBody = '<p>Hello,</p>'
+            . '<p>Your BCP Registrar ' . ($purpose === 'reset' ? 'password reset' : 'verification') . ' code is:</p>'
+            . '<p style="font-size:26px;font-weight:700;letter-spacing:4px;color:#2563eb;">' . $escOtp . '</p>'
+            . '<p>This code expires in ' . (int) (OTP_TTL_SEC / 60) . ' minutes.</p>'
+            . '<p style="color:#64748b;font-size:12px;">If you did not request this, please ignore this message.</p>';
+
+        if (function_exists('sendEmail') && emailConfigured()) {
+            $delivered = sendEmail(['email' => $to], $subject, $htmlBody);
+        } else {
+            $plainBody = trim(strip_tags(str_replace(['</p>', '<br>', '<br/>', '<br />'], "\n", $htmlBody)));
+            $headers = "From: no-reply@bestlink.edu.ph\r\nContent-Type: text/plain; charset=UTF-8\r\n";
+            $delivered = @mail($to, $subject, $plainBody, $headers);
+        }
     }
 
     $plaintext = null;

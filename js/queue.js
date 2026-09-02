@@ -180,7 +180,7 @@
                     '<div class="who"><div class="name">' + esc(w.name) + '</div>' +
                     '<div class="pos">' + (w.next_up ? 'Next up' : 'Position ' + w.position) + '</div></div></div>';
             });
-            if (!html) html = '<div style="color:#64748b;text-align:center;padding:24px;">No one is in line yet.</div>';
+            if (!html) html = '<div class="monitor-empty"><i class="fas fa-people-group"></i><p>No one is in line yet</p><span>The lineup will appear here</span></div>';
             el.innerHTML = html;
         }
 
@@ -313,7 +313,7 @@
                     '<div class="num">' + esc(w.number) + '</div>' +
                     '<div class="name">' + esc(w.name) + '</div></div>';
             });
-            if (!wh) wh = '<div style="color:#64748b;padding:12px;text-align:center;">No one is waiting.</div>';
+            if (!wh) wh = '<div class="monitor-empty"><i class="fas fa-people-group"></i><p>No one is waiting</p><span>Students join here when they tap at the kiosk</span></div>';
             waitList.innerHTML = wh;
 
             var rh = '';
@@ -324,7 +324,7 @@
                     '<div class="name">' + esc(r.name) + '</div>' +
                     '<span class="tag ' + tagClass + '">' + esc(r.status) + '</span></div>';
             });
-            if (!rh) rh = '<div style="color:#64748b;padding:12px;text-align:center;">No tickets served yet.</div>';
+            if (!rh) rh = '<div class="monitor-empty"><i class="fas fa-clock-rotate-left"></i><p>Nothing served yet</p><span>Served tickets will show up here</span></div>';
             recentList.innerHTML = rh;
         }
 
@@ -419,7 +419,7 @@
             if (tbody) {
                 var html = '';
                 if (!(d.waiting || []).length) {
-                    html = '<tr><td colspan="7" class="empty-state"><i class="fas fa-people-group"></i><p>No students waiting</p><span>Tickets appear here when students tap at the kiosk</span></td></tr>';
+                    html = '<tr class="empty-state-row"><td colspan="7" class="empty-state"><i class="fas fa-people-group"></i><p>No students waiting</p><span>Tickets appear here when students tap at the kiosk</span></td></tr>';
                 } else {
                     (d.waiting || []).forEach(function (w) {
                         html += '<tr>' +

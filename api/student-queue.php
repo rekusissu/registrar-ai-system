@@ -53,7 +53,7 @@ if ($action === 'cancel') {
         exit;
     }
     $own = $db->fetchOne(
-        "SELECT id FROM queue_tickets
+        "SELECT * FROM queue_tickets
          WHERE queue_date = ? AND student_id = ? AND status = 'waiting'
          ORDER BY joined_at DESC LIMIT 1",
         [$today, $studentId]
@@ -69,6 +69,23 @@ if ($action === 'cancel') {
         [(int) $own['id']]
     );
     logActivity(getCurrentUserId(), 'queue_cancel', 'Cancelled own ticket #' . str_pad((string) $own['id'], 3, '0', STR_PAD_LEFT), 'queue_tickets', (int) $own['id']);
+
+    // Log queue cancelled event to rfid_scan_logs (best-effort, non-fatal)
+    try {
+        $db->insert('rfid_scan_logs', [
+            'card_uid'   => $own['card_uid'] ?? '',
+            'student_id' => $own['student_id'] ?? null,
+            'location'   => 'Student Portal',
+            'event_type' => 'queue_cancelled',
+            'status'     => 'denied',
+            'scanner_id' => 'student-portal',
+            'ip_address' => $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0',
+        ]);
+    } catch (Throwable $e) {
+        // Non-fatal — surface nothing to the caller.
+        error_log('queue cancel log failed: ' . $e->getMessage());
+    }
+
     echo json_encode(['success' => true, 'message' => 'Your queue ticket was cancelled.']);
     exit;
 }

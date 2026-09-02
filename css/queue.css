@@ -1,14 +1,14 @@
 /* ============================================================
    CSS/QUEUE.CSS — Queue Management System
-   Kiosk + Monitor shared dark styles. The registrar console
+   Kiosk + Monitor shared LIGHT styles. The registrar console
    reuses the shared gen-2 system (registrar.css/components.css).
    ============================================================ */
 
 .queue-body {
     margin: 0;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
-    background: radial-gradient(1200px 600px at 50% -10%, #1e3a8a 0%, #0f172a 55%, #020617 100%);
-    color: #f1f5f9;
+    background: radial-gradient(1200px 600px at 50% -10%, #dbeafe 0%, #eff6ff 55%, #f8fafc 100%);
+    color: #1e293b;
     min-height: 100vh;
     display: flex;
     align-items: center;
@@ -41,17 +41,18 @@
     font-weight: 800;
     letter-spacing: 0.4px;
     margin: 0;
+    color: #0f172a;
 }
 .queue-brand p {
     margin: 0;
     font-size: 13px;
-    color: #94a3b8;
+    color: #64748b;
 }
 
 /* ── Kiosk idle (tap) ─────────────────────────────────────── */
 .tap-card {
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.75);
+    border: 1px solid #e2e8f0;
     border-radius: 28px;
     padding: 56px 40px;
     animation: qPulseGlow 2.6s ease-in-out infinite;
@@ -67,21 +68,22 @@
     justify-content: center;
     font-size: 42px;
     color: #fff;
-    box-shadow: 0 12px 40px rgba(37, 99, 235, 0.45);
+    box-shadow: 0 12px 40px rgba(37, 99, 235, 0.30);
 }
 .tap-card h2 {
     font-size: 40px;
     font-weight: 800;
     margin: 0 0 10px;
+    color: #0f172a;
 }
 .tap-card p {
     font-size: 18px;
-    color: #cbd5e1;
+    color: #475569;
     margin: 0 0 28px;
 }
 .tap-card .hint {
     font-size: 13px;
-    color: #64748b;
+    color: #94a3b8;
 }
 
 /* Hidden RFID capture input (keystroke reader types UID + Enter) */
@@ -103,9 +105,9 @@
     margin-bottom: 22px;
 }
 .q-tab-btn {
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    color: #cbd5e1;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    color: #475569;
     border-radius: 999px;
     padding: 10px 22px;
     font-size: 14px;
@@ -114,13 +116,13 @@
     transition: all 0.2s ease;
     font-family: inherit;
 }
-.q-tab-btn:hover { background: rgba(255, 255, 255, 0.12); color: #fff; }
+.q-tab-btn:hover { background: #f1f5f9; color: #0f172a; }
 .q-tab-btn.active { background: #2563eb; border-color: #2563eb; color: #fff; }
 
 /* ── Result screen ────────────────────────────────────────── */
 .result-card {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid #e2e8f0;
     border-radius: 28px;
     padding: 56px 40px;
 }
@@ -130,27 +132,27 @@
     font-weight: 800;
     line-height: 1;
     letter-spacing: 2px;
-    background: linear-gradient(135deg, #60a5fa, #a78bfa);
+    background: linear-gradient(135deg, #2563eb, #7c3aed);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
     margin: 0 0 6px;
 }
-.ticket-name { font-size: 34px; font-weight: 700; margin: 0 0 8px; }
-.ticket-sub { font-size: 18px; color: #cbd5e1; margin: 0 0 26px; }
+.ticket-name { font-size: 34px; font-weight: 700; margin: 0 0 8px; color: #0f172a; }
+.ticket-sub { font-size: 18px; color: #475569; margin: 0 0 26px; }
 .result-icon {
     font-size: 54px;
     margin-bottom: 16px;
 }
-.result-icon.success { color: #4ade80; }
-.result-icon.warn { color: #fbbf24; }
-.result-icon.error { color: #f87171; }
-.result-icon.info { color: #60a5fa; }
+.result-icon.success { color: #16a34a; }
+.result-icon.warn { color: #d97706; }
+.result-icon.error { color: #dc2626; }
+.result-icon.info { color: #2563eb; }
 
 /* ── Standing/board screens ───────────────────────────────── */
 .q-panel {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.85);
+    border: 1px solid #e2e8f0;
     border-radius: 22px;
     padding: 26px;
     text-align: left;
@@ -159,7 +161,7 @@
     font-size: 18px;
     font-weight: 700;
     margin: 0 0 16px;
-    color: #e2e8f0;
+    color: #1e293b;
 }
 .standing-input-wrap {
     display: flex;
@@ -168,9 +170,9 @@
     margin-bottom: 18px;
 }
 .standing-input-wrap input {
-    background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.16);
-    color: #fff;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    color: #0f172a;
     border-radius: 12px;
     padding: 12px 16px;
     font-size: 18px;
@@ -189,42 +191,42 @@
     display: flex;
     align-items: center;
     gap: 14px;
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
     border-radius: 14px;
     padding: 14px 16px;
 }
 .q-tile .num {
     font-size: 26px;
     font-weight: 800;
-    color: #93c5fd;
+    color: #2563eb;
     min-width: 72px;
     text-align: center;
 }
 .q-tile .who { flex: 1; min-width: 0; }
-.q-tile .who .name { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.q-tile .who .pos { font-size: 12px; color: #94a3b8; }
+.q-tile .who .name { font-weight: 600; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #0f172a; }
+.q-tile .who .pos { font-size: 12px; color: #64748b; }
 .q-tile.next-up {
-    border-color: #fbbf24;
-    background: rgba(251, 191, 36, 0.08);
+    border-color: #f59e0b;
+    background: #fffbeb;
 }
-.q-tile.next-up .num { color: #fbbf24; }
+.q-tile.next-up .num { color: #d97706; }
 .q-tile.serving-tile {
-    border-color: #4ade80;
-    background: rgba(74, 222, 128, 0.08);
+    border-color: #22c55e;
+    background: #f0fdf4;
 }
-.q-tile.serving-tile .num { color: #4ade80; }
+.q-tile.serving-tile .num { color: #16a34a; }
 .q-tile.you {
-    outline: 2px solid #60a5fa;
-    background: rgba(96, 165, 250, 0.1);
+    outline: 2px solid #3b82f6;
+    background: #eff6ff;
 }
 
 /* ── Monitor ──────────────────────────────────────────────── */
 .monitor-body {
     margin: 0;
     font-family: 'Inter', system-ui, sans-serif;
-    background: #0b1120;
-    color: #f1f5f9;
+    background: #f1f5f9;
+    color: #1e293b;
     min-height: 100vh;
     overflow: hidden;
 }
@@ -237,23 +239,23 @@
 }
 .monitor-top .brand { display: flex; align-items: center; gap: 12px; }
 .monitor-top .brand img { height: 44px; width: 44px; border-radius: 10px; object-fit: cover; }
-.monitor-top .brand h1 { font-size: 20px; font-weight: 800; margin: 0; }
-.monitor-top .clock { font-size: 16px; color: #94a3b8; font-variant-numeric: tabular-nums; }
+.monitor-top .brand h1 { font-size: 20px; font-weight: 800; margin: 0; color: #0f172a; }
+.monitor-top .clock { font-size: 16px; color: #64748b; font-variant-numeric: tabular-nums; }
 
 .hero {
-    background: linear-gradient(135deg, #1e3a8a 0%, #312e81 60%, #4c1d95 100%);
+    background: linear-gradient(135deg, #3b82f6 0%, #6366f1 60%, #8b5cf6 100%);
     border-radius: 26px;
     padding: 44px 40px;
     text-align: center;
     margin-bottom: 24px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid #dbeafe;
     position: relative;
 }
 .hero .hero-label {
     font-size: 18px;
     letter-spacing: 4px;
     text-transform: uppercase;
-    color: #93c5fd;
+    color: #dbeafe;
     font-weight: 700;
     margin-bottom: 6px;
 }
@@ -262,13 +264,13 @@
     font-weight: 900;
     line-height: 1;
     margin: 6px 0 4px;
-    background: linear-gradient(135deg, #fff, #a5b4fc);
+    background: linear-gradient(135deg, #ffffff, #e0e7ff);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
 }
-.hero .hero-name { font-size: 40px; font-weight: 700; margin: 0 0 10px; }
-.hero .hero-status { font-size: 16px; color: #c7d2fe; }
+.hero .hero-name { font-size: 40px; font-weight: 700; margin: 0 0 10px; color: #ffffff; }
+.hero .hero-status { font-size: 16px; color: #e0e7ff; }
 .hero.calling { animation: heroPulse 1.6s ease-in-out 2; }
 
 .monitor-cols {
@@ -281,7 +283,7 @@
     font-size: 15px;
     text-transform: uppercase;
     letter-spacing: 2px;
-    color: #94a3b8;
+    color: #64748b;
     font-weight: 700;
     margin: 0 0 12px;
 }
@@ -291,16 +293,16 @@
     grid-template-columns: 64px 64px 1fr;
     align-items: center;
     gap: 12px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
     border-radius: 12px;
     padding: 10px 14px;
 }
-.monitor-wait-row .pos { font-size: 14px; color: #64748b; font-weight: 600; }
-.monitor-wait-row .num { font-size: 22px; font-weight: 800; color: #93c5fd; text-align: center; }
-.monitor-wait-row .name { font-size: 16px; font-weight: 600; }
-.monitor-wait-row.next-up { border-color: #fbbf24; background: rgba(251, 191, 36, 0.08); }
-.monitor-wait-row.next-up .num { color: #fbbf24; }
+.monitor-wait-row .pos { font-size: 14px; color: #94a3b8; font-weight: 600; }
+.monitor-wait-row .num { font-size: 22px; font-weight: 800; color: #2563eb; text-align: center; }
+.monitor-wait-row .name { font-size: 16px; font-weight: 600; color: #0f172a; }
+.monitor-wait-row.next-up { border-color: #f59e0b; background: #fffbeb; }
+.monitor-wait-row.next-up .num { color: #d97706; }
 
 .monitor-recent-list { display: grid; gap: 8px; }
 .monitor-recent-row {
@@ -309,13 +311,29 @@
     gap: 12px;
     padding: 8px 12px;
     border-radius: 10px;
-    background: rgba(255, 255, 255, 0.03);
+    background: #ffffff;
+    border: 1px solid #f1f5f9;
 }
-.monitor-recent-row .num { font-size: 18px; font-weight: 700; color: #64748b; min-width: 56px; }
-.monitor-recent-row .name { font-size: 14px; color: #cbd5e1; }
+.monitor-recent-row .num { font-size: 18px; font-weight: 700; color: #94a3b8; min-width: 56px; }
+.monitor-recent-row .name { font-size: 14px; color: #475569; }
 .monitor-recent-row .tag { font-size: 11px; font-weight: 700; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; }
-.monitor-recent-row .tag.completed { background: rgba(74, 222, 128, 0.15); color: #4ade80; }
-.monitor-recent-row .tag.no-show, .monitor-recent-row .tag.removed { background: rgba(248, 113, 113, 0.15); color: #f87171; }
+.monitor-recent-row .tag.completed { background: #dcfce7; color: #16a34a; }
+.monitor-recent-row .tag.no-show, .monitor-recent-row .tag.removed { background: #fee2e2; color: #dc2626; }
+
+/* ── Monitor empty states (centered) ──────────────────────── */
+.monitor-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 8px;
+    padding: 36px 16px;
+    color: #94a3b8;
+}
+.monitor-empty i { font-size: 26px; color: #cbd5e1; }
+.monitor-empty p { font-size: 14px; font-weight: 600; color: #64748b; margin: 0; }
+.monitor-empty span { font-size: 12px; color: #94a3b8; }
 
 /* ── Console widget (dashboard) ───────────────────────────── */
 .live-queue-widget { font-size: 14px; }
@@ -338,12 +356,12 @@
 
 /* ── Animations ───────────────────────────────────────────── */
 @keyframes qPulseGlow {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.35); }
+    0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.25); }
     50%      { box-shadow: 0 0 0 22px rgba(37, 99, 235, 0); }
 }
 @keyframes heroPulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.5); }
-    50%      { box-shadow: 0 0 0 26px rgba(96, 165, 250, 0); }
+    0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.5); }
+    50%      { box-shadow: 0 0 0 26px rgba(59, 130, 246, 0); }
 }
 
 @media (max-width: 820px) {

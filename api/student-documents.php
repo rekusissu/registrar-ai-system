@@ -284,5 +284,5 @@ try {
                    'fee' => $fee, 'delivery_fee' => $deliveryFee, 'payment_method' => $paymentMethod],
     ]);
 } catch (Throwable $e) {
-    json_error($e, 'Unable to submit the request.');
+    json_error($e, 'Unable to submit request. Please check for outstanding balance or account status.');
 }

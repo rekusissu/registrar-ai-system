@@ -395,21 +395,20 @@ function decryptData($encrypted, $key = null) {
 // ─── STUDENT HELPERS ────────────────────────────────────────────
 
 /**
- * Generate student number
+ * Generate the next student number in the 9-digit sequence:
+ *   100000001, 100000002, 100000003, … (matches database/update_student_numbers.sql).
  */
 function generateStudentNumber() {
-    $year = date('Y');
     $db = Database::getInstance();
     $last = $db->fetchColumn(
-        "SELECT student_number FROM students WHERE student_number LIKE ? ORDER BY id DESC LIMIT 1",
-        [$year . '%']
+        "SELECT student_number FROM students
+         WHERE student_number REGEXP '^10000000[0-9]+$'
+         ORDER BY CAST(student_number AS UNSIGNED) DESC LIMIT 1"
     );
-    
     if ($last) {
-        $num = intval(substr($last, -4)) + 1;
-        return $year . '-' . str_pad($num, 4, '0', STR_PAD_LEFT);
+        return (string) ((int) $last + 1);
     }
-    return $year . '-0001';
+    return '100000001';
 }
 
 /**

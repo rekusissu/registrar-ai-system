@@ -43,6 +43,28 @@ function padNumber(int $n): string {
     return str_pad((string)$n, 3, '0', STR_PAD_LEFT);
 }
 
+/**
+ * Best-effort log of a queue state transition to rfid_scan_logs.
+ * Wrapped in its own try/catch so a logging failure (e.g. the event_type
+ * ENUM not yet migrated) never breaks the actual queue operation.
+ */
+function logQueueEvent($db, array $ticket, string $eventType, string $status, string $location = 'Queue Manager', string $scannerId = 'queue-manager'): void {
+    try {
+        $db->insert('rfid_scan_logs', [
+            'card_uid'   => $ticket['card_uid'] ?? '',
+            'student_id' => $ticket['student_id'] ?? null,
+            'location'   => $location,
+            'event_type' => $eventType,
+            'status'     => $status,
+            'scanner_id' => $scannerId,
+            'ip_address' => $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0',
+        ]);
+    } catch (Throwable $e) {
+        // Non-fatal — surface nothing to the caller.
+        error_log('logQueueEvent failed: ' . $e->getMessage());
+    }
+}
+
 $now = date('Y-m-d H:i:s');
 
 // ── Timezone-consistent "today" ─────────────────────────────────
@@ -152,6 +174,9 @@ if ($action === 'call_next') {
                 'id = ?', [$serving['id']]);
             logActivity($_SESSION['user_id'], 'queue_auto_complete', null, 'queue_tickets', $serving['id'],
                 ['status' => 'serving'], ['status' => 'completed']);
+
+            // Log queue completed event to rfid_scan_logs for auto-completed ticket
+            logQueueEvent($db, $serving, 'queue_completed', 'success');
         }
 
         $next = $db->fetchOne(
@@ -170,6 +195,9 @@ if ($action === 'call_next') {
             'id = ?', [$next['id']]);
         logActivity($_SESSION['user_id'], 'queue_call_next', null, 'queue_tickets', $next['id'],
             ['status' => 'waiting'], ['status' => 'serving']);
+
+        // Log queue call event to rfid_scan_logs
+        logQueueEvent($db, $next, 'queue_call', 'success');
 
         echo json_encode([
             'success' => true,
@@ -216,6 +244,9 @@ if ($action === 'skip') {
         logActivity($_SESSION['user_id'], 'queue_skip', null, 'queue_tickets', $ticketId,
             ['status' => $ticket['status']], ['status' => 'no-show']);
 
+        // Log queue no-show event to rfid_scan_logs for the skipped ticket
+        logQueueEvent($db, $ticket, 'queue_no_show', 'denied');
+
         $calledNext = null;
         if ($wasServing) {
             $next = $db->fetchOne(
@@ -230,6 +261,10 @@ if ($action === 'skip') {
                     'id = ?', [$next['id']]);
                 logActivity($_SESSION['user_id'], 'queue_call_next', null, 'queue_tickets', $next['id'],
                     ['status' => 'waiting'], ['status' => 'serving']);
+
+                // Log queue call event to rfid_scan_logs for the newly called ticket
+                logQueueEvent($db, $next, 'queue_call', 'success');
+
                 $calledNext = [
                     'ticket_id'      => (int) $next['id'],
                     'ticket_number'  => (int) $next['ticket_number'],
@@ -272,6 +307,10 @@ if ($action === 'complete') {
             'id = ?', [$ticketId]);
         logActivity($_SESSION['user_id'], 'queue_complete', null, 'queue_tickets', $ticketId,
             ['status' => 'serving'], ['status' => 'completed']);
+
+        // Log queue completed event to rfid_scan_logs
+        logQueueEvent($db, $ticket, 'queue_completed', 'success');
+
         echo json_encode(['success' => true, 'message' => $ticket['student_name'] . ' completed.']);
     } catch (Throwable $e) {
         json_error($e, 'Unable to complete the ticket.');
@@ -300,6 +339,10 @@ if ($action === 'no_show') {
             'id = ?', [$ticketId]);
         logActivity($_SESSION['user_id'], 'queue_no_show', null, 'queue_tickets', $ticketId,
             ['status' => 'serving'], ['status' => 'no-show']);
+
+        // Log queue no-show event to rfid_scan_logs
+        logQueueEvent($db, $ticket, 'queue_no_show', 'denied');
+
         echo json_encode(['success' => true, 'message' => $ticket['student_name'] . ' marked as no-show.']);
     } catch (Throwable $e) {
         json_error($e, 'Unable to mark no-show.');
@@ -325,6 +368,10 @@ if ($action === 'remove') {
             'id = ?', [$ticketId]);
         logActivity($_SESSION['user_id'], 'queue_remove', null, 'queue_tickets', $ticketId,
             ['status' => $ticket['status']], ['status' => 'removed']);
+
+        // Log queue cancelled event to rfid_scan_logs
+        logQueueEvent($db, $ticket, 'queue_cancelled', 'denied');
+
         echo json_encode(['success' => true, 'message' => 'Ticket removed from the queue.']);
     } catch (Throwable $e) {
         json_error($e, 'Unable to remove the ticket.');

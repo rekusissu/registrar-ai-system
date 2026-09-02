@@ -172,6 +172,15 @@ include '../includes/sidebar.php';
     background: currentColor;
 }
 .event-pill.exit  { background: #f1f5f9; color: #475569; }
+.event-pill.library    { background: #f3e8ff; color: #a855f7; }
+.event-pill.cafeteria  { background: #fef3c7; color: #b45309; }
+.event-pill.other      { background: #f1f5f9; color: #475569; }
+.event-pill.queue_join    { background: #e0e7ff; color: #4f46e5; }
+.event-pill.queue_call    { background: #fef3c7; color: #b45309; }
+.event-pill.queue_serving { background: #dbeafe; color: #2563eb; }
+.event-pill.queue_completed { background: #dcfce7; color: #16a34a; }
+.event-pill.queue_no_show { background: #fee2e2; color: #dc2626; }
+.event-pill.queue_cancelled { background: #f1f5f9; color: #475569; }
 
 /* ── Card UID pill (same as cards page) ── */
 .card-uid-display {
@@ -258,6 +267,15 @@ include '../includes/sidebar.php';
             <option value="">All events</option>
             <option value="entry">Entry</option>
             <option value="exit">Exit</option>
+            <option value="library">Library</option>
+            <option value="cafeteria">Cafeteria</option>
+            <option value="other">Other</option>
+            <option value="queue_join">Queue Join</option>
+            <option value="queue_call">Queue Called</option>
+            <option value="queue_serving">Queue Serving</option>
+            <option value="queue_completed">Queue Completed</option>
+            <option value="queue_no_show">Queue No-Show</option>
+            <option value="queue_cancelled">Queue Cancelled</option>
         </select>
     </div>
 

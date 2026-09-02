@@ -345,6 +345,24 @@ table.table,
 .empty-state p { font-size: 14px; font-weight: 600; color: #64748b; margin: 0 0 2px; }
 .empty-state span { font-size: 12px; }
 
+/* Empty state inside table cells — force full-height centering */
+td.empty-state,
+td .empty-state {
+    vertical-align: middle !important;
+    padding: 60px 20px !important;
+    text-align: center;
+}
+td.empty-state i,
+td .empty-state i { font-size: 36px; color: #e2e8f0; display: block; margin-bottom: 8px; }
+td.empty-state p,
+td .empty-state p { font-size: 15px; font-weight: 600; color: #64748b; margin: 0 0 4px; }
+td.empty-state span,
+td .empty-state span { font-size: 13px; color: #94a3b8; display: block; }
+
+/* Full-row empty state (like students.php) */
+tr.empty-state-row { display: table-row; height: 300px; }
+tr.empty-state-row td { vertical-align: middle; text-align: center; padding: 60px 20px !important; }
+
 .table-footer {
     padding: 12px 20px; background: #fafcfd;
     border-top: 1px solid #e8edf4;

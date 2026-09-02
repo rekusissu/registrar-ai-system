@@ -147,6 +147,8 @@ try {
             'card_uid' => $cardUid,
             'card_type' => 'rfid',
             'status' => 'active',
+            'status_reason' => 'active',
+            'status_updated_at' => date('Y-m-d H:i:s'),
             'issued_date' => $issuedDate,
             'expiry_date' => $expiryDate,
             'notes' => $notes
@@ -159,14 +161,19 @@ try {
     // ─── UPDATE RFID CARD ──────────────────────────────────────
     if ($method === 'PUT' && $id) {
         $input = json_decode(file_get_contents('php://input'), true);
-        
+
         $data = [];
-        $allowedFields = ['student_id', 'status', 'issued_date', 'expiry_date', 'notes'];
+        $allowedFields = ['student_id', 'status', 'status_reason', 'issued_date', 'expiry_date', 'notes'];
 
         foreach ($allowedFields as $field) {
             if (isset($input[$field])) {
                 $data[$field] = $input[$field];
             }
+        }
+
+        // If status is being updated, set the status_updated_at timestamp
+        if (isset($input['status'])) {
+            $data['status_updated_at'] = date('Y-m-d H:i:s');
         }
 
         if (empty($data)) {

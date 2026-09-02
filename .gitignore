@@ -35,6 +35,9 @@ assets/uploads/students/*
 # Local per-station config (reader mapping per scanning PC)
 /shared/config.local.php
 
+# Database dump backups (runtime artifacts, never commit)
+/backups/
+
 # OS / editor
 .DS_Store
 Thumbs.db

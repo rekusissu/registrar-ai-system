@@ -251,7 +251,7 @@ foreach ($contactByStudent as $sid => $list) {
                 <thead><tr><th>Student</th><th>Guardians</th><th>Emergency Contacts</th><th>Email Recipients</th><th style="text-align:center;">Actions</th></tr></thead>
                 <tbody id="guardBody">
                 <?php if (empty($byStudent)): ?>
-                    <tr><td colspan="5" class="empty-state"><i class="fas fa-users"></i><p>No students found</p><span>Add students first to manage their contacts</span></td></tr>
+                    <tr class="empty-state-row"><td colspan="5"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:8px;"><p style="font-size:16px;font-weight:600;color:#334155;margin:0;">No students found yet</p><p style="margin:0;color:#94a3b8;">Add students first to manage their contacts</p></div></td></tr>
                 <?php else: foreach ($byStudent as $s): ?>
                     <tr data-id="<?= (int)$s['student_id'] ?>"
                         data-search="<?= htmlspecialchars(strtolower($s['student_name'].' '.$s['student_number']), ENT_QUOTES) ?>">
@@ -723,6 +723,7 @@ function switchTab(tabId, btn) {
 // ─── OPEN MANAGE ────────────────────────────────────────────
 let currentStudentId = null;
 function openManage(id, name) {
+    // Clear removed arrays ONLY when opening fresh
     removedGuardians = []; removedEmergency = []; removedContacts = [];
     if (id) {
         currentStudentId = id;
@@ -744,6 +745,7 @@ function openManage(id, name) {
     }
 }
 document.getElementById('mgPicker') && document.getElementById('mgPicker').addEventListener('change', function(e) {
+    // Clear removed arrays when changing student selection
     removedGuardians = []; removedEmergency = []; removedContacts = [];
     if (e.target.value) {
         currentStudentId = e.target.value;
@@ -794,7 +796,8 @@ function loadEmail(id) {
 let gSeq=1000, eSeq=1000, cSeq=2000;
 function guardianRow(g) {
     gSeq++;
-    return '<div class="g-row mg-row" data-gid="' + (g.id||'') + '" data-key="' + gSeq + '">'
+    const gid = (g.id || 0);
+    return '<div class="g-row mg-row" data-gid="' + gid + '" data-key="' + gSeq + '">'
         + '<div class="mg-row-grid">'
         + '<input class="form-control gi-name" placeholder="Full name *" value="' + esc(g.full_name) + '">'
         + '<select class="form-control gi-rel">' + relOptions(g.relationship) + '</select>'
@@ -809,7 +812,8 @@ function guardianRow(g) {
 }
 function emergencyRow(e) {
     eSeq++;
-    return '<div class="e-row mg-row" data-eid="' + (e.id||'0') + '" data-ekey="' + eSeq + '">'
+    const eid = (e.id || 0);
+    return '<div class="e-row mg-row" data-eid="' + eid + '" data-ekey="' + eSeq + '">'
         + '<div class="mg-row-grid mg-row-grid-e">'
         + '<input class="form-control ei-name" placeholder="Full name *" value="' + esc(e.full_name) + '">'
         + '<input class="form-control ei-rel" placeholder="Relationship" value="' + esc(e.relationship) + '">'
@@ -819,11 +823,12 @@ function emergencyRow(e) {
 }
 function emailRow(c) {
     cSeq++;
+    const cid = (c.id || 0);
     const verified = Number(c.verified) === 1;
     const badge = verified
         ? '<span class="mg-verified"><i class="fa-solid fa-check-circle"></i> Verified</span>'
         : '<span class="mg-unverified"><i class="fa-solid fa-clock"></i> Awaiting</span>';
-    return '<div class="c-row mg-row" data-cid="' + (c.id||'0') + '" data-ckey="' + cSeq + '">'
+    return '<div class="c-row mg-row" data-cid="' + cid + '" data-ckey="' + cSeq + '">'
         + '<div class="mg-row-grid">'
         + '<input class="form-control ci-name" placeholder="Full name *" value="' + esc(c.full_name) + '">'
         + '<input class="form-control ci-email" placeholder="Email *" value="' + esc(c.email) + '">'
@@ -937,13 +942,33 @@ async function saveAll() {
     const seqContacts = async (payload) => { const d = await api('../api/contacts.php', payload); if (!d.success) throw new Error(d.message || 'Save failed'); return d; };
 
     try {
-        // Guardians
+        // Delete removed items first, THEN save new/updated ones
+
+        // Delete removed guardians first
+        for (const gid of removedGuardians) {
+            await seqStudents('delete-guardian', { id: gid });
+        }
+
+        // Delete removed emergency contacts first
+        for (const eid of removedEmergency) {
+            await seqStudents('delete-emergency', { id: eid });
+        }
+
+        // Delete removed email recipients first
+        for (const cid of removedContacts) {
+            await seqContacts({ action: 'delete', id: cid, student_id: currentStudentId });
+        }
+
+        // NOW save guardians (only process rows that have at least a name)
         const gRows = document.querySelectorAll('.g-row');
         for (const row of gRows) {
+            const fullName = row.querySelector('.gi-name').value.trim();
+            if (!fullName) continue; // Skip empty rows
+
             await seqStudents('save-guardian', {
                 id: parseInt(row.dataset.gid || '0', 10) || 0,
                 student_id: currentStudentId,
-                full_name: row.querySelector('.gi-name').value,
+                full_name: fullName,
                 relationship: row.querySelector('.gi-rel').value,
                 contact_number: row.querySelector('.gi-contact').value,
                 email: row.querySelector('.gi-email').value,
@@ -951,37 +976,46 @@ async function saveAll() {
                 is_emergency: row.querySelector('.gi-emergency').checked ? 1 : 0
             });
         }
-        for (const gid of removedGuardians) await seqStudents('delete-guardian', { id: gid });
 
-        // Emergency contacts
+        // NOW save emergency contacts (only process rows that have at least a name)
         const eRows = document.querySelectorAll('.e-row');
         for (const row of eRows) {
+            const fullName = row.querySelector('.ei-name').value.trim();
+            if (!fullName) continue; // Skip empty rows
+
             await seqStudents('save-emergency', {
                 id: parseInt(row.dataset.eid || '0', 10) || 0,
                 student_id: currentStudentId,
-                full_name: row.querySelector('.ei-name').value,
+                full_name: fullName,
                 relationship: row.querySelector('.ei-rel').value,
                 contact_number: row.querySelector('.ei-contact').value
             });
         }
-        for (const eid of removedEmergency) await seqStudents('delete-emergency', { id: eid });
 
-        // Email recipients
+        // NOW save email recipients (only process rows that have at least name and email)
         const cRows = document.querySelectorAll('.c-row');
         for (const row of cRows) {
+            const fullName = row.querySelector('.ci-name').value.trim();
+            const email = row.querySelector('.ci-email').value.trim();
+            if (!fullName || !email) continue; // Skip incomplete rows
+
             await seqContacts({
                 action: 'save',
                 id: parseInt(row.dataset.cid || '0', 10) || 0,
                 student_id: currentStudentId,
-                full_name: row.querySelector('.ci-name').value,
-                email: row.querySelector('.ci-email').value,
+                full_name: fullName,
+                email: email,
                 phone: row.querySelector('.ci-phone').value,
                 send_billing: row.querySelector('.ci-billing').checked ? 1 : 0,
                 send_grades: row.querySelector('.ci-grades').checked ? 1 : 0,
                 send_emergency: row.querySelector('.ci-emg').checked ? 1 : 0
             });
         }
-        for (const cid of removedContacts) await seqContacts({ action: 'delete', id: cid, student_id: currentStudentId });
+
+        // Clear the removed arrays after successful save
+        removedGuardians = [];
+        removedEmergency = [];
+        removedContacts = [];
 
         showToast('Contacts updated.', 'success');
         setTimeout(() => window.location.reload(), 700);
