@@ -140,31 +140,6 @@ LOCK TABLES `authorized_cards` WRITE;
 /*!40000 ALTER TABLE `authorized_cards` DISABLE KEYS */;
 /*!40000 ALTER TABLE `authorized_cards` ENABLE KEYS */;
 UNLOCK TABLES;
-DROP TABLE IF EXISTS `clearances`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-CREATE TABLE `clearances` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `student_id` int(11) NOT NULL,
-  `status` enum('pending','partial','cleared') NOT NULL DEFAULT 'pending',
-  `issued_by` int(11) DEFAULT NULL,
-  `issued_at` timestamp NULL DEFAULT NULL,
-  `notes` text DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_clearance_student` (`student_id`),
-  KEY `idx_clearance_status` (`status`),
-  KEY `fk_clearance_issued_by` (`issued_by`),
-  CONSTRAINT `fk_clearance_issued_by` FOREIGN KEY (`issued_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
-  CONSTRAINT `fk_clearance_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-
-LOCK TABLES `clearances` WRITE;
-/*!40000 ALTER TABLE `clearances` DISABLE KEYS */;
-/*!40000 ALTER TABLE `clearances` ENABLE KEYS */;
-UNLOCK TABLES;
 DROP TABLE IF EXISTS `document_catalog`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;

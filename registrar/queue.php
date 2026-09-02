@@ -84,7 +84,7 @@ include '../includes/sidebar.php';
                 <th>#</th><th>Number</th><th>Student</th><th>ID No.</th><th>Course</th><th>Joined</th><th style="text-align:center;">Action</th>
             </tr></thead>
             <tbody id="waitingBody">
-                <tr class="empty-state-row"><td colspan="7" class="empty-state"><i class="fas fa-people-group"></i><p>No students waiting</p><span>Tickets appear here when students tap at the kiosk</span></td></tr>
+                <tr class="empty-state-row"><td colspan="7" style="height:60vh;text-align:center;"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;"><i class="fas fa-people-group" style="font-size:40px;color:#cbd5e1;margin-bottom:12px;"></i><p style="font-size:15px;font-weight:600;color:#64748b;margin:0 0 4px;">No students waiting</p><span style="font-size:13px;color:#94a3b8;">Tickets appear here when students tap at the kiosk</span></div></td></tr>
             </tbody>
         </table>
         </div>

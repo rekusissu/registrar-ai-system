@@ -119,7 +119,7 @@ include '../includes/sidebar.php';
                 <thead><tr><th>File</th><th>Student</th><th>Type</th><th>Size</th><th>Uploaded</th><th style="text-align:center;">Actions</th></tr></thead>
                 <tbody id="fileBody">
                 <?php if (empty($files)): ?>
-                    <tr><td colspan="6" class="empty-state"><i class="fas fa-folder-open"></i><p>No files stored</p><span>Upload a document to get started</span></td></tr>
+                    <tr><td colspan="6" style="height:60vh;text-align:center;"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;"><i class="fas fa-folder-open" style="font-size:40px;color:#cbd5e1;margin-bottom:12px;"></i><p style="font-size:15px;font-weight:600;color:#64748b;margin:0 0 4px;">No files stored</p><span style="font-size:13px;color:#94a3b8;">Upload a document to get started</span></div></td></tr>
                 <?php else: foreach ($files as $f):
                     $ext = strtolower($f['file_type'] ?? '');
                     $icons = ['pdf'=>'fa-file-pdf red','doc'=>'fa-file-word blue','docx'=>'fa-file-word blue','xls'=>'fa-file-excel green','xlsx'=>'fa-file-excel green','jpg'=>'fa-file-image purple','jpeg'=>'fa-file-image purple','png'=>'fa-file-image purple','webp'=>'fa-file-image purple','txt'=>'fa-file-lines gray','zip'=>'fa-file-zipper gray'];

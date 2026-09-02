@@ -371,7 +371,7 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 <span class="q-dot q-<?= $qDotClass ?>" title="<?= htmlspecialchars($qTitle) ?>" style="display:inline-block;width:10px;height:10px;border-radius:50%;<?= $qScore>=85?'background:#22c55e':($qScore>=60?'background:#f59e0b':'background:#ef4444') ?>;"></span>
 <?php if (!empty($qAnoms)): ?><i class="fas fa-exclamation-triangle" style="color:#f59e0b;margin-left:4px;font-size:11px;" title="<?= htmlspecialchars(implode('; ', $qAnomLabels)) ?>"></i><?php endif; ?>
 </td>
-<td><div class="action-group"><button class="action-btn view" onclick="viewStudent(<?= (int)$s['id'] ?>)" title="View"><i class="fas fa-eye"></i></button><button class="action-btn edit" onclick="editStudent(<?= (int)$s['id'] ?>)" title="Edit"><i class="fas fa-pen"></i></button><?php if ($s['status']==='archived'): ?><button class="action-btn restore" onclick="restoreStudent(<?= (int)$s['id'] ?>,'<?= htmlspecialchars($s['first_name']." ".$s['last_name'],ENT_QUOTES) ?>')" title="Restore"><i class="fas fa-undo"></i></button><?php else: ?><button class="action-btn delete" onclick="confirmDelete(<?= (int)$s['id'] ?>,'<?= htmlspecialchars($s['first_name']." ".$s['last_name'],ENT_QUOTES) ?>')" title="Delete"><i class="fas fa-trash-alt"></i></button><?php endif; ?></div></td>
+<td><div class="action-group"><button class="action-btn view" onclick="viewStudent(<?= (int)$s['id'] ?>)" title="View"><i class="fas fa-eye"></i></button><button class="action-btn edit" onclick="editStudent(<?= (int)$s['id'] ?>)" title="Edit"><i class="fas fa-pen"></i></button><?php if ($s['status']==='archived'): ?><button class="action-btn restore" onclick="restoreStudent(<?= (int)$s['id'] ?>,'<?= htmlspecialchars($s['first_name']." ".$s['last_name'],ENT_QUOTES) ?>')" title="Restore"><i class="fas fa-undo"></i></button><?php endif; ?></div></td>
 </tr>
 <?php endforeach; endif; ?>
 </tbody>
@@ -527,8 +527,6 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 <div class="form-row"><div class="form-group"><label>Contact No.</label><input type="text" id="editGuardianContact" class="form-control"></div><div class="form-group"><label>Email</label><input type="email" id="editGuardianEmail" class="form-control"></div></div>
 </div><div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeEditModal()">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save</button></div></form></div></div>
 
-<!-- Delete Modal -->
-<div class="modal-overlay" id="deleteModal"><div class="modal-content" style="max-width:420px;text-align:center;"><div class="delete-icon"><i class="fas fa-trash-alt"></i></div><h3 style="font-size:19px;font-weight:700;color:#0f172a;margin-bottom:4px;">Deactivate Student</h3><p id="deleteMessage" style="color:#64748b;font-size:14px;margin-bottom:18px;">This can be undone by restoring later.</p><div class="modal-footer" style="justify-content:center;"><button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button><button class="btn btn-danger" id="confirmDeleteBtn" style="background:#dc2626;color:white;border:none;padding:9px 18px;border-radius:10px;font-weight:600;cursor:pointer;"><i class="fas fa-trash-alt"></i> Delete</button></div></div></div>
 
 <script>
 // ─── DATA ────────────────────────────────────────────────────
@@ -539,7 +537,6 @@ const tableBody = document.getElementById('studentTableBody');
 const showingCount = document.getElementById('showingCount');
 const totalCount = document.getElementById('totalCount');
 let allStudents = [];
-let deleteTarget = null;
 
 // id → name map of advisers, injected from PHP
 const ADVISER_MAP = <?= json_encode(array_column($advisers, 'full_name', 'id')) ?>;
@@ -602,7 +599,7 @@ function closeFilterModal() { document.getElementById('filterModal').classList.r
 function applyFilters() { performSearch(); closeFilterModal(); }
 function clearFilters() { document.getElementById('filterStatus').value = ''; document.getElementById('filterYear').value = ''; document.getElementById('filterCourse').value = ''; document.getElementById('filterSection').value = ''; performSearch(); }
 document.getElementById('filterModal').addEventListener('click', function(e) { if (e.target === this) closeFilterModal(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeFilterModal(); closeDeleteModal(); closeViewModal(); closeEditModal(); }});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeFilterModal(); closeViewModal(); closeEditModal(); }});
 
 // ─── CHECKBOX BULK ───────────────────────────────────────────
 function toggleSelectAll() {
@@ -1333,23 +1330,7 @@ function quickStatus(id, status) {
     .then(r => r.json()).then(d => { if (d.success) window.location.reload(); else alert(d.message); }).catch(() => alert('Error.'));
 }
 
-// ─── DELETE / RESTORE ────────────────────────────────────────
-const deleteModal = document.getElementById('deleteModal');
-function confirmDelete(id, name) { deleteTarget = id; document.getElementById('deleteMessage').textContent = 'Delete ' + name + '? This can be undone by restoring.'; deleteModal.classList.add('active'); document.body.style.overflow = 'hidden'; }
-function closeDeleteModal() { deleteModal.classList.remove('active'); document.body.style.overflow = ''; deleteTarget = null; }
-document.getElementById('confirmDeleteBtn').addEventListener('click', async function() {
-    if (!deleteTarget) return;
-    this.disabled = true; this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
-    try {
-        const r = await fetch('../api/students.php?id=' + deleteTarget, { method: 'DELETE' });
-        const d = await r.json();
-        if (d.success) window.location.reload();
-        else alert(d.message);
-    } catch(e) { alert('Error.'); }
-    finally { this.disabled = false; this.innerHTML = '<i class="fas fa-trash-alt"></i> Delete'; closeDeleteModal(); }
-});
-deleteModal.addEventListener('click', function(e) { if (e.target === this) closeDeleteModal(); });
-
+// ─── RESTORE ─────────────────────────────────────────────────
 function restoreStudent(id, name) {
     if (!confirm('Restore ' + name + '?')) return;
     fetch('../api/students.php?id=' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'active' }) })

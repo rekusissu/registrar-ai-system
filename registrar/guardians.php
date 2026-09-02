@@ -723,8 +723,6 @@ function switchTab(tabId, btn) {
 // ─── OPEN MANAGE ────────────────────────────────────────────
 let currentStudentId = null;
 function openManage(id, name) {
-    // Clear removed arrays ONLY when opening fresh
-    removedGuardians = []; removedEmergency = []; removedContacts = [];
     if (id) {
         currentStudentId = id;
         document.getElementById('mgTitle').textContent = (name || 'Student') + ' — Manage Contacts';
@@ -745,8 +743,6 @@ function openManage(id, name) {
     }
 }
 document.getElementById('mgPicker') && document.getElementById('mgPicker').addEventListener('change', function(e) {
-    // Clear removed arrays when changing student selection
-    removedGuardians = []; removedEmergency = []; removedContacts = [];
     if (e.target.value) {
         currentStudentId = e.target.value;
         loadStudentContacts(e.target.value);
@@ -807,7 +803,6 @@ function guardianRow(g) {
         + '<div class="mg-toggles">'
         + '<label class="mg-toggle"><input type="checkbox" class="gi-primary" ' + (g.is_primary?'checked':'') + '><span><i class="fa-solid fa-star"></i> Primary</span></label>'
         + '<label class="mg-toggle"><input type="checkbox" class="gi-emergency" ' + (g.is_emergency?'checked':'') + '><span><i class="fa-solid fa-bell"></i> Emergency</span></label>'
-        + '<button type="button" class="action-btn delete" onclick="removeGuardian(this)" title="Remove"><i class="fas fa-trash-alt"></i></button>'
         + '</div></div></div>';
 }
 function emergencyRow(e) {
@@ -818,7 +813,6 @@ function emergencyRow(e) {
         + '<input class="form-control ei-name" placeholder="Full name *" value="' + esc(e.full_name) + '">'
         + '<input class="form-control ei-rel" placeholder="Relationship" value="' + esc(e.relationship) + '">'
         + '<input class="form-control ei-contact" placeholder="Contact no." value="' + esc(e.contact_number) + '">'
-        + '<button type="button" class="action-btn delete" onclick="removeEmergency(this)" title="Remove"><i class="fas fa-trash-alt"></i></button>'
         + '</div></div>';
 }
 function emailRow(c) {
@@ -846,30 +840,15 @@ function emailRow(c) {
               + '<button type="button" class="btn btn-light btn-sm" onclick="sendContactAction(this,\'transcript\')" title="Email transcript"><i class="fa-solid fa-file-lines"></i></button>'
             : '')
         + '<button type="button" class="btn btn-light btn-sm" onclick="sendContactAction(this,\'test\')" title="Send Test Email"><i class="fa-solid fa-envelope-circle-check"></i></button>'
-        + '<button type="button" class="action-btn delete" onclick="removeEmailRow(this)" title="Remove"><i class="fas fa-trash-alt"></i></button>'
         + '</div></div></div>';
 }
 
 // ─── ADD / REMOVE ROWS ──────────────────────────────────────
-let removedGuardians = [], removedEmergency = [], removedContacts = [];
-function removeGuardian(btn) {
-    const row = btn.closest('.g-row');
-    const gid = parseInt(row ? row.dataset.gid : '0', 10) || 0;
-    if (gid) removedGuardians.push(gid);
-    row.remove(); refreshCounts();
-}
-function removeEmergency(btn) {
-    const row = btn.closest('.e-row');
-    const eid = parseInt(row ? row.dataset.eid : '0', 10) || 0;
-    if (eid) removedEmergency.push(eid);
-    row.remove(); refreshCounts();
-}
-function removeEmailRow(btn) {
-    const row = btn.closest('.c-row');
-    const cid = parseInt(row ? row.dataset.cid : '0', 10) || 0;
-    if (cid) removedContacts.push(cid);
-    row.remove(); refreshCounts();
-}
+// NOTE: Delete/remove of guardians, emergency contacts, and email
+// recipients is intentionally NOT available in this UI — it is reserved
+// for the college system. Staff can add and edit, but cannot remove a
+// contact record. (Backend delete endpoints remain for admin use.)
+
 function addGuardianRow() {
     const empty = document.getElementById('mgG-empty'); if (empty) empty.remove();
     document.getElementById('mgGuardians').insertAdjacentHTML('beforeend', guardianRow({}));
@@ -942,22 +921,8 @@ async function saveAll() {
     const seqContacts = async (payload) => { const d = await api('../api/contacts.php', payload); if (!d.success) throw new Error(d.message || 'Save failed'); return d; };
 
     try {
-        // Delete removed items first, THEN save new/updated ones
-
-        // Delete removed guardians first
-        for (const gid of removedGuardians) {
-            await seqStudents('delete-guardian', { id: gid });
-        }
-
-        // Delete removed emergency contacts first
-        for (const eid of removedEmergency) {
-            await seqStudents('delete-emergency', { id: eid });
-        }
-
-        // Delete removed email recipients first
-        for (const cid of removedContacts) {
-            await seqContacts({ action: 'delete', id: cid, student_id: currentStudentId });
-        }
+        // Deletion is intentionally not available in this UI (reserved for
+        // the college system) — save new/updated rows only.
 
         // NOW save guardians (only process rows that have at least a name)
         const gRows = document.querySelectorAll('.g-row');
@@ -965,7 +930,7 @@ async function saveAll() {
             const fullName = row.querySelector('.gi-name').value.trim();
             if (!fullName) continue; // Skip empty rows
 
-            await seqStudents('save-guardian', {
+            const res = await seqStudents('save-guardian', {
                 id: parseInt(row.dataset.gid || '0', 10) || 0,
                 student_id: currentStudentId,
                 full_name: fullName,
@@ -975,6 +940,8 @@ async function saveAll() {
                 is_primary: row.querySelector('.gi-primary').checked ? 1 : 0,
                 is_emergency: row.querySelector('.gi-emergency').checked ? 1 : 0
             });
+            // Remember the real DB id so a re-save updates instead of cloning.
+            if (res && res.data && res.data.id) row.dataset.gid = res.data.id;
         }
 
         // NOW save emergency contacts (only process rows that have at least a name)
@@ -1012,17 +979,18 @@ async function saveAll() {
             });
         }
 
-        // Clear the removed arrays after successful save
-        removedGuardians = [];
-        removedEmergency = [];
-        removedContacts = [];
-
         showToast('Contacts updated.', 'success');
         setTimeout(() => window.location.reload(), 700);
     } catch (err) {
         alert(err.message || 'Error saving contacts.');
+        // Reconcile to server truth: any earlier saves in this run may
+        // have partially applied. A reload rebuilds the lists from the
+        // authoritative data, so a removed row that wasn't deleted won't
+        // silently vanish, and a saved row gets its real id (no clones
+        // on the next save).
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-save"></i> Save Contacts';
+        setTimeout(() => window.location.reload(), 1200);
     }
 }
 

@@ -113,10 +113,25 @@ try {
         if ($gId > 0) {
             $db->update('guardians', $gData, 'id = ? AND student_id = ?', [$gId, $studentId]);
         } else {
-            $gData['student_id'] = $studentId;
-            $gId = $db->insert('guardians', $gData);
+            // DEFENSIVE DE-DUP: a re-save of the same guardian (same
+            // relationship + full name) must not create a clone. If an
+            // identical row already exists for this student, update it
+            // instead of inserting a duplicate.
+            $dupe = $db->fetchOne(
+                "SELECT id FROM guardians
+                  WHERE student_id = ? AND relationship = ? AND full_name = ?
+                  ORDER BY is_primary DESC, id ASC LIMIT 1",
+                [$studentId, $gData['relationship'], $gData['full_name']]
+            );
+            if ($dupe) {
+                $gId = (int) $dupe['id'];
+                $db->update('guardians', $gData, 'id = ? AND student_id = ?', [$gId, $studentId]);
+            } else {
+                $gData['student_id'] = $studentId;
+                $gId = $db->insert('guardians', $gData);
+            }
         }
-        echo json_encode(['success' => true, 'message' => 'Guardian saved.', 'data' => ['id' => $gId]]);
+        echo json_encode(['success' => true, 'message' => 'Guardian saved.', 'data' => ['id' => (int) $gId]]);
         exit;
     }
 
@@ -760,12 +775,13 @@ try {
                     $db->insert('guardians', $gData);
                 }
             }
-            // Auto-sync Father/Mother Name → guardian rows (same as on enroll).
-            syncFatherMotherGuardians($id, $input['father_name'] ?? null, $input['mother_name'] ?? null, [
-                'relationship'   => $input['guardian_relationship'] ?? 'guardian',
-                'contact_number' => $input['guardian_contact'] ?? '',
-                'email'          => $input['guardian_email'] ?? '',
-            ]);
+            // NOTE: Father/Mother → guardian auto-sync runs at ENROLLMENT
+            // only (in the create path). It deliberately does NOT run on
+            // updates here: re-running it would resurrect a parent guardian
+            // the registrar deleted on the Contacts page, whenever the
+            // student record is saved again. After enrollment the guardian
+            // list is owned by the registrar (Contacts page + the
+            // "Auto-fill from Enrollment" action).
             echo json_encode(['success' => true, 'message' => 'Student updated successfully.']);
             exit;
         } catch (Exception $e) {

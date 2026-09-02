@@ -172,11 +172,6 @@ if ($USER_ROLE === 'student') {
             <span class="sidebar-text">Documents</span>
         </a>
 
-        <a href="<?= $APP_ROOT ?>registrar/clearance.php" class="sidebar-item <?= $ACTIVE_NAV === 'clearance' ? 'active' : '' ?>">
-            <i class="fa-solid fa-file-circle-check"></i>
-            <span class="sidebar-text">Clearance</span>
-        </a>
-
         <a href="<?= $APP_ROOT ?>registrar/queue.php" class="sidebar-item <?= $ACTIVE_NAV === 'queue' ? 'active' : '' ?>">
             <i class="fa-solid fa-display"></i>
             <span class="sidebar-text">Queue</span>
@@ -205,11 +200,6 @@ if ($USER_ROLE === 'student') {
         <a href="<?= $APP_ROOT ?>registrar/academic-history.php" class="sidebar-item <?= $ACTIVE_NAV === 'academic' ? 'active' : '' ?>">
             <i class="fa-solid fa-school"></i>
             <span class="sidebar-text">Academic History</span>
-        </a>
-
-        <a href="<?= $APP_ROOT ?>registrar/communication-log.php" class="sidebar-item <?= $ACTIVE_NAV === 'commlog' ? 'active' : '' ?>">
-            <i class="fa-solid fa-envelope-open-text"></i>
-            <span class="sidebar-text">Communication Log</span>
         </a>
 
         <div class="sidebar-divider"></div>
