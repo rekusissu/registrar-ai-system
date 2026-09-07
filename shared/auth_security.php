@@ -246,5 +246,12 @@ function signInSession(array $user): string {
     $_SESSION['login_time']  = time();
     $_SESSION['last_activity'] = time();
     logActivity((int) $user['id'], 'login_success');
-    return ($user['role'] === 'student') ? 'student/dashboard.php' : 'dashboard.php';
+    $role = $user['role'] ?? 'staff';
+    if ($role === 'student') {
+        return 'student/dashboard.php';
+    }
+    if ($role === 'nurse') {
+        return 'nurse/dashboard.php';
+    }
+    return 'dashboard.php';
 }

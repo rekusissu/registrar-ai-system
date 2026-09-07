@@ -63,6 +63,7 @@ include '../includes/sidebar.php';
             <option value="">All roles</option>
             <option value="admin">Admin</option>
             <option value="registrar">Registrar</option>
+            <option value="nurse">Nurse</option>
             <option value="staff">Staff</option>
             <option value="teacher">Teacher</option>
             <option value="student">Student</option>
@@ -122,7 +123,7 @@ include '../includes/sidebar.php';
     <div class="form-group"><label>Full Name <span style="color:#dc2626;">*</span></label><input type="text" id="addFullName" class="form-control" required></div>
     <div class="form-group"><label>Email <span style="color:#dc2626;">*</span></label><input type="email" id="addEmail" class="form-control" required></div>
     <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-        <div class="form-group"><label>Role</label><select id="addRole" class="form-control" onchange="onRoleChange()"><option value="staff">Staff</option><option value="registrar">Registrar</option><option value="teacher">Teacher</option><option value="admin">Admin</option><option value="student">Student</option></select></div>
+        <div class="form-group"><label>Role</label><select id="addRole" class="form-control" onchange="onRoleChange()"><option value="staff">Staff</option><option value="registrar">Registrar</option><option value="nurse">Nurse</option><option value="teacher">Teacher</option><option value="admin">Admin</option><option value="student">Student</option></select></div>
         <div class="form-group"><label>Password <span style="color:#dc2626;">*</span></label><input type="password" id="addPassword" class="form-control" required minlength="6" placeholder="Min 6 chars"></div>
     </div>
     <div class="form-group" id="addStudentLink" style="display:none;"><label>Link Student Record</label><select id="addStudentId" class="form-control"><option value="">— Select a student —</option></select></div>
@@ -134,7 +135,7 @@ include '../includes/sidebar.php';
 <form id="editForm"><input type="hidden" id="editId" value=""><div class="modal-body">
     <div class="form-group"><label>Full Name <span style="color:#dc2626;">*</span></label><input type="text" id="editFullName" class="form-control" required></div>
     <div class="form-group"><label>Email</label><input type="email" id="editEmail" class="form-control" disabled style="background:#f8fafc;font-size:12px;"></div>
-    <div class="form-group"><label>Role</label><select id="editRole" class="form-control" onchange="onRoleChange()"><option value="staff">Staff</option><option value="registrar">Registrar</option><option value="teacher">Teacher</option><option value="admin">Admin</option><option value="student">Student</option></select></div>
+    <div class="form-group"><label>Role</label><select id="editRole" class="form-control" onchange="onRoleChange()"><option value="staff">Staff</option><option value="registrar">Registrar</option><option value="nurse">Nurse</option><option value="teacher">Teacher</option><option value="admin">Admin</option><option value="student">Student</option></select></div>
     <div class="form-group" id="editStudentLink" style="display:none;"><label>Link Student Record</label><select id="editStudentId" class="form-control"><option value="">— Not linked —</option></select></div>
 </div>
 <div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeModal('editModal')">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save</button></div></form></div></div>

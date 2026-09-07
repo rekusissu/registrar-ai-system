@@ -21,8 +21,8 @@ if (!isLoggedIn()) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized.']);
     exit;
 }
-// Admin + registrar only
-if (!in_array(getCurrentUserRole(), ['admin', 'registrar'], true)) {
+// Admin + registrar + nurse only
+if (!in_array(getCurrentUserRole(), ['admin', 'registrar', 'nurse'], true)) {
     echo json_encode(['success' => false, 'message' => 'Forbidden.']);
     exit;
 }

@@ -72,26 +72,35 @@ try {
         $files = glob($migrationDir . '/*.sql');
         sort($files); // alphabetical — ensures consistent order
         foreach ($files as $file) {
-            // Skip files that contain destructive DML (DELETE, DROP without IF)
             $contents = file_get_contents($file);
             if ($contents === false) continue;
 
-            $statements = array_filter(
-                array_map('trim', explode(';', $contents)),
-                fn($s) => $s !== '' && !preg_match('/^(DELETE|DROP|UPDATE)\s/i', $s)
-            );
+            // Split on statement separators and keep every non-empty chunk.
+            // NOTE: these files cannot be whitelisted by leading keyword. Migrations
+            // (e.g. database/clinic_portal.sql) deliver schema changes with dynamic
+            // SQL — `SET @v := …` + `PREPARE … EXECUTE …` — and wrap CREATE TABLE in
+            // comment banners. A whitelist drops the @var assignments (so PREPARE
+            // gets NULL) and skips comment-prefixed CREATEs, leaving the migration
+            // silently unapplied in Docker. Instead we execute each chunk as-is on the
+            // shared connection; session @vars persist across chunks, and every file
+            // here is guarded to be idempotent ("already exists" errors are expected).
+            $statements = array_map('trim', explode(';', $contents));
 
             $applied = 0;
             $warns   = 0;
             foreach ($statements as $stmt) {
-                // Skip non-DDL statements (SET, USE, etc.)
-                if (!preg_match('/^(CREATE|ALTER|INSERT|PREPARE|EXECUTE|DEALLOCATE)\s/i', $stmt)) continue;
+                if ($stmt === '') continue;
+                // Inspect the SQL body with comment banners stripped.
+                $body = trim(preg_replace('/^\s*--.*$/m', '', $stmt));
+                if ($body === '') continue;                     // lone comment banner
+                if (preg_match('/^USE\s/i', $body)) continue;   // DB already selected by DSN
+                if (preg_match('/^(DROP|DELETE|UPDATE|TRUNCATE)\b/i', $body)) continue; // safety
                 try {
                     $pdo->exec($stmt);
                     $applied++;
                 } catch (PDOException $e) {
                     $warns++;
-                    // Table/column already exists is expected
+                    // Table/column already exists is expected on re-runs.
                     if (!str_contains($e->getMessage(), 'already exists')
                         && $e->getCode() !== '42S01'
                         && !str_contains($e->getMessage(), 'Duplicate')) {
