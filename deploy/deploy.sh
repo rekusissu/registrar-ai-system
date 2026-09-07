@@ -50,11 +50,44 @@ if [ ! -f .env ]; then
   exit 1
 fi
 
-# 3. Validating required vars with clear messages ------------------------------
-grep -qE '^DOMAIN=.+' .env || { echo "✘ set DOMAIN in .env"; exit 1; }
-grep -qE '^DB_PASSWORD=change-me' .env && { echo "✘ change DB_PASSWORD in .env"; exit 1; }
-grep -qE '^DB_ROOT_PASSWORD=change-me' .env && { echo "✘ change DB_ROOT_PASSWORD in .env"; exit 1; }
-grep -qE '^JWT_SECRET=replace-with' .env && { echo "✘ change JWT_SECRET in .env"; exit 1; }
+# 3. Validate required secrets ----------------------------------------------
+# Rejects: missing lines, empty values (VAR=),and leftover placeholder values
+# (both the current .env.example values and older "change-me"/"replace-with" examples).
+# This kills the classic foot-gun: a fresh .env leaves JWT_SECRET as the shipping
+# placeholder (or empty), Compose starts fine,,and the app only fails-closed on the
+# first browser hit with "JWT_SECRET is not set". We abort the deploy here instead.with a
+# clear message, before anything is started.
+
+# require_set_var <VARNAME> [known-bad-value...]  —  requires a real (non-empty,
+# non-placeholder) value.
+ require_set_var() {
+  local var="$1"; shift
+  local line value ph
+  line="$(grep -E "^${var}=" .env | tail -n1)" || {
+    echo "✘ ${var}  is missing from .env — set it before deploying."
+    exit 1
+  }
+  value="${line#*=}"
+  value="$(printf '%s' "$value" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+  if [ -z "$value" ]; then
+    echo "✘ ${var}  is empty ins .env — set it to a strong random value (e.g. openssl rand -hex 32)."
+    exit 1
+  fi
+  for ph in "$@"; do
+    if [ "$value" = "$ph" ]; then
+      echo "✘ ${var}  still uses a shipping placeholder ('${value}') — change it to a unique strong value ins .env."
+      exit 1
+    fi
+  done
+  echo "  ✓ ${var}: set."
+}
+
+require_set_var DOMAIN                    "your.domain"
+require_set_var DB_PASSWORD               "your-strong-db-password-here" "change-me"
+require_set_var DB_ROOT_PASSWORD          "your-strong-db-root-password-here" "change-me"
+require_set_var JWT_SECRET                "your-very-strong-jwt-secret-min-64-chars-openssl-rand-hex-32" "replace-with"
+require_set_var KIOSK_ACCESS_TOKEN       "your-strong-kiosk-token-min-32-chars" "kiosk-tap-2024"
+
 
 # 4. Auth to GHCR (for pushing + pulling the prebuilt image) ------------------
 # The image is PUBLIC by default so a pull usually needs no login. If you made
