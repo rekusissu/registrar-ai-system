@@ -138,16 +138,6 @@ $APP_ROOT = '../';
 $ACTIVE_NAV = 'guardians';
 include '../includes/header.php';
 include '../includes/sidebar.php';
-
-// Build JSON lists per student so JS can populate the modal.
-$guardRowsByStudent = [];
-foreach ($byStudent as $sid => $s) {
-    $guardRowsByStudent[$sid] = $s['guardians'];
-}
-$contactRowsByStudent = [];
-foreach ($contactByStudent as $sid => $list) {
-    $contactRowsByStudent[$sid] = $list;
-}
 ?>
 
 <main class="dashboard-main">
@@ -644,8 +634,6 @@ foreach ($contactByStudent as $sid => $list) {
 <script>
 // ─── DATA INJECTED FROM PHP ─────────────────────────────────
 const ALL_STUDENTS = <?= json_encode(array_values(array_map(fn($s) => ['id'=>$s['id'],'label'=>$s['student_number'].' — '.$s['name']], $students))) ?>;
-const GUARD_DATA = <?= json_encode($guardRowsByStudent) ?>;
-const CONTACT_DATA = <?= json_encode($contactRowsByStudent) ?>;
 
 // ─── MODAL + SEARCH ─────────────────────────────────────────
 function closeModal(id) { document.getElementById(id).classList.remove('active'); document.body.style.overflow=''; }
@@ -761,11 +749,19 @@ function loadStudentContacts(id) {
     loadEmail(id);
 }
 function loadGuardians(id) {
-    const list = (GUARD_DATA[id] || []);
-    document.getElementById('mgGuardians').innerHTML = list.length
-        ? list.map(g => guardianRow(g)).join('')
-        : '<div id="mgG-empty" class="mg-empty">No guardians recorded.</div>';
-    refreshCounts();
+    // Fetch live — GUARD_DATA is a page-load snapshot and goes stale the
+    // moment anyone edits guardians (this modal, the portal, enrollment).
+    fetch('../api/students.php?action=guardians&student_id=' + id)
+    .then(r => r.json()).then(d => {
+        const list = (d.success && d.data) ? d.data : [];
+        document.getElementById('mgGuardians').innerHTML = list.length
+            ? list.map(g => guardianRow(g)).join('')
+            : '<div id="mgG-empty" class="mg-empty">No guardians recorded.</div>';
+        refreshCounts();
+    }).catch(() => {
+        document.getElementById('mgGuardians').innerHTML = '<div style="color:#dc2626;font-size:12px;padding:6px 0;">Error loading guardians.</div>';
+        refreshCounts();
+    });
 }
 function loadEmergency(id) {
     fetch('../api/students.php?action=emergency&student_id=' + id)
@@ -781,11 +777,20 @@ function loadEmergency(id) {
     });
 }
 function loadEmail(id) {
-    const list = (CONTACT_DATA[id] || []);
-    document.getElementById('mgEmail').innerHTML = list.length
-        ? list.map(c => emailRow(c)).join('')
-        : '<div id="mgC-empty" class="mg-empty">No email recipients on file.</div>';
-    refreshCounts();
+    // Fetch live — CONTACT_DATA is a page-load snapshot and goes stale the
+    // moment anyone edits a recipient (this modal, the portal, or the API),
+    // which can leave the wrong recipients showing until a full reload.
+    fetch('../api/contacts.php', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'list', student_id: id }) })
+    .then(r => r.json()).then(d => {
+        const list = (d.success && d.data && d.data.contacts) ? d.data.contacts : [];
+        document.getElementById('mgEmail').innerHTML = list.length
+            ? list.map(c => emailRow(c)).join('')
+            : '<div id="mgC-empty" class="mg-empty">No email recipients on file.</div>';
+        refreshCounts();
+    }).catch(() => {
+        document.getElementById('mgEmail').innerHTML = '<div style="color:#dc2626;font-size:12px;padding:6px 0;">Error loading recipients.</div>';
+        refreshCounts();
+    });
 }
 
 // ─── ROW BUILDERS ───────────────────────────────────────────
