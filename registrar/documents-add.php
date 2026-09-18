@@ -99,14 +99,10 @@ include '../includes/sidebar.php';
             <select name="fulfillment_type" id="fulfillSelect" class="form-control" required>
                 <option value="Pickup">Pickup at the Registrar</option>
                 <option value="Digital">Digital download (encrypted PDF)</option>
-                <option value="Courier">Courier delivery (mock Lalamove)</option>
             </select>
         </div>
 
-        <div class="form-group" id="addressGroup" style="display:none;">
-            <label>Delivery address <span style="color:#dc2626;">*</span></label>
-            <input type="text" name="delivery_address" class="form-control" placeholder="Full street address for the courier dropoff" />
-        </div>
+        
 
         <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
             <div class="form-group">
@@ -141,7 +137,6 @@ include '../includes/sidebar.php';
     const qtyGroup = document.getElementById('qtyGroup');
     const quantity = document.getElementById('quantity');
     const fulfillSelect = document.getElementById('fulfillSelect');
-    const addressGroup = document.getElementById('addressGroup');
     const feePreview = document.getElementById('feePreview');
     const hint = document.getElementById('catalogHint');
 
@@ -171,9 +166,6 @@ include '../includes/sidebar.php';
         updateFee();
     });
     quantity.addEventListener('input', updateFee);
-    fulfillSelect.addEventListener('change', function () {
-        addressGroup.style.display = this.value === 'Courier' ? '' : 'none';
-    });
 
     form.addEventListener('submit', async function (e) {
         e.preventDefault();

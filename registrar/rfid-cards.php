@@ -48,10 +48,17 @@ $thisMonthCards   = $db->fetchColumn("SELECT COUNT(*) FROM rfid_cards WHERE issu
 $lastMonthCards   = $db->fetchColumn("SELECT COUNT(*) FROM rfid_cards WHERE issued_date LIKE '" . date('Y-m', strtotime('-1 month')) . "%'") ?: 0;
 $trendActive = $lastMonthCards > 0 ? round(($thisMonthCards - $lastMonthCards) / $lastMonthCards * 100) : ($thisMonthCards > 0 ? 100 : 0);
 
+// The assign-modal student picker must mirror the Student Management module
+// (registrar/students.php), which lists EVERY student row regardless of status.
+// Restricting to `status = 'active'` here silently hid students whose status is
+// anything else (e.g. the default "enrolled", but also probation / at-risk / loa /
+// dropped / transferred / graduated), so they showed in the Students page yet came
+// back "No students found" in the Assign Card search. Only soft-deleted/archived
+// records are excluded so cards can't be tied to removed students.
 $students = $db->fetchAll(
     "SELECT id, student_number, CONCAT(first_name, ' ', last_name) AS name, course
      FROM students
-     WHERE status = 'active'
+     WHERE status IS NULL OR status NOT IN ('archived')
      ORDER BY name"
 );
 

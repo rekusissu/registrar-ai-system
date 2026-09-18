@@ -17,7 +17,7 @@
 SET NAMES utf8mb4;
 
 ALTER TABLE `document_requests`
-  ADD COLUMN IF NOT EXISTS `payment_method` enum('Online','Cash_on_Delivery') NOT NULL DEFAULT 'Online' AFTER `delivery_address`,
+  ADD COLUMN IF NOT EXISTS `payment_method` enum('Online') NOT NULL DEFAULT 'Online' AFTER `delivery_address`,
   ADD COLUMN IF NOT EXISTS `delivery_fee` decimal(10,2) DEFAULT NULL AFTER `fee_amount`;
 
 ALTER TABLE `mock_payment_transactions`

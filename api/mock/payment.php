@@ -56,10 +56,7 @@ try {
         $callback  = trim($input['callback_url'] ?? '');
         // Payment method: Online (GCash/Maya gateway) or Cash_on_Delivery.
         // Keep the canonical DB casing — do not uppercase, the enum is case-sensitive.
-        $method = trim($input['method'] ?? 'Online');
-        if (!in_array($method, ['Online', 'Cash_on_Delivery'], true)) {
-            $method = 'Online';
-        }
+        $method = 'Online'; // pick-up only — no cash on delivery
 
         // A student may only create payments against their own record.
         if ($role === 'student') {
@@ -185,7 +182,7 @@ try {
                     $txn = 'TXN-MOCK-' . mt_rand(1000, 9999);
                 }
                 // COD has no gateway link — the money is handed to the courier on delivery.
-                $paymentUrl = $method === 'Cash_on_Delivery' ? null : 'http://mock-gateway.com/pay/' . $txn;
+                $paymentUrl = 'http://mock-gateway.com/pay/' . $txn;
             }
 
             // NOTE: for paymongo txns, 'paymongo_intent_id' holds the src_…
@@ -199,7 +196,7 @@ try {
                 'currency'           => $currency,
                 'status'             => 'pending',
                 'method'             => $method,
-                'due_on'             => $method === 'Cash_on_Delivery' ? 'delivery' : 'now',
+                'due_on'             => 'now',
                 'payment_url'        => $paymentUrl,
                 'callback_url'       => $callback !== '' ? $callback : null,
                 'gateway'            => $gateway,
@@ -216,7 +213,7 @@ try {
             'amount'         => $amount,
             'currency'       => $currency,
             'method'         => $method,
-            'due_on'         => $method === 'Cash_on_Delivery' ? 'delivery' : 'now',
+            'due_on'         => 'now',
             'gateway'        => $gateway,
             'intent_id'      => $paymongoIntentId,
         ];
@@ -281,30 +278,8 @@ try {
     }
 
     if ($action === 'cod_collected') {
-        // Cash on Delivery — the student hands the amount to the courier when
-        // the document arrives. Registrar/admin triggers this at hand-off.
-        $requestId = (int) ($input['request_id'] ?? 0);
-        if (!$requestId) {
-            echo json_encode(['success' => false, 'message' => 'request_id is required.']);
-            exit;
-        }
-        $row = $db->fetchOne(
-            "SELECT id FROM mock_payment_transactions
-              WHERE request_id = ? AND method = 'Cash_on_Delivery' AND status = 'pending'
-              ORDER BY id DESC LIMIT 1",
-            [$requestId]
-        );
-        if (!$row) {
-            echo json_encode(['success' => false, 'message' => 'No pending COD transaction found for this request.']);
-            exit;
-        }
-        $db->update('mock_payment_transactions', [
-            'status'       => 'completed',
-            'paid_at'      => $now,
-            'raw_response' => json_encode(['collected_on' => $now, 'collected_by' => $_SESSION['user_id'] ?? null]),
-        ], 'id = ?', [$row['id']]);
-
-        echo json_encode(['success' => true, 'message' => 'COD payment collected.', 'data' => ['paid_at' => $now]]);
+        // Cash on delivery was removed — pick-up only. This action is a no-op.
+        echo json_encode(['success' => false, 'message' => 'Cash on delivery is no longer used (pick-up only).']);
         exit;
     }
 

@@ -68,20 +68,17 @@ $requestType  = trim($input['request_type'] ?? 'Regular');
 $fulfillment  = trim($input['fulfillment_type'] ?? 'Pickup');
 $purpose      = trim($input['purpose'] ?? '');
 $recipient    = trim($input['recipient'] ?? '');
-$address      = trim($input['delivery_address'] ?? '');
+$address      = ''; // no courier — pick-up only
 // Payment method: Online (mock GCash/Maya gateway) or Cash on Delivery.
 // Keep the canonical DB casing ('Cash_on_Delivery') — do not uppercase, the
 // enum is case-sensitive.
-$paymentMethod = trim($input['payment_method'] ?? 'Online');
-if (!in_array($paymentMethod, ['Online', 'Cash_on_Delivery'], true)) {
-    $paymentMethod = 'Online';
-}
+$paymentMethod = 'Online'; // pick-up only — paid online (GCash)
 
 if (!in_array($requestType, ['Express', 'Regular'], true)) {
     echo json_encode(['success' => false, 'message' => 'Invalid request type.']);
     exit;
 }
-if (!in_array($fulfillment, ['Pickup', 'Digital', 'Courier'], true)) {
+if (!in_array($fulfillment, ['Pickup', 'Digital'], true)) {
     echo json_encode(['success' => false, 'message' => 'Invalid fulfillment type.']);
     exit;
 }
@@ -89,10 +86,7 @@ if ($purpose === '') {
     echo json_encode(['success' => false, 'message' => 'Purpose is required.']);
     exit;
 }
-if ($fulfillment === 'Courier' && $address === '') {
-    echo json_encode(['success' => false, 'message' => 'Delivery address is required for courier fulfillment.']);
-    exit;
-}
+
 
 try {
     $db = Database::getInstance();
@@ -109,10 +103,7 @@ try {
     // Courier delivery fee — quoted up-front and borne by the student.
     // Never trust the client's number: the server recomputes the same
     // deterministic quote the student saw in the fee preview.
-    $deliveryFee = null;
-    if ($fulfillment === 'Courier') {
-        $deliveryFee = mockDeliveryQuote($address)['total_fee'];
-    }
+    $deliveryFee = null; // no courier — pick-up only
 
     // Per-year sequence: DOC-2026-0001, DOC-2026-0002, …
     $year = date('Y');
@@ -129,10 +120,6 @@ try {
     if ($balance > 0) {
         // Financial block — nothing proceeds until the balance is settled.
         $status = 'Pending_Clearance';
-    } elseif ($paymentMethod === 'Cash_on_Delivery') {
-        // No online step: work starts immediately; the student pays the
-        // courier (document fee + delivery fee) when the document arrives.
-        $status = 'Processing';
     } else {
         $status = 'Awaiting_Payment';
     }
@@ -207,21 +194,7 @@ try {
 
         // Cash on Delivery — record the amount owed up front so there is a
         // payment trail; it is marked completed when the document is claimed.
-        if ($paymentMethod === 'Cash_on_Delivery' && $balance <= 0) {
-            $codTxn = 'TXN-MOCK-' . mt_rand(1000, 9999);
-            $db->insert('mock_payment_transactions', [
-                'transaction_id' => $codTxn,
-                'request_id'     => $id,
-                'student_id'     => $studentId,
-                'amount'         => round($fee + ($deliveryFee ?? 0), 2),
-                'currency'       => 'PHP',
-                'status'         => 'pending',
-                'method'         => 'Cash_on_Delivery',
-                'due_on'         => 'delivery',
-                'payment_url'    => null,
-                'created_at'     => $now,
-            ]);
-        }
+        
 
         // Initial status event.
         $db->insert('document_request_events', [
@@ -236,17 +209,7 @@ try {
             'created_at' => $now,
         ]);
 
-        // Exit clearance hard stop for TOR-final / Honorable Dismissal.
-        if ((int) $catalog['triggers_exit_clearance'] === 1) {
-            foreach (['Alumni', 'Dean', 'Property'] as $office) {
-                $db->insert('exit_clearances', [
-                    'request_id' => $id,
-                    'office'     => $office,
-                    'status'     => 'PENDING',
-                    'created_at' => $now,
-                ]);
-            }
-        }
+        // (Coordinator offices Dean / Alumni / Property no longer approve requests.)
 
         $conn->commit();
     } catch (Throwable $e) {

@@ -33,22 +33,6 @@ $requests = $db->fetchAll(
       ORDER BY dr.id DESC"
 );
 
-// Exit-clearance rows, only for clearance-triggering requests.
-$clearanceMap = [];
-$clearanceReqIds = array_filter($requests, fn($r) => (int) ($r['triggers_exit_clearance'] ?? 0) === 1);
-if ($clearanceReqIds) {
-    $ids = array_map('intval', array_column($clearanceReqIds, 'id'));
-    $ph = implode(',', array_fill(0, count($ids), '?'));
-    $rows = $db->fetchAll(
-        "SELECT * FROM exit_clearances WHERE request_id IN ($ph)
-          ORDER BY FIELD(office, 'Alumni', 'Dean', 'Property')",
-        $ids
-    );
-    foreach ($rows as $row) {
-        $clearanceMap[(int) $row['request_id']][] = $row;
-    }
-}
-
 // Status events, one pass grouped in PHP.
 $eventsByRequest = [];
 if ($requests) {
@@ -270,7 +254,6 @@ $page_scripts = ['documents.js'];
             <option value="">All fulfillment</option>
             <option value="Pickup">Pickup</option>
             <option value="Digital">Digital</option>
-            <option value="Courier">Courier</option>
         </select>
         <div class="panel-actions" style="margin-left:auto;display:flex;gap:8px;">
             <span class="chip blue"><i class="fa-solid fa-file-lines"></i> <?= count($requests) ?> request<?= count($requests) === 1 ? '' : 's' ?></span>
@@ -290,14 +273,7 @@ $page_scripts = ['documents.js'];
                 $label = $statusLabel[$r['document_status']] ?? str_replace('_', ' ', $r['document_status']);
                 $ci = $catIcon[$r['sku']] ?? ['linear-gradient(135deg,#64748b,#475569)', 'fa-file-lines'];
                 $st = (string) $r['document_status'];
-                $clearances = $clearanceMap[(int) $r['id']] ?? [];
-                $hasClearance = count($clearances) > 0; // exit-clearance doc: rows are seeded at submit
-                $allCleared = $hasClearance && count(array_filter($clearances, fn($c) => $c['status'] === 'CLEARED')) === 3;
                 $reqEvents = $eventsByRequest[(int) $r['id']] ?? [];
-                // Lock "Mark Ready" only while exit-clearance rows are pending. A request
-                // that merely *passed through* Pending_Clearance (finance block) but does
-                // not trigger exit clearance must not stay locked with nothing to clear.
-                $needsClearance = $hasClearance && !$allCleared;
                 $isDigital = $r['fulfillment_type'] === 'Digital';
             ?>
                 <tr data-doc="<?= (int) $r['id'] ?>" data-status="<?= htmlspecialchars($st) ?>"
@@ -327,18 +303,12 @@ $page_scripts = ['documents.js'];
                             <button class="btn btn-sm btn-secondary" onclick="processDoc(<?= (int) $r['id'] ?>)"><i class="fa-solid fa-gear"></i> Process</button>
                             <button class="btn btn-sm btn-danger" onclick="rejectDoc(<?= (int) $r['id'] ?>)"><i class="fa-solid fa-xmark"></i> Reject</button>
                         <?php elseif ($st === 'Processing'): ?>
-                            <?php if ($needsClearance): ?>
-                                <button class="btn btn-sm btn-secondary" disabled title="Exit clearance must be complete (Alumni / Dean / Property)"><i class="fa-solid fa-lock"></i> Mark Ready</button>
-                            <?php else: ?>
-                                <button class="btn btn-sm btn-success" onclick="readyDoc(<?= (int) $r['id'] ?>)"><i class="fa-solid fa-circle-check"></i> Mark Ready</button>
-                            <?php endif; ?>
+                            <button class="btn btn-sm btn-success" onclick="approveDoc(<?= (int) $r['id'] ?>)"><i class="fa-solid fa-circle-check"></i> Approve / Release</button>
                             <?php if ($isDigital): ?><button class="btn btn-sm btn-primary" onclick="genPdf(<?= (int) $r['id'] ?>)"><i class="fa-solid fa-file-pdf"></i> PDF</button><?php endif; ?>
                             <?php if ($isDigital && !empty($r['pdf_path'])): ?><a class="btn btn-sm btn-light" href="<?= $APP_ROOT . htmlspecialchars($r['pdf_path']) ?>" target="_blank" rel="noopener" title="Open the generated PDF (password = student birthdate YYYY-MM-DD)"><i class="fa-solid fa-eye"></i> View</a><?php endif; ?>
                             <button class="btn btn-sm btn-danger" onclick="rejectDoc(<?= (int) $r['id'] ?>)"><i class="fa-solid fa-xmark"></i> Reject</button>
                         <?php elseif ($st === 'Ready'): ?>
-                            <?php if ($r['fulfillment_type'] === 'Courier'): ?>
-                                <button class="btn btn-sm btn-primary" onclick="shipDoc(<?= (int) $r['id'] ?>)"><i class="fa-solid fa-truck"></i> Ship</button>
-                            <?php endif; ?>
+                            
                             <?php if ($isDigital): ?><button class="btn btn-sm btn-primary" onclick="genPdf(<?= (int) $r['id'] ?>)"><i class="fa-solid fa-file-pdf"></i> PDF</button><?php endif; ?>
                             <?php if ($isDigital && !empty($r['pdf_path'])): ?><a class="btn btn-sm btn-light" href="<?= $APP_ROOT . htmlspecialchars($r['pdf_path']) ?>" target="_blank" rel="noopener" title="Open the generated PDF (password = student birthdate YYYY-MM-DD)"><i class="fa-solid fa-eye"></i> View</a><?php endif; ?>
                             <button class="btn btn-sm btn-success" onclick="claimDoc(<?= (int) $r['id'] ?>)"><i class="fa-solid fa-box-check"></i> Claimed</button>
@@ -368,33 +338,9 @@ $page_scripts = ['documents.js'];
                                 <?php if ($st === 'Claimed'): ?><span><i class="fa-solid fa-circle-check" style="color:#16a34a;"></i> Claimed <?= $r['claimed_at'] ? date('M d, Y h:i A', strtotime($r['claimed_at'])) : '' ?></span><?php endif; ?>
                             </div>
 
-                            <?php if ($hasClearance): ?>
-                                <?php if ($clearances): ?>
-                                    <div class="clearance-matrix">
-                                        <div class="cm-head"><span><i class="fa-solid fa-shield-halved"></i> Exit Clearance — Approve is locked until all are CLEARED</span></div>
-                                        <?php foreach ($clearances as $cl): $cleared = $cl['status'] === 'CLEARED'; ?>
-                                            <div class="cm-row">
-                                                <span class="cm-office"><i class="fa-solid fa-building-columns"></i> <?= htmlspecialchars($cl['office']) ?> Office</span>
-                                                <span style="display:flex;align-items:center;gap:10px;">
-                                                    <span class="pill <?= $cleared ? 'ready' : 'pending-clearance' ?>"><i class="fa-solid <?= $cleared ? 'fa-circle-check' : 'fa-clock' ?>"></i> <?= $cleared ? 'CLEARED' : 'PENDING' ?></span>
-                                                    <span class="cm-meta"><?= $cleared && $cl['cleared_at'] ? 'by #' . (int) $cl['cleared_by'] . ' · ' . date('M d h:i A', strtotime($cl['cleared_at'])) : '' ?></span>
-                                                    <button class="btn btn-sm <?= $cleared ? 'btn-light' : 'btn-success' ?>" onclick="setClearance(<?= (int) $r['id'] ?>, '<?= htmlspecialchars($cl['office']) ?>', <?= $cleared ? "'reset'" : "'clear'" ?>)">
-                                                        <i class="fa-solid <?= $cleared ? 'fa-rotate-left' : 'fa-check' ?>"></i> <?= $cleared ? 'Reopen' : 'Mark CLEARED' ?>
-                                                    </button>
-                                                </span>
-                                            </div>
-                                        <?php endforeach; ?>
-                                    </div>
-                                <?php endif; ?>
-                            <?php endif; ?>
+                            
 
-                            <?php if ($r['fulfillment_type'] === 'Courier' && in_array($st, ['Shipped', 'Claimed'], true) && !empty($r['delivery_address'])): ?>
-                                <div class="delivery-card" style="margin-top:12px;">
-                                    <div class="dl-icon"><i class="fa-solid fa-motorcycle"></i></div>
-                                    <div class="dl-line"><b>Mock Lalamove order:</b> <?= htmlspecialchars($r['lalamove_order_ref']) ?><br>
-                                        Dropoff: <b><?= htmlspecialchars($r['delivery_address']) ?></b> · Tracking: <span style="font-family:monospace;">http://mock-lala.com/track/<?= htmlspecialchars($r['lalamove_order_ref']) ?></span></div>
-                                </div>
-                            <?php endif; ?>
+                            
 
                             <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;margin:14px 0 8px;"><i class="fa-solid fa-timeline"></i> Status timeline</h4>
                             <ul class="timeline">
@@ -419,34 +365,19 @@ $page_scripts = ['documents.js'];
 </div>
 </main>
 
-<!-- Ship (mock Lalamove) modal -->
-<div class="modal-overlay" id="shipModal">
-    <div class="modal-content" style="max-width:480px;">
-        <div class="modal-header"><h2><i class="fa-solid fa-truck"></i> Book Courier Delivery</h2><button class="modal-close" onclick="closeModal('shipModal')"><i class="fas fa-times"></i></button></div>
+<!-- Approve / Release modal (registrar sets reason + release date) -->
+<div class="modal-overlay" id="approveModal">
+    <div class="modal-content" style="max-width:460px;">
+        <div class="modal-header"><h2><i class="fa-solid fa-circle-check"></i> Approve &amp; Release</h2><button class="modal-close" onclick="closeModal('approveModal')"><i class="fas fa-times"></i></button></div>
         <div class="modal-body">
-            <div class="detail-row"><span class="lbl">Request</span><span class="val" id="shipRequest">—</span></div>
-            <div class="detail-row"><span class="lbl">Dropoff</span><span class="val" id="shipAddress">—</span></div>
-            <div class="detail-row" id="shipFeeRow" style="display:none;"><span class="lbl">Delivery fee (student)</span><span class="val" id="shipStoredFee" style="color:#0f766e;font-weight:700;">—</span></div>
-            <div class="detail-row" id="shipMethodRow" style="display:none;"><span class="lbl">Payment</span><span class="val" id="shipMethod">—</span></div>
-            <div id="shipQuote" style="display:none;margin-top:12px;">
-                <div class="delivery-card">
-                    <div class="dl-icon"><i class="fa-solid fa-receipt"></i></div>
-                    <div class="dl-line"><b>Mock Lalamove quotation</b><br>
-                        Distance: <b id="shipDistance">—</b> km · Fee: <b id="shipFee">—</b> · Quote: <b id="shipQuoteId">—</b></div>
-                </div>
-            </div>
-            <div id="shipBooked" style="display:none;margin-top:12px;">
-                <div class="delivery-card" style="border-color:#86efac;">
-                    <div class="dl-icon"><i class="fa-solid fa-motorcycle"></i></div>
-                    <div class="dl-line"><b id="shipDriver">—</b><br>
-                        Order: <b id="shipOrderId">—</b> · <span id="shipPhone">—</span> · <span style="font-family:monospace;" id="shipTracking">—</span></div>
-                </div>
-            </div>
+            <input type="hidden" id="approveId">
+            <div class="detail-row" style="margin-bottom:14px;"><span class="lbl">Request</span><span class="val" id="approveLabel">—</span></div>
+            <div class="form-group"><label>Approval reason <span class="required">*</span></label><textarea id="approveReason" class="form-control" rows="2" placeholder="e.g. balance, requirements verified"></textarea></div>
+            <div class="form-group"><label>Date of release <span class="required">*</span></label><input type="date" id="approveReleaseDate" class="form-control"></div>
         </div>
         <div class="modal-footer">
-            <button class="btn btn-light" onclick="closeModal('shipModal')">Close</button>
-            <button class="btn btn-primary" id="shipQuoteBtn" onclick="getShipQuote()"><i class="fa-solid fa-calculator"></i> Get Quote</button>
-            <button class="btn btn-success" id="shipBookBtn" style="display:none;" onclick="bookRider()"><i class="fa-solid fa-truck-fast"></i> Book Rider</button>
+            <button class="btn btn-light" onclick="closeModal('approveModal')">Cancel</button>
+            <button class="btn btn-success" id="approveSubmit" onclick="submitApprove()"><i class="fa-solid fa-circle-check"></i> Approve</button>
         </div>
     </div>
 </div>
@@ -482,7 +413,6 @@ $page_scripts = ['documents.js'];
 </div>
 
 <script>
-let SHIP = { id: null, address: '', quote: null };
 let CONFIRM_ACTION = null;
 
 function toggleDetail(id) {
@@ -491,11 +421,11 @@ function toggleDetail(id) {
 }
 function closeModal(id) { document.getElementById(id).classList.remove('active'); document.body.style.overflow = ''; }
 function openModal(id) { document.getElementById(id).classList.add('active'); document.body.style.overflow = 'hidden'; }
-['shipModal', 'rejectModal', 'confirmModal'].forEach(id => {
+['approveModal', 'rejectModal', 'confirmModal'].forEach(id => {
     const el = document.getElementById(id);
     el.addEventListener('click', e => { if (e.target === el) closeModal(id); });
 });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal('shipModal'); closeModal('rejectModal'); closeModal('confirmModal'); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal('approveModal'); closeModal('rejectModal'); closeModal('confirmModal'); } });
 
 // ── In-app confirmation (no native confirm()) ──────────────────
 function rowLabel(id) {
@@ -542,14 +472,26 @@ function processDoc(id) {
             }).catch(() => showToast('Network error.', 'error'));
         });
 }
-function readyDoc(id) {
-    confirmAction('Mark "' + rowLabel(id) + '" as Ready for Release? This finalizes the document and stamps the Ready time.',
-        '<i class="fa-solid fa-check"></i> Mark Ready', 'btn-success', () => {
-            putDoc(id, 'ready').then(d => {
-                if (d.success) { showToast('Request marked Ready.', 'success'); location.reload(); }
-                else showToast(d.message || 'Action failed.', 'error');
-            }).catch(() => showToast('Network error.', 'error'));
-        });
+function approveDoc(id) {
+    document.getElementById('approveId').value = id;
+    document.getElementById('approveLabel').textContent = rowLabel(id);
+    document.getElementById('approveReason').value = '';
+    document.getElementById('approveReleaseDate').value = '';
+    openModal('approveModal');
+}
+function submitApprove() {
+    const id = document.getElementById('approveId').value;
+    const reason = document.getElementById('approveReason').value.trim();
+    const releaseDate = document.getElementById('approveReleaseDate').value;
+    if (!reason) { showToast('Please enter an approval reason.', 'error'); return; }
+    if (!releaseDate) { showToast('Please set the date of release.', 'error'); return; }
+    const btn = document.getElementById('approveSubmit');
+    btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Approving…';
+    putDoc(id, 'ready', { approval_reason: reason, release_date: releaseDate }).then(d => {
+        if (d.success) { showToast('Request approved for release.', 'success'); location.reload(); }
+        else showToast(d.message || 'Action failed.', 'error');
+    }).catch(() => showToast('Network error.', 'error'))
+      .finally(() => { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-circle-check"></i> Approve'; });
 }
 function claimDoc(id) {
     confirmAction('Mark "' + rowLabel(id) + '" as Claimed? This completes the request.',
@@ -580,13 +522,7 @@ function submitReject() {
 }
 
 // ── Exit clearance ─────────────────────────────────────────────
-function setClearance(requestId, office, action) {
-    post('../api/exit-clearances.php', { request_id: requestId, office: office, action: action })
-        .then(d => {
-            if (d.success) { showToast(d.message, action === 'clear' ? 'success' : 'info'); location.reload(); }
-            else showToast(d.message || 'Could not update clearance.', 'error');
-        }).catch(() => showToast('Network error.', 'error'));
-}
+
 
 // ── Digital PDF generation (api/generate-document-pdf.php) ─────
 function genPdf(id) {
@@ -601,67 +537,6 @@ function genPdf(id) {
         .finally(() => { if (btn) { btn.disabled = false; btn.innerHTML = orig; } });
 }
 
-// ── Courier shipping (mock Lalamove) ───────────────────────────
-function shipDoc(id) {
-    const row = document.querySelector('tr[data-doc="' + id + '"]');
-    SHIP.id = id;
-    SHIP.address = row ? row.dataset.address || '' : '';
-    SHIP.quote = null;
-    document.getElementById('shipRequest').textContent = row ? row.dataset.label : ('#' + id);
-    document.getElementById('shipAddress').textContent = SHIP.address || 'No address on file';
-
-    // The delivery fee was quoted to the student at submission and is stored on
-    // the request — the student is the one who pays it (COD or at booking).
-    const storedFee = parseFloat(row && row.dataset.delivery || 0);
-    const method = row ? row.dataset.method || 'Online' : 'Online';
-    document.getElementById('shipStoredFee').textContent = storedFee > 0 ? '&#8369;' + storedFee.toFixed(2) + ' — paid by student' : '—';
-    document.getElementById('shipFeeRow').style.display = storedFee > 0 ? '' : 'none';
-    document.getElementById('shipMethod').textContent = method === 'Cash_on_Delivery' ? 'Cash on Delivery (collect on hand-off)' : 'Online payment (already paid / pay at booking)';
-    document.getElementById('shipMethodRow').style.display = '';
-
-    document.getElementById('shipQuote').style.display = 'none';
-    document.getElementById('shipBooked').style.display = 'none';
-    document.getElementById('shipQuoteBtn').style.display = '';
-    document.getElementById('shipBookBtn').style.display = 'none';
-    openModal('shipModal');
-}
-function getShipQuote() {
-    if (!SHIP.address) { showToast('No delivery address on file for this request.', 'error'); return; }
-    const btn = document.getElementById('shipQuoteBtn');
-    btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>…';
-    post('../api/mock/lalamove.php', { action: 'quotation', pickup: 'Bestlink College of the Philippines', dropoff: SHIP.address })
-        .then(d => {
-            if (d.success) {
-                SHIP.quote = d.data;
-                document.getElementById('shipDistance').textContent = d.data.distance_km;
-                document.getElementById('shipFee').textContent = '&#8369;' + d.data.total_fee.toFixed(2);
-                document.getElementById('shipQuoteId').textContent = d.data.quotation_id;
-                document.getElementById('shipQuote').style.display = 'block';
-                document.getElementById('shipBookBtn').style.display = '';
-            } else showToast(d.message || 'Quote failed.', 'error');
-        }).catch(() => showToast('Network error.', 'error'))
-        .finally(() => { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-calculator"></i> Get Quote'; });
-}
-function bookRider() {
-    if (!SHIP.quote) return;
-    const btn = document.getElementById('shipBookBtn');
-    btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Booking…';
-    post('../api/mock/lalamove.php', Object.assign({ action: 'order', request_id: SHIP.id, dropoff: SHIP.address }, SHIP.quote))
-        .then(d => {
-            if (d.success) {
-                document.getElementById('shipDriver').textContent = d.data.driver_name + ' (rider)';
-                document.getElementById('shipOrderId').textContent = d.data.order_id;
-                document.getElementById('shipPhone').textContent = d.data.driver_phone;
-                document.getElementById('shipTracking').textContent = d.data.tracking_url;
-                document.getElementById('shipBooked').style.display = 'block';
-                document.getElementById('shipQuoteBtn').style.display = 'none';
-                document.getElementById('shipBookBtn').style.display = 'none';
-                showToast('Rider booked — request marked Shipped.', 'success');
-                setTimeout(() => location.reload(), 1400);
-            } else showToast(d.message || 'Booking failed.', 'error');
-        }).catch(() => showToast('Network error.', 'error'))
-        .finally(() => { if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-truck-fast"></i> Book Rider'; } });
-}
 
 // ── Search + filters ───────────────────────────────────────────
 function applyFilters() {

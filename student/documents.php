@@ -196,11 +196,8 @@ $hasHeld = $counts['Pending_Clearance'] > 0;
                         <?php if (!empty($c['requirement'])): ?>
                             <div class="cat-req"><i class="fa-solid fa-file-shield"></i> <?= htmlspecialchars($c['requirement']) ?></div>
                         <?php endif; ?>
-                        <?php if ((int) $c['triggers_exit_clearance'] === 1): ?>
-                            <div class="cat-clear"><i class="fa-solid fa-shield-halved"></i> Requires exit clearance</div>
-                        <?php endif; ?>
                     </div>
-                <?php endforeach; ?>
+                        <?php endforeach; ?>
             </div>
         </div>
 
@@ -406,24 +403,18 @@ $hasHeld = $counts['Pending_Clearance'] > 0;
                     <select name="fulfillment_type" id="reqFulfillment" class="form-control">
                         <option value="Pickup">Pickup at Registrar</option>
                         <option value="Digital">Digital (encrypted PDF)</option>
-                        <option value="Courier">Courier delivery</option>
                     </select>
                 </div>
             </div>
 
-            <div class="form-group" id="addressGroup" style="display:none;">
-                <label>Delivery Address <span class="required">*</span></label>
-                <textarea name="delivery_address" id="reqAddress" class="form-control" rows="2" placeholder="Complete dropoff address for the courier"></textarea>
-                <small style="color:#94a3b8;">The courier delivery fee is quoted from this address and is <b>paid by you</b> — it is added to the total below.</small>
-            </div>
+            
 
             <div class="form-group">
                 <label>Payment Method <span class="required">*</span></label>
                 <select name="payment_method" id="reqPaymentMethod" class="form-control">
                     <option value="Online">Pay online (GCash)</option>
-                    <option value="Cash_on_Delivery">Cash on delivery</option>
-                </select>
-                <small style="color:#94a3b8;">Cash on delivery — pay the document fee plus delivery fee to the courier when you receive the document.</small>
+                    </select>
+                    <small style="color:#94a3b8;">Pick-up only — pay online and collect your document at the Registrar's Office.</small>
             </div>
 
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
@@ -562,21 +553,13 @@ function updateFeePreview() {
     const qty = Math.max(1, parseInt(qtyInput.value) || 1);
     const docFee = opt.base_fee * (perUnit ? 1 : qty);
 
-    // Courier delivery fee — quoted live from the address, paid by the student.
-    const isCourier = document.getElementById('reqFulfillment').value === 'Courier';
-    const delivery = isCourier ? mockDeliveryFee(document.getElementById('reqAddress').value) : 0;
-    const total = docFee + delivery;
+    const total = docFee;
 
     document.getElementById('feePreview').textContent = '₱' + total.toLocaleString('en-PH', { minimumFractionDigits: 2 });
     document.getElementById('feeNote').textContent = opt.fee_type === 'flat' ? opt.name + ' (one-time)' : opt.name + ' × ' + qty;
 
     const deliveryNote = document.getElementById('deliveryFeeNote');
-    if (delivery > 0) {
-        deliveryNote.textContent = 'Includes delivery fee ₱' + delivery.toLocaleString('en-PH', { minimumFractionDigits: 2 }) + ' — paid by you to the courier.';
-        deliveryNote.style.display = 'block';
-    } else {
-        deliveryNote.style.display = 'none';
-    }
+    deliveryNote.style.display = 'none';
 
     const fileGroup = document.getElementById('reqFileGroup');
     const hint = document.getElementById('reqHint');
@@ -590,11 +573,6 @@ function updateFeePreview() {
     }
 }
 document.getElementById('reqQty').addEventListener('input', updateFeePreview);
-document.getElementById('reqAddress').addEventListener('input', updateFeePreview);
-document.getElementById('reqFulfillment').addEventListener('change', function () {
-    document.getElementById('addressGroup').style.display = this.value === 'Courier' ? 'block' : 'none';
-    updateFeePreview();
-});
 
 document.getElementById('requestModal').addEventListener('click', function (e) { if (e.target === this) closeRequestModal(); });
 document.getElementById('payModal').addEventListener('click', function (e) { if (e.target === this) closePayModal(); });

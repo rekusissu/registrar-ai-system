@@ -48,9 +48,8 @@ ON DUPLICATE KEY UPDATE
   `triggers_exit_clearance` = VALUES(`triggers_exit_clearance`);
 
 -- ── 2. finance ───────────────────────────────────────────────
--- Clearance-gate balance table (spec: SELECT balance FROM finance
--- WHERE student_id = 'XYZ'). Student 1 is seeded with an
--- outstanding balance to demo the Pending_Clearance block.
+-- Clearance gate: SELECT balance FROM finance WHERE student_id = 'XYZ'.
+-- For the demo every balance is 0.00 so no request is ever held.
 CREATE TABLE IF NOT EXISTS `finance` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `student_id` int(11) NOT NULL,
@@ -62,7 +61,7 @@ CREATE TABLE IF NOT EXISTS `finance` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 INSERT INTO `finance` (`student_id`, `balance`) VALUES
-  (1, 2500.00),
+  (1, 0.00),
   (2, 0.00),
   (3, 0.00)
 ON DUPLICATE KEY UPDATE `balance` = VALUES(`balance`);
@@ -77,7 +76,7 @@ ALTER TABLE `document_requests`
   ADD COLUMN IF NOT EXISTS `catalog_id` int(11) DEFAULT NULL AFTER `document_type`,
   ADD COLUMN IF NOT EXISTS `quantity` int(11) NOT NULL DEFAULT 1 AFTER `catalog_id`,
   ADD COLUMN IF NOT EXISTS `request_type` enum('Express','Regular') NOT NULL DEFAULT 'Regular' AFTER `quantity`,
-  ADD COLUMN IF NOT EXISTS `fulfillment_type` enum('Pickup','Digital','Courier') NOT NULL DEFAULT 'Pickup' AFTER `request_type`,
+  ADD COLUMN IF NOT EXISTS `fulfillment_type` enum('Pickup','Digital') NOT NULL DEFAULT 'Pickup' AFTER `request_type`,
   ADD COLUMN IF NOT EXISTS `delivery_address` text DEFAULT NULL AFTER `fulfillment_type`,
   ADD COLUMN IF NOT EXISTS `document_status` enum('Pending_Clearance','Awaiting_Payment','Processing','Ready','Shipped','Claimed','Rejected') DEFAULT NULL AFTER `status`,
   ADD COLUMN IF NOT EXISTS `rejection_reason` varchar(255) DEFAULT NULL AFTER `document_status`,
