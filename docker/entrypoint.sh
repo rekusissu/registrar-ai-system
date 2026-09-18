@@ -83,5 +83,17 @@ if command -v php >/dev/null 2>&1; then
     || echo "[entrypoint] seed skipped (db may not be ready or already has tables)."
 fi
 
+# ── Database migrations ──────────────────────────────────────────────────────
+# Applies any pending migration files in database/migrations/ (idempotent and
+# recorded per database). Unlike the generic seed.php runner, this executes the
+# full SQL including row-level changes (zero balances, enum folding, …), so
+# feature rework like the document-request changes applies automatically on
+# every deploy. Already-applied files are skipped; a failed file is not recorded
+# and will be retried next boot.
+if command -v php >/dev/null 2>&1; then
+  php /var/www/html/database/migrate.php 2>/dev/null && echo "[entrypoint] migrations applied." \
+    || echo "[entrypoint] migrations skipped/failed (non-fatal)."
+fi
+
 echo "[entrypoint] starting Apache…"
 exec apache2-foreground
