@@ -1,9 +1,10 @@
 <?php
 // ============================================================
 //  SHARED/AI_CLIENT.PHP
-//  OpenAI-compatible client for the local 9Router gateway.
-//  Fronts several free models via one Bearer key. All responses
-//  are cached in the `ai_cache` table (prompt_hash, TTL).
+//  OpenAI-compatible client for AI API calls.
+//  Works with OpenAI directly (api.openai.com) or any
+//  OpenAI-compatible gateway (9Router, Ollama, etc.).
+//  All responses are cached to reduce API calls.
 //
 //  Usage:
 //    require_once __DIR__ . '/ai_client.php';

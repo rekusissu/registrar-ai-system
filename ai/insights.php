@@ -1,7 +1,8 @@
 <?php
 // ============================================================
 //  AI/INSIGHTS.PHP
-//  AI-powered insights dashboard
+//  Intelligent Analytics and Reports Dashboard
+//  With OpenAI-powered AI analysis
 // ============================================================
 
 require_once __DIR__ . '/../shared/security_headers.php';
@@ -16,67 +17,65 @@ require_once __DIR__ . '/../shared/database.php';
 
 $db = Database::getInstance();
 
-// Get statistics for insights
+$currentMonth = date('n');
+$currentYear = date('Y');
+
 $totalStudents = $db->fetchColumn("SELECT COUNT(*) FROM students");
-$activeStudents = $db->fetchColumn("SELECT COUNT(*) FROM students WHERE status = 'active'");
-$atRiskStudents = $db->fetchColumn("SELECT COUNT(*) FROM students WHERE status = 'at-risk' OR status = 'probation'");
-$graduatedStudents = $db->fetchColumn("SELECT COUNT(*) FROM students WHERE status = 'graduated'");
-
 $totalCards = $db->fetchColumn("SELECT COUNT(*) FROM rfid_cards");
-$activeCards = $db->fetchColumn("SELECT COUNT(*) FROM rfid_cards WHERE status = 'active'");
-$expiredCards = $db->fetchColumn("SELECT COUNT(*) FROM rfid_cards WHERE status = 'expired'");
-
-$pendingDocuments = $db->fetchColumn("SELECT COUNT(*) FROM document_requests WHERE status = 'pending'");
 $totalDocuments = $db->fetchColumn("SELECT COUNT(*) FROM document_requests");
+$queueTotal = $db->fetchColumn("SELECT COUNT(*) FROM queue_tickets");
 
-// Get recent status changes
-$recentStatusChanges = $db->fetchAll("
-    SELECT 
-        st.*,
-        CONCAT(s.first_name, ' ', s.last_name) AS student_name
-    FROM status_tracker st
-    LEFT JOIN students s ON st.student_id = s.id
-    ORDER BY st.created_at DESC
-    LIMIT 5
-");
+$statusData = $db->fetchAll("SELECT status, COUNT(*) as count FROM students GROUP BY status ORDER BY count DESC");
+$programData = $db->fetchAll("SELECT course, COUNT(*) as count FROM students WHERE course IS NOT NULL AND course != '' GROUP BY course ORDER BY count DESC LIMIT 8");
+$docData = $db->fetchAll("SELECT document_type, COUNT(*) as count FROM document_requests GROUP BY document_type ORDER BY count DESC");
+$rfidStatusData = $db->fetchAll("SELECT status, COUNT(*) as count FROM rfid_cards GROUP BY status ORDER BY count DESC");
 
-// Get courses distribution
-$courses = $db->fetchAll("
-    SELECT course, COUNT(*) as count 
-    FROM students 
-    WHERE course IS NOT NULL AND course != ''
-    GROUP BY course 
-    ORDER BY count DESC
-    LIMIT 5
-");
-
-$page_title = 'AI Insights';
+$page_title = 'Intelligent Analytics and Reports';
 $APP_ROOT = '../';
 $ACTIVE_NAV = 'insights';
+$use_chart = true;
 
 include '../includes/header.php';
 include '../includes/sidebar.php';
 ?>
-
 <main class="main">
     <header class="header">
         <div class="title">
-            <h1><i class="fas fa-brain" style="color: var(--primary-500);"></i> AI Insights</h1>
-            <p>Intelligent analytics and predictions</p>
+            <h1><i class="fas fa-chart-line" style="color: var(--primary-500);"></i> Intelligent Analytics and Reports</h1>
+            <p>AI-powered registrar data analysis and visualization</p>
         </div>
     </header>
 
-    <!-- Stats Overview -->
-    <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 24px;">
+    <!-- Reporting Period Selector -->
+    <div style="display: flex; justify-content: flex-end; margin-bottom: 20px; gap: 12px; align-items: center;">
+        <label style="font-weight: 500; color: #374151;">
+            <i class="fas fa-calendar-alt" style="color: var(--primary-500); margin-right: 8px;"></i> Reporting Period:
+        </label>
+        <div style="display: flex; gap: 8px;">
+            <select id="reportingMonth" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; background: white; min-width: 140px;">
+                <?php for ($m = 1; $m <= 12; $m++): ?>
+                    <option value="<?= $m ?>" <?= $m == $currentMonth ? 'selected' : '' ?>><?= date('F', mktime(0, 0, 0, $m, 1)) ?></option>
+                <?php endfor; ?>
+            </select>
+            <select id="reportingYear" style="padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; background: white; min-width: 100px;">
+                <?php for ($y = $currentYear - 2; $y <= $currentYear + 1; $y++): ?>
+                    <option value="<?= $y ?>" <?= $y == $currentYear ? 'selected' : '' ?>><?= $y ?></option>
+                <?php endfor; ?>
+            </select>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 28px;">
         <div class="stat-card">
             <div class="card-header">
                 <i class="fas fa-user-graduate" style="color: var(--primary-500);"></i>
                 <span class="card-label">Total Students</span>
             </div>
-            <div class="card-value" style="font-size: 28px;"><?= $totalStudents ?></div>
-            <div class="card-sub">
-                <span class="badge badge-success"><?= $activeStudents ?> Active</span>
-                <span class="badge badge-danger"><?= $atRiskStudents ?> At Risk</span>
+            <div class="card-value" style="font-size: 32px;"><?= number_format($totalStudents) ?></div>
+            <div class="card-sub" style="font-size: 13px;">
+                <span class="badge badge-primary">Active</span>
+                <span class="badge badge-info">Enrolled</span>
             </div>
         </div>
         <div class="stat-card">
@@ -84,219 +83,309 @@ include '../includes/sidebar.php';
                 <i class="fas fa-credit-card" style="color: var(--primary-500);"></i>
                 <span class="card-label">RFID Cards</span>
             </div>
-            <div class="card-value" style="font-size: 28px;"><?= $totalCards ?></div>
-            <div class="card-sub">
-                <span class="badge badge-success"><?= $activeCards ?> Active</span>
-                <span class="badge badge-danger"><?= $expiredCards ?> Expired</span>
+            <div class="card-value" style="font-size: 32px;"><?= number_format($totalCards) ?></div>
+            <div class="card-sub" style="font-size: 13px;">
+                <span class="badge badge-success">Active</span>
+                <span class="badge badge-warning">Expired</span>
             </div>
         </div>
         <div class="stat-card">
             <div class="card-header">
                 <i class="fas fa-file-lines" style="color: var(--primary-500);"></i>
-                <span class="card-label">Documents</span>
+                <span class="card-label">Document Transactions</span>
             </div>
-            <div class="card-value" style="font-size: 28px;"><?= $totalDocuments ?></div>
-            <div class="card-sub">
-                <span class="badge badge-warning"><?= $pendingDocuments ?> Pending</span>
+            <div class="card-value" style="font-size: 32px;"><?= number_format($totalDocuments) ?></div>
+            <div class="card-sub" style="font-size: 13px;">
+                <span class="badge badge-success">Processed</span>
+                <span class="badge badge-info">Types</span>
             </div>
         </div>
         <div class="stat-card">
             <div class="card-header">
-                <i class="fas fa-graduation-cap" style="color: var(--primary-500);"></i>
-                <span class="card-label">Graduated</span>
+                <i class="fas fa-ticket" style="color: var(--primary-500);"></i>
+                <span class="card-label">Queue Total Student</span>
             </div>
-            <div class="card-value" style="font-size: 28px;"><?= $graduatedStudents ?></div>
-            <div class="card-sub">
-                <span class="badge badge-primary"><?= round(($graduatedStudents / max($totalStudents, 1)) * 100) ?>% of total</span>
+            <div class="card-value" style="font-size: 32px;"><?= number_format($queueTotal) ?></div>
+            <div class="card-sub" style="font-size: 13px;">
+                <span class="badge badge-primary">Today: <?= $db->fetchColumn("SELECT COUNT(*) FROM queue_tickets WHERE queue_date = CURDATE()") ?></span>
+                <span class="badge badge-secondary">Total</span>
             </div>
         </div>
     </div>
 
-    <!-- AI Registrar Summary -->
-    <div class="card" style="margin-bottom: 24px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-            <div>
-                <h3 class="card-title" style="margin:0;"><i class="fas fa-robot" style="color: var(--primary-500);"></i> AI Registrar Summary</h3>
-                <p class="card-subtitle" style="margin:4px 0 0;">A short AI-written summary of the current student population</p>
+    <!-- Student Population Overview Section -->
+    <div style="margin-bottom: 28px;">
+        <h2 style="font-size: 18px; font-weight: 700; color: #1e293b; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid var(--primary-500);">
+            <i class="fas fa-users" style="color: var(--primary-500); margin-right: 10px;"></i> STUDENT POPULATION OVERVIEW
+        </h2>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
+            <div style="background: white; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <h3 style="font-size: 14px; font-weight: 600; color: #475569; margin-bottom: 16px;">
+                    <i class="fas fa-chart-pie" style="color: #8b5cf6; margin-right: 8px;"></i> Student Status Distribution
+                </h3>
+                <div style="position: relative; height: 280px;">
+                    <canvas id="statusChart"></canvas>
+                </div>
             </div>
-            <button type="button" class="btn btn-primary" id="aiReportBtn" onclick="loadAiReport()">
-                <i class="fas fa-wand-magic-sparkles"></i> Generate Summary
+            <div style="background: white; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <h3 style="font-size: 14px; font-weight: 600; color: #475569; margin-bottom: 16px;">
+                    <i class="fas fa-chart-bar" style="color: #06b6d4; margin-right: 8px;"></i> Student Program Distribution
+                </h3>
+                <div style="position: relative; height: 280px;">
+                    <canvas id="programChart"></canvas>
+                </div>
+            </div>
+            <div style="background: white; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <h3 style="font-size: 14px; font-weight: 600; color: #475569; margin-bottom: 16px;">
+                    <i class="fas fa-file" style="color: #f59e0b; margin-right: 8px;"></i> Document Transaction Overview
+                </h3>
+                <div style="position: relative; height: 280px;">
+                    <canvas id="documentChart"></canvas>
+                </div>
+            </div>
+            <div style="background: white; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                <h3 style="font-size: 14px; font-weight: 600; color: #475569; margin-bottom: 16px;">
+                    <i class="fas fa-id-card" style="color: #10b981; margin-right: 8px;"></i> RFID Overview
+                </h3>
+                <div style="position: relative; height: 280px;">
+                    <canvas id="rfidChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Report Generation Section -->
+    <div style="background: white; padding: 24px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+            <div>
+                <h2 style="font-size: 18px; font-weight: 700; color: #1e293b;">
+                    <i class="fas fa-wand-magic-sparkles" style="color: var(--primary-500); margin-right: 10px;"></i> AI Analysis Report
+                </h2>
+                <p style="font-size: 14px; color: #64748b; margin-top: 4px;">
+                    Generate an AI-assisted analysis of the registrar data.
+                </p>
+            </div>
+            <button id="generateReportBtn" style="padding: 10px 24px; background: linear-gradient(135deg, var(--primary-500), var(--primary-700)); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-wand-magic-sparkles"></i> Generate Report
             </button>
         </div>
-        <div id="aiReportBox" style="margin-top:14px;display:none;">
-            <div id="aiReportLoading" style="padding:14px 0;color:#64748b;font-size:13px;"><i class="fas fa-spinner fa-spin"></i> Writing summary…</div>
-            <div id="aiReportText" style="padding:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;font-size:14px;line-height:1.7;color:#1e293b;white-space:pre-wrap;display:none;"></div>
-        </div>
-    </div>
 
-    <!-- AI Insights Cards -->
-    <div class="grid" style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 24px;">
-        <!-- Course Distribution -->
-        <div class="card">
-            <h3 class="card-title"><i class="fas fa-chart-pie" style="color: var(--primary-500);"></i> Course Distribution</h3>
-            <p class="card-subtitle">Top 5 courses by student count</p>
-            <div style="margin-top: 16px;">
-                <?php if (empty($courses)): ?>
-                    <p class="text-gray-400">No course data available</p>
-                <?php else: ?>
-                    <?php foreach ($courses as $course): ?>
-                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
-                            <span style="width: 120px; font-size: 13px; color: #1e293b;"><?= htmlspecialchars($course['course']) ?></span>
-                            <div style="flex: 1; height: 8px; background: #e2e8f0; border-radius: 9999px; overflow: hidden;">
-                                <div style="height: 100%; width: <?= ($course['count'] / max($courses[0]['count'], 1)) * 100 ?>%; background: linear-gradient(90deg, #2563eb, #60a5fa); border-radius: 9999px;"></div>
-                            </div>
-                            <span style="font-weight: 600; font-size: 14px; color: #0f172a; min-width: 40px;"><?= $course['count'] ?></span>
-                        </div>
-                    <?php endforeach; ?>
-                <?php endif; ?>
+        <div id="reportOutput" style="display: none; margin-top: 20px;">
+            <div style="border: 2px solid var(--primary-500); border-radius: 12px; padding: 24px; background: #f8fafc;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+                    <h3 style="font-size: 20px; font-weight: 700; color: var(--primary-700); margin: 0;">
+                        <i class="fas fa-brain" style="color: var(--primary-500); margin-right: 10px;"></i> AI ANALYSIS REPORT
+                    </h3>
+                    <span style="font-size: 12px; color: #64748b; background: white; padding: 4px 12px; border-radius: 20px; border: 1px solid #e2e8f0;">
+                        <i class="far fa-clock"></i> Generated: <span id="reportGeneratedAt"></span>
+                    </span>
+                </div>
+                <div id="reportContent" style="font-size: 14px; line-height: 1.8; color: #334155; white-space: pre-wrap;"></div>
+                <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 10px;">
+                    <button id="printReportBtn" style="padding: 8px 16px; background: white; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                        <i class="fas fa-print"></i> Print Report
+                    </button>
+                    <button id="exportReportBtn" style="padding: 8px 16px; background: white; border: 1px solid #d1d5db; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                        <i class="fas fa-file-pdf"></i> Export PDF
+                    </button>
+                </div>
+            </div>
+            <div style="margin-top: 16px; padding: 12px; background: #fef3c7; border-radius: 8px; border: 1px solid #fcd34d; font-size: 12px; color: #92400e; display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-info-circle"></i>
+                <span>AI-generated information is provided for administrative reference only.</span>
             </div>
         </div>
 
-        <!-- AI Predictions -->
-        <div class="card" style="background: linear-gradient(135deg, #eef4ff, #dbeafe); border-color: #bfdbfe;">
-            <h3 class="card-title"><i class="fas fa-robot" style="color: var(--primary-500);"></i> AI Predictions</h3>
-            <div style="margin-top: 12px;">
-                <div style="padding: 12px; background: white; border-radius: 10px; margin-bottom: 10px; border: 1px solid #e2e8f0;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 500;">At-Risk Students</span>
-                        <span style="font-size: 20px; font-weight: 700; color: #dc2626;"><?= $atRiskStudents ?></span>
-                    </div>
-                    <p style="font-size: 12px; color: #64748b; margin-top: 4px;">
-                        <i class="fas fa-exclamation-triangle" style="color: #dc2626;"></i>
-                        <?= $atRiskStudents > 0 ? 'Needs immediate attention' : 'All students are on track' ?>
-                    </p>
-                </div>
-                <div style="padding: 12px; background: white; border-radius: 10px; margin-bottom: 10px; border: 1px solid #e2e8f0;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 500;">Expiring Cards</span>
-                        <span style="font-size: 20px; font-weight: 700; color: #b45309;"><?= $expiredCards ?></span>
-                    </div>
-                    <p style="font-size: 12px; color: #64748b; margin-top: 4px;">
-                        <i class="fas fa-clock" style="color: #b45309;"></i>
-                        <?= $expiredCards > 0 ? 'Renewal needed' : 'All cards are active' ?>
-                    </p>
-                </div>
-                <div style="padding: 12px; background: white; border-radius: 10px; border: 1px solid #e2e8f0;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span style="font-weight: 500;">Pending Documents</span>
-                        <span style="font-size: 20px; font-weight: 700; color: #2563eb;"><?= $pendingDocuments ?></span>
-                    </div>
-                    <p style="font-size: 12px; color: #64748b; margin-top: 4px;">
-                        <i class="fas fa-file-lines" style="color: #2563eb;"></i>
-                        <?= $pendingDocuments > 0 ? 'Process pending requests' : 'All documents processed' ?>
-                    </p>
-                </div>
-            </div>
+        <div id="reportLoading" style="display: none; text-align: center; padding: 40px;">
+            <i class="fas fa-spinner fa-spin" style="font-size: 40px; color: var(--primary-500);"></i>
+            <p style="margin-top: 16px; color: #64748b;">Analyzing registrar data with AI...</p>
         </div>
     </div>
+</div>
 
-    <!-- Recent Activity -->
-    <div class="card">
-        <h3 class="card-title"><i class="fas fa-clock-rotate-left" style="color: var(--primary-500);"></i> Recent Status Changes</h3>
-        <p class="card-subtitle">Latest student status updates</p>
-        <div style="margin-top: 12px; overflow-x: auto;">
-            <?php if (empty($recentStatusChanges)): ?>
-                <p class="text-gray-400">No recent status changes</p>
-            <?php else: ?>
-                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-                    <thead>
-                        <tr style="border-bottom: 1px solid #e2e8f0;">
-                            <th style="padding: 8px 12px; text-align: left; color: #64748b; font-weight: 600;">Student</th>
-                            <th style="padding: 8px 12px; text-align: left; color: #64748b; font-weight: 600;">Previous</th>
-                            <th style="padding: 8px 12px; text-align: left; color: #64748b; font-weight: 600;">Current</th>
-                            <th style="padding: 8px 12px; text-align: left; color: #64748b; font-weight: 600;">Date</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($recentStatusChanges as $change): ?>
-                            <tr style="border-bottom: 1px solid #f1f5f9;">
-                                <td style="padding: 8px 12px; font-weight: 500;"><?= htmlspecialchars($change['student_name'] ?? 'Unknown') ?></td>
-                                <td style="padding: 8px 12px;">
-                                    <?php if ($change['previous_status']): ?>
-                                        <span class="badge badge-neutral"><?= ucfirst($change['previous_status']) ?></span>
-                                    <?php else: ?>
-                                        <span class="text-gray-400">—</span>
-                                    <?php endif; ?>
-                                </td>
-                                <td style="padding: 8px 12px;">
-                                    <span class="badge badge-<?= $change['current_status'] === 'active' ? 'success' : ($change['current_status'] === 'at-risk' ? 'danger' : 'warning') ?>">
-                                        <?= ucfirst($change['current_status']) ?>
-                                    </span>
-                                </td>
-                                <td style="padding: 8px 12px; color: #64748b; font-size: 13px;">
-                                    <?= date('M d, Y h:i A', strtotime($change['created_at'])) ?>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
-            <?php endif; ?>
-        </div>
-    </div>
-
-    <!-- AI Recommendations -->
-    <div class="card" style="margin-top: 20px; background: linear-gradient(135deg, #f0fdf4, #dcfce7); border-color: #86efac;">
-        <h3 class="card-title"><i class="fas fa-lightbulb" style="color: #16a34a;"></i> AI Recommendations</h3>
-        <div style="margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-            <?php if ($atRiskStudents > 0): ?>
-                <div style="padding: 12px; background: white; border-radius: 10px; border: 1px solid #e2e8f0;">
-                    <p style="font-weight: 500; color: #dc2626;"><i class="fas fa-triangle-exclamation"></i> <?= $atRiskStudents ?> students at risk</p>
-                    <p style="font-size: 13px; color: #64748b; margin-top: 4px;">Schedule interventions and counseling sessions.</p>
-                </div>
-            <?php endif; ?>
-            <?php if ($expiredCards > 0): ?>
-                <div style="padding: 12px; background: white; border-radius: 10px; border: 1px solid #e2e8f0;">
-                    <p style="font-weight: 500; color: #b45309;"><i class="fas fa-clock"></i> <?= $expiredCards ?> expired cards</p>
-                    <p style="font-size: 13px; color: #64748b; margin-top: 4px;">Renew RFID cards for affected students.</p>
-                </div>
-            <?php endif; ?>
-            <?php if ($pendingDocuments > 0): ?>
-                <div style="padding: 12px; background: white; border-radius: 10px; border: 1px solid #e2e8f0;">
-                    <p style="font-weight: 500; color: #2563eb;"><i class="fas fa-file-lines"></i> <?= $pendingDocuments ?> pending documents</p>
-                    <p style="font-size: 13px; color: #64748b; margin-top: 4px;">Process pending document requests.</p>
-                </div>
-            <?php endif; ?>
-            <?php if ($activeStudents > 0 && $totalStudents > 0 && ($activeStudents / $totalStudents) < 0.5): ?>
-                <div style="padding: 12px; background: white; border-radius: 10px; border: 1px solid #e2e8f0;">
-                    <p style="font-weight: 500; color: #2563eb;"><i class="fas fa-user-graduate"></i> Low active rate</p>
-                    <p style="font-size: 13px; color: #64748b; margin-top: 4px;">Review student retention strategies.</p>
-                </div>
-            <?php endif; ?>
-        </div>
-    </div>
-</main>
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 
 <script>
-async function loadAiReport() {
-    const btn = document.getElementById('aiReportBtn');
-    const box = document.getElementById('aiReportBox');
-    const loading = document.getElementById('aiReportLoading');
-    const reportText = document.getElementById('aiReportText');
-    if (!btn || !box) return;
+Chart.defaults.font.family = "'Inter', sans-serif";
+Chart.defaults.color = '#64748b';
+
+const statusColors = {
+    'active': '#10b981', 'enrolled': '#3b82f6', 'alumni': '#8b5cf6',
+    'graduated': '#f59e0b', 'dropped': '#ef4444', 'transferred': '#06b6d4',
+    'probation': '#f97316', 'at-risk': '#dc2626'
+};
+
+const programColors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899', '#14b8a6'];
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Student Status Distribution - Pie Chart
+    const statusCtx = document.getElementById('statusChart').getContext('2d');
+    new Chart(statusCtx, {
+        type: 'pie',
+        data: {
+            labels: <?= json_encode(array_column($statusData, 'status')) ?>,
+            datasets: [{
+                data: <?= json_encode(array_column($statusData, 'count')) ?>,
+                backgroundColor: <?= json_encode(array_map(fn($s) => statusColors[strtolower($s)] || '#94a3b8', array_column($statusData, 'status'))) ?>,
+                borderColor: '#ffffff', borderWidth: 2, hoverOffset: 8
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true, font: { size: 12 } } },
+                tooltip: {
+                    backgroundColor: 'rgba(15, 23, 42, 0.9)', padding: 12, cornerRadius: 8,
+                    callbacks: { label: function(ctx) { const t = ctx.dataset.data.reduce((a,b) => a+b, 0); return ' ' + ctx.label + ': ' + ctx.raw + ' (' + ((ctx.raw/t)*100).toFixed(1) + '%)'; } }
+                }
+            }
+        }
+    });
+
+    // Student Program Distribution - Horizontal Bar
+    const programCtx = document.getElementById('programChart').getContext('2d');
+    new Chart(programCtx, {
+        type: 'bar',
+        data: {
+            labels: <?= json_encode(array_column($programData, 'course')) ?>,
+            datasets: [{
+                data: <?= json_encode(array_column($programData, 'count')) ?>,
+                backgroundColor: programColors.slice(0, <?= count($programData) ?>),
+                borderRadius: 4, borderSkipped: false
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+            plugins: { legend: { display: false }, tooltip: { backgroundColor: 'rgba(15, 23, 42, 0.9)', padding: 12, cornerRadius: 8, callbacks: { label: function(ctx) { return ' ' + ctx.raw + ' students'; } } } },
+            scales: { x: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 11 } } }, y: { grid: { display: false }, ticks: { font: { size: 11 } } } }
+        }
+    });
+
+    // Document Transaction Overview - Bar Chart
+    <?php
+    $docLabels = array_map(fn($d) => strtoupper(str_replace('_', ' ', $d['document_type'])), $docData);
+    $docValues = array_column($docData, 'count');
+    ?>
+    new Chart(document.getElementById('documentChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: <?= json_encode($docLabels) ?>,
+            datasets: [{ data: <?= json_encode($docValues) ?>, backgroundColor: '#f59e0b', borderRadius: 4, borderSkipped: false }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { backgroundColor: 'rgba(15, 23, 42, 0.9)', padding: 12, cornerRadius: 8, callbacks: { label: function(ctx) { return ' ' + ctx.raw + ' transactions'; } } } },
+            scales: { y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 11 }, stepSize: 1 } }, x: { grid: { display: false }, ticks: { font: { size: 10 } } } }
+        }
+    });
+
+    // RFID Overview - Doughnut Chart
+    <?php
+    $rfidLabels = array_map(fn($s) => ucfirst($s['status']), $rfidStatusData);
+    $rfidValues = array_column($rfidStatusData, 'count');
+    $rfidColors = [];
+    foreach (array_column($rfidStatusData, 'status') as $s) {
+        $l = strtolower($s);
+        if ($l === 'active') $rfidColors[] = '#10b981';
+        elseif ($l === 'expired') $rfidColors[] = '#ef4444';
+        elseif ($l === 'pending') $rfidColors[] = '#f59e0b';
+        else $rfidColors[] = '#94a3b8';
+    }
+    ?>
+    new Chart(document.getElementById('rfidChart').getContext('2d'), {
+        type: 'doughnut',
+        data: {
+            labels: <?= json_encode($rfidLabels) ?>,
+            datasets: [{ data: <?= json_encode($rfidValues) ?>, backgroundColor: <?= json_encode($rfidColors) ?>, borderColor: '#ffffff', borderWidth: 2, hoverOffset: 8 }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false, cutout: '60%',
+            plugins: {
+                legend: { position: 'bottom', labels: { padding: 16, usePointStyle: true, font: { size: 12 } } },
+                tooltip: { backgroundColor: 'rgba(15, 23, 42, 0.9)', padding: 12, cornerRadius: 8, callbacks: { label: function(ctx) { const t = ctx.dataset.data.reduce((a,b) => a+b, 0); return ' ' + ctx.label + ': ' + ctx.raw + ' (' + ((ctx.raw/t)*100).toFixed(1) + '%)'; } } }
+            }
+        }
+    });
+});
+
+// Generate AI Report
+document.getElementById('generateReportBtn').addEventListener('click', async function() {
+    const btn = this;
+    const reportOutput = document.getElementById('reportOutput');
+    const reportLoading = document.getElementById('reportLoading');
+    const reportContent = document.getElementById('reportContent');
+    
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
-    box.style.display = 'block';
-    loading.style.display = 'block';
-    reportText.style.display = 'none';
+    reportOutput.style.display = 'none';
+    reportLoading.style.display = 'block';
+    
     try {
-        const res = await fetch('../api/ai-tools.php?action=report', {
+        const month = document.getElementById('reportingMonth').value;
+        const year = document.getElementById('reportingYear').value;
+        
+        const response = await fetch('../api/ai-insights-report.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({})
+            body: JSON.stringify({ filters: { month: parseInt(month), year: parseInt(year) } })
         });
-        const data = await res.json();
-        if (!data.success || !data.data) throw new Error(data.message || 'Report failed.');
-        reportText.textContent = data.data.report || '';
-    } catch (err) {
-        console.error(err);
-        reportText.textContent = 'Could not generate the AI summary. Check that the AI server is running and AI_API_KEY is configured, then try again.';
+        
+        const data = await response.json();
+        
+        if (!data.success || !data.data) throw new Error(data.message || 'Failed to generate report');
+        
+        reportContent.textContent = data.data.report;
+        document.getElementById('reportGeneratedAt').textContent = data.data.generated_at + ' (' + data.data.period.label + ')';
+        
+        reportLoading.style.display = 'none';
+        reportOutput.style.display = 'block';
+        reportOutput.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (error) {
+        console.error('Report error:', error);
+        reportContent.textContent = 'ERROR: Could not generate the AI analysis report.\n\nPlease check that:\n• OpenAI API key is configured\n• Internet connection is active\n\nError: ' + error.message;
+        reportLoading.style.display = 'none';
+        reportOutput.style.display = 'block';
     } finally {
-        loading.style.display = 'none';
-        reportText.style.display = 'block';
         btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Generate Summary';
+        btn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Generate Report';
     }
-}
+});
+
+// Print Report
+document.getElementById('printReportBtn').addEventListener('click', function() {
+    const printWindow = window.open('', '_blank');
+    const reportContent = document.getElementById('reportContent').textContent;
+    const generatedAt = document.getElementById('reportGeneratedAt').textContent;
+    
+    printWindow.document.write('<!DOCTYPE html><html><head><title>AI Analysis Report</title><style>body{font-family:sans-serif;max-width:800px;margin:40px auto;padding:20px;line-height:1.6} h1{color:#1e40af;border-bottom:3px solid #1e40af;padding-bottom:15px} .footer{margin-top:40px;border-top:1px solid #ddd;font-size:11px;color:#888;text-align:center}</style></head><body>');
+    printWindow.document.write('<h1>AI ANALYSIS REPORT</h1>');
+    printWindow.document.write('<p style="color:#666;font-size:12px">Generated: ' + generatedAt + '</p>');
+    printWindow.document.write('<div style="margin-top:20px">' + reportContent.replace(/\n/g, '<br>') + '</div>');
+    printWindow.document.write('<div class="footer">Generated by: Registrar Information System<br>AI-generated information is provided for administrative reference.</div>');
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+    setTimeout(() => printWindow.print(), 500);
+});
+
+// Export PDF (opens print dialog)
+document.getElementById('exportReportBtn').addEventListener('click', function() {
+    const printWindow = window.open('', '_blank');
+    const reportContent = document.getElementById('reportContent').textContent;
+    const generatedAt = document.getElementById('reportGeneratedAt').textContent;
+    const month = document.getElementById('reportingMonth').value;
+    const year = document.getElementById('reportingYear').value;
+    const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    
+    printWindow.document.write('<!DOCTYPE html><html><head><title>AI Report - ' + monthNames[parseInt(month)-1] + ' ' + year + '</title><style>@page{size:A4;margin:2cm}body{font-family:sans-serif;line-height:1.6;color:#333}.header{text-align:center;border-bottom:3px solid #1e40af;padding-bottom:20px;margin-bottom:30px}h1{color:#1e40af;margin:0 0 10px;font-size:28px}.period{background:#f3f4f6;padding:8px 20px;border-radius:20px;display:inline-block;margin-top:10px;font-size:13px}.meta{text-align:right;font-size:11px;color:#888;margin-bottom:20px}.footer{margin-top:50px;padding-top:20px;border-top:2px solid #1e40af;text-align:center;font-size:11px}.system{font-weight:600}</style></head><body>');
+    printWindow.document.write('<div class="header"><h1>AI ANALYSIS REPORT</h1><div class="period"><i class="far fa-calendar" style="margin-right:5px"></i> ' + monthNames[parseInt(month)-1] + ' ' + year + '</div></div>');
+    printWindow.document.write('<div class="meta">Generated: ' + generatedAt + '</div>');
+    printWindow.document.write('<div style="margin-top:20px">' + reportContent + '</div>');
+    printWindow.document.write('<div class="footer"><div class="system">Generated by: Registrar Information System</div><div>AI-generated information is provided for administrative reference.</div></div>');
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+    setTimeout(() => printWindow.print(), 500);
+});
 </script>
 
 <?php include '../includes/footer.php'; ?>

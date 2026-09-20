@@ -195,35 +195,35 @@ define('JWT_SECRET', secretFromEnvOrLocal('JWT_SECRET', 'your-super-secret-key-c
 // KIOSK_ACCESS_TOKEN on live stations; do not rely on the default.
 define('KIOSK_ACCESS_TOKEN', secretFromEnvOrLocal('KIOSK_ACCESS_TOKEN', 'kiosk-tap-2024'));
 
-// ── AI (Gateway, OpenAI-compatible via Antigravity / 9Router) ──
-// Local gateway that fronts models via a single Bearer key.
-// Verified live at /v1/models (OpenAI format).
-// Gateway base URL can be overridden with NINEROUTER_URL
-// (e.g. a VPS or tunnel URL); the app appends /v1/chat/completions.
-$__aiBase = rtrim((string) getenv('NINEROUTER_URL') ?: 'http://localhost:20128', '/');
-define('AI_API_URL', $__aiBase . '/v1/chat/completions');
-define('AI_MODEL', 'ag/gemini-3.7-flash-high');
-// Ordered fallback list: the gateway tries each model in turn until one
-// succeeds (handles transient 529/5xx overloads on a single backend).
-define('AI_MODELS', [
-    'ag/gemini-3.7-flash-high',     // Gemini 3.7 Flash High (Google AI via Antigravity)
-    'ag/gemini-3.7-flash-medium',   // Gemini 3.7 Flash Medium fallback
-    'ag/gemini-3.6-flash-high',     // Gemini 3.6 Flash High fallback
-    'ollama/minimax-m3',            // vision-capable fallback
-    'ollama/kimi-k2.5',             // vision-capable fallback
-    'ollama/gpt-oss:120b',          // general-purpose fallback
-]);
-// API key: read from env var first, then from a local (git-ignored) file.
-// Never hardcode a real key in this committed file.
-$__aiKey = getenv('AI_API_KEY') ?: (getenv('NINEROUTER_KEY') ?: '');
-if ($__aiKey === '') {
-    $__aiKeyFile = __DIR__ . '/ai_key.local';
-    if (is_file($__aiKeyFile)) {
-        $__aiKey = trim((string) file_get_contents($__aiKeyFile));
-    }
+// ── AI Configuration ───────────────────────────────────────────────────────────
+// Default: OpenRouter (OpenAI-compatible API gateway)
+//   - Get your API key from https://openrouter.ai/keys
+//   - Key format: sk-or-v1-...
+//   - Models use provider prefix: openai/gpt-4o, anthropic/claude-3-opus, etc.
+//
+// Environment variables:
+//   OPENROUTER_API_KEY or AI_API_KEY - your OpenRouter API key
+//   AI_MODEL - model to use (default: openai/gpt-4o)
+//   AI_API_URL - override URL if needed (default: https://openrouter.ai/api/v1/chat/completions)
+
+$aiProvider    = getenv('AI_PROVIDER') ?: 'openrouter';
+$aiApiUrl      = getenv('AI_API_URL') ?: 'https://openrouter.ai/api/v1/chat/completions';
+$aiApiKey      = '';
+$aiModel       = getenv('AI_MODEL') ?: 'openrouter/nex-agi/nex-n2.5-pro:free';
+$aiCacheTtl    = (int) (getenv('AI_CACHE_TTL') ?: 3600);   // seconds
+
+// Load API key from env or local file
+$aiApiKey = getenv('OPENROUTER_API_KEY') ?: getenv('AI_API_KEY') ?: '';
+if ($aiApiKey === '' && is_file(__DIR__ . '/ai_key.local')) {
+    $aiApiKey = trim((string) file_get_contents(__DIR__ . '/ai_key.local'));
 }
-define('AI_API_KEY', $__aiKey);
-define('AI_CACHE_TTL', 86400); // seconds (1 day)
+
+define('AI_PROVIDER',     $aiProvider);
+define('AI_API_URL',      $aiApiUrl);
+define('AI_API_KEY',      $aiApiKey);
+define('AI_MODEL',        $aiModel);
+define('AI_CACHE_TTL',    $aiCacheTtl);
+define('AI_CACHE_ENABLED', true);
 
 // ── PayMongo (real GCash payments, sandbox/test mode) ─────────
 // Empty secret key ⇒ the document-request payment gateway stays on
