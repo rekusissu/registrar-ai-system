@@ -851,4 +851,306 @@ function mockDeliveryQuote(string $address): array
         'currency'     => 'PHP',
     ];
 }
+
+/**
+ * Create a student record from a normalized input array — the single
+ * code path shared by the manual "Add Student" form and the "Receive
+ * Student" (enrollment intake) Accept flow.
+ *
+ * Accepts the same input keys as the old api/students.php POST payload:
+ *   first_name*, last_name*, address*  (*required)
+ *   birth_date*  (*required — drives the auto-generated portal password)
+ *   middle_name, name_suffix, gender, civil_status, place_of_birth,
+ *   birth_country, nationality, religion, email, contact_number,
+ *   course, major, year_level, school_year, semester, section, adviser_id,
+ *   status, lrn, father_name, mother_name, guardian_name,
+ *   guardian_relationship, guardian_contact, guardian_email,
+ *   prev_school_name, prev_school_last_year, prev_school_graduated_sy,
+ *   emergency_name, emergency_relationship, emergency_contact
+ *
+ * On success it:
+ *   - auto-generates + inserts the student (portal `users` account
+ *     auto-created with the standard credential scheme),
+ *   - syncs Father/Mother into the guardians table,
+ *   - appends previous-school to academic_history and the emergency
+ *     contact to emergency_contacts when supplied,
+ *   - logs every action.
+ *
+ * @param  array  $input    parsed JSON payload
+ * @param  object $db       Database instance
+ * @return array{id:int, student_number:string, portal_account:?array}
+ */
+
+/**
+ * Keep the guardians table in sync with the student's Parent Info.
+ *
+ * When a student is enrolled/updated with a Father's and/or Mother's
+ * Name, those parents should appear as proper `guardians` rows so the
+ * Contacts page lists them — not just sit on the students record.
+ *
+ * For each parent that isn't already on file (matched by relationship
+ * OR full name), a guardian row is inserted. If the optional generic
+ * "guardian" section matches that parent's relationship, its contact
+ * details are reused; otherwise the row is created with blank contact
+ * info so it can be filled in later. Never touches existing rows, so
+ * it is safe to run on every save (no duplicates).
+ */
+function syncFatherMotherGuardians(int $studentId, ?string $fatherName, ?string $motherName, array $generic = []): int {
+    $db = Database::getInstance();
+    $created = 0;
+    foreach (['father' => $fatherName, 'mother' => $motherName] as $rel => $name) {
+        $name = trim((string) $name);
+        if ($name === '') { continue; }
+        $exists = $db->fetchOne(
+            'SELECT id FROM guardians WHERE student_id = ? AND (relationship = ? OR full_name = ?)',
+            [$studentId, $rel, $name]
+        );
+        if ($exists) { continue; }
+        // Reuse the generic guardian's contact info when it targets this parent.
+        $useGeneric = isset($generic['relationship']) && $generic['relationship'] === $rel;
+        $db->insert('guardians', [
+            'student_id'     => $studentId,
+            'full_name'      => $name,
+            'relationship'   => $rel,
+            'contact_number' => $useGeneric ? trim((string) ($generic['contact_number'] ?? '')) : '',
+            'email'          => $useGeneric && trim((string) ($generic['email'] ?? '')) !== ''
+                ? trim((string) $generic['email']) : null,
+            'address'        => $useGeneric && trim((string) ($generic['address'] ?? '')) !== ''
+                ? trim((string) $generic['address']) : null,
+            'is_primary'     => 0,
+            'is_emergency'   => 0,
+        ]);
+        $created++;
+    }
+    return $created;
+}
+function createStudentFromInput(array $input, $db): array
+{
+    $firstName = trim($input['first_name'] ?? '');
+    $lastName  = trim($input['last_name'] ?? '');
+    $address   = trim($input['address'] ?? '');
+
+    if ($firstName === '' || $lastName === '' || $address === '') {
+        throw new InvalidArgumentException('First name, last name, and address are required.');
+    }
+
+    // Birth date is required: the auto-created portal password is derived
+    // from the born year (# + first two letters of first name + YYYY).
+    $birthDateRaw = trim((string) ($input['birth_date'] ?? ''));
+    if ($birthDateRaw === '' || $birthDateRaw === '0000-00-00' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $birthDateRaw)) {
+        throw new InvalidArgumentException('Birth date is required.');
+    }
+    $birthYear = (int) substr($birthDateRaw, 0, 4);
+
+    // Generate student number if not provided.
+    $studentNumber = isset($input['student_number']) && trim($input['student_number']) !== ''
+        ? trim($input['student_number'])
+        : generateStudentNumber();
+
+    // Check uniqueness — bail out if student_number already exists.
+    $existing = $db->fetchOne("SELECT id FROM students WHERE student_number = ?", [$studentNumber]);
+    if ($existing) {
+        throw new RuntimeException('Student number already exists.');
+    }
+
+    // B3: normalize before save so bad data never lands.
+    $firstName = normalizeNameCase($firstName);
+    $lastName  = normalizeNameCase($lastName);
+    $address   = trim($address);
+
+    $data = [
+        'student_number' => $studentNumber,
+        'first_name' => $firstName,
+        'middle_name' => isset($input['middle_name']) && $input['middle_name'] !== '' ? normalizeNameCase(trim($input['middle_name'])) : null,
+        'last_name' => $lastName,
+        'gender' => $input['gender'] ?? null,
+        'civil_status' => $input['civil_status'] ?? null,
+        'birth_date' => $birthDateRaw,
+        'place_of_birth' => isset($input['place_of_birth']) && $input['place_of_birth'] !== '' ? normalizeNameCase(trim($input['place_of_birth'])) : null,
+        'birth_country' => isset($input['birth_country']) && trim($input['birth_country']) !== '' ? trim($input['birth_country']) : null,
+        'nationality' => isset($input['nationality']) && trim($input['nationality']) !== '' ? trim($input['nationality']) : null,
+        'religion' => isset($input['religion']) && trim($input['religion']) !== '' ? normalizeNameCase(trim($input['religion'])) : null,
+        'address' => $address,
+        'contact_number' => isset($input['contact_number']) && trim($input['contact_number']) !== '' ? normalizePhone(trim($input['contact_number'])) : null,
+        'email' => isset($input['email']) && trim($input['email']) !== '' ? strtolower(trim($input['email'])) : null,
+        'course' => isset($input['course']) && trim($input['course']) !== '' ? courseStandardize(trim($input['course'])) : null,
+        'major' => isset($input['major']) && trim($input['major']) !== '' ? trim($input['major']) : null,
+        'year_level' => isset($input['year_level']) && $input['year_level'] !== '' ? (int) $input['year_level'] : null,
+        'school_year' => isset($input['school_year']) && trim($input['school_year']) !== '' ? trim($input['school_year']) : null,
+        'semester' => $input['semester'] ?? null,
+        'section' => $input['section'] ?? null,
+        'adviser_id' => isset($input['adviser_id']) && $input['adviser_id'] !== '' ? (int) $input['adviser_id'] : null,
+        'status' => $input['status'] ?? 'active',
+    ];
+
+    // Subsystem 1 additions — LRN, suffix, parents (guarded against pre-migration schema).
+    $studentCols = $db->fetchAll("SHOW COLUMNS FROM students");
+    $studentColNames = array_column($studentCols, 'Field');
+    if (isset($input['lrn']) && trim($input['lrn']) !== '' && in_array('lrn', $studentColNames, true)) {
+        $data['lrn'] = strtoupper(preg_replace('/[^0-9]/', '', trim($input['lrn'])));
+    }
+    if (isset($input['name_suffix']) && trim($input['name_suffix']) !== '' && in_array('name_suffix', $studentColNames, true)) {
+        $data['name_suffix'] = trim($input['name_suffix']);
+    }
+    if (isset($input['mother_name']) && trim($input['mother_name']) !== '' && in_array('mother_name', $studentColNames, true)) {
+        $data['mother_name'] = normalizeNameCase(trim($input['mother_name']));
+    }
+    if (isset($input['father_name']) && trim($input['father_name']) !== '' && in_array('father_name', $studentColNames, true)) {
+        $data['father_name'] = normalizeNameCase(trim($input['father_name']));
+    }
+
+    $newId = $db->insert('students', $data);
+
+    // Insert guardian (optional explicit guardian section).
+    $guardianName = trim($input['guardian_name'] ?? '');
+    if ($guardianName !== '') {
+        try {
+            $db->insert('guardians', [
+                'student_id' => $newId,
+                'full_name' => $guardianName,
+                'relationship' => $input['guardian_relationship'] ?? 'guardian',
+                'contact_number' => $input['guardian_contact'] ?? '',
+                'email' => $input['guardian_email'] ?? null,
+            ]);
+        } catch (Exception $e) {
+        }
+    }
+
+    // Auto-sync Father/Mother Name → guardian rows so the parents
+    // entered in Personal Info always appear on the Contacts page.
+    if (function_exists('syncFatherMotherGuardians')) {
+        syncFatherMotherGuardians($newId, $input['father_name'] ?? null, $input['mother_name'] ?? null, [
+            'relationship'   => $input['guardian_relationship'] ?? 'guardian',
+            'contact_number' => $input['guardian_contact'] ?? '',
+            'email'          => $input['guardian_email'] ?? '',
+        ]);
+    }
+
+    // ── Previous school → academic_history ─────────────────────
+    $prevSchool = trim($input['prev_school_name'] ?? '');
+    if ($prevSchool !== '') {
+        try {
+            $db->insert('academic_history', [
+                'student_id'  => $newId,
+                'school_name' => $prevSchool,
+                'school_year' => $input['prev_school_graduated_sy'] ?? null,
+                'grade_level' => $input['prev_school_last_year'] ?? null,
+            ]);
+        } catch (Exception $e) {
+        }
+    }
+
+    // ── Emergency contact → emergency_contacts ─────────────────
+    $emergName = trim($input['emergency_name'] ?? '');
+    if ($emergName !== '') {
+        try {
+            $db->insert('emergency_contacts', [
+                'student_id'     => $newId,
+                'full_name'      => $emergName,
+                'relationship'   => $input['emergency_relationship'] ?? null,
+                'contact_number' => $input['emergency_contact'] ?? null,
+                'is_primary'     => 1,
+            ]);
+        } catch (Exception $e) {
+        }
+    }
+
+    logActivity($_SESSION['user_id'] ?? 0, 'student_created', json_encode(['student_number' => $studentNumber]), 'students', $newId);
+
+    // ─── AUTO-CREATE STUDENT PORTAL ACCOUNT ────────────────────
+    // Automatically create a `users` entry so the student can
+    // log in to the student portal immediately. The registrar
+    // receives the credentials to share with the student.
+    //
+    // Credential scheme (as specified):
+    //   username = first letter of first name + 9-digit student id
+    //             e.g. Juan / 100000001  ->  j100000001
+    //   password = '#' + first 2 letters of first name + 4-digit birth year
+    //             e.g. Juan / 2005        ->  #ju2005
+    $portalAccount = null;
+    try {
+        $fullName = trim($firstName . ' ' . $lastName);
+
+        // Username: keep the last 9 digits of the student id so the rule
+        // holds even if an id ever exceeds 9 digits.
+        $idDigits = preg_replace('/[^0-9]/', '', $studentNumber);
+        $id9 = substr($idDigits, -9);
+        $firstLetter = mb_strtolower(mb_substr($firstName, 0, 1));
+        $username = $firstLetter . $id9;
+
+        // Password: '#' + first 2 letters (lowercase) + birth year.
+        $firstTwo = mb_strtolower(mb_substr($firstName, 0, 2));
+        $password = '#' . $firstTwo . $birthYear;
+
+        // Fall back to the student's email (or generate one) as the
+        // email field — kept separate from the username login.
+        $studentEmail = $data['email'] ?? null;
+        if (!$studentEmail || !isValidEmail($studentEmail)) {
+            $studentEmail = 'student_' . $studentNumber . '@bestlink.edu.ph';
+        }
+        // Ensure email uniqueness — append a suffix if it already exists.
+        $emailCheck = $db->fetchOne("SELECT id FROM users WHERE email = ?", [$studentEmail]);
+        if ($emailCheck) {
+            $studentEmail = 'student_' . $studentNumber . '_' . date('ymd') . '@bestlink.edu.ph';
+        }
+        // Ensure username uniqueness — append a suffix if it already exists.
+        $userCheck = $db->fetchOne("SELECT id FROM users WHERE username = ?", [$username]);
+        if ($userCheck) {
+            $username = $firstLetter . $id9 . '_' . date('ymd');
+        }
+
+        $db->insert('users', [
+            'username'      => strtolower($username),
+            'email'         => strtolower($studentEmail),
+            'password_hash' => password_hash($password, PASSWORD_DEFAULT),
+            'full_name'     => $fullName,
+            'role'          => 'student',
+            'student_id'    => $newId,
+            'is_active'     => 1,
+            'created_at'    => date('Y-m-d H:i:s'),
+            'updated_at'    => date('Y-m-d H:i:s'),
+        ]);
+        logActivity($_SESSION['user_id'] ?? 0, 'student_portal_auto_create', null, 'users', $newId);
+        $portalAccount = [
+            'username' => $username,
+            'email'    => $studentEmail,
+            'password' => $password,
+            'full_name'=> $fullName,
+        ];
+
+        // ── Welcome email (opportunistic — never breaks enrollment) ──
+        // Send only when the mail library (PHPMailer via vendor/autoload)
+        // AND SMTP are actually configured. Otherwise the registrar just
+        // sees the credentials in the modal and shares them manually.
+        $mailResult = null;
+        $autoload = dirname(__DIR__) . '/vendor/autoload.php';
+        if (is_file($autoload)) {
+            try {
+                require_once dirname(__DIR__) . '/shared/mail_client.php';
+                if (function_exists('sendStudentWelcomeEmail') && emailConfigured()) {
+                    $mailResult = sendStudentWelcomeEmail(
+                        ['id' => $newId, 'student_number' => $studentNumber],
+                        $portalAccount,
+                        $_SESSION['user_id'] ?? null
+                    );
+                }
+            } catch (Throwable $e) {
+                // Mail layer must never crash enrollment.
+                error_log('[students.php] Welcome email skipped: ' . $e->getMessage());
+            }
+        }
+        $portalAccount['email_sent'] = $mailResult !== null && !empty($mailResult['sent']);
+    } catch (Exception $e) {
+        // Student was created but portal account failed — log but
+        // don't block the response. The admin can create the account
+        // manually via User Management.
+        error_log('[students.php] Auto portal account failed for student #' . $newId . ': ' . $e->getMessage());
+    }
+
+    return [
+        'id'             => $newId,
+        'student_number' => $studentNumber,
+        'portal_account' => $portalAccount,
+    ];
+}
 ?>

@@ -287,7 +287,8 @@ select.form-control{cursor:pointer;appearance:auto;-webkit-appearance:auto;}
 </div>
 </div>
 <button class="btn btn-secondary" onclick="openQualityPanel()"><i class="fas fa-shield-halved"></i> Data Quality</button>
-<button class="btn btn-primary" onclick="openAddModal()"><i class="fas fa-plus"></i> Add Student</button>
+<button class="btn btn-primary" onclick="openReceiveModal()"><i class="fas fa-inbox"></i> Receive Student</button>
+<button class="btn btn-secondary" title="Manually add a student record" onclick="openAddModal()"><i class="fas fa-user-plus"></i></button>
 </div>
 </header>
 
@@ -310,7 +311,6 @@ select.form-control{cursor:pointer;appearance:auto;-webkit-appearance:auto;}
 <div class="search-actions">
 <button class="btn btn-secondary" onclick="printTable()"><i class="fas fa-print"></i> Print</button>
 <button class="btn btn-secondary" id="filterToggle"><i class="fas fa-sliders"></i> Filter</button>
-<button class="btn btn-secondary" id="resetBtn"><i class="fas fa-rotate-right"></i> Reset</button>
 </div>
 </div>
 
@@ -532,12 +532,20 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 <div class="form-row"><div class="form-group"><label>Contact No.</label><input type="text" id="editGuardianContact" class="form-control"></div><div class="form-group"><label>Email</label><input type="email" id="editGuardianEmail" class="form-control"></div></div>
 </div><div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeEditModal()">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save</button></div></form></div></div>
 
+<!-- Receive Student Modal (enrollment intake) -->
+<div class="modal-overlay" id="receiveModal"><div class="modal-content" style="max-width:900px;"><div class="modal-header"><h2><i class="fas fa-inbox"></i> Receive Student</h2><button class="modal-close" onclick="closeReceiveModal()"><i class="fas fa-times"></i></button></div>
+<div class="modal-body">
+<p style="font-size:13px;color:#64748b;margin-bottom:12px;">Applicants from the Enrollment System. Run a <strong>Duplication Check</strong> first, then <strong>Accept</strong> (or <strong>Re-enroll</strong> for returning students).</p>
+<div id="receiveTableWrap">
+<p style="text-align:center;color:#94a3b8;padding:24px;"><i class="fas fa-spinner fa-spin"></i> Loading applicants...</p>
+</div>
+</div>
+<div class="modal-footer"><button class="btn btn-secondary" onclick="loadEnrollments()"><i class="fas fa-rotate"></i> Refresh</button><button class="btn btn-light" onclick="closeReceiveModal()"><i class="fas fa-times"></i> Close</button></div></div></div>
 
 <script>
 // ─── DATA ────────────────────────────────────────────────────
 const searchInput = document.getElementById('studentSearch');
 const searchClear = document.getElementById('searchClear');
-const resetBtn = document.getElementById('resetBtn');
 const tableBody = document.getElementById('studentTableBody');
 const showingCount = document.getElementById('showingCount');
 const totalCount = document.getElementById('totalCount');
@@ -593,15 +601,6 @@ function performSearch() {
 }
 searchInput.addEventListener('input', performSearch);
 searchClear.addEventListener('click', () => { searchInput.value = ''; performSearch(); });
-resetBtn.addEventListener('click', () => {
-    searchInput.value = '';
-    document.getElementById('filterStatus').value = '';
-    document.getElementById('filterYear').value = '';
-    document.getElementById('filterCourse').value = '';
-    document.getElementById('filterSection').value = '';
-    performSearch();
-    closeFilterModal();
-});
 
 // ─── FILTER MODAL ────────────────────────────────────────────
 document.getElementById('filterToggle').addEventListener('click', () => { document.getElementById('filterModal').classList.add('active'); document.body.style.overflow = 'hidden'; });
@@ -1381,6 +1380,132 @@ function showToast(title, message, type) {
     c.appendChild(t); setTimeout(() => { t.classList.add('hiding'); setTimeout(() => t.remove(), 300); }, 4000);
 }
 function ucfirst(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+// ─── RECEIVE STUDENT MODAL (enrollment intake) ──────────────
+const receiveModal = document.getElementById('receiveModal');
+const receiveWrap = document.getElementById('receiveTableWrap');
+if (receiveModal) receiveModal.addEventListener('click', function(e) { if (e.target === this) closeReceiveModal(); });
+
+function openReceiveModal() {
+    receiveModal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    loadEnrollments();
+}
+function closeReceiveModal() {
+    receiveModal.classList.remove('active');
+    document.body.style.overflow = '';
+}
+
+async function enrollApi(action, body) {
+    const res = await fetch('../api/enrollments.php?action=' + action, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body || {})
+    });
+    return await res.json();
+}
+
+async function loadEnrollments() {
+    receiveWrap.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:24px;"><i class="fas fa-spinner fa-spin"></i> Loading applicants...</p>';
+    try {
+        const res = await fetch('../api/enrollments.php?action=list');
+        const d = await res.json();
+        if (!d.success) { receiveWrap.innerHTML = '<p style="text-align:center;color:#dc2626;padding:24px;">' + (d.message || 'Failed to load.') + '</p>'; return; }
+        const rows = d.data || [];
+        if (!rows.length) {
+            receiveWrap.innerHTML = '<div class="empty-state" style="display:flex;flex-direction:column;align-items:center;padding:40px 20px;"><i class="fas fa-inbox"></i><p>No applicants from the Enrollment System</p><span>Applicants will appear here when the Enrollment System sends them.</span></div>';
+            return;
+        }
+        let html = '<div class="table-responsive"><table><thead><tr><th>Name</th><th>Sex</th><th>Birth Date</th><th>Course</th><th>Status</th><th style="text-align:center;">Actions</th></tr></thead><tbody>';
+        rows.forEach(e => {
+            const name = (e.first_name||'') + ' ' + (e.middle_name ? e.middle_name + ' ' : '') + (e.last_name||'') + (e.name_suffix ? ' ' + e.name_suffix : '');
+            const bd = e.birth_date ? new Date(e.birth_date).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'}) : '—';
+            const statusBadge = e.status === 'pending' ? '<span class="status-badge active"><span class="status-dot active"></span>Pending</span>'
+                : '<span class="status-badge ' + e.status + '"><span class="status-dot ' + e.status + '"></span>' + ucfirst(e.status) + '</span>';
+            html += '<tr data-enrollment=\'' + JSON.stringify({ id: e.id, first_name: e.first_name, last_name: e.last_name, birth_date: e.birth_date, student_number: e.student_number }).replace(/'/g, '&#39;') + '\'>';
+            html += '<td style="font-weight:600;color:#0f172a;font-size:13px;">' + name + '</td>';
+            html += '<td>' + (e.gender || '—') + '</td>';
+            html += '<td>' + bd + '</td>';
+            html += '<td>' + (e.course || '—') + '</td>';
+            html += '<td>' + statusBadge + '</td>';
+            html += '<td style="text-align:center;"><div class="action-group" style="justify-content:center;flex-wrap:wrap;gap:4px;">';
+            html += '<button class="btn btn-secondary" style="height:30px;padding:0 12px;font-size:11px;" onclick="checkDuplicate(' + e.id + ')"><i class="fas fa-clone"></i> Duplicate Check</button>';
+            if (e.status === 'pending') {
+                html += '<button class="btn btn-primary" style="height:30px;padding:0 14px;font-size:11px;" onclick="acceptEnrollment(' + e.id + ')"><i class="fas fa-check"></i> Accept</button>';
+                html += '<button class="btn btn-secondary" style="height:30px;padding:0 12px;font-size:11px;display:none;" id="reEnrollBtn_' + e.id + '" onclick="reenrollEnrollment(' + e.id + ')"><i class="fas fa-rotate"></i> Re-enroll</button>';
+                html += '<button class="btn btn-secondary" style="height:30px;padding:0 12px;font-size:11px;display:none;" id="viewDupBtn_' + e.id + '" onclick="viewDuplicate(' + e.id + ')"><i class="fas fa-eye"></i> View Existing</button>';
+            }
+            html += '</div></td></tr>';
+        });
+        html += '</tbody></table></div>';
+        receiveWrap.innerHTML = html;
+    } catch (err) {
+        receiveWrap.innerHTML = '<p style="text-align:center;color:#dc2626;padding:24px;">Failed to load applicants.</p>';
+    }
+}
+
+// Dup-check state cache: enrollment_id → {exists, student}
+const dupState = {};
+async function checkDuplicate(id) {
+    const btn = event && event.target && event.target.tagName === 'BUTTON' ? event.target : (event && event.currentTarget);
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking...'; }
+    try {
+        const d = await enrollApi('duplicate-check', { enrollment_id: id });
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-clone"></i> Duplicate Check'; }
+        if (!d.success) { showToast('Error', d.message || 'Duplicate check failed.', 'error'); return; }
+        dupState[id] = d;
+        const reBtn = document.getElementById('reEnrollBtn_' + id);
+        const viewBtn = document.getElementById('viewDupBtn_' + id);
+        // Reveal the accept path when no duplicate exists
+        const acceptBtn = Array.from(document.querySelectorAll('#receiveModal button')).find(b => b.getAttribute('onclick') === 'acceptEnrollment(' + id + ')');
+        if (d.exists) {
+            showToast('Duplicate', 'Student already exists.', 'info');
+            if (reBtn) reBtn.style.display = 'inline-flex';
+            if (viewBtn) viewBtn.style.display = 'inline-flex';
+            if (acceptBtn) acceptBtn.style.display = 'none';
+        } else {
+            showToast('No Record', 'No existing record.', 'success');
+            if (reBtn) reBtn.style.display = 'none';
+            if (viewBtn) viewBtn.style.display = 'none';
+            if (acceptBtn) acceptBtn.style.display = 'inline-flex';
+        }
+    } catch (err) {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-clone"></i> Duplicate Check'; }
+        showToast('Error', 'Duplicate check failed.', 'error');
+    }
+}
+
+async function acceptEnrollment(id) {
+    if (!confirm('Accept this student into the registrar records?')) return;
+    try {
+        const d = await enrollApi('accept', { enrollment_id: id });
+        if (!d.success) { showToast('Cannot Accept', d.message || 'Failed.', 'error'); return; }
+        const num = d.data && (d.data.student_number || '');
+        showToast('Accepted', 'Student accepted' + (num ? ' — ' + num : '') + '.', 'success');
+        loadEnrollments();
+    } catch (err) {
+        showToast('Error', 'Failed to accept student.', 'error');
+    }
+}
+
+async function reenrollEnrollment(id) {
+    const st = dupState[id] && dupState[id].student;
+    const studentId = st && st.id;
+    if (!studentId) { showToast('Error', 'No existing record selected. Run Duplicate Check first.', 'error'); return; }
+    if (!confirm('Re-enroll this student with their existing student number?')) return;
+    try {
+        const d = await enrollApi('re-enroll', { enrollment_id: id, student_id: studentId });
+        if (!d.success) { showToast('Cannot Re-enroll', d.message || 'Failed.', 'error'); return; }
+        showToast('Re-enrolled', 'Student re-enrolled successfully.', 'success');
+        loadEnrollments();
+    } catch (err) {
+        showToast('Error', 'Failed to re-enroll student.', 'error');
+    }
+}
+
+function viewDuplicate(id) {
+    const st = dupState[id] && dupState[id].student;
+    if (st && st.id) viewStudent(st.id);
+}
 
 // ─── INIT ────────────────────────────────────────────────────
 performSearch();
