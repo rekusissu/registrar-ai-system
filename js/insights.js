@@ -1,136 +1,590 @@
 // ============================================================
 //  JS/INSIGHTS.JS
-//  Intelligent Analytics — Chart.js init + AI report flow
-//  Reads chart data from <script type="application/json" id="insightsData">
+//  Intelligent Analytics and Reports
+//    · Chart.js rendering for the 4 registrar charts
+//    · Reporting Period switching (cards + charts refetch)
+//    · Generate AI Insight → 3-section AI ANALYSIS REPORT
+//    · Print + Export (PDF / CSV / TXT)
+//
+//  Reads the first paint from
+//  <script type="application/json" id="insightsData">.
+//  Chart styling mirrors js/dashboard.js (same typography, dark
+//  tooltip, doughnut centre readout) so both pages read as one
+//  product.
 // ============================================================
 (function () {
     'use strict';
 
-    var dataEl = document.getElementById('insightsData');
-    var data = null;
-    try { data = dataEl ? JSON.parse(dataEl.textContent) : null; } catch (e) { data = null; }
+    var payloadEl = document.getElementById('insightsData');
+    var payload = null;
+    try { payload = payloadEl ? JSON.parse(payloadEl.textContent) : null; } catch (e) { payload = null; }
+    if (!payload) return;
 
-    var baseOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: { position: 'bottom', labels: { boxWidth: 10, boxHeight: 10, padding: 12, font: { size: 11 } } },
-            tooltip: { backgroundColor: '#0f172a', padding: 10, cornerRadius: 8, titleFont: { size: 12 }, bodyFont: { size: 12 } }
+    var ENDPOINTS = payload.endpoints || {
+        data:   '../api/ai-insights-data.php',
+        report: '../api/ai-insights-report.php'
+    };
+
+    var state = {
+        period: payload.period,
+        cards:  payload.cards,
+        charts: payload.charts,
+        report: null,
+        source: null,
+        facts:  null,
+        stale:  false
+    };
+
+    var chartInstances = {};   // canvas id → Chart
+
+    var el = {
+        month:      document.getElementById('reportMonth'),
+        year:       document.getElementById('reportYear'),
+        periodBox:  document.getElementById('periodControl'),
+        generate:   document.getElementById('generateBtn'),
+        cardGrid:   document.getElementById('statCards'),
+        statusBadge: document.getElementById('statusBadge'),
+        docBadge:   document.getElementById('docBadge'),
+        rfidBadge:  document.getElementById('rfidBadge'),
+        rfidSubtitle: document.getElementById('rfidSubtitle'),
+        rfidTrendLabel: document.getElementById('rfidTrendLabel'),
+        rfidEmptyNote: document.getElementById('rfidEmptyNote'),
+        reportOutput: document.getElementById('reportOutput'),
+        reportEmpty:  document.getElementById('reportEmpty'),
+        reportLoading: document.getElementById('reportLoading'),
+        reportError:  document.getElementById('reportError'),
+        reportMeta:   document.getElementById('reportMeta'),
+        reportSourceBadge: document.getElementById('reportSourceBadge'),
+        reportMetaText: document.getElementById('reportMetaText'),
+        reportFooter: document.getElementById('reportFooter'),
+        printBtn:   document.getElementById('printBtn'),
+        exportBtn:  document.getElementById('exportBtn'),
+        exportMenu: document.getElementById('exportMenu'),
+        exportPdf:  document.getElementById('exportPdf'),
+        exportCsv:  document.getElementById('exportCsv'),
+        exportTxt:  document.getElementById('exportTxt')
+    };
+
+    // ─── Chart.js global look (identical to the dashboard) ──────
+    if (window.Chart) {
+        Chart.defaults.font.family = "'Inter', 'Segoe UI', -apple-system, sans-serif";
+        Chart.defaults.font.weight = '500';
+        Chart.defaults.color = '#94a3b8';
+    }
+
+    var tooltipStyle = {
+        backgroundColor: 'rgba(13, 27, 46, 0.94)',
+        titleColor: '#fff',
+        titleFont: { size: 12, weight: '700' },
+        bodyColor: 'rgba(255,255,255,0.82)',
+        bodyFont: { size: 12, weight: '500' },
+        borderWidth: 0,
+        cornerRadius: 9,
+        padding: { top: 9, bottom: 9, left: 12, right: 12 },
+        displayColors: false,
+        caretSize: 5
+    };
+
+    var legendStyle = {
+        position: 'bottom',
+        labels: {
+            padding: 14,
+            boxWidth: 7,
+            boxHeight: 7,
+            usePointStyle: true,
+            pointStyle: 'circle',
+            font: { size: 11, weight: '600' },
+            color: '#64748b'
         }
     };
 
-    function initCharts() {
-        if (!window.Chart || !data) return;
+    // Centre readout inside a doughnut (total + label), as on the dashboard.
+    var doughnutCentre = {
+        id: 'doughnutCentre',
+        afterDraw: function (chart) {
+            var meta = chart.getDatasetMeta(0);
+            if (!meta || !meta.data.length) return;
 
-        if (document.getElementById('statusChart')) {
-            new Chart(document.getElementById('statusChart'), {
-                type: 'doughnut',
-                data: { labels: data.status.labels, datasets: [{ data: data.status.values, backgroundColor: data.status.colors, borderWidth: 2, borderColor: '#ffffff' }] },
-                options: Object.assign({}, baseOptions, { cutout: '62%' })
-            });
-        }
+            var total = chart.data.datasets[0].data.reduce(function (a, b) { return a + b; }, 0);
+            var arc = meta.data[0];
+            var ctx = chart.ctx;
+            var inner = arc.innerRadius || 40;
+            var big = Math.max(14, Math.min(26, inner * 0.5));
+            var small = Math.max(8, big * 0.36);
 
-        if (document.getElementById('programChart')) {
-            new Chart(document.getElementById('programChart'), {
-                type: 'bar',
-                data: { labels: data.program.labels, datasets: [{ label: 'Students', data: data.program.values, backgroundColor: data.program.colors, borderRadius: 6, maxBarThickness: 34 }] },
-                options: Object.assign({}, baseOptions, {
-                    indexAxis: 'y',
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 11 } } },
-                        y: { grid: { display: false }, ticks: { font: { size: 11 } } }
-                    }
-                })
-            });
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = '700 ' + big + "px 'Inter', sans-serif";
+            ctx.fillStyle = '#0f172a';
+            ctx.fillText(String(chart.$centreValue == null ? total : chart.$centreValue), arc.x, arc.y - small * 0.4);
+            ctx.font = '600 ' + small + "px 'Inter', sans-serif";
+            ctx.fillStyle = '#94a3b8';
+            ctx.fillText(String(chart.$centreLabel || 'Total'), arc.x, arc.y + small * 1.1);
+            ctx.restore();
         }
+    };
 
-        if (document.getElementById('docChart')) {
-            new Chart(document.getElementById('docChart'), {
-                type: 'bar',
-                data: { labels: data.doc.labels, datasets: [{ label: 'Requests', data: data.doc.values, backgroundColor: data.doc.colors, borderRadius: 6, maxBarThickness: 40 }] },
-                options: Object.assign({}, baseOptions, {
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-                        y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 11 } } }
-                    }
-                })
-            });
-        }
-
-        if (document.getElementById('rfidChart')) {
-            new Chart(document.getElementById('rfidChart'), {
-                type: 'doughnut',
-                data: { labels: data.rfid.labels, datasets: [{ data: data.rfid.values, backgroundColor: data.rfid.colors, borderWidth: 2, borderColor: '#ffffff' }] },
-                options: Object.assign({}, baseOptions, { cutout: '62%' })
-            });
-        }
+    // ─── Helpers ────────────────────────────────────────────────
+    function hasData(arr) {
+        return Array.isArray(arr) && arr.some(function (v) { return v > 0; });
     }
 
-    // ─── AI REPORT ───────────────────────────────────────────
-    var generateBtn   = document.getElementById('generateBtn');
-    var reportMonth   = document.getElementById('reportMonth');
-    var reportYear    = document.getElementById('reportYear');
-    var reportOutput  = document.getElementById('reportOutput');
-    var reportEmpty   = document.getElementById('reportEmpty');
-    var reportLoading = document.getElementById('reportLoading');
-    var reportError   = document.getElementById('reportError');
-    var printBtn      = document.getElementById('printBtn');
-    var exportBtn     = document.getElementById('exportBtn');
-    var reportDisclaimer = document.getElementById('reportDisclaimer');
-
-    function showLoading() {
-        reportEmpty.style.display = 'none';
-        reportOutput.style.display = 'none';
-        reportError.style.display = 'none';
-        reportDisclaimer.style.display = 'none';
-        reportLoading.style.display = 'block';
-        generateBtn.disabled = true;
-        generateBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating…';
-    }
-
-    function hideLoading() {
-        reportLoading.style.display = 'none';
-        generateBtn.disabled = false;
-        generateBtn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Generate Report';
+    function truncateLabel(text, max) {
+        var s = String(text == null ? '' : text);
+        return s.length > max ? s.slice(0, max - 1) + '…' : s;
     }
 
     function escapeHtml(str) {
-        return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        return String(str == null ? '' : str)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    function inlineFormat(s) {
-        return s.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+    function mount(id) {
+        var canvas = document.getElementById(id);
+        return canvas ? canvas.getContext('2d') : null;
     }
 
-    function renderReport(report) {
+    function destroyChart(id) {
+        if (chartInstances[id]) {
+            chartInstances[id].destroy();
+            delete chartInstances[id];
+        }
+    }
+
+    function num(value) {
+        return Number(value || 0).toLocaleString();
+    }
+
+
+    // ─── Charts ─────────────────────────────────────────────────
+    function renderCharts(data) {
+        var charts = data.charts || {};
+        var periodLabel = (data.period && data.period.label) || state.period.label;
+
+        // ── 1 · Student status distribution (doughnut) ──
+        var statusCtx = mount('statusChart');
+        if (statusCtx) {
+            destroyChart('statusChart');
+            var s = charts.status || { labels: [], values: [], colors: [] };
+            var sHas = hasData(s.values);
+            chartInstances.statusChart = new Chart(statusCtx, {
+                type: 'doughnut',
+                plugins: [doughnutCentre],
+                data: {
+                    labels: sHas ? s.labels : ['No data'],
+                    datasets: [{
+                        data: sHas ? s.values : [1],
+                        backgroundColor: sHas ? s.colors : ['#eef2f7'],
+                        borderWidth: 0,
+                        borderRadius: sHas ? 6 : 0,
+                        spacing: sHas ? 3 : 0,
+                        hoverOffset: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '76%',
+                    animation: { duration: 800, easing: 'easeOutQuart' },
+                    plugins: {
+                        legend: legendStyle,
+                        tooltip: Object.assign({}, tooltipStyle, {
+                            callbacks: {
+                                label: function (ctx) {
+                                    if (!sHas) return 'No students on record';
+                                    var total = ctx.dataset.data.reduce(function (a, b) { return a + b; }, 0);
+                                    var pct = total > 0 ? ((ctx.parsed / total) * 100).toFixed(1) : '0.0';
+                                    return ctx.parsed + ' students · ' + pct + '%';
+                                }
+                            }
+                        })
+                    }
+                }
+            });
+            chartInstances.statusChart.$centreValue = sHas ? num(s.total != null ? s.total : s.values.reduce(function (a, b) { return a + b; }, 0)) : '—';
+            chartInstances.statusChart.$centreLabel = sHas ? 'Students' : 'No data';
+            chartInstances.statusChart.update('none');
+        }
+
+        // ── 2 · Student program distribution (treemap; grouped bar fallback) ──
+        var programCtx = mount('programChart');
+        if (programCtx) {
+            destroyChart('programChart');
+            var p = charts.program || { labels: [], values: [], new: [], colors: [] };
+            var pHas = hasData(p.values);
+
+            chartInstances.programChart = new Chart(programCtx, {
+                type: 'bar',
+                data: {
+                    labels: (pHas ? p.labels : ['No students on record']).map(function (l) { return truncateLabel(l, 26); }),
+                    datasets: [
+                        {
+                            label: 'Total students',
+                            data: pHas ? p.values : [0],
+                            backgroundColor: pHas ? p.colors : ['#eef2f7'],
+                            borderRadius: 6,
+                            maxBarThickness: 22
+                        },
+                        {
+                            label: 'New this period',
+                            data: pHas ? (p.new || []) : [0],
+                            backgroundColor: '#0ea5e9',
+                            borderRadius: 6,
+                            maxBarThickness: 22
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 800, easing: 'easeOutQuart' },
+                    plugins: {
+                        legend: legendStyle,
+                        tooltip: Object.assign({}, tooltipStyle, {
+                            displayColors: true,
+                            callbacks: {
+                                title: function (items) {
+                                    var i = items[0].dataIndex;
+                                    return (p.labels && p.labels[i]) ? p.labels[i] : items[0].label;
+                                },
+                                label: function (ctx) { return ctx.dataset.label + ': ' + ctx.parsed.x; }
+                            }
+                        })
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            grid: { color: '#f1f5f9' },
+                            border: { display: false },
+                            ticks: { font: { size: 11, weight: '500' }, color: '#a8b3c4', padding: 6, precision: 0 }
+                        },
+                        y: {
+                            grid: { display: false },
+                            border: { display: false },
+                            ticks: { font: { size: 11, weight: '600' }, color: '#64748b', padding: 6 }
+                        }
+                    }
+                }
+            });
+        }
+
+        // ── 3 · Document transaction overview (stacked bar) ──
+        var docCtx = mount('docChart');
+        if (docCtx) {
+            destroyChart('docChart');
+            var d = charts.doc || { labels: [], series: [], totals: [], total: 0 };
+            var dHas = hasData(d.totals);
+            var docDatasets = (d.series || []).map(function (series) {
+                return {
+                    label: series.label,
+                    data: series.values,
+                    backgroundColor: series.color,
+                    borderRadius: 4,
+                    maxBarThickness: 46,
+                    stack: 'requests'
+                };
+            });
+            if (!docDatasets.length) {
+                docDatasets = [{
+                    label: 'Requests',
+                    data: (d.labels || []).map(function () { return 0; }),
+                    backgroundColor: '#eef2f7',
+                    borderRadius: 4
+                }];
+            }
+            chartInstances.docChart = new Chart(docCtx, {
+                type: 'bar',
+                data: { labels: d.labels || [], datasets: docDatasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 800, easing: 'easeOutQuart' },
+                    plugins: {
+                        legend: legendStyle,
+                        tooltip: Object.assign({}, tooltipStyle, {
+                            displayColors: true,
+                            callbacks: {
+                                label: function (ctx) {
+                                    if (!dHas) return 'No requests in this period';
+                                    return ctx.dataset.label + ': ' + ctx.parsed.y;
+                                },
+                                footer: function (items) {
+                                    if (!items.length) return '';
+                                    var bucket = items[0].dataIndex;
+                                    var total = (d.totals && d.totals[bucket] != null) ? d.totals[bucket] : 0;
+                                    return 'Total: ' + total + ' request' + (total === 1 ? '' : 's');
+                                }
+                            }
+                        })
+                    },
+                    scales: {
+                        x: {
+                            stacked: true,
+                            grid: { display: false },
+                            border: { display: false },
+                            ticks: { font: { size: 11, weight: '600' }, color: '#64748b', padding: 6, autoSkip: false, maxRotation: 40, minRotation: 0 }
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            grid: { color: '#f1f5f9' },
+                            border: { display: false },
+                            ticks: { font: { size: 11, weight: '500' }, color: '#a8b3c4', padding: 8, precision: 0 }
+                        }
+                    }
+                }
+            });
+        }
+
+        // ── 4 · RFID overview (status doughnut + activity trend) ──
+        var r = charts.rfid || { labels: [], values: [], colors: [], trend_labels: [], trend_values: [], trend_source: 'none', highlight: 0 };
+
+        var rfidCtx = mount('rfidChart');
+        if (rfidCtx) {
+            destroyChart('rfidChart');
+            var rHas = hasData(r.values);
+            if (el.rfidEmptyNote) el.rfidEmptyNote.style.display = rHas ? 'none' : 'block';
+            chartInstances.rfidChart = new Chart(rfidCtx, {
+                type: 'doughnut',
+                plugins: [doughnutCentre],
+                data: {
+                    labels: rHas ? r.labels : ['No cards'],
+                    datasets: [{
+                        data: rHas ? r.values : [1],
+                        backgroundColor: rHas ? r.colors : ['#eef2f7'],
+                        borderWidth: 0,
+                        borderRadius: rHas ? 6 : 0,
+                        spacing: rHas ? 3 : 0,
+                        hoverOffset: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '74%',
+                    animation: { duration: 800, easing: 'easeOutQuart' },
+                    plugins: {
+                        legend: rHas ? legendStyle : { display: false },
+                        tooltip: Object.assign({}, tooltipStyle, {
+                            callbacks: {
+                                label: function (ctx) {
+                                    if (!rHas) return 'No RFID cards issued yet';
+                                    return ctx.parsed + ' cards';
+                                }
+                            }
+                        })
+                    }
+                }
+            });
+            chartInstances.rfidChart.$centreValue = rHas ? num(r.total) : '0';
+            chartInstances.rfidChart.$centreLabel = rHas ? 'Cards' : 'None yet';
+            chartInstances.rfidChart.update('none');
+        }
+
+        var trendCtx = mount('rfidTrendChart');
+        if (trendCtx) {
+            destroyChart('rfidTrendChart');
+            var trendValues = r.trend_values || [];
+            var highlight = Number(r.highlight != null ? r.highlight : trendValues.length - 1);
+            chartInstances.rfidTrendChart = new Chart(trendCtx, {
+                type: 'line',
+                data: {
+                    labels: r.trend_labels || [],
+                    datasets: [{
+                        label: r.trend_source === 'cards' ? 'Cards issued' : 'Kiosk taps',
+                        data: trendValues,
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37, 99, 235, 0.12)',
+                        borderWidth: 2.5,
+                        tension: 0.35,
+                        fill: true,
+                        pointRadius: trendValues.map(function (v, i) { return i === highlight ? 6 : 3; }),
+                        pointBackgroundColor: trendValues.map(function (v, i) { return i === highlight ? '#1d4ed8' : '#93c5fd'; }),
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 800, easing: 'easeOutQuart' },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: Object.assign({}, tooltipStyle, {
+                            callbacks: {
+                                title: function (items) {
+                                    return items[0].label + (items[0].dataIndex === highlight ? ' · reporting period' : '');
+                                },
+                                label: function (ctx) {
+                                    return ctx.parsed.y + (r.trend_source === 'cards' ? ' cards issued' : ' kiosk taps');
+                                }
+                            }
+                        })
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            border: { display: false },
+                            ticks: { font: { size: 10, weight: '600' }, color: '#a8b3c4', maxRotation: 0, autoSkipPadding: 8 }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#f1f5f9' },
+                            border: { display: false },
+                            ticks: { font: { size: 10, weight: '500' }, color: '#a8b3c4', padding: 6, precision: 0, maxTicksLimit: 4 }
+                        }
+                    }
+                }
+            });
+        }
+
+        // ── Badges and labels tied to the reporting period ──
+        if (el.statusBadge) el.statusBadge.textContent = periodLabel;
+        if (el.docBadge)    el.docBadge.textContent    = periodLabel;
+        if (el.rfidBadge)   el.rfidBadge.textContent   = periodLabel;
+        if (el.rfidTrendLabel) {
+            el.rfidTrendLabel.textContent = r.trend_source === 'cards'
+                ? 'Cards issued — last 12 months'
+                : (r.trend_source === 'scans' ? 'Kiosk taps — last 12 months' : 'Activity — last 12 months');
+        }
+        if (el.rfidSubtitle) {
+            el.rfidSubtitle.textContent = r.trend_source === 'scans'
+                ? 'No cards registered yet — showing kiosk tap activity'
+                : 'Card lifecycle and issuance activity';
+        }
+    }
+
+    // ─── KPI cards ──────────────────────────────────────────────
+    var trendGlyph = { up: 'fa-arrow-up', down: 'fa-arrow-down', flat: 'fa-minus' };
+
+    function renderCards(cards) {
+        if (!el.cardGrid || !Array.isArray(cards)) return;
+        cards.forEach(function (card) {
+            var box = el.cardGrid.querySelector('[data-card="' + card.key + '"]');
+            if (!box) return;
+
+            var valueEl = box.querySelector('.stat-value');
+            if (valueEl) valueEl.textContent = num(card.value);
+
+            var labelEl = box.querySelector('.stat-label');
+            if (labelEl) labelEl.textContent = card.label;
+
+            var trendEl = box.querySelector('.stat-trend');
+            if (trendEl) {
+                trendEl.className = 'stat-trend ' + card.badge.dir;
+                trendEl.title = 'Compared with ' + (state.period.prev_label || 'the previous period');
+                var icon = trendEl.querySelector('i');
+                if (icon) icon.className = 'fas ' + (trendGlyph[card.badge.dir] || 'fa-minus');
+                var textEl = trendEl.querySelector('.stat-trend-text');
+                if (textEl) textEl.textContent = card.badge.text;
+            }
+
+            var footerEl = box.querySelector('.stat-footer');
+            if (footerEl) {
+                var dot = footerEl.querySelector('.dot');
+                if (dot) dot.className = 'dot ' + card.footer.dot;
+                var footerText = footerEl.querySelector('.stat-footer-text');
+                if (footerText) footerText.textContent = card.footer.text;
+            }
+        });
+    }
+
+    // ─── Reporting period ───────────────────────────────────────
+    function markReportStale(isStale) {
+        state.stale = !!isStale;
+        if (!state.report) return;
+        if (isStale) {
+            if (el.reportMetaText) {
+                el.reportMetaText.textContent = 'Data refreshed for ' + (state.period.label || 'a new period')
+                    + ' — select Generate AI Insight to update the analysis.';
+            }
+            if (el.reportSourceBadge) {
+                el.reportSourceBadge.textContent = 'Out of date';
+                el.reportSourceBadge.classList.add('is-fallback');
+            }
+        }
+    }
+
+    function loadPeriod() {
+        var month = parseInt(el.month.value, 10);
+        var year  = parseInt(el.year.value, 10);
+
+        if (el.periodBox) el.periodBox.classList.add('is-busy');
+        showReportError('');
+
+        fetch(ENDPOINTS.data + '?month=' + encodeURIComponent(month) + '&year=' + encodeURIComponent(year), {
+            headers: { 'Accept': 'application/json' }
+        })
+            .then(function (res) { return res.json(); })
+            .then(function (json) {
+                if (!json || !json.success || !json.data) {
+                    throw new Error((json && json.message) || 'Unable to load analytics for that period.');
+                }
+                state.period = Object.assign({}, state.period, json.data.period);
+                state.cards  = json.data.cards;
+                state.charts = json.data.charts;
+
+                renderCards(state.cards);
+                renderCharts({ period: state.period, charts: state.charts });
+                markReportStale(true);
+            })
+            .catch(function (err) {
+                showReportError('Could not refresh the dashboard: ' + err.message);
+            })
+            .then(function () {
+                if (el.periodBox) el.periodBox.classList.remove('is-busy');
+            });
+    }
+
+    // ─── Report states ──────────────────────────────────────────
+    function showReportError(message) {
+        if (!el.reportError) return;
+        if (!message) {
+            el.reportError.style.display = 'none';
+            el.reportError.textContent = '';
+            return;
+        }
+        el.reportError.textContent = message;
+        el.reportError.style.display = 'block';
+    }
+
+
+
+    // ─── AI ANALYSIS REPORT rendering ───────────────────────────
+    function inlineFormat(str) {
+        return str.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+    }
+
+    /** Markdown → HTML for the three-section report shape. */
+    function markdownToHtml(report) {
         var lines = String(report).split('\n');
         var html = '';
-        var cur = null;   // { num, title }
+        var current = null;   // { num, title }
         var body = '';
         var inList = false;
 
         function flush() {
-            if (!cur) return;
+            if (!current) return;
             if (inList) { body += '</ul>'; inList = false; }
-            var badge = cur.num ? '<span class="report-section-num">' + cur.num + '</span>' : '';
-            html += '<div class="report-section report-section-' + (cur.num || 'plain') + '">'
-                 + '<div class="report-section-head">' + badge + '<h2>' + inlineFormat(escapeHtml(cur.title)) + '</h2></div>'
-                 + body
-                 + '</div>';
+            var badge = current.num ? '<span class="report-section-num">' + current.num + '</span>' : '';
+            html += '<div class="report-section report-section-' + (current.num || 'plain') + '">'
+                + '<div class="report-section-head">' + badge + '<h2>' + inlineFormat(escapeHtml(current.title)) + '</h2></div>'
+                + body
+                + '</div>';
             body = '';
         }
 
         lines.forEach(function (line) {
             var numbered = /^##\s+(\d+)\.\s*(.*)$/.exec(line);
-            var plain = /^##\s+(.+)$/.exec(line);
+            var plain    = /^##\s+(.+)$/.exec(line);
             if (numbered) {
                 flush();
-                cur = { num: parseInt(numbered[1], 10), title: numbered[2].trim() };
+                current = { num: parseInt(numbered[1], 10), title: numbered[2].trim() };
             } else if (plain) {
                 flush();
-                cur = { num: 0, title: plain[1].trim() };
+                current = { num: 0, title: plain[1].trim() };
             } else if (/^\s*[-*]\s+/.test(line)) {
                 if (!inList) { body += '<ul>'; inList = true; }
                 body += '<li>' + inlineFormat(escapeHtml(line.replace(/^\s*[-*]\s+/, ''))) + '</li>';
@@ -142,89 +596,353 @@
             }
         });
         flush();
-        reportOutput.innerHTML = html;
-        printBtn.style.display = 'inline-flex';
-        exportBtn.style.display = 'inline-flex';
+        return html;
     }
 
-    function getReportText() {
-        return reportOutput.textContent || reportOutput.innerText || '';
+    function showLoading() {
+        el.reportEmpty.style.display = 'none';
+        el.reportOutput.style.display = 'none';
+        el.reportMeta.style.display = 'none';
+        el.reportFooter.style.display = 'none';
+        showReportError('');
+        el.reportLoading.style.display = 'block';
+        el.generate.disabled = true;
+        el.generate.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating…';
     }
 
-    if (generateBtn) {
-        generateBtn.addEventListener('click', function () {
-            showLoading();
-            fetch('../api/ai-insights-report.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    filters: {
-                        month: parseInt(reportMonth.value, 10),
-                        year: parseInt(reportYear.value, 10)
-                    }
-                })
+    function hideLoading() {
+        el.reportLoading.style.display = 'none';
+        el.generate.disabled = false;
+        // A report already exists for this period → the next click
+        // regenerates it with a forced fresh model call.
+        el.generate.innerHTML = state.report
+            ? '<i class="fas fa-rotate"></i> Regenerate AI Insight'
+            : '<i class="fas fa-wand-magic-sparkles"></i> Generate AI Insight';
+    }
+
+    function renderReport(report, meta) {
+        state.report = report;
+        state.source = meta.source || 'ai';
+        if (meta.facts)  state.facts  = meta.facts;
+        if (meta.cards)  state.cards  = meta.cards;
+        state.stale = false;
+
+        el.reportOutput.innerHTML = '<div class="ai-report-title"><i class="fas fa-chart-line"></i> AI Analysis Report</div>'
+            + markdownToHtml(report);
+        el.reportOutput.style.display = 'block';
+        el.reportFooter.style.display = 'block';
+
+        // Source badge + meta line keep the report honest about who wrote it.
+        if (el.reportSourceBadge) {
+            if (state.source === 'ai') {
+                el.reportSourceBadge.textContent = 'AI-generated' + (meta.model ? ' · ' + meta.model : '');
+                el.reportSourceBadge.classList.remove('is-fallback');
+            } else {
+                el.reportSourceBadge.textContent = 'Rule-based summary';
+                el.reportSourceBadge.classList.add('is-fallback');
+            }
+        }
+        if (el.reportMetaText) {
+            var text = (meta.period && meta.period.label) ? meta.period.label : state.period.label;
+            text += ' · generated ' + new Date().toLocaleString();
+            if (state.source === 'fallback' && meta.ai_error) {
+                text += ' · AI gateway unavailable: ' + meta.ai_error;
+            }
+            el.reportMetaText.textContent = text;
+        }
+        el.reportMeta.style.display = 'flex';
+
+        el.printBtn.style.display  = 'inline-flex';
+        el.exportBtn.style.display = 'inline-flex';
+    }
+
+    function generateReport(force) {
+        showLoading();
+        var started = Date.now();
+        var slowTimer = window.setInterval(function () {
+            if (Date.now() - started > 20000) {
+                var t = document.getElementById('reportLoadingText');
+                if (t) t.textContent = 'Contacting the AI model — this can take a moment…';
+                window.clearInterval(slowTimer);
+            }
+        }, 1000);
+
+        fetch(ENDPOINTS.report, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                filters: {
+                    month: parseInt(el.month.value, 10),
+                    year:  parseInt(el.year.value, 10)
+                },
+                force: !!force
             })
-            .then(function (r) { return r.json(); })
-            .then(function (d) {
+        })
+            .then(function (res) { return res.json(); })
+            .then(function (json) {
+                window.clearInterval(slowTimer);
                 hideLoading();
-                if (d.success && d.data && d.data.report) {
-                    renderReport(d.data.report);
-                    reportDisclaimer.style.display = 'block';
+                var t = document.getElementById('reportLoadingText');
+                if (t) t.textContent = 'Analysing registrar data…';
+
+                if (json && json.success && json.data && json.data.report) {
+                    renderReport(json.data.report, json.data);
                 } else {
-                    reportError.textContent = d.message || 'Failed to generate report.';
-                    reportError.style.display = 'block';
-                    reportEmpty.style.display = 'block';
+                    showReportError((json && json.message) || 'Failed to generate the analysis.');
+                    el.reportEmpty.style.display = 'block';
                 }
             })
             .catch(function (err) {
+                window.clearInterval(slowTimer);
                 hideLoading();
-                reportError.textContent = 'Network error: ' + err.message;
-                reportError.style.display = 'block';
-                reportEmpty.style.display = 'block';
+                showReportError('Network error: ' + err.message);
+                el.reportEmpty.style.display = 'block';
             });
+    }
+
+
+
+
+    // ─── Printable executive report ─────────────────────────────
+    var CHART_PRINT = [
+        { id: 'statusChart',    title: 'Student Status Distribution' },
+        { id: 'programChart',   title: 'Student Program Distribution' },
+        { id: 'docChart',       title: 'Document Transaction Overview' },
+        { id: 'rfidChart',      title: 'RFID Cards by Status' },
+        { id: 'rfidTrendChart', title: 'RFID Activity — Last 12 Months' }
+    ];
+
+    function chartImages() {
+        var out = [];
+        CHART_PRINT.forEach(function (entry) {
+            var canvas = document.getElementById(entry.id);
+            if (!canvas) return;
+            try {
+                out.push({ title: entry.title, data: canvas.toDataURL('image/png') });
+            } catch (e) {
+                // A tainted canvas would throw; skip that chart rather than fail the print.
+            }
+        });
+        return out;
+    }
+
+    function kpiTiles() {
+        return (state.cards || []).map(function (card) {
+            return '<div class="kpi">'
+                + '<div class="kpi-label">' + escapeHtml(card.label) + '</div>'
+                + '<div class="kpi-value">' + num(card.value) + '</div>'
+                + '<div class="kpi-foot">' + escapeHtml(card.footer.text) + '</div>'
+                + '</div>';
+        }).join('');
+    }
+
+    /**
+     * Opens the printable executive report: BCP letterhead, KPI tiles,
+     * chart snapshots, the three AI sections and the signature block.
+     * "Export PDF" reuses this view (print → save as PDF) — the same
+     * convention as registrar/masterlist.php, and it needs no GD on the
+     * server because the charts are rasterised in the browser.
+     */
+    function openPrintView() {
+        if (!state.report) return;
+
+        var w = window.open('', '_blank');
+        if (!w) {
+            showReportError('Allow pop-ups for this site to print or export the report.');
+            return;
+        }
+
+        var logo = new URL('../assets/images/BCP_LOGO.png', window.location.href).href;
+        var periodLabel = state.period.label || '';
+        var generated = new Date().toLocaleString();
+        var images = chartImages();
+
+        var chartsHtml = images.map(function (img) {
+            return '<div class="chart-block"><div class="chart-title">' + escapeHtml(img.title) + '</div>'
+                + '<img src="' + img.data + '" alt="' + escapeHtml(img.title) + '"></div>';
+        }).join('');
+
+        var d = w.document;
+        d.write('<!DOCTYPE html><html><head><meta charset="utf-8">');
+        d.write('<title>AI Insight Report — ' + escapeHtml(periodLabel) + '</title><style>');
+        d.write('@page { size: A4 portrait; margin: 14mm; }');
+        d.write('body { font-family: Inter, Arial, sans-serif; font-size: 11px; color: #0f172a; margin: 0; -webkit-print-color-adjust: exact; }');
+        d.write('.letterhead { display:flex; align-items:center; gap:12px; border-bottom:3px double #1a2d4a; padding-bottom:8px; margin-bottom:12px; }');
+        d.write('.letterhead img { width:54px; height:54px; object-fit:contain; }');
+        d.write('.lh-text { flex:1; text-align:center; }');
+        d.write('.lh-text .school { font-size:15px; font-weight:700; letter-spacing:.3px; }');
+        d.write('.lh-text .sub { font-size:10px; color:#475569; margin-top:2px; }');
+        d.write('.lh-text .title { font-size:12px; font-weight:700; margin-top:6px; letter-spacing:.6px; }');
+        d.write('.meta { font-size:10px; color:#64748b; margin-bottom:12px; }');
+        d.write('.kpis { display:flex; gap:8px; margin-bottom:14px; }');
+        d.write('.kpi { flex:1; border:1px solid #cbd5e1; border-radius:8px; padding:8px 10px; }');
+        d.write('.kpi-label { font-size:9px; text-transform:uppercase; letter-spacing:.4px; color:#64748b; font-weight:700; }');
+        d.write('.kpi-value { font-size:19px; font-weight:700; margin:2px 0; }');
+        d.write('.kpi-foot { font-size:9px; color:#64748b; }');
+        d.write('.charts { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:12px; }');
+        d.write('.chart-block { width:48%; border:1px solid #e2e8f0; border-radius:8px; padding:8px; page-break-inside:avoid; }');
+        d.write('.chart-block img { width:100%; height:auto; }');
+        d.write('.chart-title { font-size:10px; font-weight:700; color:#475569; margin-bottom:6px; }');
+        d.write('h2.section { font-size:12px; background:#1a2d4a; color:#fff; padding:5px 8px; border-radius:3px; margin:14px 0 8px; page-break-after:avoid; }');
+        d.write('.report-section { border:1px solid #cbd5e1; border-radius:6px; padding:8px 10px; margin-bottom:8px; page-break-inside:avoid; }');
+        d.write('.report-section-head { display:flex; align-items:center; gap:8px; margin-bottom:3px; }');
+        d.write('.report-section-num { width:18px; height:18px; border-radius:4px; background:#2563eb; color:#fff; font-size:10px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; }');
+        d.write('.report-section h2 { font-size:11px; margin:0; text-transform:uppercase; letter-spacing:.3px; }');
+        d.write('ul { margin:4px 0; padding-left:16px; } li { margin-bottom:3px; } p { margin:4px 0; }');
+
+        d.write('<div class="letterhead"><img src="' + logo + '" alt="BCP" onerror="this.style.display=\'none\'">'
+            + '<div class="lh-text"><div class="school">BESTLINK COLLEGE OF THE PHILIPPINES</div>'
+            + '<div class="sub">812 A. Luna St., Barangay Tatalon, Quezon City · registrar@bestlink.edu.ph</div>'
+            + '<div class="title">AI ANALYSIS REPORT — ' + escapeHtml(String(periodLabel).toUpperCase()) + '</div></div></div>');
+
+        d.write('<div class="meta">Reporting period: ' + escapeHtml(periodLabel)
+            + ' (compared with ' + escapeHtml(state.period.prev_label || '—') + ') · Generated: ' + escapeHtml(generated)
+            + (state.source === 'fallback' ? ' · rule-based summary (AI gateway unavailable)' : '')
+            + '</div>');
+        d.write('<div class="kpis">' + kpiTiles() + '</div>');
+        d.write('<div class="charts">' + chartsHtml + '</div>');
+        d.write('<h2 class="section">AI ANALYSIS REPORT</h2>');
+        d.write(markdownToHtml(state.report));
+        d.write('<div class="sig"><div class="box"><div class="line">Prepared by:<br>Registrar</div></div>'
+            + '<div class="box"><div class="line">Noted by:<br>School Head / President</div></div></div>');
+        d.write('<div class="foot-note">Generated by: Registrar Information System<br>'
+            + 'AI-generated information is provided for administrative reference.</div>');
+        d.write('</body></html>');
+        d.close();
+        w.focus();
+        w.print();
+    }
+
+    // ─── Export ─────────────────────────────────────────────────
+    function periodSlug() {
+        return el.year.value + '-' + ('0' + el.month.value).slice(-2);
+    }
+
+    function downloadBlob(content, filename, mime) {
+        var blob = new Blob([content], { type: mime });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    }
+
+    function exportTxt() {
+        if (!state.report) return;
+        var text = 'AI ANALYSIS REPORT\n';
+        text += 'Bestlink College of the Philippines — Office of the Registrar\n';
+        text += 'Reporting period: ' + (state.period.label || '') + ' (compared with ' + (state.period.prev_label || '—') + ')\n';
+        text += 'Generated: ' + new Date().toLocaleString() + '\n';
+        text += 'Source: ' + (state.source === 'ai' ? 'AI-generated' : 'Rule-based summary (AI gateway unavailable)') + '\n';
+        text += Array(64).join('=') + '\n\n';
+        text += state.report + '\n\n';
+        text += Array(64).join('-') + '\n';
+        text += 'Generated by: Registrar Information System\n';
+        text += 'AI-generated information is provided for administrative reference.\n';
+
+        downloadBlob(text, 'ai-insights-' + periodSlug() + '.txt', 'text/plain;charset=utf-8');
+    }
+
+    /** Every figure that fed the analysis, as a flat CSV (auditable). */
+    function exportCsv() {
+        if (!state.facts) return;
+        var f = state.facts;
+        var rows = [['Metric', 'Value']];
+        function add(metric, value) { rows.push([metric, value]); }
+
+        add('Reporting period', f.period.label);
+        add('Period start', f.period.start);
+        add('Period end', f.period.end);
+        add('Comparison period', f.period.prev_label);
+        add('Report source', state.source === 'ai' ? 'AI-generated' : 'Rule-based summary');
+
+        add('Total students', f.students.total);
+        add('Active or enrolled', f.students.active_enrolled);
+        add('New registrations in period', f.students.new_in_period);
+        add('New registrations previous period', f.students.new_in_previous);
+        Object.keys(f.students.by_status || {}).forEach(function (k) {
+            add('Students — ' + k, f.students.by_status[k]);
+        });
+
+        add('Document requests in period', f.documents.total_in_period);
+        add('Document requests previous period', f.documents.total_previous);
+        add('Documents pending', f.documents.pending);
+        add('Documents completed', f.documents.completed);
+        add('Documents rejected', f.documents.rejected);
+        Object.keys(f.documents.by_type || {}).forEach(function (k) {
+            add('Document type — ' + k, f.documents.by_type[k]);
+        });
+        Object.keys(f.documents.by_stage || {}).forEach(function (k) {
+            add('Workflow stage — ' + k, f.documents.by_stage[k]);
+        });
+
+        add('RFID cards total', f.rfid.total_cards);
+        add('RFID cards active', f.rfid.active);
+        add('RFID cards expired', f.rfid.expired);
+        add('RFID cards lost', f.rfid.lost);
+        add('RFID cards inactive', f.rfid.inactive);
+        add('RFID issued in period', f.rfid.issued_in_period);
+        add('RFID activity source', f.rfid.activity_source);
+        add('Kiosk taps (12 months)', f.rfid.kiosk_taps_total);
+
+        add('Queue students in period', f.queue.students_in_period);
+        add('Queue students previous period', f.queue.students_previous);
+        add('Queue tickets in period', f.queue.tickets_in_period);
+        add('Queue tickets previous period', f.queue.tickets_previous);
+        add('Queue completed', f.queue.served);
+        add('Queue cancelled / no-show', f.queue.cancelled_or_no_show);
+        add('Queue walk-ins without student record', f.queue.walk_ins);
+        add('Queue tickets today', f.queue.tickets_today);
+        add('Busiest queue day', f.queue.busiest_day || '');
+        add('Busiest day tickets', f.queue.busiest_day_tickets);
+
+        (f.programs.top || []).forEach(function (p) {
+            add('Program — ' + p.course, p.students + ' (' + p.new_in_period + ' new)');
+        });
+
+        var csv = rows.map(function (row) {
+            return row.map(function (cell) {
+                return '"' + String(cell == null ? '' : cell).replace(/"/g, '""') + '"';
+            }).join(',');
+        }).join('\r\n');
+
+        downloadBlob('\uFEFF' + csv, 'ai-insights-' + periodSlug() + '.csv', 'text/csv;charset=utf-8;');
+    }
+
+    // ─── Wiring ─────────────────────────────────────────────────
+    function closeExportMenu() {
+        if (el.exportMenu) el.exportMenu.classList.remove('is-open');
+    }
+
+    if (el.generate) {
+        el.generate.addEventListener('click', function () {
+            // Second run for the same period forces a fresh model call.
+            generateReport(!!state.report);
         });
     }
 
-    if (printBtn) {
-        printBtn.addEventListener('click', function () {
-            var text = getReportText();
-            if (!text) return;
-            var w = window.open('', '_blank', 'width=820,height=600');
-            if (!w) return;
-            w.document.write('<!DOCTYPE html><html><head><title>AI Insight Report</title>');
-            w.document.write('<style>body{font-family:Inter,Arial,sans-serif;padding:40px;color:#1e293b;line-height:1.7;max-width:760px;margin:0 auto}');
-            w.document.write('h1{font-size:20px;margin:0 0 4px}.meta{color:#64748b;font-size:12px;margin-bottom:24px;border-bottom:1px solid #e2e8f0;padding-bottom:12px}');
-            w.document.write('h2{font-size:15px;margin:18px 0 8px}.report-section{border:1px solid #e2e8f0;border-radius:8px;padding:12px 14px;margin-bottom:12px;page-break-inside:avoid}.report-section-head{display:flex;align-items:center;gap:8px;margin-bottom:4px}.report-section-num{width:22px;height:22px;border-radius:6px;background:#2563eb;color:#fff;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}ul{margin:4px 0 10px;padding-left:18px}li{margin-bottom:4px}</style></head><body>');
-            w.document.write('<h1>Intelligent Analytics — AI Insight Report</h1>');
-            w.document.write('<div class="meta">Period: ' + escapeHtml(reportMonth.options[reportMonth.selectedIndex].text) + ' ' + escapeHtml(reportYear.value) + ' · Generated ' + new Date().toLocaleString() + '</div>');
-            w.document.write(reportOutput.innerHTML);
-            w.document.write('</body></html>');
-            w.document.close();
-            w.focus();
-            w.print();
+    [el.month, el.year].forEach(function (select) {
+        if (!select) return;
+        select.addEventListener('change', loadPeriod);
+    });
+
+    if (el.printBtn)  el.printBtn.addEventListener('click', openPrintView);
+    if (el.exportPdf) el.exportPdf.addEventListener('click', function (e) { e.preventDefault(); closeExportMenu(); openPrintView(); });
+    if (el.exportCsv) el.exportCsv.addEventListener('click', function (e) { e.preventDefault(); closeExportMenu(); exportCsv(); });
+    if (el.exportTxt) el.exportTxt.addEventListener('click', function (e) { e.preventDefault(); closeExportMenu(); exportTxt(); });
+
+    if (el.exportBtn) {
+        el.exportBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            if (el.exportMenu) el.exportMenu.classList.toggle('is-open');
         });
     }
+    document.addEventListener('click', closeExportMenu);
 
-    if (exportBtn) {
-        exportBtn.addEventListener('click', function () {
-            var text = getReportText();
-            if (!text) return;
-            var monthName = reportMonth.options[reportMonth.selectedIndex].text;
-            var header = 'INTELLIGENT ANALYTICS — AI INSIGHT REPORT\n';
-            header += 'Period: ' + monthName + ' ' + reportYear.value + '\n';
-            header += 'Generated: ' + new Date().toLocaleString() + '\n';
-            header += '============================================================\n\n';
-            var blob = new Blob([header + text], { type: 'text/plain;charset=utf-8' });
-            var url = URL.createObjectURL(blob);
-            var a = document.createElement('a');
-            a.href = url;
-            a.download = 'ai-insights-report-' + reportYear.value + '-' + ('0' + reportMonth.value).slice(-2) + '.txt';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        });
-    }
-
-    initCharts();
+    // ─── First paint (server-rendered payload) ──────────────────
+    renderCards(state.cards);
+    renderCharts({ period: state.period, charts: state.charts });
 })();

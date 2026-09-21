@@ -1,293 +1,305 @@
 <?php
 // ============================================================
 //  AI/INSIGHTS.PHP
-//  Intelligent Analytics and Reports Dashboard
-//  Styled to match registrar system design language
+//  Intelligent Analytics and Reports
+//
+//  The core AI function of the registrar system:
+//    structured dashboard → historical comparison → AI interpretation
+//    → printable executive report.
+//
+//  Layout reuses the dashboard's own classes (css/dashboard.css is
+//  loaded globally by includes/header.php) so the two pages stay
+//  visually identical: .header/.title, .stats-grid/.stat-card,
+//  .chart-grid/.chart-card.
 // ============================================================
 
 require_once __DIR__ . '/../shared/security_headers.php';
 require_once __DIR__ . '/../shared/session_config.php';
 
-if (empty($_SESSION['user_id'])) {
+if (!isLoggedIn()) {
     header('Location: ../login.php');
     exit;
 }
 
+require_once __DIR__ . '/../shared/config.php';
 require_once __DIR__ . '/../shared/database.php';
+require_once __DIR__ . '/../shared/analytics.php';
 
-$db = Database::getInstance();
-$currentMonth = (int) date('n');
-$currentYear  = (int) date('Y');
-
-// ─── STAT CARDS ─────────────────────────────────────────────
-$totalStudents  = (int) $db->fetchColumn("SELECT COUNT(*) FROM students");
-$activeStudents = (int) $db->fetchColumn("SELECT COUNT(*) FROM students WHERE status IN ('active','enrolled')");
-$totalCards     = (int) $db->fetchColumn("SELECT COUNT(*) FROM rfid_cards");
-$activeCards    = (int) $db->fetchColumn("SELECT COUNT(*) FROM rfid_cards WHERE status = 'active'");
-$expiredCards   = (int) $db->fetchColumn("SELECT COUNT(*) FROM rfid_cards WHERE status = 'expired'");
-$totalDocuments = (int) $db->fetchColumn("SELECT COUNT(*) FROM document_requests");
-$pendingDocs    = (int) $db->fetchColumn("SELECT COUNT(*) FROM document_requests WHERE status = 'pending'");
-$queueToday     = (int) $db->fetchColumn("SELECT COUNT(*) FROM queue_tickets WHERE queue_date = CURDATE()");
-$queueTotal     = (int) $db->fetchColumn("SELECT COUNT(*) FROM queue_tickets");
-
-// ─── CHART DATASETS ─────────────────────────────────────────
-$statusData     = $db->fetchAll("SELECT status, COUNT(*) AS count FROM students GROUP BY status ORDER BY count DESC");
-$programData    = $db->fetchAll("SELECT course, COUNT(*) AS count FROM students WHERE course IS NOT NULL AND course != '' GROUP BY course ORDER BY count DESC LIMIT 8");
-$docData        = $db->fetchAll("SELECT document_type, COUNT(*) AS count FROM document_requests WHERE document_type IS NOT NULL AND document_type != '' GROUP BY document_type ORDER BY count DESC");
-$rfidStatusData = $db->fetchAll("SELECT status, COUNT(*) AS count FROM rfid_cards GROUP BY status ORDER BY count DESC");
-
-$docLabels = [
-    'form137'     => 'Form 137',
-    'form138'     => 'Form 138',
-    'good_moral'  => 'Good Moral',
-    'transcript'  => 'Transcript',
-    'certificate' => 'Certificate',
-    'clearance'   => 'Clearance',
-    'withdrawal'  => 'Withdrawal Form',
-    'cor'         => 'COR',
-    'cog'         => 'COG',
-    'tor'         => 'TOR',
-    'diploma'     => 'Diploma',
-];
-
-$statusMeta = [
-    'active'      => ['label' => 'Active',      'color' => '#16a34a'],
-    'enrolled'    => ['label' => 'Enrolled',    'color' => '#2563eb'],
-    'probation'   => ['label' => 'Probation',   'color' => '#b45309'],
-    'at-risk'     => ['label' => 'At Risk',     'color' => '#dc2626'],
-    'graduated'   => ['label' => 'Graduated',   'color' => '#7c3aed'],
-    'alumni'      => ['label' => 'Alumni',      'color' => '#0891b2'],
-    'transferred' => ['label' => 'Transferred', 'color' => '#db2777'],
-    'dropped'     => ['label' => 'Dropped',     'color' => '#64748b'],
-    'loa'         => ['label' => 'LOA',         'color' => '#ea580c'],
-];
-
-$rfidMeta = [
-    'active'   => ['label' => 'Active',   'color' => '#16a34a'],
-    'inactive' => ['label' => 'Inactive', 'color' => '#94a3b8'],
-    'lost'     => ['label' => 'Lost',     'color' => '#dc2626'],
-    'expired'  => ['label' => 'Expired',  'color' => '#b45309'],
-];
-
-$statusLabels = []; $statusValues = []; $statusColors = [];
-foreach ($statusData as $row) {
-    $key = $row['status'];
-    $statusLabels[] = $statusMeta[$key]['label'] ?? ucfirst($key);
-    $statusValues[] = (int) $row['count'];
-    $statusColors[] = $statusMeta[$key]['color'] ?? '#64748b';
+// Registrar analytics is staff work — student and nurse accounts are
+// bounced the same way requireRole() does it, just with the extra roles
+// this page allows (admin, registrar, staff, teacher).
+if (!in_array(getCurrentUserRole(), aiInsightRoles(), true)) {
+    header('Location: ../dashboard.php?error=access_denied');
+    exit;
 }
 
-$programLabels = array_column($programData, 'course');
-$programValues = array_map('intval', array_column($programData, 'count'));
-$programColors = ['#2563eb', '#16a34a', '#7c3aed', '#b45309', '#0891b2', '#db2777', '#ea580c', '#64748b'];
+$period      = aiInsightPeriodFromRequest();
+$build       = aiInsightBuild($period);
+$cards       = $build['cards'];
+$charts      = $build['charts'];
+$currentYear = (int) date('Y');
 
-$docLabelsArr = []; $docValues = [];
-foreach ($docData as $row) {
-    $docLabelsArr[] = $docLabels[$row['document_type']] ?? ucfirst($row['document_type']);
-    $docValues[]    = (int) $row['count'];
-}
-$docColors = ['#2563eb', '#16a34a', '#b45309', '#7c3aed', '#0891b2', '#db2777', '#ea580c', '#64748b'];
+// Trend badge glyph per direction.
+$trendIcon = ['up' => 'fa-arrow-up', 'down' => 'fa-arrow-down', 'flat' => 'fa-minus'];
 
-$rfidLabels = []; $rfidValues = []; $rfidColors = [];
-foreach ($rfidStatusData as $row) {
-    $key = $row['status'];
-    $rfidLabels[] = $rfidMeta[$key]['label'] ?? ucfirst($key);
-    $rfidValues[] = (int) $row['count'];
-    $rfidColors[] = $rfidMeta[$key]['color'] ?? '#64748b';
-}
-
-$chartData = [
-    'status'  => ['labels' => $statusLabels,  'values' => $statusValues,  'colors' => $statusColors],
-    'program' => ['labels' => $programLabels, 'values' => $programValues, 'colors' => $programColors],
-    'doc'     => ['labels' => $docLabelsArr,  'values' => $docValues,     'colors' => $docColors],
-    'rfid'    => ['labels' => $rfidLabels,    'values' => $rfidValues,    'colors' => $rfidColors],
-];
-
-$page_title = 'Intelligent Analytics';
-$APP_ROOT = '../';
+$page_title = 'Intelligent Analytics and Reports';
+$APP_ROOT   = '../';
 $ACTIVE_NAV = 'insights';
+// Footer wiring: Chart.js CDN + this page's frontend logic.
+$use_chart = true;
+$page_scripts = ['insights.js'];
 
 include '../includes/header.php';
 include '../includes/sidebar.php';
-?><style>
-:root { --sidebar-width:260px; --sidebar-collapsed-width:72px; }
-.dashboard-main { margin-left:var(--sidebar-width); padding:24px 32px; min-height:100vh; width:calc(100% - var(--sidebar-width)); max-width:calc(100% - var(--sidebar-width)); overflow-x:hidden; transition:margin-left .3s,width .3s,max-width .3s; }
-.sidebar.collapsed~.dashboard-main,body.sidebar-collapsed .dashboard-main { margin-left:var(--sidebar-collapsed-width); width:calc(100% - var(--sidebar-collapsed-width)); max-width:calc(100% - var(--sidebar-collapsed-width)); }
+?>
+<style>
+/* ── Reporting Period control (same pill language as the dashboard header) ── */
+.period-control { display:flex; align-items:center; gap:8px; background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:6px 10px; box-shadow:0 1px 3px rgba(15,23,42,0.04); }
+.period-control label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:#64748b; display:flex; align-items:center; gap:6px; white-space:nowrap; margin:0; }
+.period-control select { border:1.5px solid #e2e8f0; border-radius:8px; padding:6px 10px; font-size:13px; font-family:inherit; color:#1e293b; background:#fff; outline:none; cursor:pointer; }
+.period-control select:focus { border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,0.10); }
+.period-control.is-busy { opacity:.6; pointer-events:none; }
 
-/* Page header */
-.page-header { display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap; margin-bottom:24px; }
-.page-header h1 { font-size:22px; font-weight:700; color:#0f172a; margin:0 0 4px; letter-spacing:-0.3px; }
-.page-header .page-subtitle { font-size:13px; color:#64748b; margin:0; }
-.header-actions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+/* ── Section divider ── */
+.ai-section-title { display:flex; align-items:center; gap:14px; margin:2px 0 18px; }
+.ai-section-title span { font-size:12px; font-weight:700; letter-spacing:1.2px; text-transform:uppercase; color:#475569; white-space:nowrap; }
+.ai-section-title::before, .ai-section-title::after { content:''; height:1px; background:#e2e8f0; flex:1; }
 
-/* Filter controls */
-.filter-group { display:flex; gap:8px; align-items:center; background:white; border:1px solid #e2e8f0; border-radius:12px; padding:6px 10px; box-shadow:0 1px 3px rgba(15,23,42,0.04); }
-.filter-group label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.4px; color:#64748b; display:flex; align-items:center; gap:6px; }
-.filter-group select { border:1.5px solid #e2e8f0; border-radius:8px; padding:6px 10px; font-size:13px; font-family:inherit; color:#1e293b; background:white; outline:none; cursor:pointer; }
-.filter-group select:focus { border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,0.10); }
+/* ── Chart grid variants ── */
+.chart-grid.pie-first { grid-template-columns:1fr 2fr; }
+.stat-trend.flat { color:#64748b; background:#f1f5f9; }
 
-/* AI report */
+/* ── RFID card: doughnut + activity trend stacked ── */
+.ai-rfid-body { height:auto !important; display:flex; flex-direction:column; gap:16px; }
+.ai-mini-chart { position:relative; height:150px; }
+.ai-mini-label { font-size:11px; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:.4px; margin-bottom:8px; }
+.ai-empty-note { font-size:12px; color:#94a3b8; text-align:center; padding:16px 8px; }
+
+/* ── AI ANALYSIS REPORT ── */
 .ai-report-card .card-body { height:auto; }
 .ai-report-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-.ai-report-output { min-height:200px; font-size:14px; line-height:1.7; color:#1e293b; }
-.report-section { background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:14px 18px 12px; margin-bottom:12px; box-shadow:0 1px 2px rgba(15,23,42,0.03); }
+.ai-report-empty { text-align:center; padding:44px 20px; color:#94a3b8; }
+.ai-report-empty i { font-size:34px; color:#cbd5e1; display:block; margin-bottom:12px; }
+.ai-report-empty p { margin:0 0 4px; font-weight:600; color:#64748b; font-size:14px; }
+.ai-report-empty span { font-size:12px; }
+.ai-report-loading { display:none; text-align:center; padding:44px 20px; }
+.ai-report-loading .spinner { width:38px; height:38px; border:3px solid #e2e8f0; border-top-color:#2563eb; border-radius:50%; animation:ai-spin .8s linear infinite; margin:0 auto 12px; }
+@keyframes ai-spin { to { transform:rotate(360deg); } }
+.ai-report-error { display:none; background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; border-radius:12px; padding:12px 16px; font-size:13px; margin-bottom:14px; }
+.ai-report-meta { display:none; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:14px; font-size:12px; color:#64748b; }
+.ai-source-badge { font-size:11px; font-weight:600; padding:4px 10px; border-radius:7px; background:#ecfdf5; color:#047857; }
+.ai-source-badge.is-fallback { background:#fef3c7; color:#b45309; }
+.ai-report-output { font-size:14px; line-height:1.7; color:#1e293b; }
+.ai-report-output .ai-report-title { font-size:15px; font-weight:700; letter-spacing:.6px; text-transform:uppercase; color:#0f172a; margin:0 0 14px; display:flex; align-items:center; gap:9px; }
+.ai-report-output .ai-report-title i { color:#7c3aed; }
+.report-section { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:14px 18px 12px; margin-bottom:12px; }
 .report-section-head { display:flex; align-items:center; gap:10px; margin-bottom:4px; }
 .report-section-num { width:24px; height:24px; flex:0 0 24px; border-radius:7px; background:#2563eb; color:#fff; font-size:12px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; }
-.report-section-2 .report-section-num { background:#0d9488; } .report-section-3 .report-section-num { background:#7c3aed; } .report-section-4 .report-section-num { background:#b45309; } .report-section-5 .report-section-num { background:#dc2626; }
-.report-section h2 { font-size:13px; font-weight:700; color:#0f172a; margin:0; text-transform:uppercase; letter-spacing:.3px; } .report-section ul { margin:4px 0 2px; padding-left:18px; } .report-section li { margin-bottom:6px; } .report-section li::marker { color:#94a3b8; } .report-section p { margin:6px 0 2px; } .report-section strong { color:#0f172a; } .ai-report-disclaimer { font-size:11px; color:#94a3b8; text-align:center; padding:10px 12px 0; border-top:1px dashed #e2e8f0; margin-top:14px; }
-.ai-report-empty { color:#94a3b8; text-align:center; padding:48px 20px; }
-.ai-report-empty i { font-size:34px; margin-bottom:10px; color:#cbd5e1; }
-.ai-report-loading { display:none; text-align:center; padding:48px 20px; }
-.ai-report-loading .spinner { width:38px; height:38px; border:3px solid #e2e8f0; border-top-color:#2563eb; border-radius:50%; animation:spin .8s linear infinite; margin:0 auto 14px; }
-@keyframes spin { to { transform:rotate(360deg); } }
-.ai-report-error { background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; border-radius:10px; padding:12px 16px; font-size:13px; margin-bottom:12px; display:none; }
+.report-section-2 .report-section-num { background:#0d9488; }
+.report-section-3 .report-section-num { background:#7c3aed; }
+.report-section h2 { font-size:13px; font-weight:700; color:#0f172a; margin:0; text-transform:uppercase; letter-spacing:.3px; }
+.report-section ul { margin:4px 0 2px; padding-left:18px; }
+.report-section li { margin-bottom:6px; }
+.report-section p { margin:6px 0 2px; }
+.report-section strong { color:#0f172a; }
+.ai-report-footer { display:none; font-size:11px; color:#94a3b8; text-align:center; padding:12px 12px 0; border-top:1px dashed #e2e8f0; margin-top:16px; }
+.ai-report-footer strong { color:#64748b; }
 
-@media (max-width:1100px){ .chart-grid-3{grid-template-columns:1fr 1fr} }
-@media (max-width:768px){ .dashboard-main{padding:16px} .chart-grid,.chart-grid-3{grid-template-columns:1fr} .page-header{flex-direction:column;align-items:flex-start} }
+/* ── Export dropdown (mirrors the masterlist export menu) ── */
+.ai-export-wrap { position:relative; }
+.ai-export-menu { display:none; position:absolute; top:100%; right:0; z-index:50; background:#fff; border:1px solid #e2e8f0; border-radius:10px; box-shadow:0 8px 24px rgba(0,0,0,0.1); min-width:172px; padding:4px; margin-top:4px; }
+.ai-export-menu a { display:block; padding:8px 12px; font-size:12px; font-weight:600; color:#1e293b; text-decoration:none; border-radius:6px; }
+.ai-export-menu a:hover { background:#f1f5f9; }
+.ai-export-menu.is-open { display:block; }
+
+@media (max-width:1100px) { .chart-grid.pie-first { grid-template-columns:1fr; } }
 </style>
 
 <main class="dashboard-main">
-    <div class="page-header">
-        <div>
-            <h1><i class="fas fa-chart-line" style="color:#2563eb;margin-right:8px;"></i>Intelligent Analytics</h1>
-            <p class="page-subtitle">AI-powered registrar insights, trends, and operational patterns</p>
-        </div>
-        <div class="header-actions">
-            <div class="filter-group">
-                <label for="reportMonth"><i class="fas fa-calendar"></i> Period</label>
-                <select id="reportMonth">
-                    <?php for ($m = 1; $m <= 12; $m++): ?>
-                        <option value="<?= $m ?>" <?= $m === $currentMonth ? 'selected' : '' ?>><?= date('F', mktime(0, 0, 0, $m, 1)) ?></option>
-                    <?php endfor; ?>
-                </select>
-                <select id="reportYear">
-                    <?php for ($y = $currentYear; $y >= $currentYear - 4; $y--): ?>
-                        <option value="<?= $y ?>" <?= $y === $currentYear ? 'selected' : '' ?>><?= $y ?></option>
-                    <?php endfor; ?>
-                </select>
-            </div>
-            <button type="button" class="btn btn-primary" id="generateBtn">
-                <i class="fas fa-wand-magic-sparkles"></i> Generate Report
-            </button>
-        </div>
-    </div>
+    <div class="dashboard-container">
 
-    <!-- Stat Cards -->
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-header">
-                <div class="stat-icon blue"><i class="fas fa-users"></i></div>
-                <span class="stat-trend up"><i class="fas fa-arrow-up"></i> <?= $activeStudents ?>/<?= $totalStudents ?></span>
+        <!-- ── Page header ─────────────────────────────────────── -->
+        <header class="header">
+            <div class="title">
+                <h1><i class="fas fa-chart-line" style="color:#2563eb;margin-right:8px;"></i>Intelligent Analytics and Reports</h1>
+                <p>AI-assisted interpretation of registrar data for the selected reporting period</p>
             </div>
-            <div class="stat-value"><?= number_format($totalStudents) ?></div>
-            <div class="stat-label">Total Students</div>
-            <div class="stat-footer"><span class="dot blue"></span> <?= $totalStudents > 0 ? round($activeStudents / $totalStudents * 100) : 0 ?>% active/enrolled</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-header">
-                <div class="stat-icon green"><i class="fas fa-id-card"></i></div>
-                <span class="stat-trend up"><i class="fas fa-arrow-up"></i> <?= $activeCards ?>/<?= $totalCards ?></span>
+            <div class="header-actions">
+                <div class="period-control" id="periodControl">
+                    <label for="reportMonth"><i class="fas fa-calendar-days"></i> Reporting Period</label>
+                    <select id="reportMonth" aria-label="Reporting month">
+                        <?php for ($m = 1; $m <= 12; $m++): ?>
+                            <option value="<?= $m ?>" <?= $m === $period['month'] ? 'selected' : '' ?>>
+                                <?= date('F', mktime(0, 0, 0, $m, 1)) ?>
+                            </option>
+                        <?php endfor; ?>
+                    </select>
+                    <select id="reportYear" aria-label="Reporting year">
+                        <?php for ($y = $currentYear; $y >= $currentYear - 4; $y--): ?>
+                            <option value="<?= $y ?>" <?= $y === $period['year'] ? 'selected' : '' ?>><?= $y ?></option>
+                        <?php endfor; ?>
+                    </select>
+                </div>
+                <button type="button" class="btn btn-primary" id="generateBtn">
+                    <i class="fas fa-wand-magic-sparkles"></i> Generate AI Insight
+                </button>
             </div>
-            <div class="stat-value"><?= number_format($totalCards) ?></div>
-            <div class="stat-label">RFID Cards</div>
-            <div class="stat-footer"><span class="dot green"></span> <?= $expiredCards ?> expired</div>
+        </header>
+
+        <!-- ── KPI cards ───────────────────────────────────────── -->
+        <div class="stats-grid dashboard-section" id="statCards">
+            <?php foreach ($cards as $card): ?>
+                <div class="stat-card" data-card="<?= htmlspecialchars($card['key']) ?>">
+                    <div class="stat-header">
+                        <div class="stat-icon <?= htmlspecialchars($card['tone']) ?>">
+                            <i class="fas <?= htmlspecialchars($card['icon']) ?>"></i>
+                        </div>
+                        <span class="stat-trend <?= htmlspecialchars($card['badge']['dir']) ?>" title="Compared with <?= htmlspecialchars($period['prev_label']) ?>">
+                            <i class="fas <?= $trendIcon[$card['badge']['dir']] ?? 'fa-minus' ?>"></i>
+                            <span class="stat-trend-text"><?= htmlspecialchars($card['badge']['text']) ?></span>
+                        </span>
+                    </div>
+                    <div class="stat-value"><?= number_format((int) $card['value']) ?></div>
+                    <div class="stat-label"><?= htmlspecialchars($card['label']) ?></div>
+                    <div class="stat-footer">
+                        <span class="dot <?= htmlspecialchars($card['footer']['dot']) ?>"></span>
+                        <span class="stat-footer-text"><?= htmlspecialchars($card['footer']['text']) ?></span>
+                    </div>
+                </div>
+            <?php endforeach; ?>
         </div>
-        <div class="stat-card">
-            <div class="stat-header">
-                <div class="stat-icon yellow"><i class="fas fa-file-lines"></i></div>
-                <span class="stat-trend down"><i class="fas fa-clock"></i> <?= $pendingDocs ?> pending</span>
+
+        <!-- ── Student Population Overview ─────────────────────── -->
+        <div class="ai-section-title"><span>Student Population Overview</span></div>
+
+        <!-- 1 & 2 · Student status + program distribution -->
+        <div class="chart-grid pie-first dashboard-section">
+            <div class="chart-card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title"><i class="fas fa-chart-pie"></i> Student Status Distribution</div>
+                        <div class="card-subtitle">Active, enrolled, alumni, graduate, dropped, transferred</div>
+                    </div>
+                    <span class="card-badge" id="statusBadge"><?= htmlspecialchars($period['label']) ?></span>
+                </div>
+                <div class="card-body"><canvas id="statusChart"></canvas></div>
             </div>
-            <div class="stat-value"><?= number_format($totalDocuments) ?></div>
-            <div class="stat-label">Document Requests</div>
-            <div class="stat-footer"><span class="dot yellow"></span> Total transactions</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-header">
-                <div class="stat-icon purple"><i class="fas fa-ticket"></i></div>
-                <span class="stat-trend up"><i class="fas fa-arrow-up"></i> <?= $queueTotal ?> all-time</span>
+            <div class="chart-card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title"><i class="fas fa-th-large"></i> Student Program Distribution</div>
+                        <div class="card-subtitle">Student count per program — tile size = share of enrollment</div>
+                    </div>
+                    <span class="card-badge">Top 8</span>
+                </div>
+                <div class="card-body"><canvas id="programChart"></canvas></div>
             </div>
-            <div class="stat-value"><?= number_format($queueToday) ?></div>
-            <div class="stat-label">Queue Today</div>
-            <div class="stat-footer"><span class="dot purple"></span> Tickets issued</div>
         </div>
-    </div>    <!-- Charts Row 1 -->
-    <div class="chart-grid-3 dashboard-section">
-        <div class="chart-card">
+
+        <!-- 3 & 4 · Document transactions + RFID -->
+        <div class="chart-grid dashboard-section">
+            <div class="chart-card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title"><i class="fas fa-file-lines"></i> Document Transaction Overview</div>
+                        <div class="card-subtitle">Requests by document type and workflow stage</div>
+                    </div>
+                    <span class="card-badge" id="docBadge"><?= htmlspecialchars($period['label']) ?></span>
+                </div>
+                <div class="card-body"><canvas id="docChart"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <div class="card-header">
+                    <div>
+                        <div class="card-title"><i class="fas fa-id-card"></i> RFID Overview</div>
+                        <div class="card-subtitle" id="rfidSubtitle">Card lifecycle and activity</div>
+                    </div>
+                    <span class="card-badge" id="rfidBadge">12 Months</span>
+                </div>
+                <div class="card-body ai-rfid-body">
+                    <div>
+                        <div class="ai-mini-label">Cards by status</div>
+                        <div class="ai-mini-chart">
+                            <canvas id="rfidChart"></canvas>
+                            <div class="ai-empty-note" id="rfidEmptyNote" style="display:none;">No RFID cards issued yet.</div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="ai-mini-label" id="rfidTrendLabel">Activity — last 12 months</div>
+                        <div class="ai-mini-chart"><canvas id="rfidTrendChart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── AI ANALYSIS REPORT ──────────────────────────────── -->
+        <div class="chart-card ai-report-card dashboard-section">
             <div class="card-header">
                 <div>
-                    <div class="card-title"><i class="fas fa-chart-pie"></i> Student Status</div>
-                    <div class="card-subtitle">Population distribution by status</div>
+                    <div class="card-title"><i class="fas fa-robot" style="color:#7c3aed;"></i> AI ANALYSIS REPORT</div>
+                    <div class="card-subtitle">Generate an AI-assisted analysis of the registrar data.</div>
                 </div>
-                <span class="card-badge">Live</span>
-            </div>
-            <div class="card-body"><canvas id="statusChart"></canvas></div>
-        </div>
-        <div class="chart-card">
-            <div class="card-header">
-                <div>
-                    <div class="card-title"><i class="fas fa-chart-column"></i> Program Distribution</div>
-                    <div class="card-subtitle">Top programs by enrollment</div>
+                <div class="ai-report-actions">
+                    <button type="button" class="btn btn-secondary" id="printBtn" style="display:none;">
+                        <i class="fas fa-print"></i> Print
+                    </button>
+                    <div class="ai-export-wrap">
+                        <button type="button" class="btn btn-secondary" id="exportBtn" style="display:none;">
+                            <i class="fas fa-download"></i> Export <i class="fas fa-caret-down" style="margin-left:4px;"></i>
+                        </button>
+                        <div class="ai-export-menu" id="exportMenu">
+                            <a href="#" id="exportPdf"><i class="fas fa-file-pdf"></i> Export PDF</a>
+                            <a href="#" id="exportCsv"><i class="fas fa-file-csv"></i> Export CSV</a>
+                            <a href="#" id="exportTxt"><i class="fas fa-file-lines"></i> Export TXT</a>
+                        </div>
+                    </div>
                 </div>
-                <span class="card-badge">Top 8</span>
             </div>
-            <div class="card-body"><canvas id="programChart"></canvas></div>
-        </div>
-        <div class="chart-card">
-            <div class="card-header">
-                <div>
-                    <div class="card-title"><i class="fas fa-id-card"></i> RFID Card Status</div>
-                    <div class="card-subtitle">Card lifecycle overview</div>
+            <div class="card-body">
+                <div class="ai-report-error" id="reportError"></div>
+
+                <div class="ai-report-meta" id="reportMeta">
+                    <span class="ai-source-badge" id="reportSourceBadge">AI-generated</span>
+                    <span id="reportMetaText"></span>
                 </div>
-                <span class="card-badge">Live</span>
-            </div>
-            <div class="card-body"><canvas id="rfidChart"></canvas></div>
-        </div>
-    </div>
 
-    <!-- Document Chart -->
-    <div class="chart-card dashboard-section">
-        <div class="card-header">
-            <div>
-                <div class="card-title"><i class="fas fa-file-lines"></i> Document Requests by Type</div>
-                <div class="card-subtitle">Transaction volume per document</div>
-            </div>
-            <span class="card-badge">All-time</span>
-        </div>
-        <div class="card-body"><canvas id="docChart"></canvas></div>
-    </div>
+                <div class="ai-report-empty" id="reportEmpty">
+                    <i class="fas fa-chart-simple"></i>
+                    <p>No analysis generated yet</p>
+                    <span>Choose a reporting period, then select Generate AI Insight.</span>
+                </div>
 
-    <!-- AI Insight Report -->
-    <div class="chart-card ai-report-card dashboard-section">
-        <div class="card-header">
-            <div>
-                <div class="card-title"><i class="fas fa-robot" style="color:#7c3aed;"></i> AI Insight Report</div>
-                <div class="card-subtitle">Generated analysis for the selected period</div>
-            </div>
-            <div class="ai-report-actions">
-                <button type="button" class="btn btn-secondary" id="printBtn" style="display:none;"><i class="fas fa-print"></i> Print</button>
-                <button type="button" class="btn btn-secondary" id="exportBtn" style="display:none;"><i class="fas fa-download"></i> Export</button>
-            </div>
-        </div>
-        <div class="card-body">
-            <div class="ai-report-error" id="reportError"></div>
-            <div class="ai-report-empty" id="reportEmpty">
-                <i class="fas fa-chart-simple"></i>
-                <p style="margin:0 0 4px;font-weight:600;color:#64748b;">No report generated yet</p>
-                <span>Select a period and click Generate Report to see AI insights.</span>
-            </div>
-            <div class="ai-report-loading" id="reportLoading">
-                <div class="spinner"></div>
-                <p style="margin:0;font-size:13px;color:#64748b;">Analyzing registrar data…</p>
-            </div>
-            <div class="ai-report-output" id="reportOutput" style="display:none;"></div>
-            <div class="ai-report-disclaimer" id="reportDisclaimer" style="display:none;">AI-generated content is for administrative reference. Generated by <strong>Registrar Information System</strong>.</div>
-        </div>
-    </div>
+                <div class="ai-report-loading" id="reportLoading">
+                    <div class="spinner"></div>
+                    <p style="margin:0;font-size:13px;color:#64748b;" id="reportLoadingText">Analysing registrar data…</p>
+                </div>
 
-    <script type="application/json" id="insightsData"><?= json_encode($chartData) ?></script>
+                <div class="ai-report-output" id="reportOutput" style="display:none;"></div>
+
+                <div class="ai-report-footer" id="reportFooter">
+                    Generated by: <strong>Registrar Information System</strong><br>
+                    AI-generated information is provided for administrative reference.
+                </div>
+            </div>
+        </div>
+
+        <!-- Period + chart payload for js/insights.js (first paint is server-rendered) -->
+        <script type="application/json" id="insightsData"><?= json_encode([
+            'period'    => [
+                'month'      => $period['month'],
+                'year'       => $period['year'],
+                'label'      => $period['label'],
+                'prev_label' => $period['prev_label'],
+            ],
+            'cards'     => $cards,
+            'charts'    => $charts,
+            'endpoints' => [
+                'data'   => '../api/ai-insights-data.php',
+                'report' => '../api/ai-insights-report.php',
+            ],
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?></script>
+
+    </div><!-- /.dashboard-container -->
 </main>
 
-<?php
-$use_chart = true;
-$page_scripts = ['insights.js'];
-include '../includes/footer.php';
+<?php include '../includes/footer.php'; ?>

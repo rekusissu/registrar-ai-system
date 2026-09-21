@@ -242,7 +242,7 @@ if ($USER_ROLE === 'student') {
 
         <a href="<?= $APP_ROOT ?>ai/insights.php" class="sidebar-item <?= $ACTIVE_NAV === 'insights' ? 'active' : '' ?>">
             <i class="fa-solid fa-chart-line"></i>
-            <span class="sidebar-text">Intelligent Analytics</span>
+            <span class="sidebar-text">Intelligent Analytics and Reports</span>
         </a>
 
         <a href="<?= $APP_ROOT ?>ai/search.php" class="sidebar-item <?= $ACTIVE_NAV === 'aisearch' ? 'active' : '' ?>">

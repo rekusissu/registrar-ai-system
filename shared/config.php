@@ -200,17 +200,39 @@ define('KIOSK_ACCESS_TOKEN', secretFromEnvOrLocal('KIOSK_ACCESS_TOKEN', 'kiosk-t
 //   - Get your API key from https://openrouter.ai/keys
 //   - Key format: sk-or-v1-...
 //   - Models use provider prefix: openai/gpt-4o, anthropic/claude-3-opus, etc.
+//     Do NOT also prefix "openrouter/" — the API rejects that form (400).
 //
 // Environment variables:
 //   OPENROUTER_API_KEY or AI_API_KEY - your OpenRouter API key
-//   AI_MODEL - model to use (default: openai/gpt-4o)
+//     (or paste the key into the git-ignored shared/ai_key.local file)
+//   AI_MODEL - model to use (default: inclusionai/ling-3.0-flash-vl:free; NO "openrouter/" prefix)
 //   AI_API_URL - override URL if needed (default: https://openrouter.ai/api/v1/chat/completions)
 
 $aiProvider    = getenv('AI_PROVIDER') ?: 'openrouter';
 $aiApiUrl      = getenv('AI_API_URL') ?: 'https://openrouter.ai/api/v1/chat/completions';
 $aiApiKey      = '';
-$aiModel       = getenv('AI_MODEL') ?: 'openrouter/nex-agi/nex-n2.5-pro:free';
+$aiGeminiModel = getenv('GEMINI_MODEL') ?: getenv('AI_GEMINI_MODEL') ?: 'gemini-2.0-flash';
+$aiModel       = getenv('AI_MODEL') ?: ($aiProvider === 'gemini' ? $aiGeminiModel : 'inclusionai/ling-3.0-flash-vl:free');
 $aiCacheTtl    = (int) (getenv('AI_CACHE_TTL') ?: 3600);   // seconds
+
+// Optional OpenRouter (or gateway) failover chain, comma-separated:
+//   AI_MODELS="openai/gpt-4o-mini,google/gemini-2.0-flash-001"
+// ai_client.php walks this list in order when a model fails, so one
+// overloaded model never takes the AI Insight report down with it.
+$aiModels    = [];
+$aiModelsEnv = trim((string) (getenv('AI_MODELS') ?: ''));
+if ($aiModelsEnv !== '') {
+    foreach (explode(',', $aiModelsEnv) as $m) {
+        $m = trim($m);
+        if ($m !== '') $aiModels[] = $m;
+    }
+}
+if (empty($aiModels)) {
+    $aiModels = [$aiModel];
+}
+if (!in_array($aiModel, $aiModels, true)) {
+    array_unshift($aiModels, $aiModel);
+}
 
 // Load API key from env or local file
 $aiApiKey = getenv('OPENROUTER_API_KEY') ?: getenv('AI_API_KEY') ?: '';
@@ -218,10 +240,21 @@ if ($aiApiKey === '' && is_file(__DIR__ . '/ai_key.local')) {
     $aiApiKey = trim((string) file_get_contents(__DIR__ . '/ai_key.local'));
 }
 
+// Gemini provider key (used only when AI_PROVIDER=gemini). Read from
+// GEMINI_API_KEY (Google's official env name) first, then AI_GEMINI_API_KEY,
+// then the same git-ignored shared/ai_key.local fallback.
+$aiGeminiKey = getenv('GEMINI_API_KEY') ?: getenv('AI_GEMINI_API_KEY') ?: '';
+if ($aiGeminiKey === '' && is_file(__DIR__ . '/ai_key.local')) {
+    $aiGeminiKey = trim((string) file_get_contents(__DIR__ . '/ai_key.local'));
+}
+
 define('AI_PROVIDER',     $aiProvider);
 define('AI_API_URL',      $aiApiUrl);
 define('AI_API_KEY',      $aiApiKey);
+define('AI_GEMINI_API_KEY', $aiGeminiKey);
+define('AI_GEMINI_MODEL',  $aiGeminiModel);
 define('AI_MODEL',        $aiModel);
+define('AI_MODELS',       $aiModels);
 define('AI_CACHE_TTL',    $aiCacheTtl);
 define('AI_CACHE_ENABLED', true);
 
