@@ -77,31 +77,35 @@ include '../includes/sidebar.php';
 /* ── Tap Card ────────────────────────────────────────────── */
 .clinic-grid{display:grid;grid-template-columns:380px 1fr;gap:20px;align-items:start}
 @media(max-width:1000px){.clinic-grid{grid-template-columns:1fr}}
-.tap-card{background:#fff;border:1px solid #ccfbf1;border-radius:18px;padding:24px;box-shadow:0 8px 28px rgba(13,148,136,.08);position:relative;overflow:hidden}
+.tap-card{background:#fff;border:1px solid #ccfbf1;border-radius:18px;padding:24px;box-shadow:0 8px 28px rgba(13,148,136,.08);position:relative;overflow:visible}
 .tap-card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#0d9488,#14b8a6,#5eead4)}
 .tap-icon{width:64px;height:64px;margin:0 auto 12px;border-radius:20px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#99f6e4,#5eead4);color:#0f766e;box-shadow:0 6px 20px rgba(13,148,136,.15)}
 .tap-icon i{font-size:28px}.tap-title{text-align:center;font-weight:800;font-size:17px;color:#0f172a}
 .tap-sub{text-align:center;font-size:12px;color:#94a3b8;margin-top:4px}
 .tap-status{margin-top:14px;padding:12px 14px;border-radius:12px;background:#f0fdfa;border:1px dashed #5eead4;text-align:center;font-weight:700;font-size:13px;color:#134e4a}
+.tap-status.awaiting{animation:tapPulse 2s ease-in-out infinite}
+.tap-status.awaiting i{animation:tapIconPulse 1.8s ease-in-out infinite}
+@keyframes tapPulse{0%,100%{background:#f0fdfa;border-color:#5eead4}50%{background:#ccfbf1;border-color:#0d9488}}
+@keyframes tapIconPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.85)}}
 #tapInput{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
 .divider{display:flex;align-items:center;gap:10px;margin:18px 0 14px;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:.6px;font-weight:700}
 .divider::before,.divider::after{content:'';flex:1;height:1px;background:#e2e8f0}
 
 /* ── Student Search ──────────────────────────────────────── */
-.student-search-wrap{position:relative}
-.search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:14px;pointer-events:none;z-index:2}
+.student-search-wrap{position:relative;overflow:visible}
+.student-search-wrap i{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:14px;pointer-events:none;z-index:2}
 .student-search-input{width:100%;padding:12px 14px 12px 40px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:14px;font-weight:500;color:#0f172a;background:#f8fafc;transition:border-color .15s,box-shadow .15s;outline:none;box-sizing:border-box}
 .student-search-input::placeholder{color:#94a3b8;font-weight:400}
 .student-search-input:focus{border-color:#0d9488;box-shadow:0 0 0 3px rgba(13,148,136,.12);background:#fff}
-.search-dropdown{position:absolute;top:calc(100% + 4px);left:0;right:0;background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 12px 36px rgba(15,23,42,.12);max-height:260px;overflow-y:auto;z-index:50;display:none}
+.search-dropdown{position:absolute;top:calc(100% + 6px);left:0;right:0;background:#fff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 12px 40px rgba(15,23,42,.16);max-height:340px;overflow-y:auto;z-index:50;display:none}
 .search-dropdown.open{display:block}
-.search-item{padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:12px;border-bottom:1px solid #f1f5f9;transition:background .1s}
+.search-item{padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;border-bottom:1px solid #f1f5f9;transition:background .1s}
 .search-item:last-child{border-bottom:none}
 .search-item:hover,.search-item.active{background:#f0fdfa}
-.search-item .si-avatar{width:36px;height:36px;min-width:36px;border-radius:10px;background:linear-gradient(135deg,#0d9488,#14b8a6);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+.search-item .si-avatar{width:40px;height:40px;min-width:40px;border-radius:12px;background:linear-gradient(135deg,#0d9488,#14b8a6);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700}
 .search-item .si-info{flex:1;min-width:0}
-.search-item .si-name{font-size:13px;font-weight:700;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.search-item .si-meta{font-size:11px;color:#64748b;margin-top:1px}
+.search-item .si-name{font-size:14px;font-weight:700;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.search-item .si-meta{font-size:12px;color:#64748b;margin-top:2px}
 .search-empty{padding:14px;text-align:center;color:#94a3b8;font-size:13px;font-weight:500}
 
 /* ── Workspace Panel ─────────────────────────────────────── */
@@ -181,14 +185,14 @@ textarea.form-control{resize:vertical;min-height:60px}
         <div class="tap-icon"><i class="fas fa-credit-card"></i></div>
         <div class="tap-title">Student Tap-In</div>
         <div class="tap-sub">Tap the RFID student ID card on the reader</div>
-        <div class="tap-status" id="tapStatus"><i class="fas fa-circle-dot" style="color:#0d9488;margin-right:6px;"></i>Awaiting card tap…</div>
+        <div class="tap-status awaiting" id="tapStatus"><i class="fas fa-circle-dot" style="color:#0d9488;margin-right:6px;"></i>Awaiting card tap…</div>
         <input id="tapInput" type="text" maxlength="10" autocomplete="off" aria-label="Card UID" />
 
         <div class="divider">or</div>
 
         <label class="section-label" style="margin-top:0;">Search student by name or ID</label>
         <div class="student-search-wrap">
-            <i class="fas fa-magnifying-glass search-icon"></i>
+            <i class="fas fa-magnifying-glass"></i>
             <input id="studentSearch" type="text" class="student-search-input" placeholder="Type name or student number…" autocomplete="off" />
             <div id="searchDropdown" class="search-dropdown"></div>
         </div>
@@ -361,6 +365,7 @@ textarea.form-control{resize:vertical;min-height:60px}
     function setTapStatus(text, ok){
         if(!tapStatus) return;
         tapStatus.innerHTML = '<i class="fas '+(ok?'fa-circle-check':'fa-circle-dot')+'" style="color:'+(ok?'#059669':'#0d9488')+';margin-right:6px;"></i>'+esc(text);
+        tapStatus.classList.toggle('awaiting', !ok);
         var strip = el('stripState');
         if(strip) strip.textContent = ok ? 'Identified' : 'Ready';
     }
@@ -439,21 +444,26 @@ textarea.form-control{resize:vertical;min-height:60px}
         if(!searchDD) return;
         query = (query||'').toLowerCase().trim();
         if(query.length < 1){ searchDD.classList.remove('open'); searchDD.innerHTML=''; searchIdx=-1; return; }
-        var hits = students.filter(function(s){
+        var allHits = students.filter(function(s){
             return (s.name||'').toLowerCase().indexOf(query) !== -1
                 || (s.student_number||'').toLowerCase().indexOf(query) !== -1
                 || (s.course||'').toLowerCase().indexOf(query) !== -1;
-        }).slice(0, 8);
+        });
+        var hits = allHits.slice(0, 8);
         if(hits.length === 0){
             searchDD.innerHTML = '<div class="search-empty">No students found for "' + esc(query) + '"</div>';
         } else {
-            searchDD.innerHTML = hits.map(function(s, i){
+            var html = hits.map(function(s, i){
                 var initials = (s.name||'?').trim().split(/\s+/).map(function(w){ return w.charAt(0); }).join('').slice(0,2).toUpperCase();
                 return '<div class="search-item" data-id="'+s.id+'" data-idx="'+i+'">'
                     + '<div class="si-avatar">'+initials+'</div>'
                     + '<div class="si-info"><div class="si-name">'+esc(s.name)+'</div>'
                     + '<div class="si-meta">'+esc(s.student_number)+' · '+esc(s.course)+'</div></div></div>';
             }).join('');
+            if(allHits.length > 8){
+                html += '<div class="search-empty" style="font-size:11px;border-top:1px solid #f1f5f9;">Showing 8 of '+allHits.length+' results</div>';
+            }
+            searchDD.innerHTML = html;
         }
         searchDD.classList.add('open');
         searchIdx = -1;

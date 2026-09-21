@@ -116,6 +116,23 @@ if ($method === 'POST' && $action === 'identify') {
             [(int) $student['id']]
         );
 
+        // ── Log to rfid_scan_logs (clinic tap) ────────────────
+        if (!empty($cardUid)) {
+            try {
+                $db->insert('rfid_scan_logs', [
+                    'card_uid'   => $cardUid,
+                    'student_id' => (int) $student['id'],
+                    'location'   => 'Clinic',
+                    'event_type' => 'clinic',
+                    'status'     => 'success',
+                    'scanner_id' => 'nurse-kiosk',
+                    'ip_address' => $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0',
+                ]);
+            } catch (Exception $logErr) {
+                error_log('[clinic identify] scan log failed: ' . $logErr->getMessage());
+            }
+        }
+
         echo json_encode([
             'success' => true,
             'message' => 'Student identified.',

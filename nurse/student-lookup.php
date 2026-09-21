@@ -106,7 +106,7 @@ include '../includes/sidebar.php';
             <input type="text" id="slQ" name="q" placeholder="Search by name, student number, or course…" value="<?= htmlspecialchars($q, ENT_QUOTES, 'UTF-8') ?>" autocomplete="off" />
         </div>
     </form>
-    <div class="sl-search-hint">Type at least 2 characters to search</div>
+    <div class="sl-search-hint">Search by name, student number, or course</div>
 </div>
 
 <!-- ── Results ───────────────────────────────────────────── -->

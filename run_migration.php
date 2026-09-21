@@ -16,7 +16,7 @@ try {
 
     // Extend event_type ENUM
     $sql = "ALTER TABLE `rfid_scan_logs`
-MODIFY `event_type` enum('entry','exit','library','cafeteria','other','queue_join','queue_call','queue_serving','queue_completed','queue_no_show','queue_cancelled') DEFAULT 'entry'";
+MODIFY `event_type` enum('entry','exit','library','cafeteria','clinic','other','queue_join','queue_call','queue_serving','queue_completed','queue_no_show','queue_cancelled') DEFAULT 'entry'";
 
     $db->query($sql);
     echo "Migration applied successfully!\n";

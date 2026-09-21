@@ -174,6 +174,7 @@ include '../includes/sidebar.php';
 .event-pill.exit  { background: #f1f5f9; color: #475569; }
 .event-pill.library    { background: #f3e8ff; color: #a855f7; }
 .event-pill.cafeteria  { background: #fef3c7; color: #b45309; }
+.event-pill.clinic     { background: #ccfbf1; color: #0d9488; }
 .event-pill.other      { background: #f1f5f9; color: #475569; }
 .event-pill.queue_join    { background: #e0e7ff; color: #4f46e5; }
 .event-pill.queue_call    { background: #fef3c7; color: #b45309; }
@@ -269,6 +270,7 @@ include '../includes/sidebar.php';
             <option value="exit">Exit</option>
             <option value="library">Library</option>
             <option value="cafeteria">Cafeteria</option>
+            <option value="clinic">Clinic</option>
             <option value="other">Other</option>
             <option value="queue_join">Queue Join</option>
             <option value="queue_call">Queue Called</option>
