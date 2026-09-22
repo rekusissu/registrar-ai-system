@@ -278,6 +278,9 @@ try {
             exit;
         }
 
+        // Link any documents staged under the enrollment number.
+        syncDocumentsByEnrollNo($created['student_number'], $created['id']);
+
         // Mark the enrollment received + link the assigned student number.
         $db->update('enrollments', [
             'status'        => 'received',
@@ -355,6 +358,9 @@ try {
             'status'         => 'enrolled',
             'enrolled_at'    => date('Y-m-d H:i:s'),
         ]);
+
+        // Link any documents staged under the enrollment number.
+        syncDocumentsByEnrollNo($student['student_number'], $studentId);
 
         // Mark the enrollment re-enrolled.
         $db->update('enrollments', [

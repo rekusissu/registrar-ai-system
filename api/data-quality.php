@@ -100,15 +100,34 @@ if ($method === 'GET' && $action === 'summary') {
         ];
     }
 
+    // Documents staged under enrollment numbers (student not yet enrolled).
+    $db->update('documents', [
+        'enroll_status' => 'abandoned',
+    ], "student_id IS NULL AND enroll_status = 'pending' AND created_at < (NOW() - INTERVAL 30 DAY)");
+
+    $staged = $db->fetchAll(
+        "SELECT id, enroll_no, filename, doc_type, enroll_status, created_at
+         FROM documents WHERE student_id IS NULL ORDER BY created_at DESC"
+    );
+    $stagedPending = 0;
+    $stagedAbandoned = 0;
+    foreach ($staged as $sd) {
+        if ($sd['enroll_status'] === 'abandoned') $stagedAbandoned++;
+        else $stagedPending++;
+    }
+
     echo json_encode([
         'success' => true,
         'data' => [
-            'total_students'   => count($students),
-            'complete'         => $completeStudents,
-            'missing'          => count($missingStudents),
-            'duplicate_groups' => count($duplicates),
-            'missing_students' => $missingStudents,
-            'duplicates'       => $duplicates,
+            'total_students'    => count($students),
+            'complete'          => $completeStudents,
+            'missing'           => count($missingStudents),
+            'duplicate_groups'  => count($duplicates),
+            'missing_students'  => $missingStudents,
+            'duplicates'        => $duplicates,
+            'staged'            => $staged,
+            'staged_pending'    => $stagedPending,
+            'staged_abandoned'  => $stagedAbandoned,
         ],
     ]);
     exit;

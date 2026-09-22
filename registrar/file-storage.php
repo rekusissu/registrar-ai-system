@@ -176,14 +176,15 @@ include '../includes/sidebar.php';
     <div class="modal-header"><h2><i class="fas fa-upload" style="color:#2563eb;"></i> Upload Document</h2><button class="modal-close" onclick="closeModal('uploadModal')"><i class="fas fa-times"></i></button></div>
     <form id="uploadForm">
     <div class="modal-body">
-        <div class="form-group"><label>Student <span style="color:#dc2626;">*</span></label>
-            <select id="upStudent" class="form-control" data-searchable required>
-                <option value="">Select a student</option>
+        <div class="form-group"><label>Student</label>
+            <select id="upStudent" class="form-control" data-searchable>
+                <option value="">Select a student (or use enrollment number below)</option>
                 <?php foreach ($students as $st): ?>
                     <option value="<?= (int)$st['id'] ?>" <?= $fileStudentId && $st['id'] === $fileStudentId ? 'selected' : '' ?>><?= htmlspecialchars($st['student_number'].' — '.$st['name']) ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
+        <div class="form-group"><label>Enrollment No. <span style="font-weight:400;color:#94a3b8;">(for applicants not yet enrolled)</span></label><input type="text" id="upEnrollNo" class="form-control" placeholder="e.g. 100000001"></div>
         <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
             <div class="form-group"><label>Document Type</label>
                 <select id="upType" class="form-control">
@@ -262,13 +263,15 @@ function openUpload() {
 document.getElementById('uploadForm').addEventListener('submit', function(e) {
     e.preventDefault();
     const studentId = document.getElementById('upStudent').value;
+    const enrollNo = document.getElementById('upEnrollNo').value.trim();
     const file = document.getElementById('upFile').files[0];
-    if (!studentId) { alert('Select a student.'); return; }
+    if (!studentId && !enrollNo) { alert('Select a student or enter an enrollment number.'); return; }
     if (!file) { alert('Choose a file.'); return; }
     const btn = document.getElementById('upSubmit');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading...';
     const fd = new FormData();
     fd.append('student_id', studentId);
+    fd.append('enroll_no', enrollNo);
     fd.append('doc_type', document.getElementById('upType').value);
     fd.append('category', document.getElementById('upCategory').value);
     fd.append('description', document.getElementById('upDesc').value);
@@ -373,6 +376,7 @@ function loadQuality() {
             document.getElementById('dqDuplicates').textContent = data.duplicate_groups;
             renderMissing();
             renderDuplicates();
+            renderStaged();
         })
         .catch(() => wrapM.innerHTML = '<p style="text-align:center;color:#dc2626;padding:24px;">Failed to load data quality.</p>');
 }
@@ -409,6 +413,25 @@ function renderDuplicates() {
     ).join('');
 }
 
+function renderStaged() {
+    const wrap = document.getElementById('dqStagedWrap');
+    const list = qualityData.staged || [];
+    if (!list.length) {
+        wrap.innerHTML = '<div style="padding:24px;text-align:center;color:#94a3b8;">No documents staged by enrollment number.</div>';
+        return;
+    }
+    wrap.innerHTML = '<div style="font-size:12px;color:#64748b;margin-bottom:10px;"><strong>' + qualityData.staged_pending + '</strong> pending, <strong>' + qualityData.staged_abandoned + '</strong> abandoned (30-day rule)</div>'
+        + list.map(sd => {
+            const abandoned = sd.enroll_status === 'abandoned';
+            const badge = abandoned
+                ? '<span style="font-size:11px;font-weight:700;color:#991b1b;background:#fee2e2;padding:3px 10px;border-radius:999px;">Abandoned</span>'
+                : '<span style="font-size:11px;font-weight:700;color:#92400e;background:#fef3c7;padding:3px 10px;border-radius:999px;">Pending - waiting for enrollment</span>';
+            const when = sd.created_at ? new Date(String(sd.created_at).replace(' ','T')).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '';
+            return '<div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid #f1f5f9;border-radius:10px;margin-bottom:8px;">'
+                + '<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#0f172a;font-size:13px;font-family:\'JetBrains Mono\',monospace;">' + esc(sd.enroll_no) + '</div>'
+                + '<div style="font-size:11.5px;color:#94a3b8;margin-top:2px;">' + esc(sd.filename) + ' - uploaded ' + when + '</div></div>' + badge + '</div>';
+        }).join('');
+}
 document.querySelectorAll('.dq-tab').forEach(btn => {
     btn.addEventListener('click', () => {
         document.querySelectorAll('.dq-tab').forEach(b => {
@@ -417,8 +440,8 @@ document.querySelectorAll('.dq-tab').forEach(btn => {
             b.style.borderBottomColor = on ? '#2563eb' : 'transparent';
             b.classList.toggle('active', on);
         });
-        document.getElementById('dqMissingWrap').style.display = btn.dataset.tab === 'missing' ? '' : 'none';
-        document.getElementById('dqDupsWrap').style.display = btn.dataset.tab === 'dups' ? '' : 'none';
+        const map = { missing: 'dqMissingWrap', dups: 'dqDupsWrap', staged: 'dqStagedWrap' };
+        Object.keys(map).forEach(k => { const el = document.getElementById(map[k]); if (el) el.style.display = k === btn.dataset.tab ? '' : 'none'; });
     });
 });
 
@@ -460,9 +483,11 @@ async function notifyMissing(studentId) {
         <div style="display:flex;gap:8px;border-bottom:2px solid #f1f5f9;margin-bottom:12px;">
             <button type="button" class="dq-tab" data-tab="missing" style="padding:8px 14px;border:none;background:none;font-weight:700;font-size:13px;color:#2563eb;border-bottom:2px solid #2563eb;margin-bottom:-2px;cursor:pointer;font-family:inherit;">Missing Documents</button>
             <button type="button" class="dq-tab" data-tab="dups" style="padding:8px 14px;border:none;background:none;font-weight:700;font-size:13px;color:#64748b;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;font-family:inherit;">Possible Duplicates</button>
+            <button type="button" class="dq-tab" data-tab="staged" style="padding:8px 14px;border:none;background:none;font-weight:700;font-size:13px;color:#64748b;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;font-family:inherit;">Staged by Enrollment No.</button>
         </div>
         <div id="dqMissingWrap" style="max-height:50vh;overflow-y:auto;"></div>
         <div id="dqDupsWrap" style="max-height:50vh;overflow-y:auto;display:none;"></div>
+        <div id="dqStagedWrap" style="max-height:50vh;overflow-y:auto;display:none;"></div>
         <p style="font-size:11px;color:#94a3b8;margin:12px 0 0;"><i class="fas fa-circle-info"></i> Rule-based checks only - nothing is deleted or merged automatically.</p>
     </div>
     <div class="modal-footer">

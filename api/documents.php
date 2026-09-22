@@ -67,14 +67,33 @@ try {
         // ── UPLOAD FILE ──
         if ($method === 'POST' && !isset($_GET['action'])) {
             $studentId = intval($_POST['student_id'] ?? 0);
+            $enrollNo  = trim((string) ($_POST['enroll_no'] ?? ''));
             $docType   = trim($_POST['doc_type'] ?? 'other');
             $category  = trim($_POST['category'] ?? '');
             $desc      = trim($_POST['description'] ?? '');
 
-            if (!$studentId || !isset($_FILES['file'])) {
-                echo json_encode(['success' => false, 'message' => 'Student and file are required.']);
+            // Either a student or an enrollment number must be provided.
+            if (!$studentId && $enrollNo === '') {
+                echo json_encode(['success' => false, 'message' => 'Select a student or enter an enrollment number.']);
                 exit;
             }
+            if (!isset($_FILES['file'])) {
+                echo json_encode(['success' => false, 'message' => 'File is required.']);
+                exit;
+            }
+
+            // Enrollment-number staging: if the number matches a student,
+            // link the document immediately; otherwise store it pending.
+            $enrollStatus = 'linked';
+            if (!$studentId) {
+                $matched = $db->fetchOne("SELECT id, student_number FROM students WHERE student_number = ?", [$enrollNo]);
+                if ($matched) {
+                    $studentId = (int) $matched['id'];
+                } else {
+                    $enrollStatus = 'pending';
+                }
+            }
+            if (!$studentId) $enrollNo = $enrollNo;
             $file = $_FILES['file'];
             $allowed = ['pdf','doc','docx','xls','xlsx','jpg','jpeg','png','webp','txt','odt','ods','zip','rar'];
             $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
@@ -90,18 +109,21 @@ try {
                 $docType = 'other';
             }
 
-            $dir = __DIR__ . '/../uploads/student_files/' . $studentId;
+            $dirKey = $studentId ? ('student_files/' . $studentId) : ('student_files/staged_' . preg_replace('/[^A-Za-z0-9._-]/', '-', $enrollNo));
+            $dir = __DIR__ . '/../uploads/' . $dirKey;
             if (!is_dir($dir)) mkdir($dir, 0775, true);
-            $filename = $studentId . '_' . time() . '_' . preg_replace('/[^A-Za-z0-9._-]/', '-', basename($file['name']));
+            $filename = ($studentId ? (string) $studentId : $enrollNo) . '_' . time() . '_' . preg_replace('/[^A-Za-z0-9._-]/', '-', basename($file['name']));
             $dest = $dir . '/' . $filename;
 
             if (move_uploaded_file($file['tmp_name'], $dest)) {
-                $filePath = '../uploads/student_files/' . $studentId . '/' . $filename;
+                $filePath = '../uploads/' . $dirKey . '/' . $filename;
                 // Guard against missing columns on older schemas
                 $cols = $db->fetchAll("SHOW COLUMNS FROM documents");
                 $colNames = array_column($cols, 'Field');
                 $ins = [
-                    'student_id'  => $studentId,
+                    'student_id'  => $studentId ?: null,
+                    'enroll_no'   => $studentId ? null : $enrollNo,
+                    'enroll_status' => $enrollStatus,
                     'doc_type'    => $docType,
                     'filename'    => basename($file['name']),
                     'file_path'   => $filePath,

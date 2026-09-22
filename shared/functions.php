@@ -924,6 +924,23 @@ function syncFatherMotherGuardians(int $studentId, ?string $fatherName, ?string 
     }
     return $created;
 }
+
+/**
+ * Link documents that were staged under an enrollment number to a
+ * student record. Used by the enrollment intake once a student is
+ * accepted or re-enrolled. Returns how many documents were linked.
+ */
+function syncDocumentsByEnrollNo(string $enrollNo, int $studentId): int {
+    if (trim($enrollNo) === '') return 0;
+    $db = Database::getInstance();
+    $cols = $db->fetchAll("SHOW COLUMNS FROM documents");
+    $colNames = array_column($cols, 'Field');
+    if (!in_array('enroll_no', $colNames, true)) return 0;
+    return (int) $db->update('documents', [
+        'student_id'    => $studentId,
+        'enroll_status' => 'linked',
+    ], 'enroll_no = ? AND student_id IS NULL', [trim($enrollNo)]);
+}
 function createStudentFromInput(array $input, $db): array
 {
     $firstName = trim($input['first_name'] ?? '');
