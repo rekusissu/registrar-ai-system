@@ -28,6 +28,7 @@ $timeout = isset($_GET['timeout']) ? true : false;
     <meta name='csrf-token' content='<?= htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8') ?>' />
 
     <meta name="loader-logo" content="assets/images/BCP_LOGO.png" />
+    <link rel="icon" type="image/png" href="assets/images/BCP_LOGO.png" />
     <link rel="icon" type="image/x-icon" href="assets/images/favicon.ico" />
 
     <link rel="stylesheet" href="css/auth.css" />

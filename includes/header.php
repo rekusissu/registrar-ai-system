@@ -37,8 +37,9 @@ $__csrfToken = htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8');
     <meta name='csrf-token' content='<?= $__csrfToken ?>' />
 
     <!-- Favicon -->
+    <link rel="icon" type="image/png" href="<?= $APP_ROOT ?>assets/images/BCP_LOGO.png" />
     <link rel="icon" type="image/x-icon" href="<?= $APP_ROOT ?>assets/images/favicon.ico" />
-    <link rel="apple-touch-icon" href="<?= $APP_ROOT ?>assets/images/BCP_LOGO.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="<?= $APP_ROOT ?>assets/images/apple-touch-icon.png" />
 
     <!-- Loader Meta -->
     <meta name="loader-logo" content="<?= $APP_ROOT ?>assets/images/BCP_LOGO.png" />
