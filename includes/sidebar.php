@@ -113,6 +113,17 @@ if ($USER_ROLE === 'student') {
             <span class="sidebar-badge-ai">AI</span>
         </button>
 
+        <div class="sidebar-divider"></div>
+
+        <div class="sidebar-brand">
+            <div class="brand-title">Account</div>
+        </div>
+
+        <a href="<?= $APP_ROOT ?>settings.php" class="sidebar-item <?= $ACTIVE_NAV === 'settings' ? 'active' : '' ?>">
+            <i class="fa-solid fa-gear"></i>
+            <span class="sidebar-text">Account Settings</span>
+        </a>
+
     </div><!-- end sidebar-nav -->
 
     <div class="sidebar-footer">
@@ -142,6 +153,17 @@ if ($USER_ROLE === 'student') {
         <a href="<?= $APP_ROOT ?>nurse/student-lookup.php" class="sidebar-item <?= $ACTIVE_NAV === 'nurse_lookup' ? 'active' : '' ?>">
             <i class="fa-solid fa-magnifying-glass"></i>
             <span class="sidebar-text">Student Lookup</span>
+        </a>
+
+        <div class="sidebar-divider"></div>
+
+        <div class="sidebar-brand">
+            <div class="brand-title">Account</div>
+        </div>
+
+        <a href="<?= $APP_ROOT ?>settings.php" class="sidebar-item <?= $ACTIVE_NAV === 'settings' ? 'active' : '' ?>">
+            <i class="fa-solid fa-gear"></i>
+            <span class="sidebar-text">Account Settings</span>
         </a>
 
     </div><!-- end sidebar-nav -->
@@ -249,6 +271,19 @@ if ($USER_ROLE === 'student') {
             <i class="fa-solid fa-robot"></i>
             <span class="sidebar-text">AI Search</span>
         </a>
+
+        <?php if ($USER_ROLE !== 'admin'): ?>
+        <div class="sidebar-divider"></div>
+
+        <div class="sidebar-brand">
+            <div class="brand-title">Account</div>
+        </div>
+
+        <a href="<?= $APP_ROOT ?>settings.php" class="sidebar-item <?= $ACTIVE_NAV === 'settings' ? 'active' : '' ?>">
+            <i class="fa-solid fa-gear"></i>
+            <span class="sidebar-text">Account Settings</span>
+        </a>
+        <?php endif; ?>
 
         <?php if ($USER_ROLE === 'admin'): ?>
         <div class="sidebar-divider"></div>

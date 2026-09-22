@@ -14,12 +14,9 @@ require_once __DIR__ . '/../shared/database.php';
 $db = Database::getInstance();
 
 $users = $db->fetchAll("
-    SELECT u.id, u.email, u.full_name, u.role, u.is_active, u.created_at, u.updated_at,
-           u.student_id,
-           CONCAT(s.first_name, ' ', s.last_name) AS student_name,
-           s.student_number
+    SELECT u.id, u.email, u.full_name, u.role, u.is_active, u.created_at, u.updated_at
     FROM users u
-    LEFT JOIN students s ON s.id = u.student_id
+    WHERE u.role <> 'student'
     ORDER BY u.id ASC
 ");
 
@@ -66,18 +63,17 @@ include '../includes/sidebar.php';
             <option value="nurse">Nurse</option>
             <option value="staff">Staff</option>
             <option value="teacher">Teacher</option>
-            <option value="student">Student</option>
         </select>
     </div>
 
     <div class="table-responsive" style="overflow-x:auto;">
     <table class="table">
         <thead>
-        <tr><th>User</th><th>Role</th><th>Linked Student</th><th>Status</th><th>Created</th><th style="text-align:center;">Actions</th></tr>
+        <tr><th>User</th><th>Role</th><th>Status</th><th>Created</th><th style="text-align:center;">Actions</th></tr>
         </thead>
         <tbody id="userBody">
         <?php if (empty($users)): ?>
-        <tr><td colspan="6" class="empty-state"><i class="fas fa-user-slash"></i><p>No users found</p><span>Add your first user to get started</span></td></tr>
+        <tr><td colspan="5" class="empty-state"><i class="fas fa-user-slash"></i><p>No users found</p><span>Add your first user to get started</span></td></tr>
         <?php else:
         $avatarColors = ['blue','green','purple','orange','pink'];
         foreach ($users as $i => $u):
@@ -91,7 +87,7 @@ include '../includes/sidebar.php';
         <tr data-user='<?= htmlspecialchars(json_encode($u),ENT_QUOTES,'UTF-8') ?>' class="<?= (int)$u['is_active']===0?'archived':'' ?>">
             <td><div class="student-info"><div class="student-avatar <?= $ac ?>"><?= $initials ?: '?' ?></div><div><div class="student-name"><?= htmlspecialchars($u['full_name']) ?></div><div class="student-sub"><?= htmlspecialchars($u['email']) ?></div></div></div></td>
             <td><span class="pill <?= htmlspecialchars($u['role']) ?>"><i class="fas fa-<?= $u['role']==='admin'?'user-shield':($u['role']==='student'?'user-graduate':($u['role']==='registrar'?'user-tie':'user')) ?>"></i> <?= ucfirst($u['role']) ?></span></td>
-            <td style="font-size:12px;color:#64748b;"><?= !empty($u['student_name']) ? htmlspecialchars($u['student_name']) . ' <span style="color:#94a3b8;">(' . htmlspecialchars($u['student_number']) . ')</span>' : '<span style="color:#94a3b8;">—</span>' ?></td>
+
             <td><span class="pill <?= (int)$u['is_active']===1?'active':'inactive' ?>"><span class="status-dot <?= (int)$u['is_active']===1?'active':'inactive' ?>"></span><?= (int)$u['is_active']===1?'Active':'Disabled' ?></span></td>
             <td style="font-size:12px;color:#64748b;"><?= date('M d, Y', strtotime($u['created_at'])) ?></td>
             <td><div class="action-group">
@@ -123,10 +119,10 @@ include '../includes/sidebar.php';
     <div class="form-group"><label>Full Name <span style="color:#dc2626;">*</span></label><input type="text" id="addFullName" class="form-control" required></div>
     <div class="form-group"><label>Email <span style="color:#dc2626;">*</span></label><input type="email" id="addEmail" class="form-control" required></div>
     <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-        <div class="form-group"><label>Role</label><select id="addRole" class="form-control" onchange="onRoleChange()"><option value="staff">Staff</option><option value="registrar">Registrar</option><option value="nurse">Nurse</option><option value="teacher">Teacher</option><option value="admin">Admin</option><option value="student">Student</option></select></div>
+        <div class="form-group"><label>Role</label><select id="addRole" class="form-control"><option value="staff">Staff</option><option value="registrar">Registrar</option><option value="nurse">Nurse</option><option value="teacher">Teacher</option><option value="admin">Admin</option></select></div>
         <div class="form-group"><label>Password <span style="color:#dc2626;">*</span></label><input type="password" id="addPassword" class="form-control" required minlength="6" placeholder="Min 6 chars"></div>
     </div>
-    <div class="form-group" id="addStudentLink" style="display:none;"><label>Link Student Record</label><select id="addStudentId" class="form-control"><option value="">— Select a student —</option></select></div>
+
 </div>
 <div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeModal('addModal')">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Create</button></div></form></div></div>
 
@@ -135,8 +131,8 @@ include '../includes/sidebar.php';
 <form id="editForm"><input type="hidden" id="editId" value=""><div class="modal-body">
     <div class="form-group"><label>Full Name <span style="color:#dc2626;">*</span></label><input type="text" id="editFullName" class="form-control" required></div>
     <div class="form-group"><label>Email</label><input type="email" id="editEmail" class="form-control" disabled style="background:#f8fafc;font-size:12px;"></div>
-    <div class="form-group"><label>Role</label><select id="editRole" class="form-control" onchange="onRoleChange()"><option value="staff">Staff</option><option value="registrar">Registrar</option><option value="nurse">Nurse</option><option value="teacher">Teacher</option><option value="admin">Admin</option><option value="student">Student</option></select></div>
-    <div class="form-group" id="editStudentLink" style="display:none;"><label>Link Student Record</label><select id="editStudentId" class="form-control"><option value="">— Not linked —</option></select></div>
+    <div class="form-group"><label>Role</label><select id="editRole" class="form-control"><option value="staff">Staff</option><option value="registrar">Registrar</option><option value="nurse">Nurse</option><option value="teacher">Teacher</option><option value="admin">Admin</option></select></div>
+
 </div>
 <div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeModal('editModal')">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save</button></div></form></div></div>
 
@@ -154,31 +150,6 @@ document.querySelectorAll('#userBody tr[data-user]').forEach(row => {
     try { const d = JSON.parse(row.dataset.user); if (d) allUsers.push({ ...d, element: row }); } catch(e) {}
 });
 const showingCount = document.getElementById('showingCount');
-
-// ── Student link dropdown population ─────────────────────────
-let studentOptions = '<option value="">— Select a student —</option>';
-fetch('../api/students.php')
-    .then(r => r.json())
-    .then(d => {
-        if (d.success && Array.isArray(d.data)) {
-            studentOptions = '<option value="">— Select a student —</option>';
-            d.data.forEach(s => {
-                const label = (s.first_name || '') + ' ' + (s.last_name || '') + ' — ' + (s.student_number || '');
-                studentOptions += '<option value="' + s.id + '">' + label.replace(/&/g, '&amp;').replace(/"/g, '&quot;') + '</option>';
-            });
-            ['addStudentId', 'editStudentId'].forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.innerHTML = studentOptions;
-            });
-        }
-    })
-    .catch(() => {});
-
-function onRoleChange() {
-    const role = document.getElementById('addRole')?.value || document.getElementById('editRole')?.value || '';
-    document.getElementById('addStudentLink').style.display = role === 'student' ? '' : 'none';
-    document.getElementById('editStudentLink').style.display = role === 'student' ? '' : 'none';
-}
 
 function performSearch() {
     const q = document.getElementById('userSearch').value.trim().toLowerCase();
@@ -204,7 +175,6 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') { ['addModal
 
 function openAddModal() {
     document.getElementById('addForm').reset();
-    document.getElementById('addStudentLink').style.display = 'none';
     openModal('addModal');
 }
 
@@ -215,12 +185,6 @@ function editUser(id) {
     document.getElementById('editFullName').value = u.full_name;
     document.getElementById('editEmail').value = u.email;
     document.getElementById('editRole').value = u.role;
-    // Preselect the linked student in the dropdown
-    const editStudentId = document.getElementById('editStudentId');
-    if (editStudentId) {
-        editStudentId.value = (u.student_id != null && u.student_id !== '') ? String(u.student_id) : '';
-        document.getElementById('editStudentLink').style.display = u.role === 'student' ? '' : 'none';
-    }
     openModal('editModal');
 }
 
@@ -253,8 +217,7 @@ document.getElementById('addForm').addEventListener('submit', async function(e) 
             full_name: document.getElementById('addFullName').value,
             email: document.getElementById('addEmail').value,
             role: document.getElementById('addRole').value,
-            password: document.getElementById('addPassword').value,
-            student_id: document.getElementById('addStudentId').value || null
+            password: document.getElementById('addPassword').value
         });
         if (d.success) { alert('User created.'); window.location.reload(); }
         else { alert(d.message); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Create'; }
@@ -269,8 +232,7 @@ document.getElementById('editForm').addEventListener('submit', async function(e)
     try {
         const d = await submitJson('../api/users.php?id=' + id, 'PUT', {
             full_name: document.getElementById('editFullName').value,
-            role: document.getElementById('editRole').value,
-            student_id: document.getElementById('editStudentId').value || null
+            role: document.getElementById('editRole').value
         });
         if (d.success) { alert('User updated.'); window.location.reload(); }
         else { alert(d.message); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save'; }

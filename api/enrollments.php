@@ -43,21 +43,23 @@ try {
     $db = Database::getInstance();
 
     // ─── LIST APPLICANTS ──────────────────────────────────────
-    if ($method === 'GET' && $action === 'list') {
-        $rows = $db->fetchAll(
-            "SELECT * FROM enrollments ORDER BY status = 'pending' DESC, id ASC"
-        );
-        echo json_encode(['success' => true, 'data' => $rows]);
-        exit;
-    }
-
-    // Sanity: the enrollments table must exist (migration 002).
+    // Sanity: the enrollments table must exist (migration 002). Checked
+    // before ANY query against it so a missing table returns an actionable
+    // JSON message instead of an uncaught SQL exception.
     $hasEnrollments = (int) $db->fetchColumn(
         "SELECT COUNT(*) FROM information_schema.TABLES
          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'enrollments'"
     ) === 1;
     if (!$hasEnrollments) {
         echo json_encode(['success' => false, 'message' => 'Enrollment system not set up. Run the 002_receive_student migration first.']);
+        exit;
+    }
+
+    if ($method === 'GET' && $action === 'list') {
+        $rows = $db->fetchAll(
+            "SELECT * FROM enrollments ORDER BY status = 'pending' DESC, id ASC"
+        );
+        echo json_encode(['success' => true, 'data' => $rows]);
         exit;
     }
 
@@ -242,6 +244,25 @@ try {
             'emergency_contact'         => $enc['emergency_contact'] ?? '',
             'status'          => 'active',
         ];
+
+        // Data-quality pass: trim text, fix enum-bound fields and reject
+        // impossible dates so bad source data can't fail the insert silently.
+        foreach (['first_name', 'middle_name', 'last_name', 'name_suffix', 'place_of_birth', 'nationality', 'religion', 'father_name', 'mother_name', 'email', 'address', 'contact_number', 'course', 'major', 'school_year', 'semester', 'section', 'prev_school_name', 'prev_school_last_year', 'prev_school_graduated_sy', 'emergency_name', 'emergency_relationship', 'emergency_contact'] as $f) {
+            $payload[$f] = trim((string) $payload[$f]);
+        }
+        $payload['gender'] = in_array(strtolower(trim((string) $payload['gender'])), ['male', 'female'], true)
+            ? ucfirst(strtolower(trim((string) $payload['gender']))) : null;
+        $payload['civil_status'] = in_array(strtolower(trim((string) $payload['civil_status'])), ['single', 'married', 'widowed', 'separated'], true)
+            ? ucfirst(strtolower(trim((string) $payload['civil_status']))) : null;
+        $payload['year_level'] = ($payload['year_level'] !== '' && $payload['year_level'] !== null) ? (int) $payload['year_level'] : null;
+        $bdRaw = trim((string) $payload['birth_date']);
+        if ($bdRaw !== '') {
+            $bdParts = explode('-', $bdRaw);
+            if (count($bdParts) !== 3 || !checkdate((int) $bdParts[1], (int) $bdParts[2], (int) $bdParts[0])) {
+                echo json_encode(['success' => false, 'message' => 'This applicant has an invalid birth date. Ask the Enrollment System to correct it before accepting.']);
+                exit;
+            }
+        }
 
         try {
             $created = createStudentFromInput($payload, $db);

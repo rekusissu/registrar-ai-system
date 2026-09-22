@@ -532,16 +532,17 @@ include '../includes/sidebar.php';
 }
 .gdn-more:hover { background: #eff6ff; border-color: #93c5fd; }
 
-/* ── Modal header (gradient, scoped to #manageModal) ── */
+/* ── Modal header (scoped to #manageModal) ── */
 #manageModal .modal-header.mg-header {
-    background:linear-gradient(135deg,#1a3a8c 0%, #2563eb 100%);
+    background:#fff;
     margin:-28px -32px 0; padding:22px 28px;
-    border-radius:20px 20px 0 0; color:#fff;
+    border-radius:20px 20px 0 0; color:#0f172a;
+    border-bottom:1px solid #e8ecf3;
 }
-#manageModal .modal-header.mg-header h2 { color:#fff; font-size:18px; }
-#manageModal .modal-header.mg-header h2 i { color:#93c5fd; }
-#manageModal .modal-close { background:rgba(255,255,255,.16); color:#fff; }
-#manageModal .modal-close:hover { background:rgba(255,255,255,.3); color:#fff; }
+#manageModal .modal-header.mg-header h2 { color:#0f172a; font-size:18px; }
+#manageModal .modal-header.mg-header h2 i { color:#2563eb; }
+#manageModal .modal-close { background:#f1f5f9; color:#94a3b8; }
+#manageModal .modal-close:hover { background:#e2e8f0; color:#1e293b; }
 #manageModal .modal-body { padding:22px 0 4px; }
 
 /* ── Tabs ────────────────────────────────────────── */

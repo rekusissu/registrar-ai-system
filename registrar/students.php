@@ -1380,6 +1380,14 @@ function showToast(title, message, type) {
     c.appendChild(t); setTimeout(() => { t.classList.add('hiding'); setTimeout(() => t.remove(), 300); }, 4000);
 }
 function ucfirst(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
+function fmtDate(v) {
+    if (!v) return '—';
+    const m = String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!m) return '—';
+    const d = new Date(+m[1], +m[2] - 1, +m[3]);
+    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', {year:'numeric', month:'short', day:'numeric'});
+}
 
 // ─── RECEIVE STUDENT MODAL (enrollment intake) ──────────────
 const receiveModal = document.getElementById('receiveModal');
@@ -1401,14 +1409,19 @@ async function enrollApi(action, body) {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body || {})
     });
-    return await res.json();
+    if (!res.ok) return { success: false, message: 'Server error (' + res.status + '). Please try again.' };
+    return await res.json().catch(() => ({ success: false, message: 'Unexpected response from the server.' }));
 }
 
 async function loadEnrollments() {
     receiveWrap.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:24px;"><i class="fas fa-spinner fa-spin"></i> Loading applicants...</p>';
     try {
         const res = await fetch('../api/enrollments.php?action=list');
-        const d = await res.json();
+        const d = await res.json().catch(() => null);
+        if (!d || typeof d.success !== 'boolean') {
+            receiveWrap.innerHTML = '<p style="text-align:center;color:#dc2626;padding:24px;">Unexpected response from the server. Please try again.</p>';
+            return;
+        }
         if (!d.success) { receiveWrap.innerHTML = '<p style="text-align:center;color:#dc2626;padding:24px;">' + (d.message || 'Failed to load.') + '</p>'; return; }
         const rows = d.data || [];
         if (!rows.length) {
@@ -1417,15 +1430,15 @@ async function loadEnrollments() {
         }
         let html = '<div class="table-responsive"><table><thead><tr><th>Name</th><th>Sex</th><th>Birth Date</th><th>Course</th><th>Status</th><th style="text-align:center;">Actions</th></tr></thead><tbody>';
         rows.forEach(e => {
-            const name = (e.first_name||'') + ' ' + (e.middle_name ? e.middle_name + ' ' : '') + (e.last_name||'') + (e.name_suffix ? ' ' + e.name_suffix : '');
-            const bd = e.birth_date ? new Date(e.birth_date).toLocaleDateString('en-US',{year:'numeric',month:'short',day:'numeric'}) : '—';
+            const name = esc([e.first_name, e.middle_name, e.last_name, e.name_suffix].filter(Boolean).join(' '));
+            const bd = fmtDate(e.birth_date);
             const statusBadge = e.status === 'pending' ? '<span class="status-badge active"><span class="status-dot active"></span>Pending</span>'
                 : '<span class="status-badge ' + e.status + '"><span class="status-dot ' + e.status + '"></span>' + ucfirst(e.status) + '</span>';
             html += '<tr data-enrollment=\'' + JSON.stringify({ id: e.id, first_name: e.first_name, last_name: e.last_name, birth_date: e.birth_date, student_number: e.student_number }).replace(/'/g, '&#39;') + '\'>';
             html += '<td style="font-weight:600;color:#0f172a;font-size:13px;">' + name + '</td>';
-            html += '<td>' + (e.gender || '—') + '</td>';
+            html += '<td>' + esc(e.gender || '—') + '</td>';
             html += '<td>' + bd + '</td>';
-            html += '<td>' + (e.course || '—') + '</td>';
+            html += '<td>' + esc(e.course || '—') + '</td>';
             html += '<td>' + statusBadge + '</td>';
             html += '<td style="text-align:center;"><div class="action-group" style="justify-content:center;flex-wrap:wrap;gap:4px;">';
             html += '<button class="btn btn-secondary" style="height:30px;padding:0 12px;font-size:11px;" onclick="checkDuplicate(' + e.id + ')"><i class="fas fa-clone"></i> Duplicate Check</button>';

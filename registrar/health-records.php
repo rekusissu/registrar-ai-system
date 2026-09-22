@@ -24,7 +24,7 @@ include '../includes/sidebar.php';
 <div class="dashboard-container">
 
 <header class="header">
-    <div class="title"><h1><i class="fas fa-heartbeat" style="color:#dc2626;"></i> Health Record Log</h1>
+    <div class="title"><h1>Health Record Log</h1>
     <p>View-only records synced from the Clinic Portal — record creation is the clinic's job</p></div>
     <div class="header-actions">
         <button class="btn btn-light" onclick="loadHealthLog()"><i class="fas fa-rotate"></i> Refresh</button>

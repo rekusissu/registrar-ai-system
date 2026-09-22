@@ -89,7 +89,7 @@ include '../includes/sidebar.php';
 
 <header class="header">
     <div class="title">
-        <h1><i class="fas fa-heartbeat" style="color:#dc2626;"></i> Health Record Log</h1>
+        <h1>Health Record Log</h1>
         <p>View and manage all clinic visit records — edit assessment, vitals, and status</p>
     </div>
     <div class="header-actions">
