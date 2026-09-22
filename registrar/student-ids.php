@@ -522,17 +522,23 @@ function editStatus(btn) {
 // Print a clean official ID card sheet (school logo, photo, QR, signature line)
 function printCard() {
     const d = currentCardData || {};
-    const w = window.open('', '_blank', 'width=600,height=800');
     const photo = normalizePhotoPath(d.photo) || '';
     const initials = initialsOf(d.name);
-    const name = d.name || '—';
+    const name = d.name || '\u2014';
     const course = d.course || '';   // year level shown by card color, not text
     const id = d.idnumber || '';
     const qr = d.qrData || (d.qr ? normalizePhotoPath(d.qr) : '');
     const type = (d.idtype || 'school_id').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
     const expiry = d.expiry ? new Date(d.expiry).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'No expiry';
+    /* Resolve relative paths to absolute so images work in pop-up */
+    const _base = window.location.origin + window.location.pathname.replace(/[^\/]*$/, '');
+    function _abs(p) { if (!p || p.startsWith('data:') || p.startsWith('http')) return p; return new URL(p, _base).href; }
+    const _logoUrl = _abs('../assets/images/BCP_LOGO.png');
+    const _photoUrl = _abs(photo);
+    const _qrUrl = _abs(qr);
     const css = ''
-        + '@page { size: 86mm 54mm; margin: 0; } '
+        + '@page { size: A4 portrait; margin: 20mm; } '
+        + '@media print { @page { size: A4 portrait; margin: 20mm; } body { margin: 0; width: 170mm; height: 257mm; } } '
         + 'body { margin: 0; font-family: Arial, sans-serif; -webkit-print-color-adjust: exact; } '
         + '.card { width: 86mm; height: 54mm; border-radius: 4mm; overflow: hidden; '
         + 'background: #fff; border: .3mm solid #dbeafe; box-sizing: border-box; position: relative; } '
@@ -570,30 +576,32 @@ function printCard() {
         + '.f { background:#fff; border-top:.3mm solid #e2e8f0; padding:1mm 4mm; text-align:center; '
         + 'font-size:2.2mm; color:#64748b; } '
         + '@media print { .card { margin: 0; border: none; } body { -webkit-print-color-adjust: exact; } }';
-    w.document.write('<html><head><title>Student ID — ' + name + '</title><style>' + css + '</style></head><body>');
-    w.document.write('<div class="card">');
-    w.document.write('<div class="h"><img src="../assets/images/BCP_LOGO.png" alt="BCP"><div class="s">BESTLINK COLLEGE OF THE PHILIPPINES<small>Official ' + type + '</small></div></div>');
-    w.document.write('<div class="b">' + (photo ? '<img class="p" src="' + photo + '" alt="photo">' : '<div class="pini">' + initials + '</div>')
-        + '<div class="i"><div class="n">' + name + '</div><div class="m">' + course + '</div><div class="d">' + id + '</div><div class="t">' + type + '</div><div class="e">Valid until: ' + expiry + '</div></div>'
-        + (qr ? '<div class="qr"><img src="' + qr + '" alt="QR"><div class="cap">Scan to verify</div></div>' : '') + '</div>');
-    w.document.write('<div class="f">This ID is property of Bestlink College of the Philippines. If found, return to the Registrar\'s Office.</div>');
     // ── Back of card ──
     const extras = CARD_EXTRAS[d.studentId] || {};
     const emgList = extras.emergency || [];
     const emgLines = emgList.length
-        ? emgList.map(c => '<div class="er"><b>' + escHtml(c.name || '—') + '</b> — ' + escHtml(c.rel || 'Emergency contact') + (c.phone ? ' · ' + escHtml(c.phone) : '') + '</div>').join('')
+        ? emgList.map(c => '<div class="er"><b>' + escHtml(c.name || '\u2014') + '</b> \u2014 ' + escHtml(c.rel || 'Emergency contact') + (c.phone ? ' \u00b7 ' + escHtml(c.phone) : '') + '</div>').join('')
         : '<div class="er" style="color:#94a3b8;font-style:italic;">No emergency contact on file</div>';
     const address = extras.address ? escHtml(extras.address) : 'Not on file';
-    w.document.write('<div class="card back">');
-    w.document.write('<div class="bh"><div class="s">BESTLINK COLLEGE OF THE PHILIPPINES<small>Registrar&#39;s Office — Caypombo, Sta. Maria, Bulacan</small></div><span class="tag">ID Card</span></div>');
-    w.document.write('<div class="bb"><div class="bt">In case of emergency, please contact</div>' + emgLines + '</div>');
-    w.document.write('<div class="bb"><div class="bt">Address</div><div class="ea">' + address + '</div></div>');
-    w.document.write('<div class="bb"><div class="bt">Reminders</div><div class="ea">This card is non-transferable. Not valid without the signature of the student and the Registrar. Report lost cards immediately.</div></div>');
-    w.document.write('<div class="sig"><div class="line"></div><div class="who">Signature of Student</div></div>');
-    w.document.write('<div class="f">If found, please return to the Registrar&#39;s Office.</div>');
-    w.document.write('</div></body></html>');
-    w.document.close();
-    setTimeout(() => { w.focus(); w.print(); }, 250);
+    let front = '<div class="card">';
+    front += '<div class="h"><img src="' + _logoUrl + '" alt="BCP"><div class="s">BESTLINK COLLEGE OF THE PHILIPPINES<small>Official ' + type + '</small></div></div>';
+    front += '<div class="b">' + (_photoUrl ? '<img class="p" src="' + _photoUrl + '" alt="photo">' : '<div class="pini">' + initials + '</div>');
+    front += '<div class="i"><div class="n">' + name + '</div><div class="m">' + course + '</div><div class="d">' + id + '</div><div class="t">' + type + '</div><div class="e">Valid until: ' + expiry + '</div></div>';
+    front += (_qrUrl ? '<div class="qr"><img src="' + _qrUrl + '" alt="QR"><div class="cap">Scan to verify</div></div>' : '') + '</div>';
+    front += '<div class="f">This ID is property of Bestlink College of the Philippines. If found, return to the Registrar\'s Office.</div></div>';
+    let back = '<div class="card back">';
+    back += '<div class="bh"><div class="s">BESTLINK COLLEGE OF THE PHILIPPINES<small>Registrar&#39;s Office \u2014 Caypombo, Sta. Maria, Bulacan</small></div><span class="tag">ID Card</span></div>';
+    back += '<div class="bb"><div class="bt">In case of emergency, please contact</div>' + emgLines + '</div>';
+    back += '<div class="bb"><div class="bt">Address</div><div class="ea">' + address + '</div></div>';
+    back += '<div class="bb"><div class="bt">Reminders</div><div class="ea">This card is non-transferable. Not valid without the signature of the student and the Registrar. Report lost cards immediately.</div></div>';
+    back += '<div class="sig"><div class="line"></div><div class="who">Signature of Student</div></div>';
+    back += '<div class="f">If found, please return to the Registrar&#39;s Office.</div></div>';
+    let doc = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Student ID \u2014 ' + name + '</title><style>' + css + '</style></head><body>' + front + back + '</body></html>';
+    const blob = new Blob([doc], {type:'text/html'});
+    const blobUrl = URL.createObjectURL(blob);
+    const w = window.open(blobUrl, '_blank', 'width=700,height=900');
+    if (!w) { showToast('Error','Pop-up blocked.','error'); return; }
+    w.onload = function(){ setTimeout(function(){ w.print(); URL.revokeObjectURL(blobUrl); }, 500); };
 }
 
 // Hold the currently-viewed card for print

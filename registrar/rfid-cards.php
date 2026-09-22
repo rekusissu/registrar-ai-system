@@ -1,7 +1,7 @@
-<?php
+﻿<?php
 // ============================================================
 //  REGISTRAR/RFID-CARDS.PHP
-//  RFID cards management — fully inline (CSS + JS)
+//  RFID cards management &mdash; fully inline (CSS + JS)
 // ============================================================
 
 require_once __DIR__ . '/../shared/security_headers.php';
@@ -26,9 +26,18 @@ $cards = $db->fetchAll("
         CONCAT(s.first_name, ' ', s.last_name) AS student_name,
         s.student_number,
         s.course,
-        s.year_level
+        s.year_level,
+        s.photo AS student_photo,
+        s.address AS student_address,
+        si.id_number AS student_id_number,
+        si.qr_code_path,
+        si.id_type AS id_type,
+        si.issue_date AS id_issue_date,
+        si.expiry_date AS id_expiry_date,
+        si.status AS id_status
     FROM rfid_cards rf
     LEFT JOIN students s ON rf.student_id = s.id
+    LEFT JOIN student_ids si ON si.rfid_card_id = rf.id AND si.id_type = 'school_id'
     ORDER BY rf.id DESC
 ");
 
@@ -62,6 +71,31 @@ $students = $db->fetchAll(
      ORDER BY name"
 );
 
+// Card-back data: address, emergency contacts, primary guardian
+$cardExtras = [];
+$idStudentIds = array_values(array_unique(array_filter(array_map(fn($c) => (int) $c['student_id'], $cards))));
+if ($idStudentIds) {
+    $in = implode(',', $idStudentIds);
+    foreach ($db->fetchAll("SELECT id, address FROM students WHERE id IN ($in)") as $st) {
+        $cardExtras[$st['id']]['address'] = (string) ($st['address'] ?? '');
+    }
+    foreach ($db->fetchAll("SELECT student_id, full_name, relationship, contact_number FROM emergency_contacts WHERE student_id IN ($in) ORDER BY is_primary DESC, id ASC") as $e) {
+        $cardExtras[$e['student_id']]['emergency'][] = [
+            'name' => (string) $e['full_name'],
+            'rel'  => (string) ($e['relationship'] ?? ''),
+            'phone'=> (string) ($e['contact_number'] ?? ''),
+        ];
+    }
+    foreach ($db->fetchAll("SELECT student_id, full_name, relationship, contact_number FROM guardians WHERE student_id IN ($in) AND is_primary = 1 ORDER BY id ASC") as $g) {
+        if (!empty($cardExtras[$g['student_id']]['emergency'])) continue;
+        $cardExtras[$g['student_id']]['emergency'][] = [
+            'name' => (string) $g['full_name'],
+            'rel'  => (string) ($g['relationship'] ?? 'Guardian'),
+            'phone'=> (string) ($g['contact_number'] ?? ''),
+        ];
+    }
+}
+
 $page_title = 'RFID Cards';
 $APP_ROOT = '../';
 $ACTIVE_NAV = 'rfid';
@@ -79,10 +113,10 @@ foreach ($cards as $i => $c) {
 ?>
 <style>
 /* ============================================================
-   RFID CARDS PAGE — INLINE STYLES
+   RFID CARDS PAGE &mdash; INLINE STYLES
    ============================================================ */
 
-/* ── Sidebar-aware main ── */
+/* â”€â”€ Sidebar-aware main â”€â”€ */
 :root { --sidebar-width: 260px; }
 .dashboard-main {
     margin-left: var(--sidebar-width);
@@ -95,7 +129,7 @@ foreach ($cards as $i => $c) {
     transition: margin-left 0.3s ease, width 0.3s ease, max-width 0.3s ease;
 }
 
-/* ── Page header ── */
+/* â”€â”€ Page header â”€â”€ */
 .header {
     display: flex;
     align-items: center;
@@ -119,7 +153,7 @@ foreach ($cards as $i => $c) {
 }
 .header-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
-/* ── Buttons ── */
+/* â”€â”€ Buttons â”€â”€ */
 .btn {
     display: inline-flex; align-items: center; gap: 8px;
     padding: 9px 16px;
@@ -143,7 +177,7 @@ foreach ($cards as $i => $c) {
 .btn-light { background: #f1f5f9; color: #475569; }
 .btn-light:hover { background: #e2e8f0; color: #0f172a; }
 
-/* ── Stats grid (students.php style) ── */
+/* â”€â”€ Stats grid (students.php style) â”€â”€ */
 .rfid-stats {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -194,7 +228,7 @@ foreach ($cards as $i => $c) {
     color: #64748b; font-size: 13px; margin-top: 1px;
 }
 
-/* ── Search Table Container (students.php style) ── */
+/* â”€â”€ Search Table Container (students.php style) â”€â”€ */
 .search-table-container {
     background: white;
     border-radius: 14px;
@@ -254,7 +288,7 @@ foreach ($cards as $i => $c) {
 .search-bar .search-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .search-bar .search-actions .btn { height: 40px; padding: 0 18px; border-radius: 10px; font-size: 13px; font-weight: 600; }
 
-/* ── Filter select (within search-bar) ── */
+/* â”€â”€ Filter select (within search-bar) â”€â”€ */
 .filter-select-wrapper {
     position: relative; display: flex; align-items: center;
     min-width: 130px;
@@ -304,7 +338,7 @@ foreach ($cards as $i => $c) {
 }
 .search-clear:hover { background: #f1f5f9; color: #1e293b; }
 
-/* ── Card UID pill ── */
+/* â”€â”€ Card UID pill â”€â”€ */
 .card-uid-display {
     display: inline-flex; align-items: center; gap: 8px;
     font-family: 'Courier New', monospace;
@@ -320,7 +354,7 @@ foreach ($cards as $i => $c) {
     font-size: 10px; color: #64748b;
 }
 
-/* ── Table ── */
+/* â”€â”€ Table â”€â”€ */
 .rfid-table-wrapper {
     background: white;
     border-radius: 14px;
@@ -349,7 +383,7 @@ foreach ($cards as $i => $c) {
 .rfid-table-wrapper tbody tr:hover { background: #f8fafc; }
 .rfid-table-wrapper tbody tr:last-child td { border-bottom: none; }
 
-/* ── Student info cell ── */
+/* â”€â”€ Student info cell â”€â”€ */
 .student-info { display: flex; align-items: center; gap: 10px; }
 .student-avatar {
     width: 32px; height: 32px;
@@ -373,7 +407,7 @@ foreach ($cards as $i => $c) {
 }
 .unassigned-text { color: #94a3b8; font-style: italic; font-size: 13px; }
 
-/* ── Status badges ── */
+/* â”€â”€ Status badges â”€â”€ */
 .status-badge {
     display: inline-flex; align-items: center; gap: 6px;
     padding: 4px 10px;
@@ -394,10 +428,10 @@ foreach ($cards as $i => $c) {
 .status-badge.denied     { background: #fee2e2; color: #dc2626; }
 .status-badge.lost      { background: #fef3c7; color: #b45309; }
 
-/* ── Expiry warning ── */
+/* â”€â”€ Expiry warning â”€â”€ */
 .expiry-warning { color: #b45309; font-size: 12px; font-weight: 500; margin-left: 6px; }
 
-/* ── Action group ── */
+/* â”€â”€ Action group â”€â”€ */
 .action-group { display: flex; gap: 6px; justify-content: center; }
 .action-btn {
     width: 32px; height: 32px;
@@ -413,7 +447,7 @@ foreach ($cards as $i => $c) {
 .action-btn.edit   { color: #b45309; } .action-btn.edit:hover   { background: #fef3c7; }
 .action-btn.delete { color: #dc2626; } .action-btn.delete:hover { background: #fee2e2; }
 
-/* ── Table footer ── */
+/* â”€â”€ Table footer â”€â”€ */
 .table-footer {
     padding: 12px 18px;
     background: #fafcfd;
@@ -422,7 +456,7 @@ foreach ($cards as $i => $c) {
 .table-footer .info-text { font-size: 13px; color: #64748b; }
 .table-footer .info-text strong { color: #0f172a; }
 
-/* ── Modals ── */
+/* â”€â”€ Modals â”€â”€ */
 .rfid-modal {
     max-width: 520px;
     text-align: left;
@@ -558,7 +592,7 @@ foreach ($cards as $i => $c) {
 }
 .rfid-modal-actions .btn { padding: 9px 18px; }
 
-/* ── View Modal (centered) ── */
+/* â”€â”€ View Modal (centered) â”€â”€ */
 .rfid-view-modal {
     max-width: 480px;
     text-align: left;
@@ -662,10 +696,10 @@ foreach ($cards as $i => $c) {
     .rfid-view-modal { max-width: 96%; padding: 22px 18px; }
 }
 
-/* ── Toast on top of everything ── */
+/* â”€â”€ Toast on top of everything â”€â”€ */
 .toast-container { z-index: 100000 !important; }
 
-/* ── Responsive ── */
+/* â”€â”€ Responsive â”€â”€ */
 @media (max-width: 1024px) {
     .dashboard-main { padding: 22px; }
 }
@@ -688,6 +722,81 @@ foreach ($cards as $i => $c) {
     .rfid-stat-card .stat-number { font-size: 18px; }
     .header { flex-direction: column; align-items: flex-start; gap: 12px; }
     .header-actions { width: 100%; }
+}
+</style>
+
+<!-- ID Card Styles (from student-ids.php) -->
+<style>
+.idtype-chip { display:inline-block; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:600; background:#eef4ff; color:#2563eb; }
+.qr-thumb { width:36px; height:36px; border:1px solid #e2e8f0; border-radius:8px; object-fit:contain; background:white; }
+/* â”€â”€ ID card (view modal) &mdash; 3D flip card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.idcard-flip { width:340px; height:430px; margin:0 auto; perspective:1400px; }
+.idcard-inner { position:relative; width:100%; height:100%; transform-style:preserve-3d; transition:transform .8s cubic-bezier(.4,.15,.2,1); }
+.idcard-flip.flipped .idcard-inner { transform:rotateY(180deg); }
+.idcard, .idcard-back {
+    position:absolute; inset:0; width:100%; height:100%; margin:0;
+    border-radius:18px; overflow:hidden; background:#fff;
+    border:1px solid #e2e8f0; box-shadow:0 12px 32px rgba(15,23,42,.12);
+    display:flex; flex-direction:column;
+    backface-visibility:hidden; -webkit-backface-visibility:hidden;
+}
+.idcard-head { background:linear-gradient(135deg,#1a3a8c 0%,#2563eb 100%); color:#fff; padding:14px 18px; display:flex; align-items:center; gap:11px; position:relative; overflow:hidden; }
+.idcard-head::after { content:''; position:absolute; right:-30px; top:-30px; width:110px; height:110px; border-radius:50%; background:radial-gradient(circle,rgba(255,255,255,.18),transparent 70%); }
+.idcard-head img { width:34px; height:34px; border-radius:8px; background:#fff; object-fit:contain; position:relative; z-index:1; }
+.idcard-head .school { font-size:12.5px; font-weight:800; letter-spacing:.3px; position:relative; z-index:1; }
+.idcard-head .school small { display:block; font-size:9.5px; font-weight:500; opacity:.85; margin-top:1px; }
+.idcard-photo-wrap { display:flex; justify-content:center; padding-top:16px; position:relative; z-index:2; }
+.idcard-photo { width:86px; height:86px; border-radius:50%; object-fit:cover; background:#e2e8f0; border:4px solid #fff; box-shadow:0 4px 12px rgba(15,23,42,.18); display:block; }
+.idcard-initials { width:86px; height:86px; border-radius:50%; background:linear-gradient(135deg,#e2e8f0,#cbd5e1); border:4px solid #fff; box-shadow:0 4px 12px rgba(15,23,42,.18); display:flex; align-items:center; justify-content:center; font-size:26px; font-weight:800; color:#475569; }
+.idcard-center { text-align:center; padding:10px 20px 0; }
+.idcard-name { font-size:16px; font-weight:800; color:#0f172a; margin-top:4px; line-height:1.3; }
+.idcard-meta { font-size:11.5px; color:#64748b; margin-top:3px; }
+.idcard-sec { display:flex; align-items:flex-start; gap:14px; margin:14px 18px 0; padding:12px 14px; background:#f8fafc; border:1px solid #eef2f7; border-radius:14px; }
+.idcard-fields { flex:1; min-width:0; }
+.idcard-field { margin-bottom:7px; }
+.idcard-field:last-child { margin-bottom:0; }
+.idcard-field .k { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.6px; color:#94a3b8; }
+.idcard-field .v { font-size:12.5px; font-weight:700; color:#0f172a; }
+.idcard-field .v.mono { font-family:'JetBrains Mono',monospace; letter-spacing:.5px; }
+.idcard-qrbox { text-align:center; flex-shrink:0; }
+.idcard-qrbox img { width:78px; height:78px; background:#fff; padding:4px; border-radius:10px; border:1px solid #e2e8f0; display:block; }
+.idcard-qrbox .cap { font-size:8.5px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#94a3b8; margin-top:3px; }
+.idcard-qrbox .cap.ok { color:#16a34a; }
+.idcard-foot { margin-top:auto; background:#f8fafc; border-top:1px solid #eef2f7; padding:12px 20px; text-align:center; font-size:9px; color:#94a3b8; line-height:1.5; }
+/* â”€â”€ Card back â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.idcard-back {
+    position:absolute; inset:0; width:100%; height:100%; margin:0;
+    border-radius:18px; overflow:hidden; background:#fff;
+    border:1px solid #e2e8f0; box-shadow:0 12px 32px rgba(15,23,42,.12);
+    display:flex; flex-direction:column;
+    backface-visibility:hidden; -webkit-backface-visibility:hidden;
+    transform:rotateY(180deg);
+}
+.idcard-back-head { background:#0f172a; color:#fff; padding:10px 18px; display:flex; align-items:center; justify-content:space-between; }
+.idcard-back-head .b-school { font-size:10.5px; font-weight:800; letter-spacing:.4px; }
+.idcard-back-head .b-school small { display:block; font-size:8.5px; font-weight:500; color:#94a3b8; margin-top:1px; }
+.idcard-back-sec { padding:12px 18px 4px; }
+.idcard-back-sec + .idcard-back-sec { padding-top:0; }
+.idcard-sec-title { display:flex; align-items:center; gap:6px; font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.7px; color:#94a3b8; margin-bottom:6px; }
+.idcard-sec-title i { color:#2563eb; font-size:10px; }
+.idcard-emg-row { display:flex; align-items:flex-start; gap:9px; padding:6px 0; }
+.idcard-emg-row + .idcard-emg-row { border-top:1px dashed #eef2f7; }
+.idcard-emg-ico { width:26px; height:26px; border-radius:8px; background:#fef2f2; color:#dc2626; display:flex; align-items:center; justify-content:center; font-size:11px; flex-shrink:0; }
+.idcard-emg-name { font-size:12px; font-weight:700; color:#0f172a; }
+.idcard-emg-sub { font-size:10.5px; color:#64748b; margin-top:1px; }
+.idcard-addr { font-size:11.5px; color:#334155; line-height:1.55; background:#f8fafc; border:1px solid #eef2f7; border-radius:10px; padding:8px 12px; }
+.idcard-addr em { color:#94a3b8; }
+.idcard-sig { text-align:center; padding:4px 24px 14px; }
+.idcard-sig .line { border-top:1px solid #334155; margin:0 24px 4px; }
+.idcard-sig .who { font-size:8.5px; color:#475569; text-transform:uppercase; letter-spacing:.5px; }
+.idcard-back-foot { margin-top:auto; background:#f8fafc; border-top:1px solid #eef2f7; padding:8px 20px; text-align:center; font-size:9px; color:#94a3b8; line-height:1.5; }
+/* ── Print-only ID card styles ──────────────────────── */
+#printArea{display:none;}
+@media print{
+    @page{size:portrait;margin:10mm;}
+    body>*{display:none !important;}
+    #printArea{display:block !important;position:fixed;left:0;top:0;width:100%;}
+    #printArea *{-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;color-adjust:exact !important;}
 }
 </style>
 
@@ -789,6 +898,8 @@ foreach ($cards as $i => $c) {
                 <tr>
                     <th>Card UID</th>
                     <th>Student</th>
+                    <th>ID Number</th>
+                    <th>QR</th>
                     <th>Issued</th>
                     <th>Expiry</th>
                     <th>Status</th>
@@ -798,7 +909,7 @@ foreach ($cards as $i => $c) {
             <tbody id="rfidTableBody">
                 <?php if (empty($cards)): ?>
                     <tr>
-                        <td colspan="6" style="text-align:center; padding:48px 12px; color:#94a3b8;">
+                        <td colspan="8" style="text-align:center; padding:48px 12px; color:#94a3b8;">
                             <i class="fas fa-credit-card" style="font-size:42px; color:#cbd5e1; display:block; margin-bottom:10px;"></i>
                             <p style="font-size:15px; font-weight:600; color:#64748b; margin:0;">No RFID cards found</p>
                             <p style="font-size:13px; margin:4px 0 0;">Assign cards to students to get started</p>
@@ -813,7 +924,19 @@ foreach ($cards as $i => $c) {
                         }
                         $avatarClass = $avatarClasses[$cardIndex] ?? 'blue';
                     ?>
-                        <tr data-card='<?= htmlspecialchars(json_encode($card), ENT_QUOTES, 'UTF-8') ?>'>
+                        <tr data-card='<?= htmlspecialchars(json_encode($card), ENT_QUOTES, 'UTF-8') ?>'
+                            data-id="<?= (int)$card['id'] ?>"
+                            data-student-id="<?= (int)($card['student_id'] ?? 0) ?>"
+                            data-name="<?= htmlspecialchars($card['student_name'] ?? '', ENT_QUOTES) ?>"
+                            data-photo="<?= htmlspecialchars($card['student_photo'] ?? '', ENT_QUOTES) ?>"
+                            data-course="<?= htmlspecialchars($card['course'] ?? '', ENT_QUOTES) ?>"
+                            data-year="<?= htmlspecialchars($card['year_level'] ?? '', ENT_QUOTES) ?>"
+                            data-idnumber="<?= htmlspecialchars($card['student_id_number'] ?? '', ENT_QUOTES) ?>"
+                            data-idtype="<?= htmlspecialchars($card['id_type'] ?? 'school_id', ENT_QUOTES) ?>"
+                            data-issued="<?= htmlspecialchars($card['id_issue_date'] ?? $card['issued_date'] ?? '', ENT_QUOTES) ?>"
+                            data-expiry="<?= htmlspecialchars($card['id_expiry_date'] ?? $card['expiry_date'] ?? '', ENT_QUOTES) ?>"
+                            data-qr="<?= htmlspecialchars($card['qr_code_path'] ?? '', ENT_QUOTES) ?>"
+                            data-student-number="<?= htmlspecialchars($card['student_number'] ?? '', ENT_QUOTES) ?>">
                             <td>
                                 <div class="card-uid-display">
                                     <span class="chip"><i class="fas fa-microchip"></i></span>
@@ -833,9 +956,23 @@ foreach ($cards as $i => $c) {
                                     <span class="unassigned-text">Unassigned</span>
                                 <?php endif; ?>
                             </td>
-                            <td><?= $card['issued_date'] ? date('M d, Y', strtotime($card['issued_date'])) : '—' ?></td>
                             <td>
-                                <?= $card['expiry_date'] ? date('M d, Y', strtotime($card['expiry_date'])) : '—' ?>
+                                <?php if (!empty($card['student_id_number'])): ?>
+                                    <span style="font-family:ui-monospace,Consolas,monospace;font-size:12px;font-weight:600;color:#2563eb;background:#eff6ff;padding:3px 8px;border-radius:6px;"><?= htmlspecialchars($card['student_id_number']) ?></span>
+                                <?php else: ?>
+                                    <span style="color:#94a3b8;font-size:12px;">&mdash;</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if (!empty($card['qr_code_path'])): ?>
+                                    <img class="qr-thumb" src="<?= htmlspecialchars($card['qr_code_path']) ?>" alt="QR">
+                                <?php else: ?>
+                                    <span style="color:#94a3b8;font-size:12px;">&mdash;</span>
+                                <?php endif; ?>
+                            </td>
+                            <td><?= $card['issued_date'] ? date('M d, Y', strtotime($card['issued_date'])) : '&mdash;' ?></td>
+                            <td>
+                                <?= $card['expiry_date'] ? date('M d, Y', strtotime($card['expiry_date'])) : '&mdash;' ?>
                                 <?php
                                     $daysLeft = null;
                                     if ($card['expiry_date']) {
@@ -854,8 +991,8 @@ foreach ($cards as $i => $c) {
                             </td>
                             <td>
                                 <div class="action-group">
-                                    <button class="action-btn view" onclick="openViewDrawer(<?= (int)$card['id'] ?>)" title="View">
-                                        <i class="fas fa-eye"></i>
+                                    <button class="action-btn view" onclick="viewIdCard(this)" title="View ID Card">
+                                        <i class="fas fa-id-card"></i>
                                     </button>
                                     <button class="action-btn edit" onclick="openEditModal(<?= (int)$card['id'] ?>)" title="Edit">
                                         <i class="fas fa-pen"></i>
@@ -878,7 +1015,7 @@ foreach ($cards as $i => $c) {
 </div><!-- /search-table-container -->
     </main>
 
-<!-- ── Assign Card Modal ── -->
+<!-- â”€â”€ Assign Card Modal â”€â”€ -->
 <div class="logout-modal-overlay" id="assignModal">
     <div class="logout-modal rfid-modal">
         <div class="rfid-modal-header">
@@ -911,7 +1048,7 @@ foreach ($cards as $i => $c) {
                         <option value="">Select a student</option>
                         <?php foreach ($students as $student): ?>
                             <option value="<?= (int)$student['id'] ?>">
-                                <?= htmlspecialchars($student['name']) ?> · <?= htmlspecialchars($student['student_number']) ?> · <?= htmlspecialchars($student['course']) ?>
+                                <?= htmlspecialchars($student['name']) ?> &middot; <?= htmlspecialchars($student['student_number']) ?> &middot; <?= htmlspecialchars($student['course']) ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
@@ -983,6 +1120,10 @@ foreach ($cards as $i => $c) {
 
             </div><!-- /rfid-modal-body-wrapper -->
 
+            <div style="padding:10px 20px;font-size:12px;color:#64748b;background:#f8fafc;border-top:1px solid #e2e8f0;">
+                <i class="fas fa-info-circle" style="color:#2563eb;"></i> A Student ID (school_id) with QR code will also be issued automatically.
+            </div>
+
             <div class="rfid-modal-actions">
                 <button type="button" class="btn btn-light" data-close-modal="assign">Cancel</button>
                 <button type="submit" class="btn btn-primary" id="assignSubmitBtn" disabled>
@@ -993,7 +1134,7 @@ foreach ($cards as $i => $c) {
     </div>
 </div>
 
-<!-- ── Edit Card Modal ── -->
+<!-- â”€â”€ Edit Card Modal â”€â”€ -->
 <div class="logout-modal-overlay" id="editModal">
     <div class="logout-modal rfid-modal">
         <div class="rfid-modal-header">
@@ -1029,14 +1170,14 @@ foreach ($cards as $i => $c) {
                     <div class="form-group" style="flex:1;">
                         <label>Assigned Student</label>
                         <div style="padding:9px 12px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:8px;font-weight:600;font-size:14px;color:#0f172a;">
-                            <span id="editStudentName">—</span>
+                            <span id="editStudentName">&mdash;</span>
                             <span id="editStudentNumber" style="font-weight:400;color:#64748b;margin-left:8px;"></span>
                         </div>
                     </div>
                 </div>
                 <div style="margin-top:8px;padding:8px 12px;background:#fef9c3;border:1px solid #facc15;border-radius:8px;font-size:11px;color:#92400e;display:flex;align-items:center;gap:8px;">
                     <i class="fas fa-info-circle"></i>
-                    <span>Last updated: <span id="editUpdatedAt">—</span></span>
+                    <span>Last updated: <span id="editUpdatedAt">&mdash;</span></span>
                 </div>
             </div>
 
@@ -1070,7 +1211,7 @@ foreach ($cards as $i => $c) {
                     <label><i class="fas fa-question-circle" style="margin-right:4px;color:#64748b;"></i>Status Reason</label>
                     <div style="position:relative;">
                         <select id="editStatusReason" class="form-control">
-                            <option value="">— Select reason —</option>
+                            <option value="">&mdash; Select reason &mdash;</option>
                             <option value="active">Active</option>
                             <option value="graduated">Graduated</option>
                             <option value="lost_card">Lost Card</option>
@@ -1109,7 +1250,7 @@ foreach ($cards as $i => $c) {
     </div>
 </div>
 
-<!-- ── View Card Modal ── -->
+<!-- â”€â”€ View Card Modal â”€â”€ -->
 <div class="logout-modal-overlay" id="viewModal">
     <div class="logout-modal rfid-view-modal">
         <div class="rfid-view-header">
@@ -1128,7 +1269,7 @@ foreach ($cards as $i => $c) {
                 <div class="uid-icon"><i class="fas fa-microchip"></i></div>
                 <div>
                     <div style="font-size:11px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;">Card UID</div>
-                    <div class="uid-text" id="viewUid">—</div>
+                    <div class="uid-text" id="viewUid">&mdash;</div>
                 </div>
             </div>
 
@@ -1142,10 +1283,11 @@ foreach ($cards as $i => $c) {
                     </div>
                 </div>
                 <ul class="rfid-view-kv">
-                    <li><span class="kv-label">Name</span><span class="kv-value" id="viewStudent">—</span></li>
-                    <li><span class="kv-label">Student #</span><span class="kv-value" id="viewStudentNumber">—</span></li>
-                    <li><span class="kv-label">Course</span><span class="kv-value" id="viewCourse">—</span></li>
-                    <li><span class="kv-label">Year</span><span class="kv-value" id="viewYearLevel">—</span></li>
+                    <li><span class="kv-label">Name</span><span class="kv-value" id="viewStudent">&mdash;</span></li>
+                    <li><span class="kv-label">Student #</span><span class="kv-value" id="viewStudentNumber">&mdash;</span></li>
+                    <li><span class="kv-label">ID Number</span><span class="kv-value" id="viewIdNumber">&mdash;</span></li>
+                    <li><span class="kv-label">Course</span><span class="kv-value" id="viewCourse">&mdash;</span></li>
+                    <li><span class="kv-label">Year</span><span class="kv-value" id="viewYearLevel">&mdash;</span></li>
                 </ul>
             </div>
 
@@ -1164,14 +1306,14 @@ foreach ($cards as $i => $c) {
                         <span class="kv-value">
                             <span class="rfid-view-status-badge" id="viewStatusBadge">
                                 <span class="status-dot"></span>
-                                <span id="viewStatus">—</span>
+                                <span id="viewStatus">&mdash;</span>
                             </span>
                         </span>
                     </li>
-                    <li><span class="kv-label">Status Reason</span><span class="kv-value" id="viewStatusReason">—</span></li>
-                    <li><span class="kv-label">Last Updated</span><span class="kv-value" id="viewStatusUpdatedAt">—</span></li>
-                    <li><span class="kv-label">Issued</span><span class="kv-value" id="viewIssued">—</span></li>
-                    <li><span class="kv-label">Expiry</span><span class="kv-value" id="viewExpiry">—</span></li>
+                    <li><span class="kv-label">Status Reason</span><span class="kv-value" id="viewStatusReason">&mdash;</span></li>
+                    <li><span class="kv-label">Last Updated</span><span class="kv-value" id="viewStatusUpdatedAt">&mdash;</span></li>
+                    <li><span class="kv-label">Issued</span><span class="kv-value" id="viewIssued">&mdash;</span></li>
+                    <li><span class="kv-label">Expiry</span><span class="kv-value" id="viewExpiry">&mdash;</span></li>
                 </ul>
             </div>
 
@@ -1196,7 +1338,7 @@ foreach ($cards as $i => $c) {
                         <div class="form-section-subtitle">Additional information</div>
                     </div>
                 </div>
-                <div class="rfid-view-notes" id="viewNotes">—</div>
+                <div class="rfid-view-notes" id="viewNotes">&mdash;</div>
             </div>
 
             <!-- Scans -->
@@ -1224,10 +1366,87 @@ foreach ($cards as $i => $c) {
     </div>
 </div>
 
-<!-- ── Toast container ── -->
+<!-- â”€â”€ View ID Card Modal â”€â”€ -->
+<div class="modal-overlay" id="idCardModal">
+    <div class="modal-content" style="max-width:400px;">
+        <div class="modal-header"><h3><i class="fas fa-id-card" style="color:#2563eb;"></i> Student ID Card</h3><button class="modal-close" onclick="document.getElementById('idCardModal').classList.remove('active'); document.body.style.overflow='';"><i class="fas fa-times"></i></button></div>
+        <div class="modal-body">
+            <div class="idcard-flip" id="cardFlip">
+              <div class="idcard-inner">
+                <div class="idcard">
+                    <div class="idcard-head">
+                        <img src="../assets/images/BCP_LOGO.png" alt="BCP" onerror="this.style.display='none'">
+                        <div class="school">BESTLINK COLLEGE OF THE PHILIPPINES<small>Official Student Identification</small></div>
+                    </div>
+                    <div class="idcard-photo-wrap">
+                        <img class="idcard-photo" id="cardPhoto" src="" alt="photo" style="display:none;" onerror="showIdInitialsFallback()">
+                        <div class="idcard-initials" id="cardInitials" style="display:none;">&mdash;</div>
+                    </div>
+                    <div class="idcard-center">
+                        <div class="idcard-name" id="cardName">&mdash;</div>
+                    </div>
+                    <div class="idcard-sec">
+                        <div class="idcard-fields">
+                            <div class="idcard-field"><div class="k">Course</div><div class="v" id="cardCourse">&mdash;</div></div>
+                            <div class="idcard-field"><div class="k">ID Number</div><div class="v mono" id="cardNumber">&mdash;</div></div>
+                            <div style="display:flex;gap:16px;">
+                                <div class="idcard-field" style="flex:1;"><div class="k">Issued</div><div class="v" id="cardIssued">&mdash;</div></div>
+                                <div class="idcard-field" style="flex:1;"><div class="k">Valid Until</div><div class="v" id="cardExpiry">&mdash;</div></div>
+                            </div>
+                        </div>
+                        <div class="idcard-qrbox">
+                            <img id="cardQr" src="" alt="QR">
+                            <div class="cap" id="cardQrCap">Scan to verify</div>
+                        </div>
+                    </div>
+                    <div class="idcard-foot">This ID is property of Bestlink College of the Philippines.<br>If found, please return to the Registrar's Office.</div>
+                </div>
+
+                <div class="idcard-back">
+                    <div class="idcard-back-head">
+                        <div class="b-school">BESTLINK COLLEGE OF THE PHILIPPINES<small>Registrar's Office</small></div>
+                    </div>
+                    <div class="idcard-back-sec">
+                        <div class="idcard-sec-title"><i class="fa-solid fa-triangle-exclamation"></i> In case of emergency, please contact</div>
+                        <div id="cardBackEmg"></div>
+                    </div>
+                    <div class="idcard-back-sec">
+                        <div class="idcard-sec-title"><i class="fa-solid fa-house"></i> Address</div>
+                        <div class="idcard-addr" id="cardBackAddr"><em>Not on file</em></div>
+                    </div>
+                    <div class="idcard-back-sec">
+                        <div class="idcard-sec-title"><i class="fa-solid fa-file-shield"></i> Reminders</div>
+                        <div class="idcard-addr" style="font-size:10.5px;">
+                            &bull; This card is non-transferable and must be worn at all times inside the campus.<br>
+                            &bull; Not valid without the signature of the Registrar.<br>
+                            &bull; Report lost cards immediately to the Registrar's Office.
+                        </div>
+                    </div>
+                    <div class="idcard-sig">
+                        <div class="line"></div>
+                        <div class="who">Signature of Student &mdash; Not valid without signature</div>
+                    </div>
+                    <div class="idcard-back-foot">If this card is found, please return to the Registrar's Office or call the school hotline.</div>
+                </div>
+              </div>
+            </div>
+            <div style="text-align:center;margin-top:14px;">
+                <button type="button" class="btn btn-light" onclick="document.getElementById('cardFlip').classList.toggle('flipped')" style="min-width:150px;"><i class="fas fa-rotate"></i> Flip Card</button>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="document.getElementById('idCardModal').classList.remove('active'); document.body.style.overflow='';">Close</button>
+            <button class="btn btn-primary" onclick="printIdCard()"><i class="fas fa-print"></i> Print ID</button>
+        </div>
+    </div>
+</div>
+
+<!-- â”€â”€ Toast container â”€â”€ -->
+<div id="printArea"></div>
+
 <div class="toast-container" id="toastContainer"></div>
 
-<!-- ── Delete Confirmation Modal ── -->
+<!-- â”€â”€ Delete Confirmation Modal â”€â”€ -->
 <div class="logout-modal-overlay" id="deleteModal">
     <div class="logout-modal">
         <div class="logout-modal-icon" style="background: #fee2e2;">
@@ -1244,13 +1463,15 @@ foreach ($cards as $i => $c) {
     </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
 <script>
 // =================================================================
-// RFID CARDS — INLINE JS
+// RFID CARDS &mdash; INLINE JS
 // =================================================================
 let deleteTarget = null;
 
-// ── Toast helper (colored, from components.css) ──
+// â”€â”€ Toast helper (colored, from components.css) â”€â”€
 function showToast(title, message, type) {
     const container = document.getElementById('toastContainer') || (() => {
         const c = document.createElement('div');
@@ -1282,7 +1503,7 @@ function showToast(title, message, type) {
     }, 4000);
 }
 
-// ── Delete modal ──
+// â”€â”€ Delete modal â”€â”€
 function confirmDelete(id, uid) {
     deleteTarget = id;
     document.getElementById('deleteMessage').textContent = 'Are you sure you want to delete RFID card ' + uid + '? This action cannot be undone.';
@@ -1315,7 +1536,7 @@ document.getElementById('deleteModal').addEventListener('click', (e) => {
     });
 });
 
-// ── Live search + status filter ──
+// â”€â”€ Live search + status filter â”€â”€
 const rfidSearchInput = document.getElementById('rfidSearch');
 const rfidTableBody = document.getElementById('rfidTableBody');
 const searchClearBtn = document.getElementById('searchClear');
@@ -1349,7 +1570,7 @@ if (resetFilterBtn) resetFilterBtn.addEventListener('click', () => {
     rfidSearchInput && rfidSearchInput.focus();
 });
 
-// ── Assign modal: students from <select> ──
+// â”€â”€ Assign modal: students from <select> â”€â”€
 // AI card search (api/rfid-ai-search.php)
 const aiRfidBtn = document.getElementById('aiRfidSearchBtn');
 const aiRfidInfo = document.getElementById('aiRfidInterpretation');
@@ -1458,7 +1679,7 @@ if (studentSearchInput) {
     });
 }
 
-// ── UID input + duplicate check ──
+// â”€â”€ UID input + duplicate check â”€â”€
 const cardUidInput = document.getElementById('cardUid');
 let uidCheckTimeout;
 
@@ -1497,7 +1718,7 @@ if (cardUidInput) {
     });
 }
 
-// ── Form validation for Assign modal ──
+// â”€â”€ Form validation for Assign modal â”€â”€
 function validateAssignForm() {
     const studentId = document.getElementById('selectedStudentId').value;
     const cardUid = document.getElementById('cardUid').value.trim();
@@ -1507,7 +1728,7 @@ function validateAssignForm() {
     }
 }
 
-// ── Open / close modals ──
+// â”€â”€ Open / close modals â”€â”€
 function openAssignModal() {
     document.getElementById('assignModal').classList.add('active');
     document.body.style.overflow = 'hidden';
@@ -1531,7 +1752,7 @@ function closeViewDrawer() {
     closeViewModal();
 }
 
-// ── Assign form submit ──
+// â”€â”€ Assign form submit â”€â”€
 document.getElementById('assignCardForm').addEventListener('submit', async function (e) {
     e.preventDefault();
     const studentId = document.getElementById('selectedStudentId').value;
@@ -1571,7 +1792,7 @@ document.getElementById('assignCardForm').addEventListener('submit', async funct
     }
 });
 
-// ── Edit modal ──
+// â”€â”€ Edit modal â”€â”€
 async function openEditModal(id) {
     const m = document.getElementById('editModal');
     if (!m) return;
@@ -1634,7 +1855,7 @@ document.getElementById('editCardForm').addEventListener('submit', async functio
     }
 });
 
-// ── View modal ──
+// â”€â”€ View modal â”€â”€
 async function openViewDrawer(id) {
     const modal = document.getElementById('viewModal');
     if (!modal) return;
@@ -1643,11 +1864,11 @@ async function openViewDrawer(id) {
 
     const setText = (sel, v) => {
         const el = modal.querySelector(sel);
-        if (el) el.textContent = (v === null || v === undefined || v === '') ? '—' : v;
+        if (el) el.textContent = (v === null || v === undefined || v === '') ? '&mdash;' : v;
     };
 
-    setText('#viewUid', '…');
-    setText('#viewStudent', 'Loading…');
+    setText('#viewUid', 'â€¦');
+    setText('#viewStudent', 'Loadingâ€¦');
 
     try {
         const res = await fetch('../api/rfid.php?id=' + id);
@@ -1657,6 +1878,7 @@ async function openViewDrawer(id) {
         setText('#viewUid', c.card_uid);
         setText('#viewStudent', c.student_name || 'Unassigned');
         setText('#viewStudentNumber', c.student_number);
+        setText('#viewIdNumber', c.student_id_number);
         setText('#viewCourse', c.course);
         setText('#viewYearLevel', c.year_level ? c.year_level + ' Year' : null);
         setText('#viewStatus', c.status ? c.status[0].toUpperCase() + c.status.slice(1) : null);
@@ -1664,7 +1886,7 @@ async function openViewDrawer(id) {
         if (badge) badge.className = 'rfid-view-status-badge ' + (c.status || '');
 
         // Status reason (convert underscores to spaces and capitalize)
-        let reasonText = '—';
+        let reasonText = '&mdash;';
         if (c.status_reason) {
             reasonText = c.status_reason
                 .split('_')
@@ -1696,8 +1918,8 @@ async function openViewDrawer(id) {
                 if (all.length) {
                     histDiv.innerHTML = all.map(h =>
                         '<div class="rfid-view-scan-row">' +
-                            '<span class="status-badge ' + (h.status || '') + '">' + (h.status ? h.status[0].toUpperCase() + h.status.slice(1) : '—') + '</span>' +
-                            '<span class="scan-meta">' + (h.card_uid || '—') + (h.issued_date ? ' · Issued ' + new Date(h.issued_date).toLocaleDateString() : '') + '</span>' +
+                            '<span class="status-badge ' + (h.status || '') + '">' + (h.status ? h.status[0].toUpperCase() + h.status.slice(1) : '&mdash;') + '</span>' +
+                            '<span class="scan-meta">' + (h.card_uid || '&mdash;') + (h.issued_date ? ' &middot; Issued ' + new Date(h.issued_date).toLocaleDateString() : '') + '</span>' +
                         '</div>'
                     ).join('');
                     histSection.style.display = '';
@@ -1707,7 +1929,7 @@ async function openViewDrawer(id) {
 
         const list = document.getElementById('viewScans');
         if (list) {
-            list.innerHTML = '<p style="color:#64748b;font-size:13px;text-align:center;padding:16px;">Loading scans…</p>';
+            list.innerHTML = '<p style="color:#64748b;font-size:13px;text-align:center;padding:16px;">Loading scansâ€¦</p>';
             try {
                 const sres = await fetch('../api/rfid-scan.php?limit=10');
                 const sjson = await sres.json();
@@ -1717,10 +1939,10 @@ async function openViewDrawer(id) {
                 } else {
                     list.innerHTML = scans.map(s => {
                         const when = new Date(s.scanned_at).toLocaleString(undefined, { month:'short', day:'2-digit', hour:'2-digit', minute:'2-digit' });
-                        const statusText = s.status ? s.status[0].toUpperCase() + s.status.slice(1) : '—';
+                        const statusText = s.status ? s.status[0].toUpperCase() + s.status.slice(1) : '&mdash;';
                         return '<div class="rfid-view-scan-row">' +
                                     '<span class="status-badge ' + (s.status || '') + '">' + statusText + '</span>' +
-                                    '<span class="scan-meta">' + when + ' · ' + (s.location || 'Main Gate') + '</span>' +
+                                    '<span class="scan-meta">' + when + ' &middot; ' + (s.location || 'Main Gate') + '</span>' +
                                 '</div>';
                     }).join('');
                 }
@@ -1740,12 +1962,13 @@ function closeViewModal() {
     document.body.style.overflow = '';
 }
 
-// ── Universal Esc + close-on-overlay ──
+// â”€â”€ Universal Esc + close-on-overlay â”€â”€
 document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if (document.getElementById('assignModal').classList.contains('active')) closeAssignModal();
     else if (document.getElementById('editModal').classList.contains('active')) closeEditModal();
     else if (document.getElementById('viewModal').classList.contains('active')) closeViewModal();
+    else if (document.getElementById('idCardModal').classList.contains('active')) { document.getElementById('idCardModal').classList.remove('active'); document.body.style.overflow = ''; }
     else if (document.getElementById('deleteModal').classList.contains('active')) {
         document.getElementById('deleteModal').classList.remove('active');
         document.body.style.overflow = '';
@@ -1759,6 +1982,145 @@ document.querySelectorAll('[data-close-modal]').forEach(el => {
         else if (t === 'edit') closeEditModal();
         else if (t === 'view') closeViewModal();
     });
+});
+
+// â”€â”€ ID Card View (3D flip) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const CARD_EXTRAS = <?= json_encode($cardExtras ?: new stdClass(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+let idCardData = null;
+
+function normalizePhotoPath(p) {
+    if (!p) return '';
+    p = p.trim();
+    if (/^(https?:|data:|blob:)/i.test(p)) return p;
+    if (p.startsWith('../') || p.startsWith('/')) return p;
+    return '../' + p.replace(/^\.?\//, '');
+}
+function idInitialsOf(name) {
+    return (name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
+}
+function showIdInitialsFallback() {
+    const img = document.getElementById('cardPhoto');
+    const ini = document.getElementById('cardInitials');
+    if (img) img.style.display = 'none';
+    if (ini) { ini.textContent = idInitialsOf(idCardData ? idCardData.name : ''); ini.style.display = 'flex'; }
+}
+
+function generateQrDataUrl(idNumber) {
+    if (typeof qrcode === 'undefined') return '';
+    try {
+        const qr = qrcode(0, 'M');
+        qr.addData('https://registrar.bcpsms2.com/verify-student.php?id_number=' + encodeURIComponent(idNumber || ''));
+        qr.make();
+        return qr.createDataURL(8, 8);
+    } catch (e) { return ''; }
+}
+
+function viewIdCard(btn) {
+    const tr = btn.closest('tr');
+    const d = tr.dataset;
+    if (!d.studentId || d.studentId === '0') { showToast('No Student', 'This card has no student assigned.', 'warning'); return; }
+    idCardData = {
+        name: d.name, studentId: d.studentId, photo: d.photo, course: d.course,
+        year: d.year, idnumber: d.idnumber, qr: d.qr, idtype: d.idtype,
+        issued: d.issued, expiry: d.expiry
+    };
+    const img = document.getElementById('cardPhoto');
+    const ini = document.getElementById('cardInitials');
+    const src = normalizePhotoPath(d.photo);
+    ini.style.display = 'none';
+    if (src) { img.style.display = 'block'; img.src = src; }
+    else { img.style.display = 'none'; ini.textContent = idInitialsOf(d.name); ini.style.display = 'flex'; }
+    document.getElementById('cardName').textContent = d.name || '&mdash;';
+    document.getElementById('cardCourse').textContent = d.course || '&mdash;';
+    document.getElementById('cardNumber').textContent = d.idnumber || '&mdash;';
+    document.getElementById('cardIssued').textContent = d.issued ? new Date(d.issued).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '&mdash;';
+    document.getElementById('cardExpiry').textContent = d.expiry ? new Date(d.expiry).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'No expiry';
+    const qrImg = document.getElementById('cardQr');
+    const cap = document.getElementById('cardQrCap');
+    cap.textContent = 'Scan to verify'; cap.classList.remove('ok');
+    qrImg.style.display = 'block';
+    idCardData.qrData = generateQrDataUrl(d.idnumber);
+    if (d.qr) {
+        qrImg.onerror = function () { this.onerror = null; if (idCardData.qrData) this.src = idCardData.qrData; };
+        qrImg.src = normalizePhotoPath(d.qr);
+    } else {
+        qrImg.onerror = null;
+        if (idCardData.qrData) { qrImg.src = idCardData.qrData; cap.classList.add('ok'); }
+        else { qrImg.style.display = 'none'; cap.textContent = ''; }
+    }
+    fillIdCardBack(d.studentId);
+    document.getElementById('cardFlip').classList.remove('flipped');
+    document.getElementById('idCardModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function fillIdCardBack(studentId) {
+    const emgBox = document.getElementById('cardBackEmg');
+    const addrBox = document.getElementById('cardBackAddr');
+    const extras = (typeof CARD_EXTRAS !== 'undefined' ? CARD_EXTRAS[studentId] : null) || {};
+    const list = extras.emergency || [];
+    if (!list.length) {
+        emgBox.innerHTML = '<div class="idcard-addr"><em>No emergency contact on file</em></div>';
+    } else {
+        emgBox.innerHTML = list.map(c =>
+            '<div class="idcard-emg-row">'
+            + '<span class="idcard-emg-ico"><i class="fa-solid fa-phone-volume"></i></span>'
+            + '<div><div class="idcard-emg-name">' + (c.name||'&mdash;').replace(/</g,'&lt;') + '</div>'
+            + '<div class="idcard-emg-sub">' + (c.rel||'Emergency').replace(/</g,'&lt;') + (c.phone ? ' &middot; '+c.phone.replace(/</g,'&lt;') : '') + '</div></div>'
+            + '</div>'
+        ).join('');
+    }
+    addrBox.innerHTML = extras.address ? extras.address.replace(/</g,'&lt;') : '<em>Not on file</em>';
+}
+
+function printIdCard() {
+    var area = document.getElementById('printArea');
+    var flip = document.getElementById('cardFlip');
+    if (!flip || !area) { showToast('Error','Card elements not found.','error'); return; }
+    var frontEl = flip.querySelector('.idcard');
+    var backEl = flip.querySelector('.idcard-back');
+    if (!frontEl || !backEl) { showToast('Error','Card faces not found.','error'); return; }
+
+    /*
+     * Standard RFID/credit card (CR80): 85mm wide × 55mm tall
+     * Screen card: 340px wide × 430px tall
+     * Portrait orientation on card: 55mm wide × 85mm tall
+     * At 96 DPI: 340px = 89.42mm, 430px = 113.90mm
+     * Scale to fit width: 55 / 89.42 = 0.615
+     * Resulting height: 113.90 × 0.615 = 70.05mm (fits within 85mm)
+     */
+    var targetWmm = 55;  // mm
+    var pxPerMm = 96 / 25.4;
+    var scale = (targetWmm * pxPerMm) / 340;
+
+    var fClone = frontEl.cloneNode(true);
+    var bClone = backEl.cloneNode(true);
+    [fClone, bClone].forEach(function(el) {
+        el.style.position = 'relative';
+        el.style.inset = 'auto';
+        el.style.width = '340px';
+        el.style.height = '430px';
+        el.style.transform = 'none';
+        el.style.backfaceVisibility = 'visible';
+        el.style.webkitBackfaceVisibility = 'visible';
+        el.style.margin = '0 auto 4mm';
+        el.style.pageBreakInside = 'avoid';
+        el.style.zoom = scale;
+    });
+    bClone.style.transform = 'none';
+
+    area.innerHTML = '';
+    area.appendChild(fClone);
+    area.appendChild(bClone);
+
+    window.print();
+    area.innerHTML = '';
+}
+
+
+// Wire up ID card modal close-on-overlay + Esc
+document.getElementById('idCardModal').addEventListener('click', function(e) {
+    if (e.target === this) { this.classList.remove('active'); document.body.style.overflow = ''; }
 });
 </script>
 

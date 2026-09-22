@@ -109,15 +109,10 @@ if ($method === 'POST') {
         $status = 'active';
     }
 
-    // Auto-generate an ID number if none provided: school year + zero-padded
+    // Auto-generate an ID number if none provided
     if ($idNumber === '') {
-        $year = date('Y');
-        $last = $db->fetchColumn(
-            "SELECT id_number FROM student_ids WHERE id_number LIKE ? ORDER BY id DESC LIMIT 1",
-            [$year . '%']
-        );
-        $num = $last ? intval(substr($last, -4)) + 1 : 1;
-        $idNumber = $year . '-' . str_pad($num, 4, '0', STR_PAD_LEFT);
+        require_once __DIR__ . '/../shared/qr_generator.php';
+        $idNumber = generateNextIdNumber($db);
     }
 
     // Uniqueness
@@ -134,8 +129,9 @@ if ($method === 'POST') {
         'status'      => $status
     ];
 
-    // Generate QR code payload and save to uploads/ids/
-    $qrPath = generateQrFile($idNumber, $studentId);
+    // Generate QR code and save to uploads/ids/
+    require_once __DIR__ . '/../shared/qr_generator.php';
+    $qrPath = generateStudentQrFile($idNumber, $studentId);
     if ($qrPath) {
         $data['qr_code_path'] = $qrPath;
     }
@@ -150,45 +146,3 @@ if ($method === 'POST') {
 }
 
 echo json_encode(['success' => false, 'message' => 'Invalid request.']);
-
-/**
- * Generate a QR code SVG for the given student ID and store it in uploads/ids/.
- * Returns the web-relative path (e.g. ../uploads/ids/xyz.svg) or null on failure.
- * Uses chillerlan/php-qrcode when Composer is installed; otherwise returns null
- * gracefully (ID still issues, QR column just stays null) rather than 500ing.
- */
-function generateQrFile($idNumber, $studentId) {
-    $dir = __DIR__ . '/../uploads/ids/';
-    if (!is_dir($dir)) mkdir($dir, 0775, true);
-    $filename = 'id_' . $studentId . '_' . time() . '.svg';
-    $path = $dir . $filename;
-
-    $autoload = __DIR__ . '/../vendor/autoload.php';
-    if (!is_file($autoload)) {
-        error_log('QR generation skipped: vendor/autoload.php missing (run composer install).');
-        return null;
-    }
-
-    try {
-        require_once $autoload;
-        // Raw SVG output (works without the GD extension)
-        $opts = new \chillerlan\QRCode\QROptions([
-            'outputInterface' => \chillerlan\QRCode\Output\QRMarkupSVG::class,
-            'outputBase64'    => false,
-            'eccLevel'        => 'M',
-            'scale'           => 6,
-        ]);
-        $qrcode = new \chillerlan\QRCode\QRCode($opts);
-        // Payload: a stable identifier the system can scan back
-        $payload = json_encode(['type' => 'student_id', 'id_number' => $idNumber, 'student_id' => $studentId]);
-        $svg = $qrcode->render($payload);
-        if (file_put_contents($path, $svg) === false) {
-            error_log('QR generation failed: could not write ' . $path);
-            return null;
-        }
-        return '../uploads/ids/' . $filename;
-    } catch (\Throwable $e) {
-        error_log('QR generation failed: ' . $e->getMessage());
-        return null;
-    }
-}

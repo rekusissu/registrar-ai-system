@@ -204,11 +204,6 @@ if ($USER_ROLE === 'student') {
             <span class="sidebar-text">Guardians &amp; Contacts</span>
         </a>
 
-        <a href="<?= $APP_ROOT ?>registrar/student-ids.php" class="sidebar-item <?= $ACTIVE_NAV === 'studentids' ? 'active' : '' ?>">
-            <i class="fa-solid fa-id-badge"></i>
-            <span class="sidebar-text">Student IDs</span>
-        </a>
-
         <a href="<?= $APP_ROOT ?>registrar/rfid-cards.php" class="sidebar-item <?= $ACTIVE_NAV === 'rfid' ? 'active' : '' ?>">
             <i class="fa-solid fa-credit-card"></i>
             <span class="sidebar-text">RFID Cards</span>

@@ -50,9 +50,11 @@ try {
                     CONCAT(s.first_name, ' ', s.last_name) AS student_name,
                     s.student_number,
                     s.course,
-                    s.year_level
+                    s.year_level,
+                    si.id_number AS student_id_number
                 FROM rfid_cards rf
                 LEFT JOIN students s ON rf.student_id = s.id
+                LEFT JOIN student_ids si ON si.rfid_card_id = rf.id AND si.id_type = 'school_id'
                 WHERE rf.student_id = ?
                 ORDER BY rf.id DESC",
                 [$studentId]
@@ -64,9 +66,11 @@ try {
                     CONCAT(s.first_name, ' ', s.last_name) AS student_name,
                     s.student_number,
                     s.course,
-                    s.year_level
+                    s.year_level,
+                    si.id_number AS student_id_number
                 FROM rfid_cards rf
                 LEFT JOIN students s ON rf.student_id = s.id
+                LEFT JOIN student_ids si ON si.rfid_card_id = rf.id AND si.id_type = 'school_id'
                 ORDER BY rf.id DESC
             ");
         }
@@ -82,9 +86,11 @@ try {
                 CONCAT(s.first_name, ' ', s.last_name) AS student_name,
                 s.student_number,
                 s.course,
-                s.year_level
+                s.year_level,
+                si.id_number AS student_id_number
             FROM rfid_cards rf
             LEFT JOIN students s ON rf.student_id = s.id
+            LEFT JOIN student_ids si ON si.rfid_card_id = rf.id AND si.id_type = 'school_id'
             WHERE rf.id = ?",
             [$id]
         );
@@ -145,14 +151,41 @@ try {
             'card_uid' => $cardUid,
             'card_type' => 'rfid',
             'status' => 'active',
-            'status_reason' => 'active',
-            'status_updated_at' => date('Y-m-d H:i:s'),
             'issued_date' => $issuedDate,
             'expiry_date' => $expiryDate,
             'notes' => $notes
         ]);
 
-        echo json_encode(['success' => true, 'message' => 'Card assigned successfully.', 'data' => ['id' => $id]]);
+        // ── Auto-create Student ID record ──────────────────────────
+        require_once __DIR__ . '/../shared/qr_generator.php';
+        $studentIdNum = '';
+        $qrPath = null;
+        // Only create if student doesn't already have an active school_id
+        $existingSid = $db->fetchOne(
+            "SELECT id FROM student_ids WHERE student_id = ? AND id_type = 'school_id' AND status = 'active'",
+            [$studentId]
+        );
+        if (!$existingSid) {
+            $studentIdNum = generateNextIdNumber($db);
+            $qrPath = generateStudentQrFile($studentIdNum, intval($studentId));
+            $sidData = [
+                'student_id'  => $studentId,
+                'id_number'   => $studentIdNum,
+                'id_type'     => 'school_id',
+                'issue_date'  => $issuedDate,
+                'expiry_date' => $expiryDate,
+                'status'      => 'active',
+                'rfid_card_id'=> $id,
+            ];
+            if ($qrPath) $sidData['qr_code_path'] = $qrPath;
+            $db->insert('student_ids', $sidData);
+        }
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'Card assigned successfully.' . ($studentIdNum ? " Student ID #{$studentIdNum} created." : ''),
+            'data' => ['id' => $id, 'student_id_number' => $studentIdNum, 'qr_code_path' => $qrPath]
+        ]);
         exit;
     }
 
@@ -161,17 +194,12 @@ try {
         $input = json_decode(file_get_contents('php://input'), true);
 
         $data = [];
-        $allowedFields = ['student_id', 'status', 'status_reason', 'issued_date', 'expiry_date', 'notes'];
+        $allowedFields = ['student_id', 'status', 'issued_date', 'expiry_date', 'notes'];
 
         foreach ($allowedFields as $field) {
             if (isset($input[$field])) {
                 $data[$field] = $input[$field];
             }
-        }
-
-        // If status is being updated, set the status_updated_at timestamp
-        if (isset($input['status'])) {
-            $data['status_updated_at'] = date('Y-m-d H:i:s');
         }
 
         if (empty($data)) {
@@ -186,6 +214,8 @@ try {
 
     // ─── DELETE RFID CARD ──────────────────────────────────────
     if ($method === 'DELETE' && $id) {
+        // Soft-delete linked student_ids (set inactive, don't lose ID number)
+        $db->query("UPDATE student_ids SET status = 'inactive' WHERE rfid_card_id = ?", [$id]);
         $db->delete('rfid_cards', 'id = ?', [$id]);
         echo json_encode(['success' => true, 'message' => 'Card deleted successfully.']);
         exit;
