@@ -404,7 +404,7 @@ CREATE TABLE `communication_log` (
 
 LOCK TABLES `communication_log` WRITE;
 /*!40000 ALTER TABLE `communication_log` DISABLE KEYS */;
-INSERT INTO `communication_log` (`id`, `student_id`, `contact_id`, `recipient_email`, `recipient_name`, `message_type`, `subject`, `status`, `ref`, `detail`, `sent_by`, `created_at`) VALUES (5,1,2,'roldantiu89@gmail.com','tite','test','Confirm your email address — BCP Registrar','verified','6d1fcc06436fb6b8a4b381c5adec8284b2990715a97df33d5ee2c15ef0f2af48','Verification email sent. Confirmed via email link on 2026-08-30 16:38:13.',5,'2026-08-30 16:37:52'),(6,1,2,'roldantiu89@gmail.com','tite','transcript','Transcript for Juan Dela Cruz','sent',NULL,'Transcript PDF emailed.',5,'2026-08-30 16:39:12'),(7,1,2,'roldantiu89@gmail.com','tite','test','Confirm your email address — BCP Registrar','verified','745840fa40563f631e9617330e8efdecc50b86c1f764967bbd88f8b33f07952f','Verification email sent. Confirmed via email link on 2026-08-30 16:41:19.',5,'2026-08-30 16:41:11');
+-- [no seed data] communication_log is student-linked
 /*!40000 ALTER TABLE `communication_log` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -480,7 +480,7 @@ CREATE TABLE `contact_recipients` (
 
 LOCK TABLES `contact_recipients` WRITE;
 /*!40000 ALTER TABLE `contact_recipients` DISABLE KEYS */;
-INSERT INTO `contact_recipients` (`id`, `student_id`, `full_name`, `relationship`, `email`, `phone`, `send_billing`, `send_grades`, `send_emergency`, `auth_token`, `token_expires_at`, `verified`, `last_emailed`, `created_at`, `updated_at`) VALUES (2,1,'tite','parent','roldantiu89@gmail.com','09910657730',1,1,1,NULL,NULL,1,'2026-08-30 16:41:07','2026-08-30 16:29:10','2026-08-30 16:41:19');
+-- [no seed data] contact_recipients is student-linked
 /*!40000 ALTER TABLE `contact_recipients` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -776,7 +776,7 @@ CREATE TABLE `enrollments` (
 
 LOCK TABLES `enrollments` WRITE;
 /*!40000 ALTER TABLE `enrollments` DISABLE KEYS */;
-INSERT INTO `enrollments` (`id`, `first_name`, `middle_name`, `last_name`, `name_suffix`, `student_number`, `birth_date`, `gender`, `civil_status`, `religion`, `nationality`, `place_of_birth`, `father_name`, `mother_name`, `email`, `address`, `contact_number`, `prev_school_name`, `prev_school_last_year`, `prev_school_graduated_sy`, `emergency_name`, `emergency_relationship`, `emergency_contact`, `course`, `major`, `year_level`, `school_year`, `semester`, `section`, `status`, `received_at`, `created_at`, `updated_at`) VALUES (1,'Maria','Santos','Reyes','Jr.',NULL,'2006-04-12','Female','Single','Roman Catholic','Filipino','Quezon City','Carlos Reyes','Luz Reyes','maria.reyes@example.com','123 Commonwealth Ave, QC','09171112233','Quezon City Science HS','Grade 12','2025-2026','Teresa Reyes','Mother','09178889900','BSIT',NULL,1,'2026-2027','1st',NULL,'pending',NULL,'2026-09-22 14:54:58','2026-09-22 14:54:58');
+-- [no seed data] enrollments is student-linked
 /*!40000 ALTER TABLE `enrollments` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -836,7 +836,7 @@ CREATE TABLE `finance` (
 
 LOCK TABLES `finance` WRITE;
 /*!40000 ALTER TABLE `finance` DISABLE KEYS */;
-INSERT INTO `finance` (`id`, `student_id`, `balance`, `updated_at`) VALUES (1,1,0.00,'2026-08-26 16:39:54'),(2,2,0.00,'2026-08-26 15:26:51'),(3,3,0.00,'2026-08-26 15:26:51');
+-- [no seed data] finance is student-linked
 /*!40000 ALTER TABLE `finance` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -871,7 +871,7 @@ CREATE TABLE `guardians` (
 
 LOCK TABLES `guardians` WRITE;
 /*!40000 ALTER TABLE `guardians` DISABLE KEYS */;
-INSERT INTO `guardians` (`id`, `student_id`, `full_name`, `relationship`, `contact_number`, `email`, `address`, `is_primary`, `is_emergency`, `created_at`) VALUES (1,1,'Ramon Dela Cruz','father','09171234560',NULL,NULL,1,1,'2026-07-07 10:42:46'),(2,1,'Elena Dela Cruz','mother','09171234561',NULL,NULL,0,1,'2026-07-07 10:42:46'),(3,2,'Carlos Santos','father','09181234570',NULL,NULL,1,1,'2026-07-07 10:42:46');
+-- [no seed data] guardians is student-linked
 /*!40000 ALTER TABLE `guardians` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1213,7 +1213,7 @@ CREATE TABLE `rfid_cards` (
 
 LOCK TABLES `rfid_cards` WRITE;
 /*!40000 ALTER TABLE `rfid_cards` DISABLE KEYS */;
-INSERT INTO `rfid_cards` (`id`, `student_id`, `card_uid`, `card_type`, `status`, `issued_date`, `expiry_date`, `notes`, `created_at`, `qr_code_path`, `issued_at`) VALUES (12,1,'0006934523','rfid','active','2026-09-22','2027-09-22','','2026-09-22 07:31:02',NULL,'2026-09-22 07:31:02');
+-- [no seed data] rfid_cards is student-linked
 /*!40000 ALTER TABLE `rfid_cards` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1285,7 +1285,7 @@ CREATE TABLE `status_tracker` (
 
 LOCK TABLES `status_tracker` WRITE;
 /*!40000 ALTER TABLE `status_tracker` DISABLE KEYS */;
-INSERT INTO `status_tracker` (`id`, `student_id`, `previous_status`, `current_status`, `reason`, `changed_by`, `created_at`, `effective_date`, `end_date`) VALUES (1,1,NULL,'active','New student enrolled',NULL,'2026-07-07 10:42:46',NULL,NULL),(2,2,NULL,'active','New student enrolled',NULL,'2026-07-07 10:42:46',NULL,NULL),(3,3,NULL,'active','New student enrolled',NULL,'2026-07-07 10:42:46',NULL,NULL);
+-- [no seed data] status_tracker is student-linked
 /*!40000 ALTER TABLE `status_tracker` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1328,7 +1328,7 @@ CREATE TABLE `student_ids` (
 
 LOCK TABLES `student_ids` WRITE;
 /*!40000 ALTER TABLE `student_ids` DISABLE KEYS */;
-INSERT INTO `student_ids` (`id`, `student_id`, `id_number`, `id_type`, `issue_date`, `expiry_date`, `status`, `photo_path`, `qr_code_path`, `rfid_card_id`, `created_at`, `qr_payload`, `school_year`, `card_color`) VALUES (4,1,'','school_id','2026-08-30',NULL,'active',NULL,'../uploads/ids/id_1_1790075134.svg',12,'2026-08-30 14:47:30',NULL,NULL,'blue');
+-- [no seed data] student_ids is student-linked
 /*!40000 ALTER TABLE `student_ids` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1384,7 +1384,7 @@ CREATE TABLE `students` (
 
 LOCK TABLES `students` WRITE;
 /*!40000 ALTER TABLE `students` DISABLE KEYS */;
-INSERT INTO `students` (`id`, `student_number`, `first_name`, `middle_name`, `last_name`, `gender`, `civil_status`, `birth_date`, `place_of_birth`, `nationality`, `religion`, `address`, `contact_number`, `email`, `photo`, `course`, `major`, `year_level`, `school_year`, `semester`, `adviser_id`, `section`, `status`, `created_at`, `updated_at`, `lrn`, `name_suffix`, `mother_name`, `father_name`, `birth_country`) VALUES (1,'2026-0001','Juan',NULL,'Dela Cruz',NULL,NULL,'2005-05-15',NULL,NULL,NULL,'123 Main St., Manila','09171234567','juan@email.com','./assets/uploads/students/student_1_1788099553.jpg','BACHELOR OF SCIENCE IN PSYCHOLOGY (BSP)',NULL,1,'2026-2027','1st',NULL,'11001','active','2026-07-07 10:42:46','2026-08-30 14:19:13',NULL,NULL,NULL,NULL,NULL),(2,'2026-0002','Maria',NULL,'Santos',NULL,NULL,'2006-03-20',NULL,NULL,NULL,'456 Oak St., Quezon City','09181234568','maria@email.com','./assets/uploads/students/student_2_1788099394.jpg','BACHELOR OF SCIENCE IN PSYCHOLOGY (BSP)',NULL,1,'2026-2027','1st',NULL,'11001','active','2026-07-07 10:42:46','2026-08-30 14:16:34',NULL,NULL,NULL,NULL,NULL),(3,'2026-0003','Ana',NULL,'Reyes',NULL,NULL,'2005-11-10',NULL,NULL,NULL,'789 Pine St., Pasig','09191234569','ana@email.com',NULL,'BACHELOR OF SCIENCE IN PSYCHOLOGY (BSP)',NULL,1,'2026-2027','1st',NULL,'11001','active','2026-07-07 10:42:46','2026-08-28 11:48:06',NULL,NULL,NULL,NULL,NULL);
+-- [no seed data] students is empty on fresh install
 /*!40000 ALTER TABLE `students` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1424,7 +1424,7 @@ CREATE TABLE `users` (
 
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` (`id`, `email`, `password_hash`, `full_name`, `role`, `rfid_uid`, `is_active`, `created_at`, `updated_at`, `student_id`, `username`, `login_attempts`, `locked_until`) VALUES (1,'admin@bestlink.edu.ph','$2y$10$f9PmndF92hBFI/jeJAWxC.Pua3Osob3.zkWHn9GRSTQXSyPX8x0dK','System Administrator','admin',NULL,1,'2026-07-07 10:42:45','2026-08-24 04:47:37',NULL,'ADM-001',0,NULL),(2,'registrar@bestlink.edu.ph','$2y$10$zj33OjRB93RcPZWd2/f4VudcEqzDCfZdLAajEcZQ7LABuuEKeqFyu','Registrar Staff','registrar',NULL,1,'2026-07-07 10:42:45','2026-08-26 16:02:51',NULL,'RGS-001',0,NULL),(3,'roldantiu89@gmail.com','$2y$10$f9PmndF92hBFI/jeJAWxC.Pua3Osob3.zkWHn9GRSTQXSyPX8x0dK','Roldan Tiu','admin',NULL,1,'2026-08-11 11:40:30','2026-08-24 04:47:37',NULL,'ADM-002',0,NULL),(5,'juan.student@bestlink.edu.ph','$2y$10$sm.k4/VQXpOG/e87XRS/Q.Zfe1ZKFbMCuVesLdAo8gEQaNCq3PQey','Juan Dela Cruz (Test Student)','student',NULL,1,'2026-08-16 06:32:46','2026-08-26 15:41:34',1,'2026-0001',0,NULL),(6,'maria.student@bestlink.edu.ph','$2y$10$1dLpgIKZLtuUq3X52f.1ceX8r9aQFgn8mCsA9Oa/VEBEqWLYqzFvW','Maria Santos','student',NULL,1,'2026-08-27 04:39:54','2026-08-26 16:39:54',2,'2026-0002',0,NULL),(7,'norse@gmail.com','$2y$10$mg/TmAFfYjwZNW34o6IGHedMnnZ04hUmYgm5iGy7OvGAxtDEoGWee','norse','nurse',NULL,1,'2026-09-02 22:16:15','2026-09-02 22:17:05',NULL,NULL,0,NULL);
+INSERT INTO `users` (`id`, `email`, `password_hash`, `full_name`, `role`, `rfid_uid`, `is_active`, `created_at`, `updated_at`, `student_id`, `username`, `login_attempts`, `locked_until`) VALUES (1,'admin@bestlink.edu.ph','$2y$10$f9PmndF92hBFI/jeJAWxC.Pua3Osob3.zkWHn9GRSTQXSyPX8x0dK','System Administrator','admin',NULL,1,'2026-07-07 10:42:45','2026-08-24 04:47:37',NULL,'ADM-001',0,NULL),(2,'registrar@bestlink.edu.ph','$2y$10$zj33OjRB93RcPZWd2/f4VudcEqzDCfZdLAajEcZQ7LABuuEKeqFyu','Registrar Staff','registrar',NULL,1,'2026-07-07 10:42:45','2026-08-26 16:02:51',NULL,'RGS-001',0,NULL),(3,'roldantiu89@gmail.com','$2y$10$f9PmndF92hBFI/jeJAWxC.Pua3Osob3.zkWHn9GRSTQXSyPX8x0dK','Roldan Tiu','admin',NULL,1,'2026-08-11 11:40:30','2026-08-24 04:47:37',NULL,'ADM-002',0,NULL),(7,'norse@gmail.com','$2y$10$mg/TmAFfYjwZNW34o6IGHedMnnZ04hUmYgm5iGy7OvGAxtDEoGWee','norse','nurse',NULL,1,'2026-09-02 22:16:15','2026-09-02 22:17:05',NULL,NULL,0,NULL);
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
 
