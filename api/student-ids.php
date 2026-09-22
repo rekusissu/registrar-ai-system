@@ -93,12 +93,12 @@ if ($method === 'POST' && isset($_GET['action']) && $_GET['action'] === 'delete'
 if ($method === 'POST') {
     $input = json_decode(file_get_contents('php://input'), true);
 
-    $studentId = intval($input['student_id'] ?? 0);
-    $idType    = trim($input['id_type'] ?? 'school_id');
-    $status    = trim($input['status'] ?? 'active');
-    $issueDate = $input['issue_date'] ?? date('Y-m-d');
+    $studentId  = intval($input['student_id'] ?? 0);
+    $idType     = trim($input['id_type'] ?? 'school_id');
+    $status     = trim($input['status'] ?? 'active');
+    $issueDate  = $input['issue_date'] ?? date('Y-m-d');
     $expiryDate = $input['expiry_date'] ?? '';
-    $idNumber  = trim($input['id_number'] ?? '');
+    $idNumber   = trim($input['id_number'] ?? '');
 
     if (!$studentId) {
         echo json_encode(['success' => false, 'message' => 'Student is required.']);
@@ -111,51 +111,28 @@ if ($method === 'POST') {
         $status = 'active';
     }
 
-    // Auto-generate an ID number if none provided
-    if ($idNumber === '') {
-        require_once __DIR__ . '/../shared/qr_generator.php';
-        $idNumber = generateNextIdNumber($db);
-    }
-
-    // Uniqueness
-    $existingNum = $db->fetchOne("SELECT id FROM student_ids WHERE id_number = ?", [$idNumber]);
-    if ($existingNum) {
-        echo json_encode(['success' => false, 'message' => 'ID number already exists.']);
-        exit;
-    }
-    // Optional photo upload (base64 data URL) - used on the ID card.
-    $photoPath = null;
-    $photoDataRaw = $input['photo_data'] ?? '';
-    if (is_string($photoDataRaw) && $photoDataRaw !== '' && strpos($photoDataRaw, 'data:image/') === 0) {
-        $mime = null;
-        if (preg_match('#^data:image/(png|jpeg|webp|gif);base64,#i', $photoDataRaw, $mimeM)) { $mime = $mimeM[1]; }
-        if ($mime) {
-            $bin = base64_decode(preg_replace('#^data:image/[a-z0-9+]+;base64,#i', '', $photoDataRaw), true);
-            if ($bin !== false && $bin !== '' && strlen($bin) <= 5 * 1024 * 1024) {
-                $dir = __DIR__ . '/../uploads/ids/';
-                if (!is_dir($dir)) mkdir($dir, 0775, true);
-                $ext = $mime === 'jpeg' ? 'jpg' : $mime;
-                $pname = 'photo_' . $studentId . '_' . time() . '.' . $ext;
-                if (file_put_contents($dir . $pname, $bin) !== false) {
-                    $photoPath = '../uploads/ids/' . $pname;
-                }
-            }
+    // No auto-generation — id_number left blank, ready for integration.
+    // Only enforce uniqueness when a value is provided.
+    if ($idNumber !== '') {
+        $existingNum = $db->fetchOne("SELECT id FROM student_ids WHERE id_number = ?", [$idNumber]);
+        if ($existingNum) {
+            echo json_encode(['success' => false, 'message' => 'ID number already exists.']);
+            exit;
         }
     }
 
     $data = [
         'student_id'  => $studentId,
-        'id_number'   => $idNumber,
+        'id_number'   => $idNumber ?: null,
         'id_type'     => $idType,
         'issue_date'  => $issueDate,
         'expiry_date' => $expiryDate !== '' ? $expiryDate : null,
-        'status'      => $status,
-        'photo_path'  => $photoPath
+        'status'      => $status
     ];
 
-    // Generate QR code and save to uploads/ids/
+    // Always generate QR using student_id (DB primary key)
     require_once __DIR__ . '/../shared/qr_generator.php';
-    $qrPath = generateStudentQrFile($idNumber, $studentId);
+    $qrPath = generateStudentQrFile(intval($studentId));
     if ($qrPath) {
         $data['qr_code_path'] = $qrPath;
     }

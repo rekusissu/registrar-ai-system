@@ -33,6 +33,14 @@ include '../includes/sidebar.php';
         <p>Live queue serving console</p>
     </div>
     <div class="header-actions">
+        <div style="display:flex;align-items:center;gap:8px;margin-right:10px;">
+            <label for="windowSelect" style="font-size:13px;font-weight:600;color:#475569;white-space:nowrap;">Window:</label>
+            <select id="windowSelect" style="padding:6px 12px;border-radius:8px;border:1px solid #cbd5e1;font-size:14px;font-weight:600;color:#1e293b;background:#fff;cursor:pointer;">
+                <option value="1">Window 1</option>
+                <option value="2">Window 2</option>
+                <option value="3">Window 3</option>
+            </select>
+        </div>
         <a href="../queue/monitor.php" target="_blank" class="btn btn-secondary"><i class="fas fa-tv"></i> Open Monitor</a>
         <a href="../queue/kiosk.php" target="_blank" class="btn btn-secondary"><i class="fas fa-credit-card"></i> Open Kiosk</a>
     </div>
@@ -66,6 +74,7 @@ include '../includes/sidebar.php';
             <div style="font-size:24px;font-weight:700;margin:8px 0 2px;" id="nsName">—</div>
             <div style="color:#64748b;font-size:13px;">ID: <span id="nsNumber2">—</span> &middot; <span id="nsCourse">—</span></div>
             <div style="font-size:12px;color:#94a3b8;margin-top:4px;">Called <span id="nsElapsed">—</span> ago</div>
+            <div class="win-badge" style="font-size:15px;font-weight:700;margin:6px 0 2px;display:none;"><span id="nsWindow">Window 1</span></div>
             <div class="action-group" style="justify-content:center;margin-top:18px;gap:10px;">
                 <button class="btn btn-success" id="nsComplete"><i class="fas fa-check"></i> Complete</button>
                 <button class="btn btn-danger" id="nsSkip"><i class="fas fa-forward"></i> Skip</button>

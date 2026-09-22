@@ -31,12 +31,17 @@ $page_title = 'Queue Monitor';
         <div class="clock" id="clock"></div>
     </div>
 
-    <!-- NOW SERVING hero -->
-    <div class="hero" id="hero">
-        <div class="hero-label">Now Serving</div>
-        <div class="hero-number" id="heroNumber">—</div>
-        <div class="hero-name" id="heroName">Waiting for the next number</div>
-        <div class="hero-status" id="heroStatus">Line up at the queue.</div>
+    <!-- NOW SERVING -->
+    <div class="serving-bar" id="hero">
+        <div class="serving-ticket">
+            <div class="serving-label" id="servingLabel">Now Serving</div>
+            <div class="serving-num" id="heroNumber">—</div>
+            <div class="serving-name" id="heroName">Waiting for the next number</div>
+        </div>
+        <div class="serving-divider hidden" id="servingDivider"></div>
+        <div class="serving-window hidden" id="heroWindow">
+            <div class="serving-win-text" id="heroWindowNum">—</div>
+        </div>
     </div>
 
     <div class="monitor-cols">

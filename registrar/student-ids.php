@@ -14,7 +14,7 @@ require_once __DIR__ . '/../shared/database.php';
 $db = Database::getInstance();
 $ids = $db->fetchAll("
     SELECT si.*, CONCAT(s.first_name, ' ', s.last_name) AS student_name,
-           s.student_number, s.course, s.year_level, COALESCE(NULLIF(si.photo_path, ''), s.photo) AS photo
+           s.student_number, s.course, s.year_level, s.photo
     FROM student_ids si
     LEFT JOIN students s ON si.student_id = s.id
     ORDER BY si.id DESC
@@ -58,7 +58,16 @@ include '../includes/sidebar.php';
 .badge.inactive { background:#f1f5f9; color:#64748b; }
 .badge.lost { background:#fee2e2; color:#dc2626; }
 .idtype-chip { display:inline-block; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:600; background:#eef4ff; color:#2563eb; }
-.qr-thumb { width:36px; height:36px; border:1px solid #e2e8f0; border-radius:8px; object-fit:contain; background:white; }
+.qr-thumb { width:36px; height:36px; border:1px solid #e2e8f0; border-radius:8px; object-fit:contain; background:white; cursor:pointer; transition:transform .15s,box-shadow .15s; }
+.qr-thumb:hover { transform:scale(1.15); box-shadow:0 2px 8px rgba(37,99,235,.2); }
+#qrModalOverlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); backdrop-filter:blur(4px); z-index:10000; align-items:center; justify-content:center; }
+#qrModalOverlay.active { display:flex; }
+#qrModalOverlay .qr-modal-box { background:#fff; border-radius:18px; padding:24px; text-align:center; max-width:320px; width:90%; box-shadow:0 24px 60px rgba(0,0,0,.25); animation:modalSlide .25s ease; }
+#qrModalOverlay .qr-modal-box img { width:220px; height:220px; object-fit:contain; border:1px solid #e2e8f0; border-radius:12px; margin-bottom:12px; }
+#qrModalOverlay .qr-modal-box .qr-modal-name { font-size:14px; font-weight:700; color:#0f172a; margin-bottom:4px; }
+#qrModalOverlay .qr-modal-box .qr-modal-sub { font-size:12px; color:#94a3b8; margin-bottom:14px; }
+#qrModalOverlay .qr-modal-close { border:none; background:#f1f5f9; border-radius:10px; padding:8px 20px; font-size:13px; font-weight:600; cursor:pointer; color:#475569; }
+#qrModalOverlay .qr-modal-close:hover { background:#e2e8f0; }
 
 /* ── Toolbar ─────────────────────────────────────── */
 .ids-toolbar { display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
@@ -182,7 +191,7 @@ include '../includes/sidebar.php';
                     <td><?= $i['issue_date'] ? date('M d, Y', strtotime($i['issue_date'])) : '—' ?></td>
                     <td><?= $i['expiry_date'] ? date('M d, Y', strtotime($i['expiry_date'])) : '—' ?></td>
                     <td><span class="badge <?= $i['status'] ?>"><?= ucfirst($i['status']) ?></span></td>
-                    <td><?= $i['qr_code_path'] ? '<img class="qr-thumb" src="' . htmlspecialchars($i['qr_code_path']) . '">' : '—' ?></td>
+                    <td><?= $i['qr_code_path'] ? '<img class="qr-thumb" src="' . htmlspecialchars($i['qr_code_path']) . '" alt="QR" onclick="showQrModal(this)" data-name="' . htmlspecialchars($i['student_name'], ENT_QUOTES) . '" data-id="' . htmlspecialchars($i['student_number'], ENT_QUOTES) . '">' : '—' ?></td>
                     <td><div class="action-group">
                         <button class="action-btn view" onclick="viewCard(this)" title="View ID Card"><i class="fas fa-id-card"></i></button>
                         <button class="action-btn edit" onclick="editStatus(this)" title="Update Status"><i class="fas fa-pen"></i></button>
@@ -231,8 +240,8 @@ include '../includes/sidebar.php';
                     <label>Expiry Date</label><input type="date" id="issueExpiry" class="form-control">
                 </div>
             </div>
-            <div class="form-group"><label>Photo (optional)</label><input type="file" id="issuePhoto" accept="image/png,image/jpeg,image/webp,image/gif" class="form-control" style="padding:6px 10px;"></div>
-            <p style="font-size:11px;color:#64748b;margin:0;"><i class="fas fa-info-circle"></i> The ID number is generated automatically, and a QR code is saved automatically.</p>
+            <div class="form-group"><label>ID Number (for integration — leave blank)</label><input type="text" id="issueNumber" class="form-control" placeholder="Leave blank — set via integration"></div>
+            <p style="font-size:11px;color:#64748b;margin:0;"><i class="fas fa-info-circle"></i> QR code is generated automatically when an ID number is provided.</p>
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="closeModal('issueModal')">Cancel</button>
@@ -371,27 +380,16 @@ function openAdd() {
     document.getElementById('issueStudent').value = '';
     document.getElementById('issueType').value = 'school_id';
     document.getElementById('issueStatus').value = 'active';
-    document.getElementById('issuePhoto').value = '';
+    document.getElementById('issueNumber').value = '';
     document.getElementById('issueExpiry').value = '';
     openModal('issueModal');
 }
 
-function readPhotoData() {
-    const fileEl = document.getElementById('issuePhoto');
-    if (!fileEl || !fileEl.files || !fileEl.files.length) return Promise.resolve('');
-    return new Promise(resolve => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result || ''));
-        reader.onerror = () => resolve('');
-        reader.readAsDataURL(fileEl.files[0]);
-    });
-}
-async function submitIssue() {
+function submitIssue() {
     const studentId = document.getElementById('issueStudent').value;
     if (!studentId) { alert('Select a student.'); return; }
     const btn = document.getElementById('issueSubmit');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Issuing...';
-    const photoData = await readPhotoData();
     fetch('../api/student-ids.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -399,8 +397,8 @@ async function submitIssue() {
             student_id: studentId,
             id_type: document.getElementById('issueType').value,
             status: document.getElementById('issueStatus').value,
-            expiry_date: document.getElementById('issueExpiry').value,
-            photo_data: photoData
+            id_number: document.getElementById('issueNumber').value,
+            expiry_date: document.getElementById('issueExpiry').value
         })
     })
     .then(r => r.json())
@@ -423,13 +421,11 @@ function normalizePhotoPath(p) {
 function initialsOf(name) {
     return (name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('') || '?';
 }
-// Always produce a QR data-URL client-side, matching the server payload
-// format: {"type":"student_id","id_number":...,"student_id":...}
-function generateQrDataUrl(idNumber, studentId) {
+// Always produce a QR data-URL client-side for fallback when server SVG fails to load
+function generateQrDataUrl(studentId) {
     try {
-        const payload = JSON.stringify({ type: 'student_id', id_number: idNumber, student_id: Number(studentId) });
         const qr = qrcode(0, 'M');
-        qr.addData(payload);
+        qr.addData('https://registrar.bcpsms2.com/verify-student.php?student_id=' + encodeURIComponent(studentId || ''));
         qr.make();
         return qr.createDataURL(8, 8);
     } catch (e) {
@@ -500,7 +496,7 @@ function viewCard(btn) {
     cap.textContent = 'Scan to verify';
     cap.classList.remove('ok');
     qrImg.style.display = 'block';
-    currentCardData.qrData = generateQrDataUrl(d.idnumber, d.studentId);
+    currentCardData.qrData = generateQrDataUrl(d.studentId);
     if (d.qr) {
         qrImg.onerror = function () { this.onerror = null; if (currentCardData.qrData) this.src = currentCardData.qrData; };
         qrImg.src = normalizePhotoPath(d.qr);
@@ -647,6 +643,31 @@ function deleteId(btn) {
     .then(d => { if (d.success) window.location.reload(); else alert(d.message || 'Error deleting.'); })
     .catch(() => alert('Network error.'));
 }
+
+// ── QR Modal ──────────────────────────────────────────────────────
+function showQrModal(img) {
+    const overlay = document.getElementById('qrModalOverlay');
+    overlay.querySelector('img').src = img.src;
+    overlay.querySelector('.qr-modal-name').textContent = img.dataset.name || '';
+    overlay.querySelector('.qr-modal-sub').textContent = img.dataset.id ? 'Student #: ' + img.dataset.id : '';
+    overlay.classList.add('active');
+}
+function closeQrModal() {
+    document.getElementById('qrModalOverlay').classList.remove('active');
+}
+document.getElementById('qrModalOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeQrModal();
+});
 </script>
+
+<!-- QR Preview Modal -->
+<div id="qrModalOverlay">
+    <div class="qr-modal-box">
+        <img src="" alt="QR Code">
+        <div class="qr-modal-name"></div>
+        <div class="qr-modal-sub"></div>
+        <button class="qr-modal-close" onclick="closeQrModal()"><i class="fas fa-times"></i> Close</button>
+    </div>
+</div>
 
 <?php include '../includes/footer.php'; ?>

@@ -92,7 +92,7 @@ function render(d) {
             ? 'You are <strong>NEXT</strong> — please stay near the Registrar\'s Office.'
             : 'There ' + (t.waiting_ahead === 1 ? 'is' : 'are') + ' <strong>' + t.waiting_ahead + '</strong> student' + (t.waiting_ahead === 1 ? '' : 's') + ' ahead of you.';
     } else if (t.status === 'serving') {
-        statusNote = 'It\'s your turn — please proceed to the counter.';
+        statusNote = 'It\'s your turn — please proceed to <strong><span class="win-badge">Window ' + (t.counter || 1) + '</span></strong>.';
     } else {
         statusNote = 'Your ticket is <strong>' + (STATUS_META[t.status] || {label: t.status}).label + '</strong>.';
     }
@@ -121,7 +121,7 @@ function render(d) {
             '<div class="ticket-body">' +
                 '<div class="ticket-note">' + statusNote + '</div>' +
                 (serving
-                    ? '<div class="ticket-serving"><span class="chip blue"><i class="fa-solid fa-bell-concierge"></i> Now serving #' + serving.number + '</span>' +
+                    ? '<div class="ticket-serving"><span class="chip blue"><i class="fa-solid fa-bell-concierge"></i> Now serving #' + serving.number + (serving.counter ? ' — Window ' + serving.counter : '') + '</span>' +
                         (serving.name ? '<span style="color:#475569;">' + serving.name + '</span>' : '') + '</div>'
                     : '') +
                 whenJoined + whenServed +

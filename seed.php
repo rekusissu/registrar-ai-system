@@ -2,10 +2,8 @@
 // seed.php — auto-import registrar_ai.sql on fresh databases
 // Called by docker entrypoint; can also be run manually: php seed.php
 //
-// After the initial import, runs every *.sql in database/ that uses
-// CREATE TABLE IF NOT EXISTS — these are idempotent migrations for
-// features added after the base schema (contacts, security, student
-// portal, etc.).
+// The single registrar_ai.sql file contains all tables and seed data.
+// No separate migration files needed.
 
 // Only run from CLI or entrypoint (not from web)
 if (php_sapi_name() !== 'cli') {
@@ -22,7 +20,7 @@ try {
     $db = Database::getInstance();
     $pdo = $db->getConnection();
 
-    // ── Step 1: Import base schema if users table is missing ────────────
+    // ── Import base schema if users table is missing ────────────────
     $r = $db->fetchColumn("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ? AND table_name = 'users'", [DB_NAME]);
     if ($r && (int)$r > 0) {
         echo "Database already seeded (users table exists).\n";
@@ -64,57 +62,7 @@ try {
         echo "Imported $imported statement(s), $errors warning(s).\n";
     }
 
-    // ── Step 2: Run idempotent migration SQL files ──────────────────────
-    // These use CREATE TABLE IF NOT EXISTS / ALTER TABLE guards so they
-    // are safe to re-run on every container start.
-    $migrationDir = __DIR__ . '/database';
-    if (is_dir($migrationDir)) {
-        $files = glob($migrationDir . '/*.sql');
-        sort($files); // alphabetical — ensures consistent order
-        foreach ($files as $file) {
-            $contents = file_get_contents($file);
-            if ($contents === false) continue;
-
-            // Split on statement separators and keep every non-empty chunk.
-            // NOTE: these files cannot be whitelisted by leading keyword. Migrations
-            // (e.g. database/clinic_portal.sql) deliver schema changes with dynamic
-            // SQL — `SET @v := …` + `PREPARE … EXECUTE …` — and wrap CREATE TABLE in
-            // comment banners. A whitelist drops the @var assignments (so PREPARE
-            // gets NULL) and skips comment-prefixed CREATEs, leaving the migration
-            // silently unapplied in Docker. Instead we execute each chunk as-is on the
-            // shared connection; session @vars persist across chunks, and every file
-            // here is guarded to be idempotent ("already exists" errors are expected).
-            $statements = array_map('trim', explode(';', $contents));
-
-            $applied = 0;
-            $warns   = 0;
-            foreach ($statements as $stmt) {
-                if ($stmt === '') continue;
-                // Inspect the SQL body with comment banners stripped.
-                $body = trim(preg_replace('/^\s*--.*$/m', '', $stmt));
-                if ($body === '') continue;                     // lone comment banner
-                if (preg_match('/^USE\s/i', $body)) continue;   // DB already selected by DSN
-                if (preg_match('/^(DROP|DELETE|UPDATE|TRUNCATE)\b/i', $body)) continue; // safety
-                try {
-                    $pdo->exec($stmt);
-                    $applied++;
-                } catch (PDOException $e) {
-                    $warns++;
-                    // Table/column already exists is expected on re-runs.
-                    if (!str_contains($e->getMessage(), 'already exists')
-                        && $e->getCode() !== '42S01'
-                        && !str_contains($e->getMessage(), 'Duplicate')) {
-                        echo "  MIGRATION WARNING (" . basename($file) . "): " . $e->getMessage() . "\n";
-                    }
-                }
-            }
-            if ($applied > 0) {
-                echo "  Applied " . basename($file) . " ($applied statement(s), $warns warning(s))\n";
-            }
-        }
-    }
-
-    // ── Verify ──────────────────────────────────────────────────────────
+    // ── Verify ──────────────────────────────────────────────────────
     $r = $db->fetchColumn("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ? AND table_name = 'users'", [DB_NAME]);
     if ($r && (int)$r > 0) {
         echo "SUCCESS: Database ready. Users table exists.\n";

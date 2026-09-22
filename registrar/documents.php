@@ -1,10 +1,8 @@
 <?php
 // ============================================================
 //  REGISTRAR/DOCUMENTS.PHP
-//  Document Requests — v2 queue + metrics hub.
-//  Queue actions (process / ready / reject / ship / claim),
-//  exit-clearance matrix, and the four spec metrics (turnaround,
-//  revenue, daily queue volume, fulfillment split).
+//  Document Requests — v2 queue + metrics hub (no Digital).
+//  Pickup only. Express available from registrar onsite.
 // ============================================================
 
 require_once __DIR__ . '/../shared/security_headers.php';
@@ -33,7 +31,7 @@ $requests = $db->fetchAll(
       ORDER BY dr.id DESC"
 );
 
-// Status events, one pass grouped in PHP.
+// Status events grouped by request.
 $eventsByRequest = [];
 if ($requests) {
     $ids = array_map('intval', array_column($requests, 'id'));
@@ -48,15 +46,12 @@ if ($requests) {
 }
 
 // ── Metrics ─────────────────────────────────────────────────────
-// 1. Turnaround time: avg hours between payment and ready.
 $tatHours = $db->fetchColumn(
     "SELECT AVG(TIMESTAMPDIFF(HOUR, paid_at, ready_at))
-       FROM document_requests
-      WHERE ready_at IS NOT NULL AND paid_at IS NOT NULL"
+       FROM document_requests WHERE ready_at IS NOT NULL AND paid_at IS NOT NULL"
 );
 $tatHours = $tatHours !== null ? round((float) $tatHours, 1) : null;
 
-// 2. Revenue report, by document type, over a date range.
 $from = preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['from'] ?? '') ? $_GET['from'] : date('Y-m-01');
 $to   = preg_match('/^\d{4}-\d{2}-\d{2}$/', $_GET['to'] ?? '')   ? $_GET['to']   : date('Y-m-d');
 $revenueRows = $db->fetchAll(
@@ -66,59 +61,41 @@ $revenueRows = $db->fetchAll(
        LEFT JOIN document_catalog c ON c.id = dr.catalog_id
       WHERE dr.document_status <> 'Rejected'
         AND COALESCE(dr.paid_at, dr.request_date) BETWEEN ? AND ?
-      GROUP BY c.id, dr.document_type
-      ORDER BY revenue DESC",
+      GROUP BY c.id, dr.document_type ORDER BY revenue DESC",
     [$from . ' 00:00:00', $to . ' 23:59:59']
 );
 $revenueTotal = array_sum(array_map(fn($r) => (float) $r['revenue'], $revenueRows));
 
-// 3. Daily queue volume (last 7 days, Express vs Regular).
 $volumeRows = $db->fetchAll(
     "SELECT DATE(request_date) AS d, request_type, COUNT(*) AS cnt
-       FROM document_requests
-      WHERE request_date >= ?
+       FROM document_requests WHERE request_date >= ?
       GROUP BY DATE(request_date), request_type",
     [date('Y-m-d', strtotime('-6 days')) . ' 00:00:00']
 );
 $volByDay = [];
-foreach ($volumeRows as $v) {
-    $volByDay[$v['d']][$v['request_type']] = (int) $v['cnt'];
-}
-$days = [];
-$expressSeries = [];
-$regularSeries = [];
+foreach ($volumeRows as $v) $volByDay[$v['d']][$v['request_type']] = (int) $v['cnt'];
+$days = $expressSeries = $regularSeries = [];
 for ($i = 6; $i >= 0; $i--) {
     $d = date('Y-m-d', strtotime("-$i days"));
     $days[] = date('M d', strtotime($d));
     $expressSeries[] = $volByDay[$d]['Express'] ?? 0;
     $regularSeries[] = $volByDay[$d]['Regular'] ?? 0;
 }
-$todayVol = $volByDay[date('Y-m-d')] ?? [];
-$expressToday = $todayVol['Express'] ?? 0;
-$regularToday = $todayVol['Regular'] ?? 0;
 
-// 4. Fulfillment split.
-$fulfillRows = $db->fetchAll(
-    "SELECT fulfillment_type, COUNT(*) AS cnt FROM document_requests GROUP BY fulfillment_type"
-);
-$fulfillMap = ['Pickup' => 0, 'Digital' => 0, 'Courier' => 0];
-$fulfillTotal = 0;
-foreach ($fulfillRows as $f) {
-    if (isset($fulfillMap[$f['fulfillment_type']])) {
-        $fulfillMap[$f['fulfillment_type']] = (int) $f['cnt'];
-        $fulfillTotal += (int) $f['cnt'];
-    }
-}
+$regularCount = $db->fetchColumn("SELECT COUNT(*) FROM document_requests WHERE request_type = 'Regular'") ?: 0;
+$expressCount = $db->fetchColumn("SELECT COUNT(*) FROM document_requests WHERE request_type = 'Express'") ?: 0;
 
-// ── Display vocabulary ──────────────────────────────────────────
+$catalog   = $db->fetchAll("SELECT * FROM document_catalog WHERE is_active = 1 ORDER BY id");
+$students  = $db->fetchAll("SELECT id, student_number, CONCAT(first_name,' ',last_name) AS name FROM students WHERE status='active' ORDER BY name");
+
 $statusPill = [
-    'Pending_Clearance' => ['pending-clearance', 'fa-triangle-exclamation'],
-    'Awaiting_Payment'  => ['awaiting-payment',  'fa-credit-card'],
-    'Processing'        => ['processing',        'fa-gear'],
-    'Ready'             => ['ready',             'fa-circle-check'],
-    'Shipped'           => ['shipped',           'fa-truck-fast'],
-    'Claimed'           => ['claimed',           'fa-box-check'],
-    'Rejected'          => ['rejected',          'fa-xmark'],
+    'Pending_Clearance' => ['pending-clearance','fa-triangle-exclamation'],
+    'Awaiting_Payment'  => ['awaiting-payment','fa-credit-card'],
+    'Processing'        => ['processing','fa-gear'],
+    'Ready'             => ['ready','fa-circle-check'],
+    'Shipped'           => ['shipped','fa-truck-fast'],
+    'Claimed'           => ['claimed','fa-box-check'],
+    'Rejected'          => ['rejected','fa-xmark'],
 ];
 $statusLabel = [
     'Pending_Clearance' => 'Pending Clearance',
@@ -130,13 +107,13 @@ $statusLabel = [
     'Rejected'          => 'Rejected',
 ];
 $catIcon = [
-    'DOC-TOR'     => ['linear-gradient(135deg,#2563eb,#1d4ed8)', 'fa-file-invoice'],
-    'DOC-COE'     => ['linear-gradient(135deg,#16a34a,#15803d)', 'fa-certificate'],
-    'DOC-GM'      => ['linear-gradient(135deg,#0d9488,#0f766e)', 'fa-handshake-angle'],
-    'DOC-DIPLOMA' => ['linear-gradient(135deg,#7c3aed,#6d28d9)', 'fa-graduation-cap'],
-    'DOC-CTC'     => ['linear-gradient(135deg,#4f46e5,#4338ca)', 'fa-copy'],
-    'DOC-HD'      => ['linear-gradient(135deg,#ea580c,#c2410c)', 'fa-sign-out-alt'],
-    'DOC-CD'      => ['linear-gradient(135deg,#db2777,#be185d)', 'fa-book-open'],
+    'DOC-TOR'     => ['linear-gradient(135deg,#2563eb,#1d4ed8)','fa-file-invoice'],
+    'DOC-COE'     => ['linear-gradient(135deg,#16a34a,#15803d)','fa-certificate'],
+    'DOC-GM'      => ['linear-gradient(135deg,#0d9488,#0f766e)','fa-handshake-angle'],
+    'DOC-DIPLOMA' => ['linear-gradient(135deg,#7c3aed,#6d28d9)','fa-graduation-cap'],
+    'DOC-CTC'     => ['linear-gradient(135deg,#4f46e5,#4338ca)','fa-copy'],
+    'DOC-HD'      => ['linear-gradient(135deg,#ea580c,#c2410c)','fa-sign-out-alt'],
+    'DOC-CD'      => ['linear-gradient(135deg,#db2777,#be185d)','fa-book-open'],
 ];
 
 $page_title = 'Document Requests';
@@ -144,8 +121,8 @@ $APP_ROOT = '../';
 $ACTIVE_NAV = 'documents';
 $extra_css = ['documents.css'];
 $use_chart = true;
-$page_scripts = ['documents.js'];
 ?>
+﻿
 
 <?php include '../includes/header.php'; ?>
 <?php include '../includes/sidebar.php'; ?>
@@ -155,108 +132,101 @@ $page_scripts = ['documents.js'];
 <header class="header">
     <div class="title">
         <h1>Document Requests</h1>
-        <p>Queue, workflow actions, exit clearances, and performance metrics.</p>
+        <p>Queue, workflow actions, and performance metrics.</p>
     </div>
     <div class="header-actions">
-        <a href="documents-add.php" class="btn btn-primary"><i class="fas fa-plus"></i> New Request</a>
+        <button class="btn btn-primary" onclick="openNewRequest()"><i class="fas fa-plus"></i> New Request</button>
     </div>
 </header>
 
-<!-- ── Metrics: stat cards ────────────────────────────────────── -->
+<!-- ── Stats Cards ──────────────────────────────────────────── -->
 <div class="stats-grid">
     <div class="stat-card">
-        <div class="stat-top"><div class="stat-icon purple"><i class="fa-solid fa-stopwatch"></i></div></div>
-        <div class="stat-number"><?= $tatHours !== null ? $tatHours . '<span style="font-size:15px;"> hrs</span>' : '—' ?></div>
-        <div class="stat-label">Avg Turnaround (Payment → Ready)</div>
+        <div class="stat-top"><div class="stat-icon blue"><i class="fa-solid fa-clock"></i></div></div>
+        <div class="stat-number"><?= $tatHours !== null ? htmlspecialchars($tatHours) . '<span style="font-size:15px;"> hrs</span>' : '—' ?></div>
+        <div class="stat-label">Avg Turnaround</div>
     </div>
     <div class="stat-card">
         <div class="stat-top"><div class="stat-icon green"><i class="fa-solid fa-coins"></i></div></div>
         <div class="stat-number">&#8369;<?= number_format($revenueTotal, 2) ?></div>
-        <div class="stat-label">Revenue · <?= date('M d', strtotime($from)) ?> – <?= date('M d', strtotime($to)) ?></div>
+        <div class="stat-label">Monthly Revenue</div>
     </div>
     <div class="stat-card">
-        <div class="stat-top"><div class="stat-icon blue"><i class="fa-solid fa-bolt"></i></div></div>
-        <div class="stat-number"><?= $expressToday ?></div>
-        <div class="stat-label">Express Requests Today</div>
+        <div class="stat-top"><div class="stat-icon yellow"><i class="fa-solid fa-file-lines"></i></div></div>
+        <div class="stat-number"><?= (int) $regularCount ?></div>
+        <div class="stat-label">Regular Requests</div>
     </div>
     <div class="stat-card">
-        <div class="stat-top"><div class="stat-icon yellow"><i class="fa-solid fa-calendar-day"></i></div></div>
-        <div class="stat-number"><?= $regularToday ?></div>
-        <div class="stat-label">Regular Requests Today</div>
+        <div class="stat-top"><div class="stat-icon purple"><i class="fa-solid fa-bolt"></i></div></div>
+        <div class="stat-number"><?= (int) $expressCount ?></div>
+        <div class="stat-label">Express Requests</div>
     </div>
 </div>
 
-<!-- ── Metrics: charts ────────────────────────────────────────── -->
-<div class="metrics-grid" style="margin-top:16px;">
-
-    <div class="panel metric-panel">
-        <div class="panel-header">
-            <div><h3><i class="fa-solid fa-chart-column"></i> Revenue by Document Type</h3></div>
+<!-- ── Charts ───────────────────────────────────────────────── -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px;">
+    <div class="panel">
+        <div class="panel-toolbar">
+            <div class="panel-title"><i class="fa-solid fa-chart-bar"></i> Revenue by Document Type</div>
+            <div class="range-filter">
+                <input type="date" id="revFrom" class="form-control" value="<?= htmlspecialchars($from) ?>" style="height:34px;width:140px;">
+                <span style="color:#94a3b8;">–</span>
+                <input type="date" id="revTo" class="form-control" value="<?= htmlspecialchars($to) ?>" style="height:34px;width:140px;">
+                <button class="btn btn-sm btn-secondary" onclick="applyRevFilter()"><i class="fa-solid fa-filter"></i></button>
+            </div>
         </div>
-        <form method="get" class="range-filter" style="margin-top:10px;">
-            <input type="date" name="from" class="form-control" value="<?= htmlspecialchars($from) ?>">
-            <span style="color:#94a3b8;">to</span>
-            <input type="date" name="to" class="form-control" value="<?= htmlspecialchars($to) ?>">
-            <button class="btn btn-secondary"><i class="fa-solid fa-filter"></i> Filter</button>
-        </form>
-        <div class="metric-canvas">
-            <canvas id="revenueChart"
-                data-labels='<?= htmlspecialchars(json_encode(array_column($revenueRows, 'doc_name'))) ?>'
-                data-data='<?= htmlspecialchars(json_encode(array_map(fn($r) => (float) $r['revenue'], $revenueRows))) ?>'
-                data-total='<?= (float) $revenueTotal ?>'></canvas>
-        </div>
-    </div>
-
-    <div class="panel metric-panel">
-        <div class="panel-header">
-            <div><h3><i class="fa-solid fa-chart-bar"></i> Daily Queue Volume</h3></div>
-        </div>
-        <div class="metric-canvas">
-            <canvas id="volumeChart"
-                data-days='<?= htmlspecialchars(json_encode($days)) ?>'
-                data-express='<?= htmlspecialchars(json_encode($expressSeries)) ?>'
-                data-regular='<?= htmlspecialchars(json_encode($regularSeries)) ?>'></canvas>
+        <div style="padding:16px;">
+            <div class="metric-canvas">
+                <canvas id="revenueChart"
+                    data-labels='<?= htmlspecialchars(json_encode(array_column($revenueRows, 'doc_name'))) ?>'
+                    data-data='<?= htmlspecialchars(json_encode(array_map(fn($r) => (float) $r['revenue'], $revenueRows))) ?>'
+                    data-total="<?= (float) $revenueTotal ?>"></canvas>
+            </div>
         </div>
     </div>
-
-    <div class="panel metric-panel">
-        <div class="panel-header">
-            <div><h3><i class="fa-solid fa-chart-pie"></i> Fulfillment Split</h3></div>
+    <div class="panel">
+        <div class="panel-toolbar">
+            <div class="panel-title"><i class="fa-solid fa-chart-line"></i> Daily Queue Volume (Last 7 Days)</div>
         </div>
-        <div class="metric-canvas">
-            <canvas id="fulfillmentChart"
-                data-labels='<?= htmlspecialchars(json_encode(['Pickup', 'Digital', 'Courier'])) ?>'
-                data-data='<?= htmlspecialchars(json_encode([$fulfillMap['Pickup'], $fulfillMap['Digital'], $fulfillMap['Courier']])) ?>'
-                data-total='<?= $fulfillTotal ?>'></canvas>
+        <div style="padding:16px;">
+            <div class="metric-canvas">
+                <canvas id="volumeChart"
+                    data-labels='<?= htmlspecialchars(json_encode($days)) ?>'
+                    data-express='<?= htmlspecialchars(json_encode($expressSeries)) ?>'
+                    data-regular='<?= htmlspecialchars(json_encode($regularSeries)) ?>'></canvas>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- ── Queue table ────────────────────────────────────────────── -->
-<div class="panel" style="margin-top:16px;">
-    <div class="search-toolbar">
-        <div class="search-wrap">
-            <i class="fas fa-search"></i>
-            <input type="text" id="docSearch" placeholder="Search by request ID, student, document, or purpose...">
-        </div>
-        <select id="statusFilter" class="form-control" style="width:auto;min-width:170px;">
-            <option value="">All statuses</option>
-            <?php foreach ($statusLabel as $k => $v): ?>
-                <option value="<?= $k ?>"><?= $v ?></option>
-            <?php endforeach; ?>
-        </select>
-        <select id="typeFilter" class="form-control" style="width:auto;min-width:120px;">
-            <option value="">All types</option>
-            <option value="Express">Express</option>
-            <option value="Regular">Regular</option>
-        </select>
-        <select id="fulfillFilter" class="form-control" style="width:auto;min-width:130px;">
-            <option value="">All fulfillment</option>
-            <option value="Pickup">Pickup</option>
-            <option value="Digital">Digital</option>
-        </select>
-        <div class="panel-actions" style="margin-left:auto;display:flex;gap:8px;">
-            <span class="chip blue"><i class="fa-solid fa-file-lines"></i> <?= count($requests) ?> request<?= count($requests) === 1 ? '' : 's' ?></span>
+<!-- ── Queue Table ──────────────────────────────────────────── -->
+<div class="panel" style="margin-top:24px;">
+    <div class="panel-toolbar">
+        <div class="panel-title"><i class="fa-solid fa-list"></i> Request Queue</div>
+    </div>
+    <div style="padding:16px 20px;">
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px;">
+            <div style="flex:1;min-width:200px;">
+                <div class="form-group" style="margin:0;">
+                    <input type="text" id="docSearch" class="form-control" placeholder="Search student, document, ID…" style="height:36px;">
+                </div>
+            </div>
+            <select id="typeFilter" class="form-control" style="height:36px;width:160px;" onchange="applyFilters()">
+                <option value="">All Types</option>
+                <option value="Regular">Regular</option>
+                <option value="Express">Express</option>
+            </select>
+            <select id="statusFilter" class="form-control" style="height:36px;width:180px;" onchange="applyFilters()">
+                <option value="">All Statuses</option>
+                <option value="Pending_Clearance">Pending Clearance</option>
+                <option value="Awaiting_Payment">Awaiting Payment</option>
+                <option value="Processing">Processing</option>
+                <option value="Ready">Ready for Release</option>
+                <option value="Shipped">Shipped</option>
+                <option value="Claimed">Claimed</option>
+                <option value="Rejected">Rejected</option>
+            </select>
+            <span style="font-size:12px;color:#94a3b8;">Showing <strong id="showingCount"><?= count($requests) ?></strong> of <?= count($requests) ?></span>
         </div>
     </div>
 
@@ -267,50 +237,36 @@ $page_scripts = ['documents.js'];
         </thead>
         <tbody>
             <?php if (empty($requests)): ?>
-                <tr><td colspan="7" class="empty-state"><i class="fas fa-file-lines"></i><p>No document requests found</p><span>Requests from the student portal appear here.</span></td></tr>
+                <tr><td colspan="7" class="empty-state"><i class="fas fa-file-lines"></i><p>No document requests found</p><span>Requests appear here once submitted.</span></td></tr>
             <?php else: foreach ($requests as $r):
-                $pill = $statusPill[$r['document_status']] ?? ['awaiting-payment', 'fa-clock'];
+                $pill = $statusPill[$r['document_status']] ?? ['awaiting-payment','fa-clock'];
                 $label = $statusLabel[$r['document_status']] ?? str_replace('_', ' ', $r['document_status']);
-                $ci = $catIcon[$r['sku']] ?? ['linear-gradient(135deg,#64748b,#475569)', 'fa-file-lines'];
+                $ci = $catIcon[$r['sku']] ?? ['linear-gradient(135deg,#64748b,#475569)','fa-file-lines'];
                 $st = (string) $r['document_status'];
                 $reqEvents = $eventsByRequest[(int) $r['id']] ?? [];
-                $isDigital = $r['fulfillment_type'] === 'Digital';
+                $isPaid = !empty($r['paid_at']);
             ?>
                 <tr data-doc="<?= (int) $r['id'] ?>" data-status="<?= htmlspecialchars($st) ?>"
                     data-reqtype="<?= htmlspecialchars((string) $r['request_type']) ?>"
-                    data-fulfill="<?= htmlspecialchars((string) $r['fulfillment_type']) ?>"
-                    data-address="<?= htmlspecialchars((string) $r['delivery_address'], ENT_QUOTES) ?>"
-                    data-delivery="<?= (float) ($r['delivery_fee'] ?? 0) ?>"
-                    data-method="<?= htmlspecialchars((string) ($r['payment_method'] ?? 'Online'), ENT_QUOTES) ?>"
+                    data-paid="<?= $isPaid ? '1' : '0' ?>"
                     data-label="<?= htmlspecialchars($r['catalog_name'] ?? ucwords(str_replace('_', ' ', $r['document_type'])), ENT_QUOTES) ?>"
                     onclick="toggleDetail(<?= (int) $r['id'] ?>)">
                     <td><div class="student-info"><div class="student-avatar blue"><?= htmlspecialchars(strtoupper(substr($r['student_name'], 0, 1))) ?></div><div><div class="student-name"><?= htmlspecialchars($r['student_name']) ?></div><div class="student-sub"><?= htmlspecialchars($r['student_number']) ?></div></div></div></td>
-                    <td>
-                        <div class="student-info">
-                            <div class="student-avatar" style="background:<?= $ci[0] ?>;"><i class="fa-solid <?= $ci[1] ?>"></i></div>
-                            <div>
-                                <div class="student-name"><?= htmlspecialchars($r['catalog_name'] ?? ucwords(str_replace('_', ' ', $r['document_type']))) ?></div>
-                                <div class="student-sub"><i class="fa-solid fa-hashtag"></i> <?= htmlspecialchars($r['request_id'] ?? '') ?></div>
-                            </div>
-                        </div>
-                    </td>
+                    <td><div class="student-info"><div class="student-avatar" style="background:<?= $ci[0] ?>;"><i class="fa-solid <?= $ci[1] ?>"></i></div><div><div class="student-name"><?= htmlspecialchars($r['catalog_name'] ?? ucwords(str_replace('_', ' ', $r['document_type']))) ?></div><div class="student-sub"><i class="fa-solid fa-hashtag"></i> <?= htmlspecialchars($r['request_id'] ?? '') ?></div></div></div></td>
                     <td style="font-size:13px;font-weight:700;color:#0f172a;">&#8369;<?= number_format((float) ($r['fee_amount'] ?? 0), 2) ?></td>
-                    <td><span class="chip <?= $r['request_type'] === 'Express' ? 'express' : 'regular' ?>"><i class="fa-solid fa-bolt"></i> <?= $r['request_type'] ?></span></td>
-                    <td><span class="chip <?= strtolower((string) $r['fulfillment_type']) ?>"><i class="fa-solid <?= $r['fulfillment_type'] === 'Courier' ? 'fa-truck' : ($r['fulfillment_type'] === 'Digital' ? 'fa-download' : 'fa-store') ?>"></i> <?= htmlspecialchars($r['fulfillment_type']) ?></span></td>
+                    <td><span class="chip <?= $r['request_type'] === 'Express' ? 'express' : 'regular' ?>"><i class="fa-solid fa-bolt"></i> <?= htmlspecialchars($r['request_type']) ?></span></td>
+                    <td><span class="chip pickup"><i class="fa-solid fa-store"></i> Pickup</span></td>
                     <td><span class="pill <?= $pill[0] ?>"><i class="fa-solid <?= $pill[1] ?>"></i> <?= htmlspecialchars($label) ?></span></td>
                     <td><div class="row-actions" onclick="event.stopPropagation();">
-                        <?php if (in_array($st, ['Awaiting_Payment', 'Pending_Clearance'], true)): ?>
-                            <button class="btn btn-sm btn-secondary" onclick="processDoc(<?= (int) $r['id'] ?>)"><i class="fa-solid fa-gear"></i> Process</button>
+                        <?php if (in_array($st, ['Awaiting_Payment','Pending_Clearance'], true)): ?>
+                            <?php if ($isPaid): ?>
+                                <button class="btn btn-sm btn-secondary" onclick="processDoc(<?= (int) $r['id'] ?>)"><i class="fa-solid fa-gear"></i> Process</button>
+                            <?php endif; ?>
                             <button class="btn btn-sm btn-danger" onclick="rejectDoc(<?= (int) $r['id'] ?>)"><i class="fa-solid fa-xmark"></i> Reject</button>
                         <?php elseif ($st === 'Processing'): ?>
-                            <button class="btn btn-sm btn-success" onclick="approveDoc(<?= (int) $r['id'] ?>)"><i class="fa-solid fa-circle-check"></i> Approve / Release</button>
-                            <?php if ($isDigital): ?><button class="btn btn-sm btn-primary" onclick="genPdf(<?= (int) $r['id'] ?>)"><i class="fa-solid fa-file-pdf"></i> PDF</button><?php endif; ?>
-                            <?php if ($isDigital && !empty($r['pdf_path'])): ?><a class="btn btn-sm btn-light" href="<?= $APP_ROOT . htmlspecialchars($r['pdf_path']) ?>" target="_blank" rel="noopener" title="Open the generated PDF (password = student birthdate YYYY-MM-DD)"><i class="fa-solid fa-eye"></i> View</a><?php endif; ?>
+                            <button class="btn btn-sm btn-success" onclick="approveRelease(<?= (int) $r['id'] ?>)"><i class="fa-solid fa-circle-check"></i> Approve &amp; Release</button>
                             <button class="btn btn-sm btn-danger" onclick="rejectDoc(<?= (int) $r['id'] ?>)"><i class="fa-solid fa-xmark"></i> Reject</button>
                         <?php elseif ($st === 'Ready'): ?>
-                            
-                            <?php if ($isDigital): ?><button class="btn btn-sm btn-primary" onclick="genPdf(<?= (int) $r['id'] ?>)"><i class="fa-solid fa-file-pdf"></i> PDF</button><?php endif; ?>
-                            <?php if ($isDigital && !empty($r['pdf_path'])): ?><a class="btn btn-sm btn-light" href="<?= $APP_ROOT . htmlspecialchars($r['pdf_path']) ?>" target="_blank" rel="noopener" title="Open the generated PDF (password = student birthdate YYYY-MM-DD)"><i class="fa-solid fa-eye"></i> View</a><?php endif; ?>
                             <button class="btn btn-sm btn-success" onclick="claimDoc(<?= (int) $r['id'] ?>)"><i class="fa-solid fa-box-check"></i> Claimed</button>
                         <?php elseif ($st === 'Shipped'): ?>
                             <button class="btn btn-sm btn-success" onclick="claimDoc(<?= (int) $r['id'] ?>)"><i class="fa-solid fa-box-check"></i> Claimed</button>
@@ -319,7 +275,8 @@ $page_scripts = ['documents.js'];
                         <?php endif; ?>
                     </div></td>
                 </tr>
-                <tr class="doc-detail-row" id="detail-<?= (int) $r['id'] ?>">
+
+                <tr class="doc-detail-row" id="detail-<?= (int) $r['id'] ?>" style="display:none;">
                     <td colspan="7" style="padding:0;">
                         <div class="doc-detail" style="padding:18px 22px;background:#f8fafc;border-bottom:1px solid #e2e8f0;">
                             <?php if ($st === 'Rejected'): ?>
@@ -328,28 +285,27 @@ $page_scripts = ['documents.js'];
                                     <div><div class="banner-title">Request rejected</div><div class="banner-text"><?= htmlspecialchars($r['rejection_reason'] ?? 'No reason provided.') ?></div></div>
                                 </div>
                             <?php endif; ?>
-
                             <div style="display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:#475569;">
-                                <span><i class="fa-solid fa-hashtag" style="color:#2563eb;"></i> <b><?= htmlspecialchars($r['request_id']) ?></b></span>
-                                <span><i class="fa-solid fa-note-sticky"></i> <?= htmlspecialchars($r['purpose'] ?? '—') ?></span>
-                                <?php if (!empty($r['recipient'])): ?><span><i class="fa-solid fa-building"></i> <?= htmlspecialchars($r['recipient']) ?></span><?php endif; ?>
-                                <?php if (!empty($r['requirement_file_path'])): ?><span><i class="fa-solid fa-file-shield"></i> <a href="<?= $APP_ROOT . htmlspecialchars($r['requirement_file_path']) ?>" target="_blank" rel="noopener">Requirement file</a></span><?php endif; ?>
-                                <?php if ($st === 'Shipped' && !empty($r['lalamove_order_ref'])): ?><span><i class="fa-solid fa-truck-fast" style="color:#6d28d9;"></i> Rider: <b><?= htmlspecialchars($r['lalamove_order_ref']) ?></b></span><?php endif; ?>
-                                <?php if ($st === 'Claimed'): ?><span><i class="fa-solid fa-circle-check" style="color:#16a34a;"></i> Claimed <?= $r['claimed_at'] ? date('M d, Y h:i A', strtotime($r['claimed_at'])) : '' ?></span><?php endif; ?>
+                                <div><strong>Purpose:</strong> <?= htmlspecialchars($r['purpose'] ?: '—') ?></div>
+                                <div><strong>Recipient:</strong> <?= htmlspecialchars($r['recipient'] ?: '—') ?></div>
+                                <div><strong>Qty:</strong> <?= (int) ($r['quantity'] ?? 1) ?></div>
+                                <div><strong>Payment:</strong> <?= htmlspecialchars($r['payment_method'] ?? 'Online') ?></div>
+                                <div><strong>Requested:</strong> <?= date('M d, Y h:i A', strtotime($r['request_date'])) ?></div>
+                                <?php if (!empty($r['paid_at'])): ?><div><strong>Paid:</strong> <?= date('M d, Y h:i A', strtotime($r['paid_at'])) ?></div><?php endif; ?>
+                                <?php if (!empty($r['ready_at'])): ?><div><strong>Ready:</strong> <?= date('M d, Y h:i A', strtotime($r['ready_at'])) ?></div><?php endif; ?>
+                                <?php if (!empty($r['release_date'])): ?><div><strong>Release Date:</strong> <?= htmlspecialchars($r['release_date']) ?></div><?php endif; ?>
                             </div>
-
-                            
-
-                            
-
-                            <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;margin:14px 0 8px;"><i class="fa-solid fa-timeline"></i> Status timeline</h4>
-                            <ul class="timeline">
-                                <?php if (empty($reqEvents)): ?>
-                                    <li><div class="tl-dot" style="background:#94a3b8;border-color:#e2e8f0;"></div><div class="tl-status">Submitted</div><div class="tl-when"><?= date('M d, Y h:i A', strtotime($r['request_date'])) ?></div></li>
-                                <?php else: foreach ($reqEvents as $ev): ?>
-                                    <li><div class="tl-dot"></div><div class="tl-status"><?= htmlspecialchars($statusLabel[$ev['status']] ?? str_replace('_', ' ', $ev['status'])) ?></div><?php if (!empty($ev['note'])): ?><div class="tl-note"><?= htmlspecialchars($ev['note']) ?></div><?php endif; ?><div class="tl-when"><?= date('M d, Y h:i A', strtotime($ev['created_at'])) ?></div></li>
-                                <?php endforeach; endif; ?>
-                            </ul>
+                            <?php if (!empty($reqEvents)): ?>
+                                <div style="margin-top:14px;border-top:1px solid #e2e8f0;padding-top:12px;">
+                                    <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px;"><i class="fa-solid fa-timeline"></i> Activity Log</div>
+                                    <?php foreach ($reqEvents as $ev): ?>
+                                        <div style="display:flex;gap:10px;margin-bottom:6px;font-size:12px;">
+                                            <span style="color:#94a3b8;white-space:nowrap;"><?= date('M d, h:i A', strtotime($ev['created_at'])) ?></span>
+                                            <span style="color:#1e293b;"><?= htmlspecialchars($ev['note'] ?? $ev['status']) ?></span>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            <?php endif; ?>
                         </div>
                     </td>
                 </tr>
@@ -357,201 +313,323 @@ $page_scripts = ['documents.js'];
         </tbody>
     </table>
     </div>
-    <div class="table-footer">
-        <div class="info-text">Showing <strong id="showingCount"><?= count($requests) ?></strong> of <strong><?= count($requests) ?></strong> requests</div>
-    </div>
 </div>
 
 </div>
 </main>
 
-<!-- Approve / Release modal (registrar sets reason + release date) -->
-<div class="modal-overlay" id="approveModal">
-    <div class="modal-content" style="max-width:460px;">
-        <div class="modal-header"><h2><i class="fa-solid fa-circle-check"></i> Approve &amp; Release</h2><button class="modal-close" onclick="closeModal('approveModal')"><i class="fas fa-times"></i></button></div>
-        <div class="modal-body">
-            <input type="hidden" id="approveId">
-            <div class="detail-row" style="margin-bottom:14px;"><span class="lbl">Request</span><span class="val" id="approveLabel">—</span></div>
-            <div class="form-group"><label>Approval reason <span class="required">*</span></label><textarea id="approveReason" class="form-control" rows="2" placeholder="e.g. balance, requirements verified"></textarea></div>
-            <div class="form-group"><label>Date of release <span class="required">*</span></label><input type="date" id="approveReleaseDate" class="form-control"></div>
+<!-- ═══ NEW REQUEST MODAL ═══════════════════════════════════════ -->
+<div class="modal-overlay" id="newRequestModal">
+    <div class="modal-content" style="max-width:560px;">
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-file-circle-plus"></i> New Document Request</h3>
+            <button class="modal-close" onclick="closeModal('newRequestModal')"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <div class="modal-footer">
-            <button class="btn btn-light" onclick="closeModal('approveModal')">Cancel</button>
-            <button class="btn btn-success" id="approveSubmit" onclick="submitApprove()"><i class="fa-solid fa-circle-check"></i> Approve</button>
+        <div class="modal-body">
+            <form id="newRequestForm" onsubmit="submitNewRequest(event)">
+                <div class="form-group">
+                    <label>Student <span style="color:#dc2626;">*</span></label>
+                    <select name="student_id" id="nrStudent" class="form-control" data-searchable required>
+                        <option value="">Search or select a student…</option>
+                        <?php foreach ($students as $s): ?>
+                            <option value="<?= (int) $s['id'] ?>"><?= htmlspecialchars($s['student_number']) ?> — <?= htmlspecialchars($s['name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Document Type <span style="color:#dc2626;">*</span></label>
+                    <select name="catalog_id" id="nrCatalog" class="form-control" required onchange="updateNrFee()">
+                        <option value="">Select a document…</option>
+                        <?php foreach ($catalog as $c):
+                            $feeTxt = $c['fee_type'] === 'flat'
+                                ? '&#8369;' . number_format((float) $c['base_fee'], 2)
+                                : '&#8369;' . number_format((float) $c['base_fee'], 2) . ' per ' . str_replace('_', ' ', $c['fee_type']); ?>
+                            <option value="<?= (int) $c['id'] ?>"
+                                data-fee="<?= (float) $c['base_fee'] ?>"
+                                data-fee-type="<?= htmlspecialchars($c['fee_type']) ?>"
+                                data-req="<?= htmlspecialchars((string) $c['requirement'], ENT_QUOTES) ?>">
+                                <?= htmlspecialchars($c['name']) ?> (<?= $feeTxt ?>)
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <div id="nrHint" class="req-hint" style="margin-top:4px;"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group" style="flex:1;">
+                        <label>Priority</label>
+                        <select id="nrPriority" class="form-control" onchange="updateNrFee()">
+                            <option value="Regular">Regular</option>
+                            <option value="Express">Express (+&#8369;100)</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label>Fulfillment</label>
+                        <input type="text" class="form-control" value="Pickup at Registrar" readonly style="background:#f1f5f9;">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Purpose <span style="color:#dc2626;">*</span></label>
+                    <input type="text" name="purpose" id="nrPurpose" class="form-control" placeholder="e.g., Employment requirement" required>
+                </div>
+                <div class="form-group">
+                    <label>Recipient</label>
+                    <input type="text" name="recipient" id="nrRecipient" class="form-control" placeholder="e.g., UP Manila Registrar">
+                </div>
+                <div class="fee-preview">
+                    <span class="fp-label"><i class="fa-solid fa-coins"></i> Estimated Fee</span>
+                    <span class="fp-amount" id="nrFeePreview">&#8369;0.00</span>
+                </div>
+                <div class="modal-footer" style="border-top:1px solid #e2e8f0;margin-top:16px;padding-top:16px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('newRequestModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="nrSubmitBtn"><i class="fa-solid fa-plus"></i> Add Request</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
 
-<!-- Reject modal -->
+<!-- ═══ APPROVE & RELEASE MODAL ═════════════════════════════════ -->
+<div class="modal-overlay" id="approveReleaseModal">
+    <div class="modal-content" style="max-width:420px;">
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-circle-check"></i> Approve &amp; Release</h3>
+            <button class="modal-close" onclick="closeModal('approveReleaseModal')"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="arId">
+            <p style="font-size:13px;color:#475569;margin-bottom:12px;">Set the date of release for this document.</p>
+            <div class="form-group">
+                <label>Date of Release <span style="color:#dc2626;">*</span></label>
+                <input type="date" id="arReleaseDate" class="form-control" required>
+            </div>
+        </div>
+        <div class="modal-footer" style="border-top:1px solid #e2e8f0;">
+            <button class="btn btn-secondary" onclick="closeModal('approveReleaseModal')">Cancel</button>
+            <button class="btn btn-success" id="arSubmitBtn" onclick="submitApproveRelease()"><i class="fa-solid fa-circle-check"></i> Approve &amp; Release</button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ REJECT MODAL ═════════════════════════════════════════════ -->
 <div class="modal-overlay" id="rejectModal">
-    <div class="modal-content" style="max-width:440px;">
-        <div class="modal-header"><h2><i class="fa-solid fa-ban"></i> Reject Request</h2><button class="modal-close" onclick="closeModal('rejectModal')"><i class="fas fa-times"></i></button></div>
+    <div class="modal-content" style="max-width:420px;">
+        <div class="modal-header">
+            <h3><i class="fa-solid fa-ban"></i> Reject Request</h3>
+            <button class="modal-close" onclick="closeModal('rejectModal')"><i class="fa-solid fa-xmark"></i></button>
+        </div>
         <div class="modal-body">
             <input type="hidden" id="rejectId">
-            <div class="detail-row" style="margin-bottom:14px;"><span class="lbl">Request</span><span class="val" id="rejectLabel">—</span></div>
-            <div class="form-group"><label>Rejection reason <span class="required">*</span></label><textarea id="rejectReason" class="form-control" rows="3" placeholder="e.g. Missing scanned ID / incomplete requirements"></textarea></div>
+            <p style="font-size:13px;color:#475569;margin-bottom:12px;">Rejecting: <strong id="rejectLabel"></strong></p>
+            <div class="form-group">
+                <label>Rejection Reason <span style="color:#dc2626;">*</span></label>
+                <textarea id="rejectReason" class="form-control" rows="3" placeholder="Enter reason for rejection…"></textarea>
+            </div>
         </div>
-        <div class="modal-footer">
-            <button class="btn btn-light" onclick="closeModal('rejectModal')">Cancel</button>
+        <div class="modal-footer" style="border-top:1px solid #e2e8f0;">
+            <button class="btn btn-secondary" onclick="closeModal('rejectModal')">Cancel</button>
             <button class="btn btn-danger" id="rejectSubmit" onclick="submitReject()"><i class="fa-solid fa-ban"></i> Reject</button>
         </div>
     </div>
 </div>
 
-<!-- Generic confirm-action modal (replaces native confirm()) -->
-<div class="modal-overlay" id="confirmModal">
-    <div class="modal-content" style="max-width:420px;">
-        <div class="modal-header"><h2><i class="fa-solid fa-circle-question"></i> Confirm Action</h2><button class="modal-close" onclick="closeModal('confirmModal')"><i class="fas fa-times"></i></button></div>
-        <div class="modal-body">
-            <div id="confirmMessage" style="font-size:13.5px;line-height:1.55;color:#334155;"></div>
-        </div>
-        <div class="modal-footer">
-            <button class="btn btn-light" onclick="closeModal('confirmModal')">Cancel</button>
-            <button class="btn btn-primary" id="confirmOkBtn" onclick="doConfirm()"></button>
-        </div>
-    </div>
-</div>
-
 <script>
-let CONFIRM_ACTION = null;
+// ── Helpers ────────────────────────────────────────────────────
+const PRIORITY_FEE = 100;
 
-function toggleDetail(id) {
-    const row = document.getElementById('detail-' + id);
-    if (row) row.style.display = row.style.display === 'none' ? '' : 'none';
-}
-function closeModal(id) { document.getElementById(id).classList.remove('active'); document.body.style.overflow = ''; }
-function openModal(id) { document.getElementById(id).classList.add('active'); document.body.style.overflow = 'hidden'; }
-['approveModal', 'rejectModal', 'confirmModal'].forEach(id => {
-    const el = document.getElementById(id);
-    el.addEventListener('click', e => { if (e.target === el) closeModal(id); });
+function openModal(id) { const m = document.getElementById(id); if (m) { m.classList.add('active'); document.body.style.overflow = 'hidden'; } }
+function closeModal(id) { const m = document.getElementById(id); if (m) { m.classList.remove('active'); document.body.style.overflow = ''; } }
+document.querySelectorAll('.modal-overlay').forEach(m => {
+    m.addEventListener('click', e => { if (e.target === m) { m.classList.remove('active'); document.body.style.overflow = ''; } });
 });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal('approveModal'); closeModal('rejectModal'); closeModal('confirmModal'); } });
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.active').forEach(m => { m.classList.remove('active'); document.body.style.overflow = ''; });
+});
 
-// ── In-app confirmation (no native confirm()) ──────────────────
 function rowLabel(id) {
-    const row = document.querySelector('tr[data-doc="' + id + '"]');
-    return row ? row.dataset.label : ('#' + id);
-}
-function confirmAction(message, okLabel, okClass, onConfirm) {
-    document.getElementById('confirmMessage').textContent = message;
-    const ok = document.getElementById('confirmOkBtn');
-    ok.className = 'btn ' + (okClass || 'btn-primary');
-    ok.innerHTML = okLabel;
-    CONFIRM_ACTION = onConfirm;
-    openModal('confirmModal');
-}
-function doConfirm() {
-    const fn = CONFIRM_ACTION;
-    CONFIRM_ACTION = null;
-    closeModal('confirmModal');
-    if (typeof fn === 'function') fn();
+    const tr = document.querySelector('tr[data-doc="' + id + '"]');
+    return tr ? (tr.dataset.label || 'Request #' + id) : 'Request #' + id;
 }
 
-function post(url, body) {
-    return fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-    }).then(r => r.json());
-}
-function putDoc(id, action, extra) {
-    return fetch('../api/documents.php?id=' + id, {
+async function putDoc(id, action, extra) {
+    const body = Object.assign({ action: action }, extra || {});
+    const res = await fetch('../api/documents.php?id=' + id, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(Object.assign({ action: action }, extra || {}))
-    }).then(r => r.json());
+        body: JSON.stringify(body)
+    });
+    return res.json();
 }
 
-// ── Simple transition actions (confirmed via in-app modal) ─────
+// ── New Request Modal ──────────────────────────────────────────
+function openNewRequest() {
+    document.getElementById('newRequestForm').reset();
+    document.getElementById('nrHint').textContent = '';
+    document.getElementById('nrHint').classList.remove('visible');
+    document.getElementById('nrFeePreview').textContent = '\u20B10.00';
+    openModal('newRequestModal');
+}
+
+function updateNrFee() {
+    const opt = document.getElementById('nrCatalog').selectedOptions[0];
+    if (!opt || !opt.value) {
+        document.getElementById('nrFeePreview').textContent = '\u20B10.00';
+        document.getElementById('nrHint').classList.remove('visible');
+        return;
+    }
+    const fee = parseFloat(opt.dataset.fee || '0');
+    const feeType = opt.dataset.feeType;
+    const isExpress = document.getElementById('nrPriority').value === 'Express';
+    const total = (feeType === 'flat' ? fee : fee) + (isExpress ? PRIORITY_FEE : 0);
+    document.getElementById('nrFeePreview').textContent = '\u20B1' + total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const req = opt.dataset.req;
+    if (req) {
+        document.getElementById('nrHint').textContent = 'Required: ' + req;
+        document.getElementById('nrHint').classList.add('visible');
+    } else {
+        document.getElementById('nrHint').classList.remove('visible');
+    }
+}
+
+async function submitNewRequest(e) {
+    e.preventDefault();
+    const btn = document.getElementById('nrSubmitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Adding\u2026';
+    const data = {
+        student_id: document.getElementById('nrStudent').value,
+        catalog_id: document.getElementById('nrCatalog').value,
+        request_type: document.getElementById('nrPriority').value,
+        fulfillment_type: 'Pickup',
+        purpose: document.getElementById('nrPurpose').value.trim(),
+        recipient: document.getElementById('nrRecipient').value.trim()
+    };
+    if (!data.student_id || !data.catalog_id || !data.purpose) {
+        showToast('Please fill all required fields.', 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-plus"></i> Add Request';
+        return;
+    }
+    try {
+        const res = await fetch('../api/student-documents.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        const result = await res.json();
+        if (result.success) {
+            closeModal('newRequestModal');
+            showToast(result.message || 'Document request created.', 'success');
+            setTimeout(() => location.reload(), 600);
+        } else {
+            showToast(result.message || 'Failed to create request.', 'error');
+        }
+    } catch (err) {
+        showToast('Network error.', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-plus"></i> Add Request';
+    }
+}
+
+// ── Process ────────────────────────────────────────────────────
 function processDoc(id) {
-    confirmAction('Start processing "' + rowLabel(id) + '"? The request moves to the Processing queue.',
-        '<i class="fa-solid fa-play"></i> Start Processing', 'btn-primary', () => {
-            putDoc(id, 'process').then(d => {
-                if (d.success) { showToast('Request moved to Processing.', 'success'); location.reload(); }
-                else showToast(d.message || 'Action failed.', 'error');
-            }).catch(() => showToast('Network error.', 'error'));
-        });
-}
-function approveDoc(id) {
-    document.getElementById('approveId').value = id;
-    document.getElementById('approveLabel').textContent = rowLabel(id);
-    document.getElementById('approveReason').value = '';
-    document.getElementById('approveReleaseDate').value = '';
-    openModal('approveModal');
-}
-function submitApprove() {
-    const id = document.getElementById('approveId').value;
-    const reason = document.getElementById('approveReason').value.trim();
-    const releaseDate = document.getElementById('approveReleaseDate').value;
-    if (!reason) { showToast('Please enter an approval reason.', 'error'); return; }
-    if (!releaseDate) { showToast('Please set the date of release.', 'error'); return; }
-    const btn = document.getElementById('approveSubmit');
-    btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Approving…';
-    putDoc(id, 'ready', { approval_reason: reason, release_date: releaseDate }).then(d => {
-        if (d.success) { showToast('Request approved for release.', 'success'); location.reload(); }
+    const tr = document.querySelector('tr[data-doc="' + id + '"]');
+    if (tr && tr.dataset.paid !== '1') {
+        showToast('Payment not confirmed. Cannot process yet.', 'error');
+        return;
+    }
+    if (!confirm('Start processing this request?')) return;
+    putDoc(id, 'process').then(d => {
+        if (d.success) { showToast('Request set to Processing.', 'success'); location.reload(); }
         else showToast(d.message || 'Action failed.', 'error');
-    }).catch(() => showToast('Network error.', 'error'))
-      .finally(() => { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-circle-check"></i> Approve'; });
+    }).catch(() => showToast('Network error.', 'error'));
 }
+
+// ── Approve & Release ─────────────────────────────────────────
+function approveRelease(id) {
+    document.getElementById('arId').value = id;
+    document.getElementById('arReleaseDate').value = '';
+    openModal('approveReleaseModal');
+}
+
+async function submitApproveRelease() {
+    const id = document.getElementById('arId').value;
+    const releaseDate = document.getElementById('arReleaseDate').value;
+    if (!releaseDate) { showToast('Please select a release date.', 'error'); return; }
+    const btn = document.getElementById('arSubmitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Approving\u2026';
+    try {
+        const d = await putDoc(id, 'ready', { approval_reason: 'Approved by registrar', release_date: releaseDate });
+        if (d.success) {
+            closeModal('approveReleaseModal');
+            showToast('Request approved and ready for release.', 'success');
+            setTimeout(() => location.reload(), 600);
+        } else {
+            showToast(d.message || 'Action failed.', 'error');
+        }
+    } catch (err) {
+        showToast('Network error.', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-circle-check"></i> Approve &amp; Release';
+    }
+}
+
+// ── Claim ──────────────────────────────────────────────────────
 function claimDoc(id) {
-    confirmAction('Mark "' + rowLabel(id) + '" as Claimed? This completes the request.',
-        '<i class="fa-solid fa-flag-checkered"></i> Mark Claimed', 'btn-success', () => {
-            putDoc(id, 'claim').then(d => {
-                if (d.success) { showToast('Request marked Claimed.', 'success'); location.reload(); }
-                else showToast(d.message || 'Action failed.', 'error');
-            }).catch(() => showToast('Network error.', 'error'));
-        });
+    if (!confirm('Mark this request as claimed?')) return;
+    putDoc(id, 'claim').then(d => {
+        if (d.success) { showToast('Request marked Claimed.', 'success'); location.reload(); }
+        else showToast(d.message || 'Action failed.', 'error');
+    }).catch(() => showToast('Network error.', 'error'));
 }
+
+// ── Reject ─────────────────────────────────────────────────────
 function rejectDoc(id) {
     document.getElementById('rejectId').value = id;
     document.getElementById('rejectLabel').textContent = rowLabel(id);
     document.getElementById('rejectReason').value = '';
     openModal('rejectModal');
 }
-function submitReject() {
+
+async function submitReject() {
     const id = document.getElementById('rejectId').value;
     const reason = document.getElementById('rejectReason').value.trim();
     if (!reason) { showToast('Please enter a rejection reason.', 'error'); return; }
     const btn = document.getElementById('rejectSubmit');
-    btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Rejecting…';
-    putDoc(id, 'reject', { rejection_reason: reason }).then(d => {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Rejecting\u2026';
+    try {
+        const d = await putDoc(id, 'reject', { rejection_reason: reason });
         if (d.success) { showToast('Request rejected.', 'success'); location.reload(); }
         else showToast(d.message || 'Action failed.', 'error');
-    }).catch(() => showToast('Network error.', 'error'))
-      .finally(() => { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-ban"></i> Reject'; });
+    } catch (err) {
+        showToast('Network error.', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-ban"></i> Reject';
+    }
 }
 
-// ── Exit clearance ─────────────────────────────────────────────
-
-
-// ── Digital PDF generation (api/generate-document-pdf.php) ─────
-function genPdf(id) {
-    const btn = event && event.target ? event.target.closest('button') : null;
-    const orig = btn ? btn.innerHTML : '';
-    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>…'; }
-    post('../api/generate-document-pdf.php', { request_id: id })
-        .then(d => {
-            if (d.success) { showToast('Digital PDF generated (' + d.data.filename + ').', 'success'); location.reload(); }
-            else showToast(d.message || 'PDF generation failed.', 'error');
-        }).catch(() => showToast('Network error.', 'error'))
-        .finally(() => { if (btn) { btn.disabled = false; btn.innerHTML = orig; } });
+// ── Detail Row Toggle ──────────────────────────────────────────
+function toggleDetail(id) {
+    const row = document.getElementById('detail-' + id);
+    if (row) row.style.display = row.style.display === 'none' ? '' : 'none';
 }
 
-
-// ── Search + filters ───────────────────────────────────────────
+// ── Search + Filters ───────────────────────────────────────────
 function applyFilters() {
     const q = (document.getElementById('docSearch').value || '').trim().toLowerCase();
     const st = document.getElementById('statusFilter').value;
     const rt = document.getElementById('typeFilter').value;
-    const ff = document.getElementById('fulfillFilter').value;
     let visible = 0;
     document.querySelectorAll('table tbody tr[data-doc]').forEach(tr => {
         const text = tr.textContent.toLowerCase();
         const matchQ = !q || text.includes(q);
         const matchS = !st || tr.dataset.status === st;
         const matchR = !rt || tr.dataset.reqtype === rt;
-        const matchF = !ff || tr.dataset.fulfill === ff;
-        const show = matchQ && matchS && matchR && matchF;
+        const show = matchQ && matchS && matchR;
         tr.style.display = show ? '' : 'none';
         const detail = document.getElementById('detail-' + tr.dataset.doc);
         if (detail) detail.style.display = 'none';
@@ -560,9 +638,13 @@ function applyFilters() {
     document.getElementById('showingCount').textContent = visible;
 }
 document.getElementById('docSearch').addEventListener('input', applyFilters);
-document.getElementById('statusFilter').addEventListener('change', applyFilters);
-document.getElementById('typeFilter').addEventListener('change', applyFilters);
-document.getElementById('fulfillFilter').addEventListener('change', applyFilters);
+
+// ── Revenue Date Filter ────────────────────────────────────────
+function applyRevFilter() {
+    const from = document.getElementById('revFrom').value;
+    const to = document.getElementById('revTo').value;
+    window.location.href = 'documents.php?from=' + encodeURIComponent(from) + '&to=' + encodeURIComponent(to);
+}
 </script>
 
 <?php include '../includes/footer.php'; ?>

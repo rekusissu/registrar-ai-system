@@ -240,37 +240,96 @@
 .monitor-top .brand { display: flex; align-items: center; gap: 12px; }
 .monitor-top .brand img { height: 44px; width: 44px; border-radius: 10px; object-fit: cover; }
 .monitor-top .brand h1 { font-size: 20px; font-weight: 800; margin: 0; color: #0f172a; }
-.monitor-top .clock { font-size: 16px; color: #64748b; font-variant-numeric: tabular-nums; }
+.monitor-top .clock { font-size: 22px; color: #1e293b; font-weight: 800; font-variant-numeric: tabular-nums; }
 
-.hero {
-    background: linear-gradient(135deg, #3b82f6 0%, #6366f1 60%, #8b5cf6 100%);
-    border-radius: 26px;
-    padding: 44px 40px;
-    text-align: center;
+.serving-bar {
+    display: flex;
+    align-items: center;
+    background: #fff;
+    border: 2px solid #e2e8f0;
+    border-radius: 20px;
     margin-bottom: 24px;
-    border: 1px solid #dbeafe;
-    position: relative;
+    overflow: hidden;
+    min-height: 200px;
+    gap: 28px;
+    padding: 32px 48px;
 }
-.hero .hero-label {
-    font-size: 18px;
-    letter-spacing: 4px;
-    text-transform: uppercase;
-    color: #dbeafe;
-    font-weight: 700;
-    margin-bottom: 6px;
+.serving-ticket {
+    flex: 1;
+    text-align: center;
 }
-.hero .hero-number {
-    font-size: 150px;
+.serving-num {
+    font-size: clamp(80px, 14vw, 140px);
     font-weight: 900;
     line-height: 1;
-    margin: 6px 0 4px;
-    background: linear-gradient(135deg, #ffffff, #e0e7ff);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    color: #0f172a;
 }
-.hero .hero-name { font-size: 40px; font-weight: 700; margin: 0 0 10px; color: #ffffff; }
-.hero .hero-status { font-size: 16px; color: #e0e7ff; }
+.serving-name {
+    font-size: clamp(18px, 2.5vw, 26px);
+    font-weight: 700;
+    color: #475569;
+    margin-top: 4px;
+}
+.serving-label {
+    font-size: clamp(12px, 1.2vw, 15px);
+    font-weight: 700;
+    color: #2563eb;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+    margin-bottom: 4px;
+    animation: labelPulse 2s ease-in-out infinite;
+}
+@keyframes labelPulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: .4; }
+}
+.serving-divider {
+    width: 2px;
+    height: 100px;
+    background: #e2e8f0;
+    border-radius: 2px;
+    flex-shrink: 0;
+}
+.serving-divider.hidden { display: none; }
+.serving-window {
+    flex-shrink: 0;
+    text-align: center;
+    background: #eff6ff;
+    border: 2px solid #bfdbfe;
+    border-radius: 16px;
+    padding: 24px 56px;
+}
+.serving-window.hidden { display: none; }
+.serving-win-text {
+    font-size: clamp(12px, 1.2vw, 13px);
+    font-weight: 700;
+    color: #2563eb;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.serving-win-text span {
+    display: block;
+    font-size: 3.8em;
+    font-weight: 900;
+    color: #1e40af;
+    line-height: 1.1;
+    margin-top: 2px;
+}
+.serving-bar.calling { animation: servePulse .6s ease-in-out 3; }
+@keyframes servePulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(37,99,235,0.3); }
+    50%      { box-shadow: 0 0 0 12px rgba(37,99,235,0); }
+}
+
+.win-badge {
+    display: inline-block;
+    padding: 2px 14px;
+    border-radius: 6px;
+    font-weight: 800;
+    font-size: inherit;
+    background: #dbeafe;
+    color: #1d4ed8;
+}
 .hero.calling { animation: heroPulse 1.6s ease-in-out 2; }
 
 .monitor-cols {

@@ -51,7 +51,7 @@ try {
          WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'enrollments'"
     ) === 1;
     if (!$hasEnrollments) {
-        echo json_encode(['success' => false, 'message' => 'Enrollment system not set up. Run the 002_receive_student migration first.']);
+        echo json_encode(['success' => false, 'message' => 'Enrollment system not set up. Import registrar_ai.sql first.']);
         exit;
     }
 

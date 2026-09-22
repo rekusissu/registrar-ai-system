@@ -4,9 +4,9 @@ require_once __DIR__ . '/shared/security_headers.php';
 require_once __DIR__ . '/shared/database.php';
 $db = Database::getInstance();
 $verified = false; $notFound = false;
-$idNumber = trim((string) ($_GET['id_number'] ?? ''));
-if ($idNumber !== '') {
-    $row = $db->fetchOne("SELECT si.id, si.status, si.expiry_date FROM student_ids si WHERE si.id_number = ? LIMIT 1", [$idNumber]);
+$studentId = intval($_GET['student_id'] ?? 0);
+if ($studentId > 0) {
+    $row = $db->fetchOne("SELECT si.id, si.status, si.expiry_date FROM student_ids si WHERE si.student_id = ? LIMIT 1", [$studentId]);
     if ($row) {
         $isValid = $row['status'] === 'active' && ($row['expiry_date'] === null || $row['expiry_date'] >= date('Y-m-d'));
         $verified = $isValid;
@@ -63,13 +63,13 @@ body{font-family:"Inter","Segoe UI",-apple-system,sans-serif;background:linear-g
             <div class="ch nf"><div class="ic"><i class="fa-solid fa-circle-xmark"></i></div><h2>Not Verified</h2></div>
             <div class="cb">
                 <div class="nm"><i class="fa-solid fa-triangle-exclamation" style="margin-right:6px;"></i>No verified student record found.</div>
-                <form class="sf" method="get" action="verify-student.php"><input type="text" name="id_number" placeholder="ID number (e.g. 2026-0001)" required /><button type="submit"><i class="fa-solid fa-magnifying-glass"></i> Verify</button></form>
+                <form class="sf" method="get" action="verify-student.php"><input type="text" name="student_id" placeholder="Student ID (e.g. 5)" required /><button type="submit"><i class="fa-solid fa-magnifying-glass"></i> Verify</button></form>
             </div>
         <?php else: ?>
             <div class="ch nu"><div class="ic"><i class="fa-solid fa-qrcode"></i></div><h2>Student Verification</h2></div>
             <div class="cb">
-                <p style="font-size:13px;color:var(--mut);margin-bottom:16px;">Scan a student ID QR code or enter the ID number manually.</p>
-                <form class="sf" method="get" action="verify-student.php"><input type="text" name="id_number" placeholder="ID number (e.g. 2026-0001)" required /><button type="submit"><i class="fa-solid fa-magnifying-glass"></i> Verify</button></form>
+                <p style="font-size:13px;color:var(--mut);margin-bottom:16px;">Scan a student ID QR code or enter the student ID manually.</p>
+                <form class="sf" method="get" action="verify-student.php"><input type="text" name="student_id" placeholder="Student ID (e.g. 5)" required /><button type="submit"><i class="fa-solid fa-magnifying-glass"></i> Verify</button></form>
             </div>
         <?php endif; ?>
     </div>

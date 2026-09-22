@@ -9,11 +9,10 @@
 /**
  * Generate a QR code SVG pointing to the student verification page.
  *
- * @param string $idNumber  The student ID number (e.g. "2026-0001")
- * @param int    $studentId The student's DB id (used for filename uniqueness)
- * @return string|null  Web-relative path (e.g. '../uploads/ids/xyz.svg') or null on failure
+ * @param int $studentId The student's DB id (primary key)
+ * @return string|null   Web-relative path (e.g. '../uploads/ids/xyz.svg') or null on failure
  */
-function generateStudentQrFile(string $idNumber, int $studentId): ?string {
+function generateStudentQrFile(int $studentId): ?string {
     $dir = __DIR__ . '/../uploads/ids/';
     if (!is_dir($dir)) mkdir($dir, 0775, true);
     $filename = 'id_' . $studentId . '_' . time() . '.svg';
@@ -30,13 +29,11 @@ function generateStudentQrFile(string $idNumber, int $studentId): ?string {
         $opts = new \chillerlan\QRCode\QROptions([
             'outputInterface' => \chillerlan\QRCode\Output\QRMarkupSVG::class,
             'outputBase64'    => false,
-            'eccLevel'        => 'M',
+            'eccLevel'        => 0, // ECC_M
             'scale'           => 6,
         ]);
         $qrcode = new \chillerlan\QRCode\QRCode($opts);
-        // ponytail: QR points to public verification page on registrar.bcpsms2.com
-        // Switch to a relative URL or env-based domain if deployment changes.
-        $verifyUrl = 'https://registrar.bcpsms2.com/verify-student.php?id_number=' . urlencode($idNumber);
+        $verifyUrl = 'https://registrar.bcpsms2.com/verify-student.php?student_id=' . intval($studentId);
         $svg = $qrcode->render($verifyUrl);
         if (file_put_contents($path, $svg) === false) {
             error_log('QR generation failed: could not write ' . $path);

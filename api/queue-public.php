@@ -7,10 +7,12 @@
 //    GET  ?action=my_ticket&number=N      standing lookup (portal-ready)
 //
 //  Join is evaluated strictly in this order:
-//    1. 2 s global anti-bounce (double-read / rapid re-tap)
-//    2. card validation (exists, linked, active)
+//    1. card validation (exists, linked, active)
+//    2. 2 s per-card anti-bounce (same cardUid rapid re-tap)
 //    3. 5 min per-student cooldown (already has a ticket that is < 5 min old)
 //    4. join from the back (always) — new number appended, prior ticket stays
+//       Steps 3 + 4 run inside a transaction with SELECT … FOR UPDATE
+//       to prevent duplicate tickets from race conditions.
 // ============================================================
 
 header('Content-Type: application/json');
@@ -67,17 +69,7 @@ if ($action === 'join') {
             exit;
         }
 
-        // ── 1. 2 s global anti-bounce ──────────────────────────
-        $lastJoin = $db->fetchColumn(
-            "SELECT MAX(joined_at) FROM queue_tickets WHERE queue_date = ?",
-            [$today]
-        );
-        if ($lastJoin && (time() - strtotime($lastJoin) < 2)) {
-            echo json_encode(['success' => false, 'code' => 'bounce', 'message' => 'Please wait a moment before tapping.']);
-            exit;
-        }
-
-        // ── 2. Card validation ────────────────────────────────
+        // ── 1. Card validation ────────────────────────────────
         // All validation failures (not found, unlinked, lost, expired,
         // inactive) return the same generic message to prevent card-UID
         // enumeration. The specific reason is logged server-side only.
@@ -115,60 +107,86 @@ if ($action === 'join') {
         $studentNumber = $card['student_number'] ?? null;
         $course = $card['course'] ?? null;
 
-        // ── 3. 5 min per-student cooldown ─────────────────────
-        $existing = $db->fetchOne(
-            "SELECT * FROM queue_tickets
-             WHERE queue_date = ? AND student_id = ?
+        // ── 2. 2 s per-card anti-bounce ────────────────────────
+        $recentByCard = $db->fetchOne(
+            "SELECT joined_at FROM queue_tickets
+             WHERE queue_date = ? AND card_uid = ?
              ORDER BY joined_at DESC LIMIT 1",
-            [$today, $studentId]
+            [$today, $cardUid]
         );
-        if ($existing && (time() - strtotime($existing['joined_at']) < 300)) {
-            // Already have a (recent) ticket today
-            $position = 0;
-            if ($existing['status'] === 'waiting') {
-                $position = (int) $db->fetchColumn(
-                    "SELECT COUNT(*) FROM queue_tickets
-                     WHERE queue_date = ? AND status = 'waiting' AND ticket_number <= ?",
-                    [$today, (int) $existing['ticket_number']]
-                );
-            }
-            echo json_encode([
-                'success' => false,
-                'code'    => 'cooldown',
-                'message' => 'You already have number ' . padNumber((int) $existing['ticket_number'])
-                             . ' — you can get a new number after the 5-minute cooldown.',
-                'data'    => [
-                    'ticket_id'      => (int) $existing['id'],
-                    'ticket_number'  => (int) $existing['ticket_number'],
-                    'display_number' => padNumber((int) $existing['ticket_number']),
-                    'student_name'   => $studentName,
-                    'position'       => $position,
-                    'waiting_ahead'  => max(0, $position - 1),
-                ],
-            ]);
+        if ($recentByCard && (time() - strtotime($recentByCard['joined_at']) < 2)) {
+            echo json_encode(['success' => false, 'code' => 'throttle', 'message' => 'Please wait a moment before tapping again.']);
             exit;
         }
 
+        // ── 3. 5 min per-student cooldown ─────────────────────
         // ── 4. Join from the back (always) ────────────────────
-        [$reader, $location] = resolveReaderLocation($db, null);
+        // Wrap cooldown check + INSERT in a transaction with
+        // SELECT … FOR UPDATE to prevent duplicate tickets from
+        // two concurrent requests seeing the same next number.
+        $db->beginTransaction();
+        try {
+            $existing = $db->fetchOne(
+                "SELECT * FROM queue_tickets
+                 WHERE queue_date = ? AND student_id = ?
+                 ORDER BY joined_at DESC LIMIT 1 FOR UPDATE",
+                [$today, $studentId]
+            );
+            if ($existing && (time() - strtotime($existing['joined_at']) < 300)) {
+                $db->rollBack();
+                // Already have a (recent) ticket today
+                $position = 0;
+                if ($existing['status'] === 'waiting') {
+                    $position = (int) $db->fetchColumn(
+                        "SELECT COUNT(*) FROM queue_tickets
+                         WHERE queue_date = ? AND status = 'waiting' AND ticket_number <= ?",
+                        [$today, (int) $existing['ticket_number']]
+                    );
+                }
+                echo json_encode([
+                    'success' => false,
+                    'code'    => 'cooldown',
+                    'message' => 'You already have number ' . padNumber((int) $existing['ticket_number'])
+                                 . ' — you can get a new number after the 5-minute cooldown.',
+                    'data'    => [
+                        'ticket_id'      => (int) $existing['id'],
+                        'ticket_number'  => (int) $existing['ticket_number'],
+                        'display_number' => padNumber((int) $existing['ticket_number']),
+                        'student_name'   => $studentName,
+                        'position'       => $position,
+                        'waiting_ahead'  => max(0, $position - 1),
+                    ],
+                ]);
+                exit;
+            }
 
-        $nextNumber = (int) $db->fetchColumn(
-            "SELECT COALESCE(MAX(ticket_number), 0) + 1 FROM queue_tickets WHERE queue_date = ?",
-            [$today]
-        );
-        $now = date('Y-m-d H:i:s');
-        $ticketId = $db->insert('queue_tickets', [
-            'queue_date'     => $today,
-            'ticket_number'  => $nextNumber,
-            'student_id'     => $studentId,
-            'student_name'   => $studentName,
-            'student_number' => $studentNumber,
-            'course'         => $course,
-            'status'         => 'waiting',
-            'counter'        => 1,
-            'card_uid'       => $cardUid,
-            'joined_at'      => $now,
-        ]);
+            [$reader, $location] = resolveReaderLocation($db, null);
+
+            $nextNumber = (int) $db->fetchColumn(
+                "SELECT COALESCE(MAX(ticket_number), 0) + 1 FROM queue_tickets WHERE queue_date = ? FOR UPDATE",
+                [$today]
+            );
+            $now = date('Y-m-d H:i:s');
+            $ticketId = $db->insert('queue_tickets', [
+                'queue_date'     => $today,
+                'ticket_number'  => $nextNumber,
+                'student_id'     => $studentId,
+                'student_name'   => $studentName,
+                'student_number' => $studentNumber,
+                'course'         => $course,
+                'status'         => 'waiting',
+                'counter'        => 1,
+                'card_uid'       => $cardUid,
+                'joined_at'      => $now,
+            ]);
+
+            $db->commit();
+        } catch (Throwable $e) {
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+            throw $e;
+        }
 
         $db->insert('rfid_scan_logs', [
             'card_uid'   => $cardUid,
@@ -211,7 +229,7 @@ if ($action === 'join') {
 if ($action === 'board') {
     try {
         $serving = $db->fetchOne(
-            "SELECT id, ticket_number, student_name FROM queue_tickets
+            "SELECT id, ticket_number, student_name, counter FROM queue_tickets
              WHERE queue_date = ? AND status = 'serving'
              ORDER BY id DESC LIMIT 1",
             [$today]
@@ -260,7 +278,7 @@ if ($action === 'board') {
             'success' => true,
             'data'    => [
                 'serving'       => $serving
-                    ? ['number' => padNumber((int) $serving['ticket_number']), 'name' => $serving['student_name']]
+                    ? ['number' => padNumber((int) $serving['ticket_number']), 'name' => $serving['student_name'], 'counter' => (int) $serving['counter']]
                     : null,
                 'waiting'       => $waiting,
                 'recently_served' => $recentMapped,
@@ -293,7 +311,7 @@ if ($action === 'my_ticket') {
 
         $ordering = ['waiting' => 0, 'serving' => 1, 'completed' => 2, 'no-show' => 3, 'cancelled' => 4, 'removed' => 5];
         $serving = $db->fetchOne(
-            "SELECT ticket_number, student_name FROM queue_tickets
+            "SELECT ticket_number, student_name, counter FROM queue_tickets
              WHERE queue_date = ? AND status = 'serving'
              ORDER BY id DESC LIMIT 1",
             [$today]
@@ -333,7 +351,7 @@ if ($action === 'my_ticket') {
                 'position'        => $position,
                 'waiting_ahead'   => $waitingAhead,
                 'next_up'         => $nextUp,
-                'serving_ticket'  => $serving ? ['number' => padNumber((int) $serving['ticket_number']), 'name' => $serving['student_name']] : null,
+                'serving_ticket'  => $serving ? ['number' => padNumber((int) $serving['ticket_number']), 'name' => $serving['student_name'], 'counter' => (int) $serving['counter']] : null,
                 'joined_at'       => $ticket['joined_at'],
                 'called_at'       => $ticket['called_at'],
                 'served_at'       => $ticket['served_at'],

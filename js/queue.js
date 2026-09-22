@@ -68,6 +68,7 @@
         var activeScreen = 'tap';
         var boardTimer = null;
         var standingTimer = null;
+        var submitting = false;
 
         function show(screen) {
             activeScreen = screen;
@@ -91,6 +92,9 @@
         }
 
         function submitJoin(uid) {
+            if (submitting) return;
+            submitting = true;
+            if (cardInput) cardInput.value = '';
             fetchJson(API + '?action=join', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -101,7 +105,7 @@
             }).catch(function () {
                 renderResult({ success: false, message: 'Network error. Please try again.', code: 'network' });
                 returnToTap(4500);
-            });
+            }).finally(function () { submitting = false; });
         }
 
         function renderResult(d) {
@@ -283,7 +287,6 @@
         function render(data) {
             var heroNum = document.getElementById('heroNumber');
             var heroName = document.getElementById('heroName');
-            var heroStatus = document.getElementById('heroStatus');
             var hero = document.getElementById('hero');
             var waitList = document.getElementById('waitList');
             var recentList = document.getElementById('recentList');
@@ -292,39 +295,49 @@
             if (serving) {
                 heroNum.textContent = serving.number;
                 heroName.textContent = serving.name;
-                heroStatus.textContent = 'Please proceed to the registrar window';
+                var win = serving.counter || 1;
                 var key = serving.number + ':' + serving.name;
                 if (lastServing && lastServing !== key) {
                     hero.classList.remove('calling');
-                    void hero.offsetWidth; // reflow to restart animation
+                    void hero.offsetWidth;
                     hero.classList.add('calling');
                 }
                 lastServing = key;
+                var hw = document.getElementById('heroWindow');
+                var dv = document.getElementById('servingDivider');
+                if (hw) {
+                    hw.classList.remove('hidden');
+                    document.getElementById('heroWindowNum').innerHTML = 'Proceed to Window<span>' + win + '</span>';
+                }
+                if (dv) dv.classList.remove('hidden');
             } else {
-                heroNum.textContent = '—';
+                heroNum.textContent = '\u2014';
                 heroName.textContent = 'Waiting for the next number';
-                heroStatus.textContent = 'Line up at the queue.';
+                var hw = document.getElementById('heroWindow');
+                var dv = document.getElementById('servingDivider');
+                if (hw) hw.classList.add('hidden');
+                if (dv) dv.classList.add('hidden');
             }
 
             var wh = '';
             (data.waiting || []).forEach(function (w) {
                 wh += '<div class="monitor-wait-row' + (w.next_up ? ' next-up' : '') + '">' +
-                    '<div class="pos">' + (w.next_up ? 'Next' : '#' + w.position) + '</div>' +
-                    '<div class="num">' + esc(w.number) + '</div>' +
-                    '<div class="name">' + esc(w.name) + '</div></div>';
+                    '<span class="pos">' + (w.next_up ? 'Next' : '#' + w.position) + '</span>' +
+                    '<span class="num">' + esc(w.number) + '</span>' +
+                    '<span class="name">' + esc(w.name) + '</span></div>';
             });
-            if (!wh) wh = '<div class="monitor-empty"><i class="fas fa-people-group"></i><p>No one is waiting</p><span>Students join here when they tap at the kiosk</span></div>';
+            if (!wh) wh = '<div class="monitor-empty"><i class="fas fa-users"></i><p>No one is waiting</p></div>';
             waitList.innerHTML = wh;
 
             var rh = '';
             (data.recently_served || []).forEach(function (r) {
                 var tagClass = r.status === 'completed' ? 'completed' : 'no-show';
                 rh += '<div class="monitor-recent-row">' +
-                    '<div class="num">' + esc(r.number) + '</div>' +
-                    '<div class="name">' + esc(r.name) + '</div>' +
+                    '<span class="num">' + esc(r.number) + '</span>' +
+                    '<span class="name">' + esc(r.name) + '</span>' +
                     '<span class="tag ' + tagClass + '">' + esc(r.status) + '</span></div>';
             });
-            if (!rh) rh = '<div class="monitor-empty"><i class="fas fa-clock-rotate-left"></i><p>Nothing served yet</p><span>Served tickets will show up here</span></div>';
+            if (!rh) rh = '<div class="monitor-empty"><i class="fas fa-clock"></i><p>No records yet</p></div>';
             recentList.innerHTML = rh;
         }
 
@@ -402,6 +415,8 @@
                     document.getElementById('nsCourse').textContent = d.serving.course || '—';
                     document.getElementById('nsElapsed').textContent = d.serving.called_at
                         ? elapsed(d.serving.called_at) : '—';
+                    var nsWin = document.getElementById('nsWindow');
+                    if (nsWin) { var w = d.serving.counter || 1; nsWin.textContent = 'Window ' + w; nsWin.parentElement.style.display = ''; }
                     document.getElementById('nsSkip').dataset.ticketId = d.serving.ticket_id;
                     document.getElementById('nsComplete').dataset.ticketId = d.serving.ticket_id;
                     var btnCall = document.getElementById('btnCallNext');
@@ -409,6 +424,8 @@
                 } else {
                     document.getElementById('nsEmpty').style.display = 'block';
                     document.getElementById('nsContent').style.display = 'none';
+                    var nsWin2 = document.getElementById('nsWindow');
+                    if (nsWin2) nsWin2.parentElement.style.display = 'none';
                     var btnCall2 = document.getElementById('btnCallNext');
                     if (btnCall2) btnCall2.style.display = '';
                 }
@@ -509,7 +526,8 @@
             var btnCall = document.getElementById('btnCallNext');
             if (btnCall) btnCall.addEventListener('click', function () {
                 btnCall.disabled = true;
-                post('call_next').then(function (d) {
+                var winSel = document.getElementById('windowSelect'); var winNum = winSel ? parseInt(winSel.value, 10) || 1 : 1;
+                post('call_next', { window: winNum }).then(function (d) {
                     if (d.success) showToast(d.message, 'success');
                     else showToast(d.message || 'Error.', 'error');
                 }).catch(function () { showToast('Network error.', 'error'); })
@@ -560,6 +578,13 @@
             }).catch(function () {});
         }
 
+        // Persist window selection
+        var winSel = document.getElementById('windowSelect');
+        if (winSel) {
+            var saved = localStorage.getItem('queue_window');
+            if (saved && [1,2,3].indexOf(parseInt(saved,10)) !== -1) winSel.value = saved;
+            winSel.addEventListener('change', function() { localStorage.setItem('queue_window', this.value); });
+        }
         bindConsole();
         loadState();
         startPoll(loadState, 3000);

@@ -156,21 +156,22 @@ try {
             'notes' => $notes
         ]);
 
-        // ── Auto-create Student ID record ──────────────────────────
+        // ── Auto-create Student ID record (id_number blank — ready for integration) ──
         require_once __DIR__ . '/../shared/qr_generator.php';
-        $studentIdNum = '';
-        $qrPath = null;
+        $qrPath = generateStudentQrFile(intval($studentId));
         // Only create if student doesn't already have an active school_id
         $existingSid = $db->fetchOne(
             "SELECT id FROM student_ids WHERE student_id = ? AND id_type = 'school_id' AND status = 'active'",
             [$studentId]
         );
-        if (!$existingSid) {
-            $studentIdNum = generateNextIdNumber($db);
-            $qrPath = generateStudentQrFile($studentIdNum, intval($studentId));
+        if ($existingSid) {
+            // Backfill QR if missing on existing record
+            if ($qrPath) {
+                $db->update('student_ids', ['qr_code_path' => $qrPath], 'id = ? AND (qr_code_path IS NULL OR qr_code_path = "")', [$existingSid['id']]);
+            }
+        } else {
             $sidData = [
                 'student_id'  => $studentId,
-                'id_number'   => $studentIdNum,
                 'id_type'     => 'school_id',
                 'issue_date'  => $issuedDate,
                 'expiry_date' => $expiryDate,
@@ -183,8 +184,8 @@ try {
 
         echo json_encode([
             'success' => true,
-            'message' => 'Card assigned successfully.' . ($studentIdNum ? " Student ID #{$studentIdNum} created." : ''),
-            'data' => ['id' => $id, 'student_id_number' => $studentIdNum, 'qr_code_path' => $qrPath]
+            'message' => 'Card assigned successfully.',
+            'data' => ['id' => $id]
         ]);
         exit;
     }

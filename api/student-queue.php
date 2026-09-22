@@ -104,7 +104,7 @@ try {
     }
 
     $serving = $db->fetchOne(
-        "SELECT ticket_number, student_name FROM queue_tickets
+        "SELECT ticket_number, student_name, counter FROM queue_tickets
          WHERE queue_date = ? AND status = 'serving'
          ORDER BY id DESC LIMIT 1",
         [$today]
@@ -153,7 +153,7 @@ try {
                 'served_time'     => $servedTime,
             ],
             'serving' => $serving
-                ? ['number' => padNumber((int) $serving['ticket_number']), 'name' => $serving['student_name']]
+                ? ['number' => padNumber((int) $serving['ticket_number']), 'name' => $serving['student_name'], 'counter' => (int) $serving['counter']]
                 : null,
         ],
     ]);

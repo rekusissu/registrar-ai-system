@@ -245,9 +245,6 @@ include '../includes/sidebar.php';
             <a href="rfid-cards.php" class="btn btn-secondary">
                 <i class="fas fa-arrow-left"></i> Back to Cards
             </a>
-            <a href="rfid-test.php" class="btn btn-secondary">
-                <i class="fas fa-credit-card"></i> Test Scanner
-            </a>
         </div>
     </header>
 

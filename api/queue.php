@@ -140,6 +140,7 @@ if ($action === 'state') {
                     'student_number' => $serving['student_number'],
                     'course'         => $serving['course'],
                     'called_at'      => $serving['called_at'],
+                    'counter'        => (int) $serving['counter'],
                 ] : null,
                 'waiting'   => $waiting,
                 'completed' => $completed,
@@ -188,8 +189,11 @@ if ($action === 'call_next') {
             exit;
         }
 
+        // Accept window number (1-3 max) from the registrar console
+        $window = max(1, min(3, (int) ($input['window'] ?? 1)));
+
         $db->update('queue_tickets',
-            ['status' => 'serving', 'called_at' => $now],
+            ['status' => 'serving', 'called_at' => $now, 'counter' => $window],
             'id = ?', [$next['id']]);
         logActivity($_SESSION['user_id'], 'queue_call_next', null, 'queue_tickets', $next['id'],
             ['status' => 'waiting'], ['status' => 'serving']);
@@ -199,7 +203,7 @@ if ($action === 'call_next') {
 
         echo json_encode([
             'success' => true,
-            'message' => 'Called number ' . padNumber((int) $next['ticket_number']) . ' — ' . $next['student_name'] . '.',
+            'message' => 'Called number ' . padNumber((int) $next['ticket_number']) . ' — ' . $next['student_name'] . ' — Proceed to Window ' . $window . '.',
             'data'    => [
                 'called' => [
                     'ticket_id'      => (int) $next['id'],
@@ -209,6 +213,7 @@ if ($action === 'call_next') {
                     'student_number' => $next['student_number'],
                     'course'         => $next['course'],
                     'called_at'      => $now,
+                    'counter'        => $window,
                 ],
             ],
         ]);

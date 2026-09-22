@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 // ============================================================
 //  REGISTRAR/RFID-CARDS.PHP
 //  RFID cards management &mdash; fully inline (CSS + JS)
@@ -728,7 +728,16 @@ foreach ($cards as $i => $c) {
 <!-- ID Card Styles (from student-ids.php) -->
 <style>
 .idtype-chip { display:inline-block; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:600; background:#eef4ff; color:#2563eb; }
-.qr-thumb { width:36px; height:36px; border:1px solid #e2e8f0; border-radius:8px; object-fit:contain; background:white; }
+.qr-thumb { width:36px; height:36px; border:1px solid #e2e8f0; border-radius:8px; object-fit:contain; background:white; cursor:pointer; transition:transform .15s,box-shadow .15s; }
+.qr-thumb:hover { transform:scale(1.15); box-shadow:0 2px 8px rgba(37,99,235,.2); }
+#qrModalOverlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); backdrop-filter:blur(4px); z-index:10000; align-items:center; justify-content:center; }
+#qrModalOverlay.active { display:flex; }
+#qrModalOverlay .qr-modal-box { background:#fff; border-radius:18px; padding:24px; text-align:center; max-width:320px; width:90%; box-shadow:0 24px 60px rgba(0,0,0,.25); animation:modalSlide .25s ease; }
+#qrModalOverlay .qr-modal-box img { width:220px; height:220px; object-fit:contain; border:1px solid #e2e8f0; border-radius:12px; margin-bottom:12px; }
+#qrModalOverlay .qr-modal-box .qr-modal-name { font-size:14px; font-weight:700; color:#0f172a; margin-bottom:4px; }
+#qrModalOverlay .qr-modal-box .qr-modal-sub { font-size:12px; color:#94a3b8; margin-bottom:14px; }
+#qrModalOverlay .qr-modal-close { border:none; background:#f1f5f9; border-radius:10px; padding:8px 20px; font-size:13px; font-weight:600; cursor:pointer; color:#475569; }
+#qrModalOverlay .qr-modal-close:hover { background:#e2e8f0; }
 /* â”€â”€ ID card (view modal) &mdash; 3D flip card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .idcard-flip { width:340px; height:430px; margin:0 auto; perspective:1400px; }
 .idcard-inner { position:relative; width:100%; height:100%; transform-style:preserve-3d; transition:transform .8s cubic-bezier(.4,.15,.2,1); }
@@ -807,8 +816,8 @@ foreach ($cards as $i => $c) {
             <p>Manage student RFID cards</p>
         </div>
         <div class="header-actions">
-            <a href="rfid-test.php" class="btn btn-secondary">
-                <i class="fas fa-credit-card"></i> Test Scanner
+            <a href="rfid-scan-logs.php" class="btn btn-secondary">
+                <i class="fas fa-clock-rotate-left"></i> Scan Logs
             </a>
             <button class="btn btn-primary" id="openAssignModal" onclick="openAssignModal()">
                 <i class="fas fa-plus"></i> Assign Card
@@ -873,7 +882,16 @@ foreach ($cards as $i => $c) {
                     </select>
                     <i class="fas fa-chevron-down filter-select-arrow"></i>
                 </div>
+                                <button type="button" id="aiRfidSearchBtn" class="btn btn-secondary" title="Ask AI to search cards - e.g. 'expired cards', 'lost cards', 'BSIT students'">
+                    <i class="fas fa-wand-magic-sparkles" style="color:#7c3aed;"></i> AI
+                </button>
+                <button type="button" id="resetFilterBtn" class="btn btn-light"><i class="fas fa-undo"></i> Reset</button>
             </div>
+        </div>
+
+        <div id="aiRfidInterpretation" style="display:none;padding:10px 14px;background:#eef4ff;border:1px solid #bfdbfe;border-radius:10px;margin-bottom:14px;">
+            <i class="fas fa-brain" style="color:#2563eb;"></i>
+            <span id="aiRfidExplanation" style="color:#1e40af;margin-left:8px;font-size:13px;"></span>
         </div>
 
     <!-- Table -->
@@ -931,7 +949,12 @@ foreach ($cards as $i => $c) {
                             <td>
                                 <?php if (!empty($card['student_id'])): ?>
                                     <div class="student-info">
-                                        <div class="student-avatar <?= $avatarClass ?>"><?= $initials ?: '?' ?></div>
+                                        <?php $photoPath = !empty($card['student_photo']) ? htmlspecialchars($card['student_photo']) : ''; ?>
+                                        <?php if ($photoPath): ?>
+                                            <img class="student-avatar" src="<?= $APP_ROOT . ltrim($photoPath, './') ?>" alt="<?= htmlspecialchars($card['student_name']) ?>" style="object-fit:cover;">
+                                        <?php else: ?>
+                                            <div class="student-avatar <?= $avatarClass ?>"><?= $initials ?: '?' ?></div>
+                                        <?php endif; ?>
                                         <div>
                                             <div class="student-name"><?= htmlspecialchars($card['student_name']) ?></div>
                                             <div class="student-detail"><?= htmlspecialchars($card['student_number']) ?></div>
@@ -950,7 +973,10 @@ foreach ($cards as $i => $c) {
                             </td>
                             <td>
                                 <?php if (!empty($card['qr_code_path'])): ?>
-                                    <img class="qr-thumb" src="<?= htmlspecialchars($card['qr_code_path']) ?>" alt="QR">
+                                    <img class="qr-thumb" src="<?= htmlspecialchars($card['qr_code_path']) ?>" alt="QR"
+                                         onclick="showQrModal(this)"
+                                         data-name="<?= htmlspecialchars($card['student_name'] ?? '', ENT_QUOTES) ?>"
+                                         data-id="<?= htmlspecialchars($card['student_number'] ?? '', ENT_QUOTES) ?>">
                                 <?php else: ?>
                                     <span style="color:#94a3b8;font-size:12px;">&mdash;</span>
                                 <?php endif; ?>
@@ -1527,6 +1553,7 @@ const rfidTableBody = document.getElementById('rfidTableBody');
 const searchClearBtn = document.getElementById('searchClear');
 const showingCount = document.getElementById('showingCount');
 const statusFilter = document.getElementById('statusFilter');
+const resetFilterBtn = document.getElementById('resetFilterBtn');
 
 function applyRfidSearch() {
     if (!rfidTableBody) return;
@@ -1547,8 +1574,62 @@ function applyRfidSearch() {
 }
 if (rfidSearchInput) rfidSearchInput.addEventListener('input', applyRfidSearch);
 if (statusFilter) statusFilter.addEventListener('change', applyRfidSearch);
+if (resetFilterBtn) resetFilterBtn.addEventListener('click', () => {
+    if (rfidSearchInput) rfidSearchInput.value = '';
+    if (statusFilter) statusFilter.value = '';
+    applyRfidSearch();
+    rfidSearchInput && rfidSearchInput.focus();
+});
 
 // â”€â”€ Assign modal: students from <select> â”€â”€
+// AI card search (api/rfid-ai-search.php)
+const aiRfidBtn = document.getElementById('aiRfidSearchBtn');
+const aiRfidInfo = document.getElementById('aiRfidInterpretation');
+const aiRfidText = document.getElementById('aiRfidExplanation');
+
+async function runAiCardSearch() {
+    const query = (rfidSearchInput?.value || '').trim();
+    if (query.length < 3) { alert('Type at least 3 characters for AI search.'); return; }
+    aiRfidBtn.disabled = true;
+    aiRfidBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> AI';
+    if (aiRfidInfo) aiRfidInfo.style.display = 'none';
+    try {
+        const res = await fetch('../api/rfid-ai-search.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query })
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || 'AI search failed.');
+        const uids = new Set((data.results || []).map(r => String(r.card_uid)));
+        let visible = 0;
+        if (rfidTableBody) {
+            rfidTableBody.querySelectorAll('tr[data-card]').forEach(row => {
+                const raw = (row.getAttribute('data-card') || '');
+                let match = false;
+                uids.forEach(uid => { if (raw.indexOf('"' + uid + '"') !== -1) match = true; });
+                row.style.display = match ? '' : 'none';
+                if (match) visible++;
+            });
+        }
+        if (showingCount) showingCount.textContent = visible;
+        if (statusFilter) statusFilter.value = '';
+        if (aiRfidInfo) {
+            aiRfidText.textContent = (data.ai_interpretation || 'Results') + ' - ' + visible + ' card(s) shown.';
+            aiRfidInfo.style.display = 'block';
+        }
+    } catch (err) {
+        console.error(err);
+        if (aiRfidInfo) {
+            aiRfidText.textContent = 'AI search failed. Check the AI server, or use the filters below.';
+            aiRfidInfo.style.display = 'block';
+        }
+    } finally {
+        aiRfidBtn.disabled = false;
+        aiRfidBtn.innerHTML = '<i class="fas fa-wand-magic-sparkles" style="color:#7c3aed;"></i> AI';
+    }
+}
+if (aiRfidBtn) aiRfidBtn.addEventListener('click', runAiCardSearch);
 
 const allStudents = [];
 const studentSelectEl = document.getElementById('studentSelect');
@@ -1935,11 +2016,11 @@ function showIdInitialsFallback() {
     if (ini) { ini.textContent = idInitialsOf(idCardData ? idCardData.name : ''); ini.style.display = 'flex'; }
 }
 
-function generateQrDataUrl(idNumber) {
+function generateQrDataUrl(studentId) {
     if (typeof qrcode === 'undefined') return '';
     try {
         const qr = qrcode(0, 'M');
-        qr.addData('https://registrar.bcpsms2.com/verify-student.php?id_number=' + encodeURIComponent(idNumber || ''));
+        qr.addData('https://registrar.bcpsms2.com/verify-student.php?student_id=' + encodeURIComponent(studentId || ''));
         qr.make();
         return qr.createDataURL(8, 8);
     } catch (e) { return ''; }
@@ -1969,7 +2050,7 @@ function viewIdCard(btn) {
     const cap = document.getElementById('cardQrCap');
     cap.textContent = 'Scan to verify'; cap.classList.remove('ok');
     qrImg.style.display = 'block';
-    idCardData.qrData = generateQrDataUrl(d.idnumber);
+    idCardData.qrData = generateQrDataUrl(d.studentId);
     if (d.qr) {
         qrImg.onerror = function () { this.onerror = null; if (idCardData.qrData) this.src = idCardData.qrData; };
         qrImg.src = normalizePhotoPath(d.qr);
@@ -2047,10 +2128,36 @@ function printIdCard() {
     area.innerHTML = '';
 }
 
+
 // Wire up ID card modal close-on-overlay + Esc
 document.getElementById('idCardModal').addEventListener('click', function(e) {
     if (e.target === this) { this.classList.remove('active'); document.body.style.overflow = ''; }
 });
+
+// ── QR Modal ──────────────────────────────────────────────────────
+function showQrModal(img) {
+    const overlay = document.getElementById('qrModalOverlay');
+    overlay.querySelector('img').src = img.src;
+    overlay.querySelector('.qr-modal-name').textContent = img.dataset.name || '';
+    overlay.querySelector('.qr-modal-sub').textContent = img.dataset.id ? 'Student #: ' + img.dataset.id : '';
+    overlay.classList.add('active');
+}
+function closeQrModal() {
+    document.getElementById('qrModalOverlay').classList.remove('active');
+}
+document.getElementById('qrModalOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeQrModal();
+});
 </script>
+
+<!-- QR Preview Modal -->
+<div id="qrModalOverlay">
+    <div class="qr-modal-box">
+        <img src="" alt="QR Code">
+        <div class="qr-modal-name"></div>
+        <div class="qr-modal-sub"></div>
+        <button class="qr-modal-close" onclick="closeQrModal()"><i class="fas fa-times"></i> Close</button>
+    </div>
+</div>
 
 <?php include '../includes/footer.php'; ?>
