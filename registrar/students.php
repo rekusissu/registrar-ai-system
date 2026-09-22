@@ -22,6 +22,12 @@ $totalStudents = count($students);
 $activeStudents = count(array_filter($students, fn($s) => $s['status'] === 'active'));
 $atRiskStudents = count(array_filter($students, fn($s) => $s['status'] === 'at-risk' || $s['status'] === 'probation'));
 $graduatedStudents = count(array_filter($students, fn($s) => $s['status'] === 'graduated'));
+// Per-year-level counts for the Year 1-4 cards.
+$yearLevelCounts = [1 => 0, 2 => 0, 3 => 0, 4 => 0];
+foreach ($students as $s) {
+    $yl = (int) ($s['year_level'] ?? 0);
+    if (isset($yearLevelCounts[$yl])) { $yearLevelCounts[$yl]++; }
+}
 
 $thisMonth = $db->fetchColumn("SELECT COUNT(*) FROM students WHERE created_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01')") ?: 0;
 $lastMonth = $db->fetchColumn("SELECT COUNT(*) FROM students WHERE created_at >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH) AND created_at < DATE_FORMAT(CURDATE(), '%Y-%m-01')") ?: 0;
@@ -55,12 +61,12 @@ include '../includes/sidebar.php';
 .sidebar.collapsed~.dashboard-main,body.sidebar-collapsed .dashboard-main { margin-left:var(--sidebar-collapsed-width); width:calc(100% - var(--sidebar-collapsed-width)); max-width:calc(100% - var(--sidebar-collapsed-width)); }
 
 /* Stats */
-.dashboard-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
+.dashboard-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:16px; margin-bottom:24px; }
 .stat-card { background:white; border-radius:14px; padding:18px 20px; border:1px solid #e2e8f0; transition:all .3s; box-shadow:0 1px 3px rgba(15,23,42,0.04); }
 .stat-card:hover { transform:translateY(-3px); box-shadow:0 6px 20px rgba(15,23,42,0.06); border-color:#d8dde4; }
 .stat-card .stat-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
 .stat-card .stat-icon { width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0; }
-.stat-icon.blue{background:#eef4ff;color:#2563eb} .stat-icon.green{background:#dcfce7;color:#16a34a}
+.stat-icon.blue{background:#eef4ff;color:#2563eb} .stat-icon.green{background:#dcfce7;color:#16a34a} .stat-icon.teal{background:#ccfbf1;color:#0d9488}
 .stat-icon.yellow{background:#fef3c7;color:#b45309} .stat-icon.purple{background:#f3e8ff;color:#7c3aed}
 .stat-card .stat-trend{font-size:11px;font-weight:600;padding:2px 10px;border-radius:9999px;display:inline-flex;align-items:center;gap:4px}
 .stat-trend.up{color:#16a34a;background:#dcfce7} .stat-trend.down{color:#dc2626;background:#fee2e2} .stat-trend.neutral{color:#64748b;background:#f1f5f9}
@@ -294,10 +300,11 @@ select.form-control{cursor:pointer;appearance:auto;-webkit-appearance:auto;}
 
 <!-- Stats -->
 <div class="dashboard-stats">
-<div class="stat-card"><div class="stat-top"><div class="stat-icon blue"><i class="fas fa-users"></i></div><span class="stat-trend <?= $trendTotal>=0?'up':'down' ?>"><i class="fas fa-arrow-<?= $trendTotal>=0?'up':'down' ?>"></i> <?= abs($trendTotal) ?>%</span></div><div class="stat-number"><?= $totalStudents ?></div><div class="stat-label">Total Students</div></div>
-<div class="stat-card"><div class="stat-top"><div class="stat-icon green"><i class="fas fa-user-check"></i></div><span class="stat-trend up"><i class="fas fa-arrow-up"></i> <?= $totalStudents ? round($activeStudents/$totalStudents*100) : 0 ?>%</span></div><div class="stat-number"><?= $activeStudents ?></div><div class="stat-label">Active</div></div>
-<div class="stat-card"><div class="stat-top"><div class="stat-icon yellow"><i class="fas fa-triangle-exclamation"></i></div><span class="stat-trend neutral"><i class="fas fa-minus"></i> <?= $totalStudents ? round($atRiskStudents/$totalStudents*100) : 0 ?>%</span></div><div class="stat-number"><?= $atRiskStudents ?></div><div class="stat-label">At Risk</div></div>
-<div class="stat-card"><div class="stat-top"><div class="stat-icon purple"><i class="fas fa-graduation-cap"></i></div><span class="stat-trend up"><i class="fas fa-arrow-up"></i> <?= $totalStudents ? round($graduatedStudents/$totalStudents*100) : 0 ?>%</span></div><div class="stat-number"><?= $graduatedStudents ?></div><div class="stat-label">Graduated</div></div>
+<div class="stat-card"><div class="stat-top"><div class="stat-icon blue"><i class="fas fa-users"></i></div></div><div class="stat-number"><?= $totalStudents ?></div><div class="stat-label">Total Students</div></div>
+<div class="stat-card"><div class="stat-top"><div class="stat-icon green"><i class="fas fa-1"></i></div></div><div class="stat-number"><?= $yearLevelCounts[1] ?></div><div class="stat-label">Year 1</div></div>
+<div class="stat-card"><div class="stat-top"><div class="stat-icon yellow"><i class="fas fa-2"></i></div></div><div class="stat-number"><?= $yearLevelCounts[2] ?></div><div class="stat-label">Year 2</div></div>
+<div class="stat-card"><div class="stat-top"><div class="stat-icon purple"><i class="fas fa-3"></i></div></div><div class="stat-number"><?= $yearLevelCounts[3] ?></div><div class="stat-label">Year 3</div></div>
+<div class="stat-card"><div class="stat-top"><div class="stat-icon teal"><i class="fas fa-4"></i></div></div><div class="stat-number"><?= $yearLevelCounts[4] ?></div><div class="stat-label">Year 4</div></div>
 </div>
 
 <!-- Search + Table -->
@@ -1428,7 +1435,7 @@ async function loadEnrollments() {
             receiveWrap.innerHTML = '<div class="empty-state" style="display:flex;flex-direction:column;align-items:center;padding:40px 20px;"><i class="fas fa-inbox"></i><p>No applicants from the Enrollment System</p><span>Applicants will appear here when the Enrollment System sends them.</span></div>';
             return;
         }
-        let html = '<div class="table-responsive"><table><thead><tr><th>Name</th><th>Sex</th><th>Birth Date</th><th>Course</th><th>Status</th><th style="text-align:center;">Actions</th></tr></thead><tbody>';
+        let html = '<div class="table-responsive"><table><thead><tr><th>Name</th><th>Enrollment No.</th><th>Sex</th><th>Birth Date</th><th>Course</th><th>Status</th><th style="text-align:center;">Actions</th></tr></thead><tbody>';
         rows.forEach(e => {
             const name = esc([e.first_name, e.middle_name, e.last_name, e.name_suffix].filter(Boolean).join(' '));
             const bd = fmtDate(e.birth_date);
@@ -1436,6 +1443,7 @@ async function loadEnrollments() {
                 : '<span class="status-badge ' + e.status + '"><span class="status-dot ' + e.status + '"></span>' + ucfirst(e.status) + '</span>';
             html += '<tr data-enrollment=\'' + JSON.stringify({ id: e.id, first_name: e.first_name, last_name: e.last_name, birth_date: e.birth_date, student_number: e.student_number }).replace(/'/g, '&#39;') + '\'>';
             html += '<td style="font-weight:600;color:#0f172a;font-size:13px;">' + name + '</td>';
+            html += '<td style="font-family:\'JetBrains Mono\',monospace;font-size:12px;">' + esc(e.student_number || '—') + '</td>';
             html += '<td>' + esc(e.gender || '—') + '</td>';
             html += '<td>' + bd + '</td>';
             html += '<td>' + esc(e.course || '—') + '</td>';

@@ -143,6 +143,9 @@ include '../includes/sidebar.php';
             <button class="btn btn-secondary" onclick="window.print()">
                 <i class="fas fa-print"></i> Print
             </button>
+            <button type="button" class="btn btn-primary" onclick="sendList()" title="Send the masterlist to the Academic Strand / Course Assignment module (CMS)">
+                <i class="fas fa-paper-plane"></i> Send List
+            </button>
             <div class="export-wrap" style="position:relative;">
                 <button class="btn btn-primary" id="exportBtn"><i class="fas fa-download"></i> Export</button>
                 <div class="export-menu" id="exportMenu" style="position:absolute;top:100%;right:0;z-index:50;background:white;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.1);min-width:160px;padding:4px;margin-top:4px;display:none;">
@@ -253,6 +256,7 @@ include '../includes/sidebar.php';
                         <?php endif; ?>
                         <button class="btn btn-secondary btn-sm" style="padding:5px 12px;font-size:12px;" onclick='openSectionWorkspace(<?= json_encode(['course' => $gCourse, 'year_level' => $gYear, 'semester' => $gSem, 'school_year' => $gSy, 'adviser_id' => $gAdviserId, 'section' => $group['section']], JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'><i class="fas fa-user-plus"></i> Add Student</button>
                         <button class="btn btn-secondary btn-sm" style="padding:5px 12px;font-size:12px;" onclick='openEditSection(<?= json_encode(['course' => $gCourse, 'year_level' => $gYear, 'semester' => $gSem, 'school_year' => $gSy, 'adviser_id' => $gAdviserId, 'section' => $group['section']], JSON_HEX_APOS | JSON_HEX_QUOT) ?>)' title="Edit section"><i class="fas fa-pen"></i> Edit</button>
+                        <button class="btn btn-secondary btn-sm" style="padding:5px 12px;font-size:12px;" onclick='handoffGroup(<?= htmlspecialchars(json_encode($sectionTitle), ENT_QUOTES) ?>)' title="Hand off this section to the CMS (Academic Strand module)"><i class="fas fa-paper-plane"></i> HAND-OFF</button>
                     </div>
                     <div style="overflow-x: auto; border-radius: 12px; overflow: hidden;">
                         <table class="masterlist-table" style="width: 100%; border-collapse: collapse; font-size: 13px; word-wrap: break-word; word-break: break-word;">
@@ -1105,7 +1109,28 @@ document.getElementById('filterSearchModal').addEventListener('click', function 
 document.addEventListener('keydown', e => {
     if (e.key === 'Escape') { closeViewModal(); closeGenerateModal(); closeFilterSearchModal(); closeCreateSectionModal(); closeSectionWorkspace(); closeEditSection(); }
 });
-</script>
+
+// ---- SEND LIST / HAND-OFF (CMS) ----
+function handoffApi(payload) {
+    return fetch('../api/masterlist-handoff.php', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    }).then(r => r.json());
+}
+function sendList() {
+    if (!confirm('Send the masterlist to the Academic Strand / Course Assignment module (CMS)?')) return;
+    handoffApi({ program: '' }).then(d => {
+        if (typeof showToast === 'function') showToast(d.success ? 'Sent' : 'Error', d.message || 'Failed.', d.success ? 'success' : 'error');
+        else alert(d.message || 'Failed.');
+    }).catch(() => { if (typeof showToast === 'function') showToast('Error', 'Network error.', 'error'); else alert('Network error.'); });
+}
+function handoffGroup(label) {
+    if (!confirm('Hand off this section to the CMS?\n\n' + label)) return;
+    handoffApi({ program: label }).then(d => {
+        if (typeof showToast === 'function') showToast(d.success ? 'Handed off' : 'Error', d.message || 'Failed.', d.success ? 'success' : 'error');
+        else alert(d.message || 'Failed.');
+    }).catch(() => { if (typeof showToast === 'function') showToast('Error', 'Network error.', 'error'); else alert('Network error.'); });
+}</script>
 
 <style>
 .bulk-bar a { text-decoration: none; }

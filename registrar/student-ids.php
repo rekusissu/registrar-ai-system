@@ -14,7 +14,7 @@ require_once __DIR__ . '/../shared/database.php';
 $db = Database::getInstance();
 $ids = $db->fetchAll("
     SELECT si.*, CONCAT(s.first_name, ' ', s.last_name) AS student_name,
-           s.student_number, s.course, s.year_level, s.photo
+           s.student_number, s.course, s.year_level, COALESCE(NULLIF(si.photo_path, ''), s.photo) AS photo
     FROM student_ids si
     LEFT JOIN students s ON si.student_id = s.id
     ORDER BY si.id DESC
@@ -231,8 +231,8 @@ include '../includes/sidebar.php';
                     <label>Expiry Date</label><input type="date" id="issueExpiry" class="form-control">
                 </div>
             </div>
-            <div class="form-group"><label>ID Number (leave blank to auto-generate)</label><input type="text" id="issueNumber" class="form-control" placeholder="e.g., 2026-0001"></div>
-            <p style="font-size:11px;color:#64748b;margin:0;"><i class="fas fa-info-circle"></i> A QR code will be generated and saved automatically.</p>
+            <div class="form-group"><label>Photo (optional)</label><input type="file" id="issuePhoto" accept="image/png,image/jpeg,image/webp,image/gif" class="form-control" style="padding:6px 10px;"></div>
+            <p style="font-size:11px;color:#64748b;margin:0;"><i class="fas fa-info-circle"></i> The ID number is generated automatically, and a QR code is saved automatically.</p>
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="closeModal('issueModal')">Cancel</button>
@@ -371,16 +371,27 @@ function openAdd() {
     document.getElementById('issueStudent').value = '';
     document.getElementById('issueType').value = 'school_id';
     document.getElementById('issueStatus').value = 'active';
-    document.getElementById('issueNumber').value = '';
+    document.getElementById('issuePhoto').value = '';
     document.getElementById('issueExpiry').value = '';
     openModal('issueModal');
 }
 
-function submitIssue() {
+function readPhotoData() {
+    const fileEl = document.getElementById('issuePhoto');
+    if (!fileEl || !fileEl.files || !fileEl.files.length) return Promise.resolve('');
+    return new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => resolve('');
+        reader.readAsDataURL(fileEl.files[0]);
+    });
+}
+async function submitIssue() {
     const studentId = document.getElementById('issueStudent').value;
     if (!studentId) { alert('Select a student.'); return; }
     const btn = document.getElementById('issueSubmit');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Issuing...';
+    const photoData = await readPhotoData();
     fetch('../api/student-ids.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -388,8 +399,8 @@ function submitIssue() {
             student_id: studentId,
             id_type: document.getElementById('issueType').value,
             status: document.getElementById('issueStatus').value,
-            id_number: document.getElementById('issueNumber').value,
-            expiry_date: document.getElementById('issueExpiry').value
+            expiry_date: document.getElementById('issueExpiry').value,
+            photo_data: photoData
         })
     })
     .then(r => r.json())

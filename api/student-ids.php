@@ -56,7 +56,8 @@ if ($method === 'POST' && isset($_GET['action']) && $_GET['action'] === 'update'
     if (!$id) {
         echo json_encode(['success' => false, 'message' => 'ID required.']);
         exit;
-    }    $data = [];
+    }
+    $data = [];
     foreach (['status', 'expiry_date', 'issue_date', 'id_type'] as $f) {
         if (array_key_exists($f, $input)) $data[$f] = $input[$f];
     }
@@ -102,7 +103,8 @@ if ($method === 'POST') {
     if (!$studentId) {
         echo json_encode(['success' => false, 'message' => 'Student is required.']);
         exit;
-    }    if (!in_array($idType, ['school_id', 'library', 'cafeteria'], true)) {
+    }
+    if (!in_array($idType, ['school_id', 'library', 'cafeteria'], true)) {
         $idType = 'school_id';
     }
     if (!in_array($status, ['active', 'inactive', 'lost'], true)) {
@@ -120,13 +122,35 @@ if ($method === 'POST') {
     if ($existingNum) {
         echo json_encode(['success' => false, 'message' => 'ID number already exists.']);
         exit;
-    }    $data = [
+    }
+    // Optional photo upload (base64 data URL) - used on the ID card.
+    $photoPath = null;
+    $photoDataRaw = $input['photo_data'] ?? '';
+    if (is_string($photoDataRaw) && $photoDataRaw !== '' && strpos($photoDataRaw, 'data:image/') === 0) {
+        $mime = null;
+        if (preg_match('#^data:image/(png|jpeg|webp|gif);base64,#i', $photoDataRaw, $mimeM)) { $mime = $mimeM[1]; }
+        if ($mime) {
+            $bin = base64_decode(preg_replace('#^data:image/[a-z0-9+]+;base64,#i', '', $photoDataRaw), true);
+            if ($bin !== false && $bin !== '' && strlen($bin) <= 5 * 1024 * 1024) {
+                $dir = __DIR__ . '/../uploads/ids/';
+                if (!is_dir($dir)) mkdir($dir, 0775, true);
+                $ext = $mime === 'jpeg' ? 'jpg' : $mime;
+                $pname = 'photo_' . $studentId . '_' . time() . '.' . $ext;
+                if (file_put_contents($dir . $pname, $bin) !== false) {
+                    $photoPath = '../uploads/ids/' . $pname;
+                }
+            }
+        }
+    }
+
+    $data = [
         'student_id'  => $studentId,
         'id_number'   => $idNumber,
         'id_type'     => $idType,
         'issue_date'  => $issueDate,
         'expiry_date' => $expiryDate !== '' ? $expiryDate : null,
-        'status'      => $status
+        'status'      => $status,
+        'photo_path'  => $photoPath
     ];
 
     // Generate QR code and save to uploads/ids/

@@ -308,6 +308,48 @@ try {
         exit;
     }
 
+    // Import previous-school records from the enrollment intake into
+    // academic_history (idempotent: existing schools are skipped).
+    if ($method === 'POST' && isset($_GET['action']) && $_GET['action'] === 'import-academic') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $studentId = intval($input['student_id'] ?? 0);
+        $student = $db->fetchOne("SELECT id, student_number FROM students WHERE id = ?", [$studentId]);
+        if (!$student) {
+            echo json_encode(['success' => false, 'message' => 'Student not found.']);
+            exit;
+        }
+        $imported = 0;
+        $encRows = $db->fetchAll(
+            "SELECT prev_school_name, prev_school_last_year, prev_school_graduated_sy
+             FROM enrollments
+             WHERE student_number = ? AND status IN ('received','re-enrolled')
+               AND prev_school_name IS NOT NULL AND TRIM(prev_school_name) != ''",
+            [$student['student_number']]
+        );
+        foreach ($encRows as $enc) {
+            $school = trim((string) $enc['prev_school_name']);
+            if ($school === '') continue;
+            $exists = $db->fetchOne(
+                "SELECT id FROM academic_history WHERE student_id = ? AND TRIM(school_name) = ?",
+                [$studentId, $school]
+            );
+            if ($exists) continue;
+            $db->insert('academic_history', [
+                'student_id'  => $studentId,
+                'school_name' => $school,
+                'school_year' => ($enc['prev_school_graduated_sy'] ?? '') !== '' ? $enc['prev_school_graduated_sy'] : null,
+                'grade_level' => ($enc['prev_school_last_year'] ?? '') !== '' ? $enc['prev_school_last_year'] : null,
+            ]);
+            $imported++;
+        }
+        echo json_encode([
+            'success' => true,
+            'message' => $imported > 0 ? 'Imported ' . $imported . ' previous-school record(s).' : 'No new records to import.',
+            'data'    => ['imported' => $imported],
+        ]);
+        exit;
+    }
+
     // ─── SAVE HEALTH RECORD ────────────────────────────────────
     if ($method === 'POST' && isset($_GET['action']) && $_GET['action'] === 'save-health') {
         $input = json_decode(file_get_contents('php://input'), true);

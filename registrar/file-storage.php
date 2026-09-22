@@ -343,6 +343,131 @@ function showToast(title, message, type) {
     t.querySelector('.toast-close').addEventListener('click', () => { t.classList.add('hiding'); setTimeout(() => t.remove(), 300); });
     c.appendChild(t); setTimeout(() => { t.classList.add('hiding'); setTimeout(() => t.remove(), 300); }, 4000);
 }
-</script>
+// ---- DATA QUALITY ----
+let qualityData = null;
+function openQuality() {
+    const modal = document.getElementById('qualityModal');
+    if (!modal) return;
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    loadQuality();
+}
+function closeQuality() {
+    const modal = document.getElementById('qualityModal');
+    if (modal) { modal.classList.remove('active'); document.body.style.overflow = ''; }
+}
+document.getElementById('qualityModal').addEventListener('click', function(e){ if (e.target === this) closeQuality(); });
+
+function loadQuality() {
+    const wrapM = document.getElementById('dqMissingWrap');
+    const wrapD = document.getElementById('dqDupsWrap');
+    wrapM.innerHTML = '<p style="text-align:center;color:#94a3b8;padding:24px;"><i class="fas fa-spinner fa-spin"></i> Checking data quality...</p>';
+    fetch('../api/data-quality.php?action=summary')
+        .then(r => r.json())
+        .then(d => {
+            if (!d.success || !d.data) { wrapM.innerHTML = '<p style="text-align:center;color:#dc2626;padding:24px;">' + esc(d.message || 'Failed to load.') + '</p>'; return; }
+            const data = d.data;
+            qualityData = data;
+            document.getElementById('dqComplete').textContent = data.complete;
+            document.getElementById('dqMissing').textContent = data.missing;
+            document.getElementById('dqDuplicates').textContent = data.duplicate_groups;
+            renderMissing();
+            renderDuplicates();
+        })
+        .catch(() => wrapM.innerHTML = '<p style="text-align:center;color:#dc2626;padding:24px;">Failed to load data quality.</p>');
+}
+
+function renderMissing() {
+    const wrapM = document.getElementById('dqMissingWrap');
+    const list = qualityData.missing_students || [];
+    if (!list.length) {
+        wrapM.innerHTML = '<div style="padding:28px;text-align:center;color:#16a34a;"><i class="fas fa-check-circle" style="font-size:34px;"></i><p style="margin:10px 0 0;font-weight:600;">All students have their required documents.</p></div>';
+        return;
+    }
+    wrapM.innerHTML = list.map(s =>
+        '<div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid #f1f5f9;border-radius:10px;margin-bottom:8px;">'
+        + '<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#0f172a;font-size:13px;">' + esc(s.student_name) + '</div>'
+        + '<div style="font-size:11.5px;color:#94a3b8;margin-top:2px;">' + esc(s.student_number) + ' - missing: ' + s.missing.map(m => esc(m.label)).join(', ') + '</div></div>'
+        + '<button class="btn btn-primary btn-sm" style="height:30px;padding:0 12px;font-size:11px;" onclick="notifyMissing(' + s.student_id + ')"><i class="fas fa-bell"></i> Notify</button>'
+        + '</div>'
+    ).join('');
+}
+
+function renderDuplicates() {
+    const wrapD = document.getElementById('dqDupsWrap');
+    const list = qualityData.duplicates || [];
+    if (!list.length) {
+        wrapD.innerHTML = '<div style="padding:28px;text-align:center;color:#16a34a;"><i class="fas fa-check-circle" style="font-size:34px;"></i><p style="margin:10px 0 0;font-weight:600;">No possible duplicate documents found.</p></div>';
+        return;
+    }
+    wrapD.innerHTML = list.map(x =>
+        '<div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid #fecaca;background:#fef2f2;border-radius:10px;margin-bottom:8px;">'
+        + '<div style="flex:1;min-width:0;"><div style="font-weight:700;color:#0f172a;font-size:13px;">' + esc(x.student_name) + ' - ' + esc(x.doc_label) + '</div>'
+        + '<div style="font-size:11.5px;color:#94a3b8;margin-top:2px;">' + esc(x.filename) + ' (' + x.count + ' copies) for ' + esc(x.student_number) + '</div></div>'
+        + '<span style="font-size:11px;font-weight:700;color:#dc2626;background:#fee2e2;padding:4px 10px;border-radius:999px;">Flagged</span>'
+        + '</div>'
+    ).join('');
+}
+
+document.querySelectorAll('.dq-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.querySelectorAll('.dq-tab').forEach(b => {
+            const on = b === btn;
+            b.style.color = on ? '#2563eb' : '#64748b';
+            b.style.borderBottomColor = on ? '#2563eb' : 'transparent';
+            b.classList.toggle('active', on);
+        });
+        document.getElementById('dqMissingWrap').style.display = btn.dataset.tab === 'missing' ? '' : 'none';
+        document.getElementById('dqDupsWrap').style.display = btn.dataset.tab === 'dups' ? '' : 'none';
+    });
+});
+
+async function notifyMissing(studentId) {
+    if (!confirm('Send a document reminder to this student portal?')) return;
+    try {
+        const res = await fetch('../api/data-quality.php?action=notify', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ student_id: studentId })
+        });
+        const d = await res.json();
+        showToast(d.success ? 'Reminder sent.' : (d.message || 'Failed.'), d.success ? 'success' : 'error');
+    } catch (err) {
+        showToast('Network error.', 'error');
+    }
+}</script>
+
+<!-- Data Quality Modal -->
+<div class="modal-overlay" id="qualityModal"><div class="modal-content" style="max-width:720px;">
+    <div class="modal-header">
+        <h3><i class="fas fa-shield-halved" style="color:#2563eb;"></i> Data Quality</h3>
+        <button class="modal-close" onclick="closeQuality()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+        <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:150px;background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;padding:10px 14px;">
+                <div style="font-size:22px;font-weight:800;color:#0f172a;" id="dqComplete">-</div>
+                <div style="font-size:11px;color:#64748b;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">Complete</div>
+            </div>
+            <div style="flex:1;min-width:150px;background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:10px 14px;">
+                <div style="font-size:22px;font-weight:800;color:#b45309;" id="dqMissing">-</div>
+                <div style="font-size:11px;color:#92400e;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">Missing Documents</div>
+            </div>
+            <div style="flex:1;min-width:150px;background:#fee2e2;border:1px solid #fecaca;border-radius:10px;padding:10px 14px;">
+                <div style="font-size:22px;font-weight:800;color:#dc2626;" id="dqDuplicates">-</div>
+                <div style="font-size:11px;color:#991b1b;font-weight:700;text-transform:uppercase;letter-spacing:.4px;">Possible Duplicates</div>
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;border-bottom:2px solid #f1f5f9;margin-bottom:12px;">
+            <button type="button" class="dq-tab" data-tab="missing" style="padding:8px 14px;border:none;background:none;font-weight:700;font-size:13px;color:#2563eb;border-bottom:2px solid #2563eb;margin-bottom:-2px;cursor:pointer;font-family:inherit;">Missing Documents</button>
+            <button type="button" class="dq-tab" data-tab="dups" style="padding:8px 14px;border:none;background:none;font-weight:700;font-size:13px;color:#64748b;border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;font-family:inherit;">Possible Duplicates</button>
+        </div>
+        <div id="dqMissingWrap" style="max-height:50vh;overflow-y:auto;"></div>
+        <div id="dqDupsWrap" style="max-height:50vh;overflow-y:auto;display:none;"></div>
+        <p style="font-size:11px;color:#94a3b8;margin:12px 0 0;"><i class="fas fa-circle-info"></i> Rule-based checks only - nothing is deleted or merged automatically.</p>
+    </div>
+    <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeQuality()">Close</button>
+    </div>
+</div></div>
 
 <?php include '../includes/footer.php'; ?>

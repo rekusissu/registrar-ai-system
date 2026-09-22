@@ -67,29 +67,13 @@ try {
     $contactByStudent = [];
 }
 
-// Pending student change requests (contact_change_requests).
-$pendingRequests = [];
-try {
-    $pendingRequests = $db->fetchAll("
-        SELECT ccr.*, CONCAT(s.first_name,' ',s.last_name) AS student_name, s.student_number
-        FROM contact_change_requests ccr
-        JOIN students s ON s.id = ccr.student_id
-        WHERE ccr.status = 'pending'
-        ORDER BY ccr.id DESC
-    ");
-} catch (Throwable $e) {
-    error_log('[guardians] contact_change_requests query failed: ' . $e->getMessage());
-    $pendingRequests = [];
-}
-
 // ── Overview counters ─────────────────────────────────────────
 $statStudents = count($byStudent);
 $statGuardians = 0;
 foreach ($byStudent as $s) $statGuardians += count($s['guardians']);
-$statEmergency = 0;
-foreach ($emgByStudent as $list) $statEmergency += count($list);
+
 $statMissing = count(array_filter($byStudent, fn($s) => empty($s['guardians'])));
-$statPending = count($pendingRequests);
+$statEmgMissing = count(array_filter($byStudent, fn($s) => empty($emgByStudent[(int) $s['student_id']] ?? [])));
 
 /** Two-letter initials from a name, for the student avatar tile. */
 function gdn_initials(string $name): string {
@@ -107,32 +91,6 @@ function gdn_esc(?string $s): string {
     return htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
 }
 
-/** Human-readable summary of a student's proposed change request. */
-function gdn_ap_summary(array $req): string {
-    $payload = json_decode((string) ($req['payload'] ?? '{}'), true);
-    $payload = is_array($payload) ? $payload : [];
-    $t    = (string) $req['request_type'];
-    $type = (string) $req['contact_type'];
-    $name = trim((string) ($payload['full_name'] ?? ''));
-
-    $line = '<strong>' . ucfirst($t) . ' ' . $type . '</strong>'
-        . ($name !== '' ? ' — ' . gdn_esc($name) : '');
-
-    $bits = [];
-    if (!empty($payload['relationship'])) $bits[] = gdn_esc(ucfirst((string) $payload['relationship']));
-    if (!empty($payload['contact_number'])) $bits[] = gdn_esc((string) $payload['contact_number']);
-    if (!empty($payload['phone'])) $bits[] = gdn_esc((string) $payload['phone']);
-    if (!empty($payload['email'])) $bits[] = gdn_esc((string) $payload['email']);
-    if ($type === 'email') {
-        $perms = [];
-        if (!empty($payload['send_billing'])) $perms[] = 'Invoices';
-        if (!empty($payload['send_grades'])) $perms[] = 'Grades';
-        if (!empty($payload['send_emergency'])) $perms[] = 'Alerts';
-        if ($perms) $bits[] = implode(', ', $perms);
-    }
-    return $line . ($bits ? ' · <span class="ap-detail">' . implode(' · ', $bits) . '</span>' : '');
-}
-
 $page_title = 'Guardians & Contacts';
 $APP_ROOT = '../';
 $ACTIVE_NAV = 'guardians';
@@ -148,7 +106,7 @@ include '../includes/sidebar.php';
                 <p>Registrar-managed guardians, emergency contacts, and email recipients for every student</p>
             </div>
             <div class="header-actions">
-                <button class="btn btn-primary" onclick="openManage()"><i class="fas fa-users"></i> Manage Contacts</button>
+                <button class="btn btn-primary" onclick="openManage()"><i class="fas fa-rotate"></i> Sync from student information</button>
             </div>
         </header>
 
@@ -169,10 +127,10 @@ include '../includes/sidebar.php';
                 </div>
             </div>
             <div class="gdn-card">
-                <div class="gdn-ico gdn-purple"><i class="fa-solid fa-truck-medical"></i></div>
+                <div class="gdn-ico gdn-red"><i class="fa-solid fa-user-slash"></i></div>
                 <div>
-                    <div class="gdn-val"><?= $statEmergency ?></div>
-                    <div class="gdn-lbl">Emergency contacts</div>
+                    <div class="gdn-val"><?= $statEmgMissing ?></div>
+                    <div class="gdn-lbl">No emergency contacts</div>
                 </div>
             </div>
             <div class="gdn-card">
@@ -182,49 +140,10 @@ include '../includes/sidebar.php';
                     <div class="gdn-lbl">No guardian recorded</div>
                 </div>
             </div>
-            <div class="gdn-card<?= $statPending > 0 ? ' clickable' : '' ?>"<?= $statPending > 0 ? ' onclick="document.getElementById(\'approvalsPanel\')?.scrollIntoView({behavior:\'smooth\'})"' : '' ?>>
-                <div class="gdn-ico gdn-red"><i class="fa-solid fa-file-circle-check"></i></div>
-                <div>
-                    <div class="gdn-val"><?= $statPending ?></div>
-                    <div class="gdn-lbl">Pending approvals</div>
-                </div>
-            </div>
+
         </div>
 
-        <?php if ($pendingRequests): ?>
-        <!-- ── Approvals queue ────────────────────────────────── -->
-        <div class="panel gdn-panel" id="approvalsPanel" style="margin-bottom:24px;border-left:4px solid #ea580c;">
-            <div class="gdn-toolbar">
-                <div class="gdn-toolbar-title">
-                    <i class="fa-solid fa-file-circle-check"></i> Student change requests
-                    <span class="gdn-pill amber"><?= count($pendingRequests) ?></span>
-                </div>
-                <span class="mg-hint" style="color:#94a3b8;font-size:12px;">Approve to apply the change; Reject to send it back with a note.</span>
-            </div>
-            <?php foreach ($pendingRequests as $req): ?>
-            <div class="ap-row">
-                <div class="ap-main">
-                    <div class="ap-head">
-                        <span class="ap-student"><?= gdn_esc($req['student_name']) ?><small><?= gdn_esc($req['student_number']) ?></small></span>
-                        <span class="chip blue"><?= gdn_esc(ucfirst((string) $req['contact_type'])) ?></span>
-                        <span class="chip green"><?= gdn_esc(ucfirst((string) $req['request_type'])) ?></span>
-                        <span class="ap-time"><?= date('M j, g:i A', strtotime((string) $req['created_at'])) ?></span>
-                    </div>
-                    <div class="ap-body"><?= gdn_ap_summary($req) ?></div>
-                    <?php if (!empty($req['reason'])): ?>
-                        <div class="ap-reason"><i class="fa-solid fa-quote-left"></i><span><?= gdn_esc($req['reason']) ?></span></div>
-                    <?php endif; ?>
-                </div>
-                <div class="ap-actions">
-                    <button class="btn btn-primary btn-sm" onclick="approveRequest(<?= (int) $req['id'] ?>)"><i class="fa-solid fa-check"></i> Approve</button>
-                    <button class="btn btn-danger btn-sm" onclick="rejectRequest(<?= (int) $req['id'] ?>)"><i class="fa-solid fa-xmark"></i> Reject</button>
-                </div>
-            </div>
-            <?php endforeach; ?>
-        </div>
-        <?php endif; ?>
-
-        <div class="panel gdn-panel">
+              <div class="panel gdn-panel">
             <div class="gdn-toolbar">
                 <div class="gdn-toolbar-title">
                     <i class="fa-solid fa-address-book"></i> All students
@@ -689,7 +608,6 @@ function gdnCollapseAll() {
 }
 gdnCollapseAll();
 
-
 // ─── HELPERS ────────────────────────────────────────────────
 function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function relOptions(sel){
@@ -899,21 +817,6 @@ async function sendContactAction(btn, kind) {
         showToast(d.message, d.success ? 'success' : 'error');
     } catch (err) { showToast('Network error. Please try again.', 'error'); }
     btn.disabled = false; btn.innerHTML = orig;
-}
-
-// ─── APPROVAL QUEUE ─────────────────────────────────────────
-async function approveRequest(id) {
-    if (!confirm('Approve and apply this change request?')) return;
-    const d = await fetch('../api/contacts.php', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'approve_change', id: id }) }).then(r => r.json());
-    showToast(d.message, d.success ? 'success' : 'error');
-    if (d.success) setTimeout(() => window.location.reload(), 600);
-}
-async function rejectRequest(id) {
-    const note = prompt('Reason for rejection (shown to the student):', '');
-    if (note === null) return;
-    const d = await fetch('../api/contacts.php', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'reject_change', id: id, note: note }) }).then(r => r.json());
-    showToast(d.message, d.success ? 'success' : 'error');
-    if (d.success) setTimeout(() => window.location.reload(), 600);
 }
 
 // ─── SAVE ALL ───────────────────────────────────────────────
