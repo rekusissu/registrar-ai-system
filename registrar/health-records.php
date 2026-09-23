@@ -58,10 +58,18 @@ include '../includes/sidebar.php';
     <div class="table-responsive" style="overflow-x:auto;">
     <table class="table">
         <thead>
-        <tr><th>Record ID</th><th>Visit Date</th><th style="text-align:center;">Action</th></tr>
+        <tr>
+            <th style="width:90px;">Record ID</th>
+            <th style="width:120px;">Student ID</th>
+            <th>Student Name</th>
+            <th style="width:170px;">Visit Date</th>
+            <th>Reason for Visit</th>
+            <th style="width:110px;">Status</th>
+            <th style="width:90px;text-align:center;">Action</th>
+        </tr>
         </thead>
         <tbody id="hlogBody">
-            <tr><td colspan="3" style="text-align:center;padding:28px;color:#94a3b8;">Loading health record log...</td></tr>
+            <tr><td colspan="7" style="text-align:center;padding:28px;color:#94a3b8;">Loading health record log...</td></tr>
         </tbody>
     </table>
     </div>
@@ -93,6 +101,11 @@ include '../includes/sidebar.php';
     function ord(n){ n=Number(n); if(!n) return '-'; var s=['th','st','nd','rd'], v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); }
     function fmt(dt){ if(!dt) return '-'; var d=new Date(String(dt).replace(' ','T')); if(isNaN(d.getTime())) return esc(dt); return d.toLocaleString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
     function fmtDateOnly(dt){ if(!dt) return '-'; var d=new Date(String(dt).replace(' ','T')); if(isNaN(d.getTime())) return esc(dt); return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+    function statusClass(status){
+        if(status === 'Recorded') return 'active';
+        if(status === 'Pending') return 'warning';
+        return 'inactive';
+    }
 
     // Detail modal
     var currentHr = null;
@@ -150,13 +163,22 @@ include '../includes/sidebar.php';
                 var rows = (d.success && d.data) ? d.data : [];
                 var body = el('hlogBody');
                 if(!rows.length){
-                    body.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:28px;color:#94a3b8;">No health record log matches your filters.</td></tr>';
+                    body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:28px;color:#94a3b8;">No health record log matches your filters.</td></tr>';
                 }else{
                     body.innerHTML = rows.map(function(r){
                         var payload = JSON.stringify(r).replace(/\\/g,'\\\\').replace(/'/g,'&#39;').replace(/"/g,'&quot;');
+                        var status = r.record_status || 'Pending';
+                        var studentNumber = esc(r.student_number || '') || '&mdash;';
+                        var reason = esc(r.reason_for_visit || '') || '&mdash;';
                         return '<tr data-id="' + r.id + '" data-record=\'' + payload + '\'>' +
                             '<td style="font-family:\'JetBrains Mono\',monospace;font-size:12px;">#' + esc(r.id) + '</td>' +
-                            '<td style="font-size:13px;font-weight:600;">' + fmtDateOnly(r.date_time) + '</td>' +
+                            '<td style="font-family:\'JetBrains Mono\',monospace;font-size:12px;">' + studentNumber + '</td>' +
+                            '<td><strong>' + esc(r.student_name || 'Unknown student') + '</strong>' +
+                                (r.course || r.section ? '<div style="font-size:11px;color:#94a3b8;margin-top:2px;">' + esc(r.course || '') + (r.course && r.section ? ' &middot; ' : '') + esc(r.section || '') + '</div>' : '') +
+                            '</td>' +
+                            '<td style="white-space:nowrap;">' + fmt(r.date_time) + '</td>' +
+                            '<td style="max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="' + esc(r.reason_for_visit || '') + '">' + reason + '</td>' +
+                            '<td><span class="pill ' + statusClass(status) + '">' + esc(status) + '</span></td>' +
                             '<td style="text-align:center;"><button class="action-btn view" onclick="viewHealthRecord(' + r.id + ')" title="View record"><i class="fas fa-eye"></i></button></td>' +
                         '</tr>';
                     }).join('');
@@ -168,7 +190,7 @@ include '../includes/sidebar.php';
                 el('statRecorded').textContent = rows.filter(function(r){ return String(r.record_status)==='Recorded'; }).length;
                 el('hlogInfo').textContent = 'Showing ' + rows.length + ' record(s) (view-only)';
             })
-            .catch(function(){ el('hlogBody').innerHTML='<tr><td colspan="3" style="text-align:center;padding:28px;color:#dc2626;">Network error loading the log.</td></tr>'; });
+            .catch(function(){ el('hlogBody').innerHTML='<tr><td colspan="7" style="text-align:center;padding:28px;color:#dc2626;">Network error loading the log.</td></tr>'; });
     };
 
     el('hlogQ').addEventListener('keyup', function(e){ if(e.key==='Enter') loadHealthLog(); });
