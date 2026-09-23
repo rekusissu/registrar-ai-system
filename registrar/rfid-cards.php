@@ -1270,6 +1270,16 @@ foreach ($cards as $i => $c) {
                         <input type="text" id="studentSearchInput" class="form-control" placeholder="Type student name..." autocomplete="off" />
                         <div class="student-search-results" id="studentSearchResults"></div>
                     </div>
+
+                    <select id="studentSelect" style="display:none;">
+                        <option value="">Select a student</option>
+                        <?php foreach ($students as $student): ?>
+                            <option value="<?= (int)$student['id'] ?>">
+                                <?= htmlspecialchars($student['name']) ?> &middot; <?= htmlspecialchars($student['student_number']) ?> &middot; <?= htmlspecialchars($student['course']) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+
                     <div class="selected-student-chip" id="selectedStudentDisplay">
                         <i class="fas fa-check-circle"></i>
                         <div style="flex:1;"><span class="chip-name" id="selectedName"></span><span class="chip-id" id="selectedId" style="display:block;font-size:11px;color:#16a34a;margin-top:1px;">Selected</span></div>
