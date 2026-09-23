@@ -490,7 +490,7 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-users"></i> Guardian / Parent</div>
 <div class="form-row"><div class="form-group"><label>Full Name <span style="color:#dc2626;">*</span></label><input type="text" id="addGuardianName" class="form-control" required></div><div class="form-group"><label>Relationship</label><select id="addGuardianRel" class="form-control"><option value="father">Father</option><option value="mother">Mother</option><option value="guardian">Guardian</option></select></div></div>
-<div class="form-row"><div class="form-group"><label>Contact No.</label><input type="text" id="addGuardianContact" class="form-control" pattern="09[0-9]{9}" title="11-digit mobile number (e.g. 09171234567)"></div><div class="form-group"><label>Email (optional)</label><input type="email" id="addGuardianEmail" class="form-control"></div></div>
+<div class="form-row"><div class="form-group"><label>Contact No. <span style="color:#dc2626;">*</span></label><input type="text" id="addGuardianContact" class="form-control" placeholder="09XXXXXXXXX" pattern="09[0-9]{9}" title="11-digit mobile number (e.g. 09171234567)"></div><div class="form-group"><label>Email (optional)</label><input type="email" id="addGuardianEmail" class="form-control"></div></div>
 </div><div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeAddModal()">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Enroll</button></div></form></div></div>
 
 <!-- Auto-created Student Portal Account Modal -->
@@ -538,7 +538,7 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-users"></i> Guardian</div>
 <div class="form-row"><div class="form-group"><label>Full Name</label><input type="text" id="editGuardianName" class="form-control"></div><div class="form-group"><label>Relationship</label><select id="editGuardianRel" class="form-control"><option value="">Select</option><option value="father">Father</option><option value="mother">Mother</option><option value="guardian">Guardian</option></select></div></div>
-<div class="form-row"><div class="form-group"><label>Contact No.</label><input type="text" id="editGuardianContact" class="form-control" pattern="09[0-9]{9}" title="11-digit mobile number (e.g. 09171234567)"></div><div class="form-group"><label>Email</label><input type="email" id="editGuardianEmail" class="form-control"></div></div>
+<div class="form-row"><div class="form-group"><label>Contact No. <span style="color:#dc2626;">*</span></label><input type="text" id="editGuardianContact" class="form-control" placeholder="09XXXXXXXXX" pattern="09[0-9]{9}" title="11-digit mobile number (e.g. 09171234567)"></div><div class="form-group"><label>Email</label><input type="email" id="editGuardianEmail" class="form-control"></div></div>
 </div><div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeEditModal()">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save</button></div></form></div></div>
 
 <!-- Receive Student Modal (enrollment intake) -->

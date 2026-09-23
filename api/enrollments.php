@@ -102,7 +102,11 @@ try {
                 ]);
             }
         }
-        if (trim((string) ($enc['emergency_name'] ?? '')) !== '') {
+        $emergencyPhone = trim((string) ($enc['emergency_contact'] ?? ''));
+        if ($emergencyPhone !== '') {
+            $emergencyPhone = normalizePhone($emergencyPhone);
+        }
+        if (trim((string) ($enc['emergency_name'] ?? '')) !== '' && $emergencyPhone !== '' && isValidPhone($emergencyPhone)) {
             $exists = $db->fetchOne(
                 "SELECT id FROM emergency_contacts
                  WHERE student_id = ? AND TRIM(full_name) = ?",
@@ -113,7 +117,7 @@ try {
                     'student_id'     => $studentId,
                     'full_name'      => trim($enc['emergency_name']),
                     'relationship'   => ($enc['emergency_relationship'] ?? '') !== '' ? $enc['emergency_relationship'] : null,
-                    'contact_number' => ($enc['emergency_contact'] ?? '') !== '' ? $enc['emergency_contact'] : null,
+                    'contact_number' => $emergencyPhone,
                     'is_primary'     => 1,
                 ]);
             }
@@ -250,8 +254,17 @@ try {
         foreach (['first_name', 'middle_name', 'last_name', 'name_suffix', 'place_of_birth', 'nationality', 'religion', 'father_name', 'mother_name', 'email', 'address', 'contact_number', 'course', 'major', 'school_year', 'semester', 'section', 'prev_school_name', 'prev_school_last_year', 'prev_school_graduated_sy', 'emergency_name', 'emergency_relationship', 'emergency_contact'] as $f) {
             $payload[$f] = trim((string) $payload[$f]);
         }
+        $payload['emergency_contact'] = normalizePhone((string) $payload['emergency_contact']);
         if (trim((string) $payload['emergency_contact']) !== '' && !isValidPhone((string) $payload['emergency_contact'])) {
             echo json_encode(['success' => false, 'message' => 'Emergency contact number must be an 11-digit mobile number (e.g. 09171234567).']);
+            exit;
+        }
+        if (trim((string) $payload['emergency_name']) !== '' && trim((string) $payload['emergency_contact']) === '') {
+            echo json_encode(['success' => false, 'message' => 'Emergency contact number is required and must be an 11-digit mobile number (e.g. 09171234567).']);
+            exit;
+        }
+        if (trim((string) $payload['emergency_contact']) !== '' && trim((string) $payload['emergency_name']) === '') {
+            echo json_encode(['success' => false, 'message' => 'Emergency contact name is required.']);
             exit;
         }
         $payload['gender'] = in_array(strtolower(trim((string) $payload['gender'])), ['male', 'female'], true)

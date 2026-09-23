@@ -460,7 +460,7 @@ function renderReqFields(type) {
         h += '<div class="form-group">' + fieldInput('f_name', 'Full name *', 'fa-user') + '</div>';
         h += '<div class="form-row">'
             + '<div class="form-group"><label>Relationship</label>' + fieldSelect('f_rel', relSelectOptions(RELS_GUARDIAN, '')) + '</div>'
-            + '<div class="form-group"><label>Contact number</label>' + fieldInput('f_phone', '0917 123 4567', 'fa-phone') + '</div>'
+            + '<div class="form-group"><label>Contact number *</label>' + fieldInput('f_phone', '0917 123 4567', 'fa-phone') + '</div>'
             + '</div>';
         h += '<div class="form-group"><label>Email (optional)</label>' + fieldInput('f_email', 'name@example.com', 'fa-envelope') + '</div>';
         h += '<div class="rq-field-hd"><i class="fa-solid fa-star"></i> Flags</div>'
@@ -471,7 +471,7 @@ function renderReqFields(type) {
         h += '<div class="form-group">' + fieldInput('f_name', 'Full name *', 'fa-user') + '</div>';
         h += '<div class="form-row">'
             + '<div class="form-group"><label>Relationship</label>' + fieldInput('f_rel', 'e.g. Aunt, Mother', 'fa-people-roof') + '</div>'
-            + '<div class="form-group"><label>Contact number</label>' + fieldInput('f_phone', '0917 123 4567', 'fa-phone') + '</div>'
+            + '<div class="form-group"><label>Contact number *</label>' + fieldInput('f_phone', '0917 123 4567', 'fa-phone') + '</div>'
             + '</div>';
         h += '<div class="rq-field-hd"><i class="fa-solid fa-star"></i> Flags</div>'
             + reqToggle('f_primary', 'fa-star', '#eff6ff', '#2563eb', 'Primary contact', 'Mark as the main emergency contact', false);
@@ -482,7 +482,7 @@ function renderReqFields(type) {
             + '<div class="form-group"><label>Relationship</label>' + fieldSelect('f_rel', relSelectOptions(RELS_EMAIL, 'parent')) + '</div>'
             + '<div class="form-group"><label>Email *</label>' + fieldInput('f_email', 'name@example.com', 'fa-envelope') + '</div>'
             + '</div>';
-        h += '<div class="form-group"><label>Phone (optional)</label>' + fieldInput('f_phone', '0917 123 4567', 'fa-phone') + '</div>';
+        h += '<div class="form-group"><label>Phone *</label>' + fieldInput('f_phone', '0917 123 4567', 'fa-phone') + '</div>';
         h += '<div class="rq-field-hd"><i class="fa-solid fa-bolt"></i> What can they receive?</div>'
             + reqToggle('f_billing', 'fa-file-invoice-dollar', '#eff6ff', '#2563eb', 'Tuition Invoices', 'Copies of your document-fee invoices', false)
             + reqToggle('f_grades', 'fa-chart-simple', '#ecfdf5', '#059669', 'Semester Grades', 'Grade snapshots and transcripts', false)
@@ -598,10 +598,13 @@ document.getElementById('reqForm').addEventListener('submit', async function (e)
         payload.payload = collectFields(type);
     }
 
-    // Contact numbers must be 11 digits (09XXXXXXXXX).
+    // Contact numbers are required and must be 11 digits (09XXXXXXXXX).
     const pf = payload.payload || {};
-    if (pf.contact_number && !ph11(pf.contact_number)) { showToast('Contact number must be an 11-digit mobile number (e.g. 09171234567).', 'error'); return; }
-    if (pf.phone && !ph11(pf.phone)) { showToast('Phone must be an 11-digit mobile number (e.g. 09171234567).', 'error'); return; }
+    if (action !== 'remove') {
+        if (type === 'email') {
+            if (!pf.phone || !ph11(pf.phone)) { showToast('Phone is required and must be an 11-digit mobile number (e.g. 09171234567).', 'error'); return; }
+        } else if (!pf.contact_number || !ph11(pf.contact_number)) { showToast('Contact number is required and must be an 11-digit mobile number (e.g. 09171234567).', 'error'); return; }
+    }
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
     try {
         const d = await csrfFetch(API_URL, payload);

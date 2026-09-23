@@ -721,7 +721,7 @@ function guardianRow(g) {
         + '<div class="mg-row-grid">'
         + '<input class="form-control gi-name" placeholder="Full name *" value="' + esc(g.full_name) + '">'
         + '<select class="form-control gi-rel">' + relOptions(g.relationship) + '</select>'
-        + '<input class="form-control gi-contact" placeholder="Contact no." value="' + esc(g.contact_number) + '"></div>'
+        + '<input class="form-control gi-contact" placeholder="Contact no. *" value="' + esc(g.contact_number) + '" required pattern="09[0-9]{9}" title="11-digit mobile number (e.g. 09171234567)"></div>'
         + '<div class="mg-row-sub">'
         + '<input class="form-control gi-email" placeholder="Email" value="' + esc(g.email) + '">'
         + '<div class="mg-toggles">'
@@ -736,7 +736,7 @@ function emergencyRow(e) {
         + '<div class="mg-row-grid mg-row-grid-e">'
         + '<input class="form-control ei-name" placeholder="Full name *" value="' + esc(e.full_name) + '">'
         + '<input class="form-control ei-rel" placeholder="Relationship" value="' + esc(e.relationship) + '">'
-        + '<input class="form-control ei-contact" placeholder="Contact no." value="' + esc(e.contact_number) + '">'
+        + '<input class="form-control ei-contact" placeholder="Contact no. *" value="' + esc(e.contact_number) + '" required pattern="09[0-9]{9}" title="11-digit mobile number (e.g. 09171234567)">'
         + '</div></div>';
 }
 function emailRow(c) {
@@ -750,7 +750,7 @@ function emailRow(c) {
         + '<div class="mg-row-grid">'
         + '<input class="form-control ci-name" placeholder="Full name *" value="' + esc(c.full_name) + '">'
         + '<input class="form-control ci-email" placeholder="Email *" value="' + esc(c.email) + '">'
-        + '<input class="form-control ci-phone" placeholder="Phone" value="' + esc(c.phone) + '"></div>'
+        + '<input class="form-control ci-phone" placeholder="Phone *" value="' + esc(c.phone) + '" required pattern="09[0-9]{9}" title="11-digit mobile number (e.g. 09171234567)"></div>'
         + '<div class="mg-row-sub">'
         + '<div class="mg-toggles">'
         + '<label class="mg-toggle"><input type="checkbox" class="ci-billing" ' + (Number(c.send_billing)===1?'checked':'') + '><span><i class="fa-solid fa-file-invoice-dollar"></i> Invoices</span></label>'
@@ -820,6 +820,13 @@ async function sendContactAction(btn, kind) {
 }
 
 // ─── SAVE ALL ───────────────────────────────────────────────
+function ph11(v) {
+    let d = String(v || '').replace(/\D/g, '');
+    if (d.length === 12 && d.startsWith('63')) d = '0' + d.slice(2);
+    if (d.length === 13 && d.startsWith('63')) d = '0' + d.slice(2);
+    return /^09\d{9}$/.test(d);
+}
+
 async function saveAll() {
     if (!currentStudentId) { alert('Select a student first.'); return; }
     const btn = document.querySelector('#manageModal .modal-footer .btn-primary');
@@ -839,12 +846,17 @@ async function saveAll() {
             const fullName = row.querySelector('.gi-name').value.trim();
             if (!fullName) continue; // Skip empty rows
 
+            const contactNumber = row.querySelector('.gi-contact').value;
+            if (!ph11(contactNumber)) {
+                throw new Error('Guardian contact number is required and must be an 11-digit mobile number (e.g. 09171234567).');
+            }
+
             const res = await seqStudents('save-guardian', {
                 id: parseInt(row.dataset.gid || '0', 10) || 0,
                 student_id: currentStudentId,
                 full_name: fullName,
                 relationship: row.querySelector('.gi-rel').value,
-                contact_number: row.querySelector('.gi-contact').value,
+                contact_number: contactNumber,
                 email: row.querySelector('.gi-email').value,
                 is_primary: row.querySelector('.gi-primary').checked ? 1 : 0,
                 is_emergency: row.querySelector('.gi-emergency').checked ? 1 : 0
@@ -859,12 +871,17 @@ async function saveAll() {
             const fullName = row.querySelector('.ei-name').value.trim();
             if (!fullName) continue; // Skip empty rows
 
+            const contactNumber = row.querySelector('.ei-contact').value;
+            if (!ph11(contactNumber)) {
+                throw new Error('Emergency contact number is required and must be an 11-digit mobile number (e.g. 09171234567).');
+            }
+
             await seqStudents('save-emergency', {
                 id: parseInt(row.dataset.eid || '0', 10) || 0,
                 student_id: currentStudentId,
                 full_name: fullName,
                 relationship: row.querySelector('.ei-rel').value,
-                contact_number: row.querySelector('.ei-contact').value
+                contact_number: contactNumber
             });
         }
 
@@ -875,13 +892,18 @@ async function saveAll() {
             const email = row.querySelector('.ci-email').value.trim();
             if (!fullName || !email) continue; // Skip incomplete rows
 
+            const phone = row.querySelector('.ci-phone').value;
+            if (!ph11(phone)) {
+                throw new Error('Phone is required and must be an 11-digit mobile number (e.g. 09171234567).');
+            }
+
             await seqContacts({
                 action: 'save',
                 id: parseInt(row.dataset.cid || '0', 10) || 0,
                 student_id: currentStudentId,
                 full_name: fullName,
                 email: email,
-                phone: row.querySelector('.ci-phone').value,
+                phone: phone,
                 send_billing: row.querySelector('.ci-billing').checked ? 1 : 0,
                 send_grades: row.querySelector('.ci-grades').checked ? 1 : 0,
                 send_emergency: row.querySelector('.ci-emg').checked ? 1 : 0

@@ -166,9 +166,21 @@ try {
                         echo json_encode(['success' => false, 'message' => 'A valid email address is required.']);
                         exit;
                     }
-                } elseif (trim((string) ($payload['full_name'] ?? '')) === '') {
-                    echo json_encode(['success' => false, 'message' => 'A full name is required.']);
-                    exit;
+                    $phone = trim((string) ($payload['phone'] ?? ''));
+                    if ($phone === '' || !isValidPhone($phone)) {
+                        echo json_encode(['success' => false, 'message' => 'Phone is required and must be an 11-digit mobile number (e.g. 09171234567).']);
+                        exit;
+                    }
+                } else {
+                    if (trim((string) ($payload['full_name'] ?? '')) === '') {
+                        echo json_encode(['success' => false, 'message' => 'A full name is required.']);
+                        exit;
+                    }
+                    $phone = trim((string) ($payload['contact_number'] ?? ''));
+                    if ($phone === '' || !isValidPhone($phone)) {
+                        echo json_encode(['success' => false, 'message' => 'Contact number is required and must be an 11-digit mobile number (e.g. 09171234567).']);
+                        exit;
+                    }
                 }
             }
 
@@ -285,7 +297,7 @@ try {
                                 'full_name'      => trim((string) ($payload['full_name'] ?? '')),
                                 'relationship'   => trim((string) ($payload['relationship'] ?? '')) !== '' ? trim((string) $payload['relationship']) : 'parent',
                                 'email'          => $email,
-                                'phone'          => trim((string) ($payload['phone'] ?? '')) !== '' ? trim((string) $payload['phone']) : null,
+                                'phone'          => normalizePhone(trim((string) ($payload['phone'] ?? ''))),
                                 'send_billing'   => !empty($payload['send_billing']) ? 1 : 0,
                                 'send_grades'    => !empty($payload['send_grades']) ? 1 : 0,
                                 'send_emergency' => !empty($payload['send_emergency']) ? 1 : 0,
@@ -293,8 +305,8 @@ try {
                             if ($data['full_name'] === '' || !isValidEmail($email)) {
                                 throw new RuntimeException('A valid name and email address are required.');
                             }
-                            if (($data['phone'] ?? '') !== '' && !isValidPhone($data['phone'])) {
-                                throw new RuntimeException('Phone must be an 11-digit mobile number (e.g. 09171234567).');
+                            if ($data['phone'] === '' || !isValidPhone($data['phone'])) {
+                                throw new RuntimeException('Phone is required and must be an 11-digit mobile number (e.g. 09171234567).');
                             }
                             if ($requestType === 'update' && $targetId > 0) {
                                 $dup = $db->fetchOne('SELECT id FROM contact_recipients WHERE student_id = ? AND email = ? AND id <> ?', [$studentId, $email, $targetId]);
@@ -389,16 +401,8 @@ try {
                     [$studentId, $rel, $name]
                 );
                 if ($exists) { continue; }
-                $db->insert('guardians', [
-                    'student_id'     => $studentId,
-                    'full_name'      => $name,
-                    'relationship'   => $rel,
-                    'contact_number' => '',
-                    'email'          => null,
-                    'is_primary'     => 0,
-                    'is_emergency'   => 0,
-                ]);
-                $created++;
+                // Never auto-create a guardian without a valid contact number.
+                continue;
             }
             logActivity((int) getCurrentUserId(), 'pulled guardians from enrollment', null, 'guardians', $studentId,
                 null, ['created' => $created]);
@@ -422,7 +426,7 @@ try {
             $fullName  = trim((string) ($input['full_name'] ?? ''));
             $email     = strtolower(trim((string) ($input['email'] ?? '')));
             $relationship = trim((string) ($input['relationship'] ?? 'parent'));
-            $phone     = trim((string) ($input['phone'] ?? ''));
+            $phone     = normalizePhone(trim((string) ($input['phone'] ?? '')));
             $billing   = (int) (bool) ($input['send_billing'] ?? 0);
             $grades    = (int) (bool) ($input['send_grades'] ?? 0);
             $emergency = (int) (bool) ($input['send_emergency'] ?? 0);
@@ -431,8 +435,8 @@ try {
                 echo json_encode(['success' => false, 'message' => 'A valid name and email are required.']);
                 exit;
             }
-            if ($phone !== '' && !isValidPhone($phone)) {
-                echo json_encode(['success' => false, 'message' => 'Phone must be an 11-digit mobile number (e.g. 09171234567).']);
+            if ($phone === '' || !isValidPhone($phone)) {
+                echo json_encode(['success' => false, 'message' => 'Phone is required and must be an 11-digit mobile number (e.g. 09171234567).']);
                 exit;
             }
             if ($relationship === '' || strlen($relationship) > 40) {
@@ -444,7 +448,7 @@ try {
                 'full_name'      => $fullName,
                 'relationship'   => $relationship,
                 'email'          => $email,
-                'phone'          => $phone !== '' ? $phone : null,
+                'phone'          => $phone,
                 'send_billing'   => $billing,
                 'send_grades'    => $grades,
                 'send_emergency' => $emergency,

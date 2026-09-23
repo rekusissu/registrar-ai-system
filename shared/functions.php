@@ -952,6 +952,12 @@ function syncFatherMotherGuardians(int $studentId, ?string $fatherName, ?string 
         if ($exists) { continue; }
         // Reuse the generic guardian's contact info when it targets this parent.
         $useGeneric = isset($generic['relationship']) && $generic['relationship'] === $rel;
+        $contactNumber = $useGeneric ? trim((string) ($generic['contact_number'] ?? '')) : '';
+        if ($contactNumber !== '') {
+            $contactNumber = normalizePhone($contactNumber);
+        }
+        // Never auto-create a guardian without a valid 11-digit contact number.
+        if ($contactNumber === '' || !isValidPhone($contactNumber)) { continue; }
         $db->insert('guardians', [
             'student_id'     => $studentId,
             'full_name'      => $name,
