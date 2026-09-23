@@ -84,12 +84,14 @@ AI_API_KEY=
 # CORS Configuration (Restrict to your domains in production)
 CORS_ALLOWED_ORIGINS=https://registrar.bestlink.edu.ph,https://kiosk.bestlink.edu.ph
 
-# Email Configuration (Optional - if using SMTP)
-MAIL_HOST=
-MAIL_PORT=
-MAIL_USERNAME=
-MAIL_PASSWORD=
+# Email Configuration (Optional - if using SMTP / Gmail App Password)
+# NOTE: config.php reads SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS.
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=
+SMTP_PASS=
 MAIL_FROM=no-reply@bestlink.edu.ph
+MAIL_FROM_NAME=BCP Registrar System
 EOF
 
 echo -e "${GREEN}✓ .env file created${NC}"
