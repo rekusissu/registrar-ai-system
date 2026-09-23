@@ -105,6 +105,24 @@ include '../includes/sidebar.php';
 .q-icon { width:36px; height:36px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; }
 .q-item .q-pct { font-size:20px; font-weight:700; color:#0f172a; }
 .q-item .q-label { font-size:12px; color:#64748b; }
+
+/* ── Toolbar search / filter bar ──────────────────────── */
+.fs-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;row-gap:10px}
+.fs-toolbar-left{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.fs-toolbar-left .count-badge{font-size:12px;font-weight:600;color:#64748b;background:#f1f5f9;padding:3px 10px;border-radius:9999px;white-space:nowrap;line-height:1.4}
+.fs-toolbar-right{display:flex;align-items:center;gap:10px;margin-left:auto;flex-wrap:wrap;row-gap:8px}
+.fs-search{position:relative;display:flex;align-items:center;height:38px;min-width:200px;flex:1 1 240px;max-width:320px}
+.fs-search i.fa-magnifying-glass{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:13px;pointer-events:none}
+.fs-search input{width:100%;height:100%;padding:0 32px 0 36px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:13px;font-family:inherit;outline:none;background:#fff;color:#1e293b;box-sizing:border-box;transition:border-color .15s,box-shadow .15s}
+.fs-search input:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.08)}
+.fs-search input::placeholder{color:#94a3b8}
+.fs-search .clear-btn{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:22px;height:22px;border:none;background:none;color:#94a3b8;border-radius:50%;cursor:pointer;display:none;align-items:center;justify-content:center;font-size:13px;line-height:1;transition:background .12s,color .12s}
+.fs-search .clear-btn:hover{background:#f1f5f9;color:#475569}
+.fs-search .clear-btn.show{display:flex}
+.fs-filter{height:38px;min-width:150px;max-width:180px;padding:0 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:13px;font-family:inherit;color:#1e293b;background:#fff;cursor:pointer;outline:none;appearance:auto;transition:border-color .15s}
+.fs-filter:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.08)}
+.fs-divider{width:1px;height:24px;background:#e2e8f0;flex-shrink:0}
+.fs-count{font-size:12px;font-weight:600;color:#94a3b8;white-space:nowrap}
 </style>
 
 <main class="dashboard-main">
@@ -139,20 +157,32 @@ include '../includes/sidebar.php';
         </div>
 
         <div class="panel" style="margin-bottom:18px;">
-            <div class="panel-toolbar">
-                <div class="panel-title"><i class="fas fa-users" style="color:#2563eb;"></i> Student Files</div>
-                <div class="panel-actions">
-                    <input type="text" id="stuSearch" class="form-control" placeholder="Search name, enrollment…" style="max-width:240px;font-size:13px;">
-                    <select id="docTypeFilter" class="form-control" style="max-width:180px;font-size:13px;">
-                        <option value="">All Document Types</option>
-                        <option value="enrollment">Enrollment</option>
-                        <option value="transcript">Transcript</option>
-                        <option value="health">Health</option>
-                        <option value="photo">Photo</option>
-                        <option value="clearance">Clearance</option>
-                        <option value="other">Other</option>
-                    </select>
-                    <button class="btn btn-secondary btn-sm" onclick="notifyMissing()" id="notifyBtn"><i class="fas fa-bell"></i> Notify Students</button>
+            <div class="panel-toolbar" style="flex-direction:column;align-items:stretch;border-bottom:none;padding-bottom:0;margin-bottom:0;">
+                <div class="fs-toolbar">
+                    <!-- Left: title + count -->
+                    <div class="fs-toolbar-left">
+                        <div class="panel-title"><i class="fas fa-users" style="color:#2563eb;"></i> Student Files</div>
+                        <span class="count-badge" id="shownCount"><?= count($sortedStudents) ?> shown</span>
+                    </div>
+                    <!-- Right: search, filter, notify -->
+                    <div class="fs-toolbar-right">
+                        <div class="fs-search">
+                            <i class="fas fa-magnifying-glass"></i>
+                            <input type="text" id="stuSearch" placeholder="Search name, enrollment…" autocomplete="off">
+                            <button type="button" class="clear-btn" id="stuSearchClear"><i class="fas fa-xmark"></i></button>
+                        </div>
+                        <select id="docTypeFilter" class="fs-filter">
+                            <option value="">All types</option>
+                            <option value="enrollment">Enrollment</option>
+                            <option value="transcript">Transcript</option>
+                            <option value="health">Health</option>
+                            <option value="photo">Photo</option>
+                            <option value="clearance">Clearance</option>
+                            <option value="other">Other</option>
+                        </select>
+                        <div class="fs-divider"></div>
+                        <button class="btn btn-secondary btn-sm" onclick="notifyMissing()" id="notifyBtn"><i class="fas fa-bell"></i> Notify Students</button>
+                    </div>
                 </div>
             </div>
             <div class="table-responsive">
@@ -202,7 +232,7 @@ include '../includes/sidebar.php';
                                 $ic = $iconMap[$ext] ?? 'fa-file';
                                 $cl = $colorMap[$ext] ?? '#94a3b8';
                             ?>
-                                <div class="file-expand-row" data-id="<?= (int)$f['id'] ?>" data-name="<?= htmlspecialchars($f['filename']) ?>" data-path="<?= htmlspecialchars($f['file_path']) ?>" data-type="<?= htmlspecialchars($ext) ?>" data-student="<?= htmlspecialchars($stu['student_name']) ?>" data-desc="<?= htmlspecialchars($f['description'] ?? '') ?>">
+                                <div class="file-expand-row" data-id="<?= (int)$f['id'] ?>" data-name="<?= htmlspecialchars($f['filename']) ?>" data-path="<?= htmlspecialchars($f['file_path']) ?>" data-type="<?= htmlspecialchars($ext) ?>" data-student="<?= htmlspecialchars($stu['student_name']) ?>" data-desc="<?= htmlspecialchars($f['description'] ?? '') ?>" data-ai-valid="<?= (int)($f['ai_valid'] ?? -1) ?>">
                                     <?php if ($isImage($ext)): ?>
                                         <img src="<?= htmlspecialchars($f['file_path']) ?>" alt="" class="thumb">
                                     <?php else: ?>
@@ -218,6 +248,14 @@ include '../includes/sidebar.php';
                                         </div>
                                     </div>
                                     <div class="action-group">
+                                        <?php $av = (int)($f['ai_valid'] ?? -1); ?>
+                                        <?php if ($av === 1): ?>
+                                            <span class="action-btn" style="color:#16a34a;cursor:default;" title="AI Valid: <?= htmlspecialchars($f['ai_validation_note'] ?? 'Verified') ?>"><i class="fas fa-circle-check"></i></span>
+                                        <?php elseif ($av === 0): ?>
+                                            <span class="action-btn" style="color:#dc2626;cursor:default;background:#fef2f2;" title="AI Flagged: <?= htmlspecialchars($f['ai_validation_note'] ?? 'Invalid document') ?>"><i class="fas fa-triangle-exclamation"></i></span>
+                                        <?php else: ?>
+                                            <button class="action-btn" onclick="aiValidate(this)" data-id="<?= (int)$f['id'] ?>" title="AI Validate this document" style="color:#8b5cf6;"><i class="fas fa-robot"></i></button>
+                                        <?php endif; ?>
                                         <button class="action-btn view" onclick="previewFile(this.closest('.file-expand-row'))" title="Preview"><i class="fas fa-eye"></i></button>
                                         <a class="action-btn download" href="<?= htmlspecialchars($f['file_path']) ?>" title="Download" download><i class="fas fa-download"></i></a>
                                         <button class="action-btn delete" onclick="deleteFile(this.closest('.file-expand-row'))" title="Delete"><i class="fas fa-trash-alt"></i></button>
@@ -415,8 +453,18 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
         var res = await fetch('../api/documents.php?section=files', { method: 'POST', body: fd });
         var d = await res.json();
         if (d.success) {
-            showToast('Uploaded', 'Document stored.', 'success');
-            setTimeout(function() { window.location.reload(); }, 700);
+            showToast('Uploaded', 'Document stored. Validating…', 'success');
+            // Auto-validate the uploaded document via AI
+            if (d.data && d.data.id) {
+                validateDocument(d.data.id, function(vr) {
+                    if (vr && vr.valid === false) {
+                        showToast('⚠ Flagged', 'AI flagged this document: ' + (vr.reasoning || 'Does not match declared type.'), 'error');
+                    }
+                    setTimeout(function() { window.location.reload(); }, vr && vr.valid === false ? 1500 : 700);
+                });
+            } else {
+                setTimeout(function() { window.location.reload(); }, 700);
+            }
         } else {
             alert(d.message || 'Upload failed.');
         }
@@ -425,10 +473,34 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
     btn.innerHTML = '<i class="fas fa-upload"></i> Upload';
 });
 
+// ─── OPEN UPLOAD MODAL ─────────────────────────────────
+function openUpload() { openModal('uploadModal'); }
+
+// ─── DROPZONE ──────────────────────────────────────────
+(function() {
+    var dz = document.getElementById('upDropzone');
+    var fi = document.getElementById('upFile');
+    var fn = document.getElementById('upFileName');
+    if (dz && fi) {
+        dz.addEventListener('click', function() { fi.click(); });
+        fi.addEventListener('change', function() {
+            if (fi.files.length) fn.textContent = fi.files[0].name;
+        });
+        dz.addEventListener('dragover', function(e) { e.preventDefault(); dz.classList.add('over'); });
+        dz.addEventListener('dragleave', function() { dz.classList.remove('over'); });
+        dz.addEventListener('drop', function(e) {
+            e.preventDefault(); dz.classList.remove('over');
+            if (e.dataTransfer.files.length) { fi.files = e.dataTransfer.files; fn.textContent = e.dataTransfer.files[0].name; }
+        });
+    }
+})();
+
 // ─── SEARCH / FILTER ─────────────────────────────────────
-var searchInput   = document.getElementById('stuSearch');
-var docTypeFilter = document.getElementById('docTypeFilter');
-var shownCount    = document.getElementById('shownCount');
+var searchInput    = document.getElementById('stuSearch');
+var searchClearBtn = document.getElementById('stuSearchClear');
+var docTypeFilter  = document.getElementById('docTypeFilter');
+var shownCountEl   = document.getElementById('shownCount');
+var totalStudents  = document.querySelectorAll('#studentTableBody tr[data-search]').length;
 
 function applyFilter() {
     var q = searchInput.value.trim().toLowerCase();
@@ -446,13 +518,28 @@ function applyFilter() {
         }
         if (okQ && okT) visible++;
     });
-    shownCount.textContent = visible;
+    shownCountEl.textContent = visible + ' shown';
+    searchClearBtn.classList.toggle('show', searchInput.value.length > 0);
 }
 searchInput.addEventListener('input', applyFilter);
 docTypeFilter.addEventListener('change', applyFilter);
+searchClearBtn.addEventListener('click', function() {
+    searchInput.value = '';
+    applyFilter();
+    searchInput.focus();
+});
 
 // ─── PREVIEW ─────────────────────────────────────────────
 var IMG_EXTS = ['jpg','jpeg','png','webp','gif'];
+var _mammothLoaded = false;
+function _loadMammoth(cb) {
+    if (_mammothLoaded) { cb(); return; }
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
+    s.onload = function() { _mammothLoaded = true; cb(); };
+    s.onerror = function() { cb(); };
+    document.head.appendChild(s);
+}
 function previewFile(el) {
     document.getElementById('pvFileName').textContent = el.dataset.name;
     document.getElementById('pvMeta').innerHTML = '<b>' + (el.dataset.student || '') + '</b> · ' + el.dataset.type.toUpperCase() + ' · ' + (el.dataset.desc || 'No description');
@@ -467,6 +554,20 @@ function previewFile(el) {
         fetch(el.dataset.path).then(function(r) { return r.text(); }).then(function(t) {
             c.innerHTML = '<pre style="text-align:left;font-size:12px;white-space:pre-wrap;max-height:420px;overflow:auto;">' + t.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</pre>';
         }).catch(function() { c.innerHTML = '<p style="color:#64748b;">Preview not available.</p>'; });
+    } else if (ext === 'docx') {
+        c.innerHTML = '<div style="text-align:center;padding:40px;color:#94a3b8;"><i class="fas fa-spinner fa-spin" style="font-size:24px;"></i><p style="margin-top:8px;">Loading document preview…</p></div>';
+        openModal('previewModal');
+        _loadMammoth(function() {
+            if (typeof mammoth === 'undefined') { c.innerHTML = '<p style="color:#64748b;">Preview library failed to load. Download the file to view.</p>'; return; }
+            fetch(el.dataset.path).then(function(r) { return r.arrayBuffer(); }).then(function(buf) {
+                return mammoth.convertToHtml({ arrayBuffer: buf });
+            }).then(function(res) {
+                var html = res.value;
+                if (!html || !html.trim()) { html = '<p style="color:#64748b;">Document appears empty.</p>'; }
+                c.innerHTML = '<div style="max-height:480px;overflow:auto;padding:20px;background:#fff;border-radius:8px;font-size:13px;line-height:1.7;">' + html + '</div>';
+            }).catch(function() { c.innerHTML = '<p style="color:#64748b;">Could not preview this document. Download to view.</p>'; });
+        });
+        return;
     } else {
         c.innerHTML = '<span style="font-size:32px;color:#94a3b8;"><i class="fas fa-file"></i></span><p style="color:#64748b;margin-top:8px;">No inline preview for .' + ext + ' — download to view.</p>';
     }
@@ -506,6 +607,46 @@ function notifyMissing() {
     }).finally(function() {
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-bell"></i> Notify Students';
+    });
+}
+
+// ─── AI VALIDATE ────────────────────────────────────────
+function validateDocument(docId, cb) {
+    var fd = new FormData();
+    fd.append('document_id', docId);
+    fetch('../api/documents-ai.php?action=validate', { method: 'POST', body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(d) { if (cb) cb(d); })
+        .catch(function() { if (cb) cb(null); });
+}
+
+// Validate a single file row
+function aiValidate(el) {
+    var docId = el.dataset.id;
+    var row = el.closest('.file-expand-row');
+    el.disabled = true;
+    el.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    validateDocument(docId, function(d) {
+        el.disabled = false;
+        if (!d || !d.success) {
+            el.innerHTML = '<i class="fas fa-triangle-exclamation"></i>';
+            el.title = 'Validation failed';
+            return;
+        }
+        if (d.valid) {
+            el.innerHTML = '<i class="fas fa-circle-check"></i>';
+            el.className = 'action-btn valid-badge';
+            el.title = 'Valid: ' + (d.reasoning || '');
+            el.style.color = '#16a34a';
+        } else {
+            el.innerHTML = '<i class="fas fa-triangle-exclamation"></i>';
+            el.className = 'action-btn invalid-badge';
+            el.title = 'Invalid: ' + (d.reasoning || '');
+            el.style.color = '#dc2626';
+            // Highlight row
+            row.style.background = '#fef2f2';
+        }
+        // Remove validate button, show result
     });
 }
 

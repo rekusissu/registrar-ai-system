@@ -286,6 +286,37 @@ function logActivity($userId, $action, $details = null, $tableName = null, $reco
 }
 
 /**
+ * Send a notification to a student's bell (student_notifications table).
+ *
+ * @param int    $studentId   Target student
+ * @param string $title       Short title
+ * @param string $message     Body text
+ * @param string $type        'info', 'warning', 'success', 'error'
+ * @param int|null $docId     Related document id
+ * @param int|null $createdBy Actor (registrar/admin user id)
+ * @return int|null           Inserted notification id
+ */
+function notifyStudent(int $studentId, string $title, string $message, string $type = 'info', ?int $docId = null, ?int $createdBy = null): ?int {
+    try {
+        $db = Database::getInstance();
+        $id = $db->insert('student_notifications', [
+            'student_id'     => $studentId,
+            'title'          => $title,
+            'message'        => $message,
+            'type'           => $type,
+            'is_read'        => 0,
+            'related_doc_id' => $docId,
+            'created_by'     => $createdBy,
+            'created_at'     => date('Y-m-d H:i:s'),
+        ]);
+        return (int) $id;
+    } catch (Exception $e) {
+        error_log('[notifyStudent] failed for student #' . $studentId . ': ' . $e->getMessage());
+        return null;
+    }
+}
+
+/**
  * Log an error
  */
 function logError($message) {
@@ -294,6 +325,9 @@ function logError($message) {
     file_put_contents($logFile, $entry, FILE_APPEND);
 }
 
+/**
+ * Log an error
+ */
 /**
  * Log API request
  */
@@ -969,16 +1003,10 @@ function createStudentFromInput(array $input, $db): array
     }
     $birthYear = (int) substr($birthDateRaw, 0, 4);
 
-    // Generate student number if not provided.
+    // Student number is assigned later by the enrollment department — leave empty on creation.
     $studentNumber = isset($input['student_number']) && trim($input['student_number']) !== ''
         ? trim($input['student_number'])
-        : generateStudentNumber();
-
-    // Check uniqueness — bail out if student_number already exists.
-    $existing = $db->fetchOne("SELECT id FROM students WHERE student_number = ?", [$studentNumber]);
-    if ($existing) {
-        throw new RuntimeException('Student number already exists.');
-    }
+        : '';
 
     // B3: normalize before save so bad data never lands.
     $firstName = normalizeNameCase($firstName);
@@ -1130,10 +1158,9 @@ function createStudentFromInput(array $input, $db): array
     try {
         $fullName = trim($firstName . ' ' . $lastName);
 
-        // Username: keep the last 9 digits of the student id so the rule
-        // holds even if an id ever exceeds 9 digits.
-        $idDigits = preg_replace('/[^0-9]/', '', $studentNumber);
-        $id9 = substr($idDigits, -9);
+        // Username: use the DB auto-increment id when student_number not yet assigned.
+        $idDigits = preg_replace('/[^0-9]/', '', $studentNumber ?: (string) $newId);
+        $id9 = str_pad(substr($idDigits, -9), 9, '0', STR_PAD_LEFT);
         $firstLetter = mb_strtolower(mb_substr($firstName, 0, 1));
         $username = $firstLetter . $id9;
 
@@ -1145,12 +1172,12 @@ function createStudentFromInput(array $input, $db): array
         // email field — kept separate from the username login.
         $studentEmail = $data['email'] ?? null;
         if (!$studentEmail || !isValidEmail($studentEmail)) {
-            $studentEmail = 'student_' . $studentNumber . '@bestlink.edu.ph';
+            $studentEmail = 'student_' . $newId . '@bestlink.edu.ph';
         }
         // Ensure email uniqueness — append a suffix if it already exists.
         $emailCheck = $db->fetchOne("SELECT id FROM users WHERE email = ?", [$studentEmail]);
         if ($emailCheck) {
-            $studentEmail = 'student_' . $studentNumber . '_' . date('ymd') . '@bestlink.edu.ph';
+            $studentEmail = 'student_' . $newId . '_' . date('ymd') . '@bestlink.edu.ph';
         }
         // Ensure username uniqueness — append a suffix if it already exists.
         $userCheck = $db->fetchOne("SELECT id FROM users WHERE username = ?", [$username]);

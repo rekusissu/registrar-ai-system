@@ -27,6 +27,9 @@ uploads/document_pdfs/*
 # Student profile photos written by api/student-upload-photo.php.
 # User data, not source — but keep the .htaccess that blocks script execution.
 assets/uploads/students/*
+
+# Student file uploads (digital file storage feature)
+uploads/student_files/*
 !assets/uploads/students/.htaccess
 
 # Editor/tooling backup copies (*.php.backup etc.) — never commit these

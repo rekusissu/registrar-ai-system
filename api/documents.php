@@ -105,8 +105,20 @@ try {
                 echo json_encode(['success' => false, 'message' => 'File too large (max 25 MB).']);
                 exit;
             }
-            if (!in_array($docType, ['enrollment','transcript','health','photo','clearance','other'], true)) {
+            if (!in_array($docType, ['enrollment','transcript','health','photo','clearance','other','form_137','psa'], true)) {
                 $docType = 'other';
+            }
+
+            // Compute SHA-256 hash for duplicate detection
+            $fileHash = hash_file('sha256', $file['tmp_name']);
+
+            // Pre-upload duplicate check: warn if same hash exists for this student
+            $existingDupe = null;
+            if ($studentId && $fileHash) {
+                $existingDupe = $db->fetchOne(
+                    "SELECT id, filename, doc_type FROM documents WHERE student_id = ? AND file_hash = ?",
+                    [$studentId, $fileHash]
+                );
             }
 
             $dirKey = $studentId ? ('student_files/' . $studentId) : ('student_files/staged_' . preg_replace('/[^A-Za-z0-9._-]/', '-', $enrollNo));
@@ -136,8 +148,15 @@ try {
                 if (in_array('category', $colNames, true)) {
                     $ins['category'] = $category !== '' ? $category : $docType;
                 }
+                if (in_array('file_hash', $colNames, true)) {
+                    $ins['file_hash'] = $fileHash;
+                }
                 $id = $db->insert('documents', $ins);
-                echo json_encode(['success' => true, 'message' => 'File uploaded.', 'data' => ['id' => $id]]);
+                $response = ['success' => true, 'message' => 'File uploaded.', 'data' => ['id' => $id]];
+                if ($existingDupe) {
+                    $response['duplicate_warning'] = "This file is identical to an existing upload: {$existingDupe['filename']} ({$existingDupe['doc_type']})";
+                }
+                echo json_encode($response);
             } else {
                 echo json_encode(['success' => false, 'message' => 'Upload failed.']);
             }

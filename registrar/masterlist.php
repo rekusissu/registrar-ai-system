@@ -734,7 +734,7 @@ function viewStudent(id) {
         if (!d.success || !d.data) return;
         const s = d.data;
         document.getElementById('vName').textContent = s.first_name + ' ' + s.last_name;
-        document.getElementById('vStudentId').textContent = s.student_number;
+        document.getElementById('vStudentId').textContent = s.student_number || 'ID not yet assigned';
         document.getElementById('vCourse').textContent = s.course || '—';
         document.getElementById('vYearSection').textContent = (s.year_level ? s.year_level + ' Year' : '') + (s.section ? ' — ' + s.section : '');
         document.getElementById('vSchoolYearSem').textContent = (s.school_year ? s.school_year : '—') + (s.semester ? ' — ' + s.semester : '');

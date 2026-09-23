@@ -3,20 +3,22 @@
 -- ============================================================
 --  Database:       registrar_ai
 --  Server version: 10.4.32-MariaDB
---  Generated:      Sep 22, 2026 at 11:18
+--  Generated:      Sep 23, 2026
+--  Updated:        Sep 23, 2026 — consolidated all migrations
 --
 --  Import with:  mysql -u root registrar_ai < registrar_ai.sql
 --  Each table is dropped before it is recreated, so importing
 --  over an existing registrar_ai REPLACES it. Foreign key checks
 --  are disabled for the duration of the import.
 --
---  37 tables. 10 structure-only (security/cache/log):
+--  39 tables. 10 structure-only (security/cache/log):
 --    otp_codes, login_attempts, ai_cache, masterlist_cache,
 --    audit_logs, rfid_scan_logs, mock_lalamove_orders,
 --    mock_payment_transactions, queue_tickets, document_request_events
 --
---  All migrations from database/*.sql and database/migrations/*.sql
---  have been consolidated into this file.
+--  Includes all migrations from database/migrations/ and
+--  database/*.sql (document AI, student notifications,
+--  RFID inventory, queue events).
 -- ============================================================
 
 -- MariaDB dump 10.19  Distrib 10.4.32-MariaDB, for Win64 (AMD64)
@@ -170,7 +172,6 @@ CREATE TABLE `announcements` (
 
 LOCK TABLES `announcements` WRITE;
 /*!40000 ALTER TABLE `announcements` DISABLE KEYS */;
-INSERT INTO `announcements` (`id`, `title`, `body`, `author_id`, `is_published`, `created_at`, `updated_at`) VALUES (1,'Midterm Grades Available','Midterm grades are now available. Please check your portal.',2,1,'2026-08-16 18:33:48','2026-08-24 22:13:19');
 /*!40000 ALTER TABLE `announcements` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -628,7 +629,7 @@ CREATE TABLE `documents` (
   `student_id` int(11) DEFAULT NULL,
   `enroll_no` varchar(20) DEFAULT NULL,
   `enroll_status` varchar(20) DEFAULT NULL,
-  `doc_type` enum('enrollment','transcript','health','photo','clearance','other') NOT NULL,
+  `doc_type` enum('enrollment','transcript','health','photo','clearance','other','form_137','psa') NOT NULL,
   `filename` varchar(255) NOT NULL,
   `file_path` varchar(500) NOT NULL,
   `file_size` bigint(20) DEFAULT NULL,
@@ -638,11 +639,18 @@ CREATE TABLE `documents` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `category` varchar(40) DEFAULT NULL,
   `is_locked` tinyint(1) DEFAULT 0,
+  `file_hash` varchar(64) DEFAULT NULL,
+  `content_text` text DEFAULT NULL,
+  `ai_classified` tinyint(1) DEFAULT 0,
+  `ai_confidence` decimal(3,2) DEFAULT NULL,
+  `ai_valid` tinyint(1) DEFAULT NULL,
+  `ai_validation_note` text DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `uploaded_by` (`uploaded_by`),
   KEY `idx_student_id` (`student_id`),
   KEY `idx_doc_type` (`doc_type`),
   KEY `idx_documents_enroll_no` (`enroll_no`),
+  KEY `idx_documents_file_hash` (`file_hash`),
   CONSTRAINT `documents_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE,
   CONSTRAINT `documents_ibfk_2` FOREIGN KEY (`uploaded_by`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -1188,13 +1196,16 @@ DROP TABLE IF EXISTS `rfid_cards`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `rfid_cards` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `student_id` int(11) NOT NULL,
+  `student_id` int(11) NULL DEFAULT NULL,
   `card_uid` varchar(50) NOT NULL,
   `card_type` enum('rfid','qrcode') DEFAULT 'rfid',
-  `status` enum('active','inactive','lost','expired') DEFAULT 'active',
+  `status` enum('active','inactive','lost','expired','available','archived') DEFAULT 'available',
   `issued_date` date DEFAULT NULL,
   `expiry_date` date DEFAULT NULL,
   `notes` text DEFAULT NULL,
+  `registered_at` timestamp NULL DEFAULT NULL,
+  `assigned_at` timestamp NULL DEFAULT NULL,
+  `archive_reason` varchar(255) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `qr_code_path` varchar(255) DEFAULT NULL,
   `issued_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -1203,6 +1214,8 @@ CREATE TABLE `rfid_cards` (
   KEY `student_id` (`student_id`),
   KEY `idx_card_uid` (`card_uid`),
   KEY `idx_status` (`status`),
+  KEY `idx_student_id` (`student_id`),
+  KEY `idx_available` (`status`, `student_id`),
   CONSTRAINT `rfid_cards_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
@@ -1299,7 +1312,7 @@ DROP TABLE IF EXISTS `student_ids`;
 CREATE TABLE `student_ids` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `student_id` int(11) NOT NULL,
-  `id_number` varchar(20) NOT NULL,
+  `id_number` varchar(20) DEFAULT '' COMMENT 'Enrollment department ID - assigned later',
   `id_type` enum('school_id','library','cafeteria') DEFAULT 'school_id',
   `issue_date` date DEFAULT NULL,
   `expiry_date` date DEFAULT NULL,
@@ -1312,7 +1325,6 @@ CREATE TABLE `student_ids` (
   `school_year` varchar(20) DEFAULT NULL,
   `card_color` varchar(20) DEFAULT 'blue',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `id_number` (`id_number`),
   KEY `student_id` (`student_id`),
   KEY `idx_id_number` (`id_number`),
   KEY `idx_status` (`status`),
@@ -1341,7 +1353,7 @@ DROP TABLE IF EXISTS `students`;
 /*!40101 SET character_set_client = utf8 */;
 CREATE TABLE `students` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `student_number` varchar(20) NOT NULL,
+  `student_number` varchar(20) DEFAULT '' COMMENT 'Enrollment department ID — assigned later',
   `first_name` varchar(50) NOT NULL,
   `middle_name` varchar(50) DEFAULT NULL,
   `last_name` varchar(50) NOT NULL,
@@ -1371,11 +1383,10 @@ CREATE TABLE `students` (
   `father_name` varchar(100) DEFAULT NULL,
   `birth_country` varchar(60) DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `student_number` (`student_number`),
   KEY `idx_student_number` (`student_number`),
   KEY `idx_status` (`status`),
   KEY `idx_course` (`course`)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -1384,7 +1395,6 @@ CREATE TABLE `students` (
 
 LOCK TABLES `students` WRITE;
 /*!40000 ALTER TABLE `students` DISABLE KEYS */;
--- [no seed data] students is empty on fresh install
 /*!40000 ALTER TABLE `students` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -1426,6 +1436,55 @@ LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
 INSERT INTO `users` (`id`, `email`, `password_hash`, `full_name`, `role`, `rfid_uid`, `is_active`, `created_at`, `updated_at`, `student_id`, `username`, `login_attempts`, `locked_until`) VALUES (1,'admin@bestlink.edu.ph','$2y$10$f9PmndF92hBFI/jeJAWxC.Pua3Osob3.zkWHn9GRSTQXSyPX8x0dK','System Administrator','admin',NULL,1,'2026-07-07 10:42:45','2026-08-24 04:47:37',NULL,'ADM-001',0,NULL),(2,'registrar@bestlink.edu.ph','$2y$10$zj33OjRB93RcPZWd2/f4VudcEqzDCfZdLAajEcZQ7LABuuEKeqFyu','Registrar Staff','registrar',NULL,1,'2026-07-07 10:42:45','2026-08-26 16:02:51',NULL,'RGS-001',0,NULL),(3,'roldantiu89@gmail.com','$2y$10$f9PmndF92hBFI/jeJAWxC.Pua3Osob3.zkWHn9GRSTQXSyPX8x0dK','Roldan Tiu','admin',NULL,1,'2026-08-11 11:40:30','2026-08-24 04:47:37',NULL,'ADM-002',0,NULL),(7,'norse@gmail.com','$2y$10$mg/TmAFfYjwZNW34o6IGHedMnnZ04hUmYgm5iGy7OvGAxtDEoGWee','norse','nurse',NULL,1,'2026-09-02 22:16:15','2026-09-02 22:17:05',NULL,NULL,0,NULL);
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `student_notifications`
+--
+
+DROP TABLE IF EXISTS `student_notifications`;
+CREATE TABLE `student_notifications` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `student_id` int(11) NOT NULL,
+  `title` varchar(200) NOT NULL,
+  `message` text NOT NULL,
+  `type` varchar(50) DEFAULT 'info',
+  `is_read` tinyint(1) DEFAULT 0,
+  `related_doc_id` int(11) DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `read_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_sn_student` (`student_id`),
+  KEY `idx_sn_read` (`is_read`),
+  CONSTRAINT `fk_sn_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+LOCK TABLES `student_notifications` WRITE;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `document_ai_audit`
+--
+
+DROP TABLE IF EXISTS `document_ai_audit`;
+CREATE TABLE `document_ai_audit` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `document_id` int(11) DEFAULT NULL,
+  `student_id` int(11) DEFAULT NULL,
+  `action` varchar(50) NOT NULL,
+  `input_summary` text DEFAULT NULL,
+  `result` text DEFAULT NULL,
+  `confidence` decimal(3,2) DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_daa_document` (`document_id`),
+  KEY `idx_daa_student` (`student_id`),
+  KEY `idx_daa_action` (`action`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+LOCK TABLES `document_ai_audit` WRITE;
 UNLOCK TABLES;
 
 --

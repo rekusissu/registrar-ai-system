@@ -151,7 +151,7 @@ function extractDocxText(string $tmpPath): string {
 function storeAiDocument(string $tmpPath, string $origName): string {
     $dir = __DIR__ . '/../uploads/ai_docs';
     if (!is_dir($dir)) {
-        @mkdir($dir, 0777, true);
+        @mkdir($dir, 0755, true);
     }
     $safe = preg_replace('/[^a-zA-Z0-9._-]/', '_', pathinfo($origName, PATHINFO_FILENAME));
     $name = $safe . '_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . strtolower(pathinfo($origName, PATHINFO_EXTENSION));

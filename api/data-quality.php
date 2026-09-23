@@ -29,7 +29,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 $db = Database::getInstance();
 $action = $_GET['action'] ?? '';
 
-$requiredTypes = ['enrollment', 'transcript', 'health', 'photo', 'clearance'];
+$requiredTypes = ['form_137', 'psa', 'photo', 'enrollment', 'transcript'];
 $typeLabels = [
     'enrollment' => 'Enrollment Form',
     'transcript' => 'Transcript / Grades',
@@ -148,14 +148,22 @@ if ($method === 'POST' && $action === 'notify') {
     }
     $message = trim((string) ($input['message'] ?? ''));
     if ($message === '') {
-        $message = 'You have missing required documents in the Digital File Storage. Please upload them as soon as possible.';
+        $message = 'You have missing required documents (Form 137, PSA, 1x1 Photo, Enrollment, Transcript). Please upload them as soon as possible.';
     }
+    $notifyId = notifyStudent(
+        $studentId,
+        'Missing Documents',
+        $message,
+        'warning',
+        null,
+        $_SESSION['user_id']
+    );
     logActivity(
         $_SESSION['user_id'],
         'documents_missing_reminder',
         json_encode(['student_id' => $studentId, 'student' => $student['name'], 'message' => $message]),
-        'documents',
-        $studentId
+        'student_notifications',
+        $notifyId
     );
     echo json_encode(['success' => true, 'message' => 'Reminder sent to the student portal.']);
     exit;

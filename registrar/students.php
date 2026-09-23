@@ -331,7 +331,7 @@ select.form-control{cursor:pointer;appearance:auto;-webkit-appearance:auto;}
 <div class="table-responsive" id="studentTableWrap">
 <table id="studentTable">
 <thead>
-<tr><th style="width:30px;"><div class="cb-wrap"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></div></th><th>ID</th><th>Name</th><th>Course</th><th>Year</th><th>Section</th><th>Gender</th><th>RFID</th><th>Status</th><th style="text-align:center;">Quality <span class="quality-legend" title=""><i class="fas fa-circle-info" style="cursor:help;"></i><span class="quality-legend-box">Quality score = % of required student fields filled.
+<tr><th style="width:30px;"><div class="cb-wrap"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></div></th><th>#</th><th>Student ID</th><th>Name</th><th>Course</th><th>Year</th><th>Section</th><th>Gender</th><th>RFID</th><th>Status</th><th style="text-align:center;">Quality <span class="quality-legend" title=""><i class="fas fa-circle-info" style="cursor:help;"></i><span class="quality-legend-box">Quality score = % of required student fields filled.
 <span style="color:#22c55e;">●</span> 85–100% &nbsp; Complete
 <span style="color:#f59e0b;">●</span> 60–84% &nbsp; Some fields missing
 <span style="color:#ef4444;">●</span> &lt;60% &nbsp; Many fields missing
@@ -353,7 +353,8 @@ $qDotClass = $qScore >= 85 ? 'good' : ($qScore >= 60 ? 'warn' : 'bad');
 ?>
 <tr data-student='<?= htmlspecialchars(json_encode($s),ENT_QUOTES,'UTF-8') ?>' class="<?= $s['status']==='archived'?'archived':'' ?>">
 <td><div class="cb-wrap"><input type="checkbox" class="student-cb" value="<?= (int)$s['id'] ?>" onchange="updateBulkBar()"></div></td>
-<td class="student-id" style="font-weight:600;font-size:12px;"><?= htmlspecialchars($s['student_number']) ?></td>
+<td class="student-id" style="font-weight:600;font-size:12px;color:#64748b;"><?= (int)$s['id'] ?></td>
+<td class="student-id" style="font-weight:600;font-size:12px;"><?= htmlspecialchars($s['student_number'] ?: '—') ?></td>
 <td><div class="student-info"><div class="student-avatar <?= $ac ?>"><?= $initials ?: '?' ?></div><div><div class="student-name"><?= htmlspecialchars($s['first_name']." ".$s['last_name']) ?></div><div class="student-email"><?= htmlspecialchars($s['email'] ?? '') ?></div></div></div></td>
 <td><?= htmlspecialchars($s['course'] ?? 'N/A') ?></td>
 <td><?= htmlspecialchars($s['year_level'] ?? 'N/A') ?></td>
@@ -429,6 +430,7 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 <button class="btn btn-secondary" style="margin:-4px auto 10px;padding:4px 12px;font-size:11px;" onclick="document.getElementById('photoInput').click()"><i class="fas fa-camera"></i> Change Photo</button>
 <div class="vp-name" id="vName">—</div>
 <div class="vp-id" id="vStudentId">—</div>
+<div class="vp-id" id="vDbId" style="font-size:11px;color:#94a3b8;margin-top:2px;">—</div>
 <div id="vLastScan" style="font-size:12px;color:#64748b;margin-top:6px;display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;"></div>
 <div id="vAiSummary" style="display:none;margin-top:12px;background:linear-gradient(135deg,#eef4ff,#f5f3ff);border:1px solid #dbeafe;border-radius:10px;padding:12px 14px;font-size:13px;color:#1e40af;"></div>
 </div>
@@ -471,7 +473,7 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 
 <!-- Add Modal (inline, with guardian) -->
 <div class="modal-overlay" id="addModal"><div class="modal-content" style="max-width:760px;"><div class="modal-header"><h2><i class="fas fa-plus-circle"></i> Enroll New Student</h2><div style="display:flex;gap:8px;align-items:center;"><button class="btn btn-secondary" style="padding:6px 12px;font-size:12px;" onclick="openPasteModal()"><i class="fas fa-magic"></i> Paste to Fill</button><button class="modal-close" onclick="closeAddModal()"><i class="fas fa-times"></i></button></div></div><form id="addForm"><div class="modal-body">
-<div class="form-row"><div class="form-group" style="flex:0 0 160px;"><label>Student ID</label><input type="text" id="addStudentNumber" class="form-control" placeholder="Auto" style="background:#f8fafc;font-size:12px;" readonly></div><div class="form-group"><label>Academic Status</label><select id="addStatus" class="form-control"><option value="enrolled">Enrolled</option><option value="active">Active</option><option value="probation">Probation</option><option value="at-risk">At Risk</option><option value="loa">LOA</option><option value="graduated">Graduated</option><option value="transferred">Transferred</option><option value="dropped">Dropped</option></select></div></div>
+<div class="form-row"><div class="form-group"><label>Academic Status</label><select id="addStatus" class="form-control"><option value="enrolled">Enrolled</option><option value="active">Active</option><option value="probation">Probation</option><option value="at-risk">At Risk</option><option value="loa">LOA</option><option value="graduated">Graduated</option><option value="transferred">Transferred</option><option value="dropped">Dropped</option></select></div></div>
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:0 0 12px;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-user"></i> Personal Information</div>
 <div class="form-row"><div class="form-group"><label>First Name <span style="color:#dc2626;">*</span></label><input type="text" id="addFirstName" class="form-control" required></div><div class="form-group"><label>Middle Name</label><input type="text" id="addMiddleName" class="form-control"></div><div class="form-group"><label>Last Name <span style="color:#dc2626;">*</span></label><input type="text" id="addLastName" class="form-control" required></div></div>
@@ -519,7 +521,7 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 
 <!-- Edit Modal (same structure) -->
 <div class="modal-overlay" id="editModal"><div class="modal-content" style="max-width:760px;"><div class="modal-header"><h2><i class="fas fa-pen"></i> Edit Student</h2><button class="modal-close" onclick="closeEditModal()"><i class="fas fa-times"></i></button></div><form id="editForm"><input type="hidden" id="editId" value=""><div class="modal-body">
-<div class="form-row"><div class="form-group" style="flex:0 0 160px;"><label>Student ID</label><input type="text" id="editStudentNumber" class="form-control" readonly style="background:#f8fafc;font-size:12px;"></div><div class="form-group"><label>Academic Status</label><select id="editStatus" class="form-control"><option value="enrolled">Enrolled</option><option value="active">Active</option><option value="probation">Probation</option><option value="at-risk">At Risk</option><option value="graduated">Graduated</option><option value="loa">LOA</option><option value="transferred">Transferred</option><option value="dropped">Dropped</option><option value="archived">Archived</option></select></div></div>
+<div class="form-row"><div class="form-group" style="flex:0 0 160px;"><label>Student ID (Enrollment Dept)</label><input type="text" id="editStudentNumber" class="form-control" placeholder="Assigned by enrollment" style="font-size:12px;"></div><div class="form-group"><label>Academic Status</label><select id="editStatus" class="form-control"><option value="enrolled">Enrolled</option><option value="active">Active</option><option value="probation">Probation</option><option value="at-risk">At Risk</option><option value="graduated">Graduated</option><option value="loa">LOA</option><option value="transferred">Transferred</option><option value="dropped">Dropped</option><option value="archived">Archived</option></select></div></div>
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:0 0 12px;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-user"></i> Personal Information</div>
 <div class="form-row"><div class="form-group"><label>First Name <span style="color:#dc2626;">*</span></label><input type="text" id="editFirstName" class="form-control" required></div><div class="form-group"><label>Middle Name</label><input type="text" id="editMiddleName" class="form-control"></div><div class="form-group"><label>Last Name <span style="color:#dc2626;">*</span></label><input type="text" id="editLastName" class="form-control" required></div></div>
@@ -660,7 +662,8 @@ function viewStudent(id) {
         if (s.photo) { avatarEl.style.background = 'transparent'; avatarEl.style.backgroundImage = 'url('+s.photo+')'; avatarEl.style.backgroundSize = 'cover'; avatarText.style.display = 'none'; }
         else { avatarEl.style.backgroundImage = ''; avatarText.style.display = ''; avatarText.textContent = initials.toUpperCase(); }
         document.getElementById('vName').textContent = name;
-        document.getElementById('vStudentId').textContent = s.student_number;
+        document.getElementById('vStudentId').textContent = s.student_number || 'ID not yet assigned';
+        document.getElementById('vDbId').textContent = 'Record #' + s.id;
         document.getElementById('vStatus').innerHTML = '<span class="status-badge '+(s.status||'active')+'"><span class="status-dot '+(s.status||'active')+'"></span>'+ucfirst(s.status||'Active')+'</span>';
         document.getElementById('vLrn').textContent = s.lrn || '—';
         document.getElementById('vGender').textContent = s.gender || '—';
@@ -885,7 +888,8 @@ document.getElementById('editForm').addEventListener('submit', async function(e)
                 guardian_name: document.getElementById('editGuardianName').value,
                 guardian_relationship: document.getElementById('editGuardianRel').value,
                 guardian_contact: document.getElementById('editGuardianContact').value,
-                guardian_email: document.getElementById('editGuardianEmail').value
+                guardian_email: document.getElementById('editGuardianEmail').value,
+                student_number: document.getElementById('editStudentNumber').value
             })
         });
         const d = await res.json();

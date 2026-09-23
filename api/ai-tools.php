@@ -72,6 +72,88 @@ switch ($action) {
         echo json_encode(['success' => true, 'data' => ['report' => $report]]);
         exit;
 
+    // ─── STATUS RECOMMENDATIONS (AI) ────────────────────────
+    case 'status_recommendations':
+        $allS = $db->fetchAll(
+            "SELECT s.id,s.student_number,s.first_name,s.last_name,s.course,
+                    s.year_level,s.status,MAX(st.created_at) AS last_change
+             FROM students s LEFT JOIN status_tracker st ON st.student_id=s.id
+             GROUP BY s.id ORDER BY s.id"
+        );
+        $recs = [];
+        foreach ($allS as $s) {
+            $sid = (int) $s['id'];
+            $st  = strtolower(trim((string) ($s['status'] ?? '')));
+            $nm  = trim(($s['first_name'] ?? '') . ' ' . ($s['last_name'] ?? ''));
+            $h   = $db->fetchAll("SELECT current_status,created_at FROM status_tracker WHERE student_id=? ORDER BY created_at DESC LIMIT 10", [$sid]);
+            $ds  = $s['last_change'] ? (int) floor((time() - strtotime($s['last_change'])) / 86400) : 999;
+            $cP  = 0;
+            foreach ($h as $x) { if (strtolower((string)($x['current_status'] ?? '')) === 'probation') $cP++; else break; }
+            $ad = (int) ($db->fetchColumn("SELECT COUNT(*) FROM document_requests WHERE student_id=? AND status NOT IN ('completed','claimed')", [$sid]) ?? 0);
+            $sc = (int) ($db->fetchColumn("SELECT COUNT(*) FROM rfid_scan_logs l JOIN rfid_cards c ON l.card_uid=c.card_uid WHERE c.student_id=? AND l.scan_time>=DATE_SUB(NOW(),INTERVAL 30 DAY)", [$sid]) ?? 0);
+            $r = null;
+            if ($st === 'probation' && $cP >= 2)           $r = ['recommended_status'=>'at-risk','severity'=>'high',"reason"=>"$nm probation $cP consecutive periods."];
+            elseif ($st === 'at-risk' && $ds > 180)        $r = ['recommended_status'=>'inactive','severity'=>'high',"reason"=>"$nm at-risk over 6 months."];
+            elseif ($st === 'graduated' && $ad === 0 && (int)($s['year_level'] ?? 0) >= 4)
+                                                           $r = ['recommended_status'=>'alumni','severity'=>'medium',"reason"=>"$nm graduated, no pending docs."];
+            elseif (in_array($st, ['enrolled','active']) && $ds > 90 && $sc === 0)
+                                                           $r = ['recommended_status'=>'inactive','severity'=>'medium',"reason"=>"$nm no activity for {$ds} days."];
+            if ($r) { $r['student_id']=$sid; $r['student_name']=$nm; $r['student_number']=(string)($s['student_number']??''); $r['current_status']=$st; $r['action_type']=$r['recommended_status']?'change_status':'review'; $recs[]=$r; }
+        }
+        $src = 'rule';
+        if (!empty($recs) && function_exists('aiGenerateJson')) {
+            $ai = aiGenerateJson("Refine recommendations. JSON: {\"recommendations\":[{\"student_id\":int,\"student_name\":str,\"student_number\":str,\"current_status\":str,\"recommended_status\":str|null,\"severity\":\"low\"|\"medium\"|\"high\",\"reason\":str,\"action_type\":\"change_status\"|\"review\"}]}", json_encode(array_slice($recs, 0, 20)), [], ['max_tokens' => 1200]);
+            if (is_array($ai) && !empty($ai['recommendations'])) { $recs = $ai['recommendations']; $src = 'ai'; }
+        }
+        usort($recs, fn($a,$b) => (['high'=>0,'medium'=>1,'low'=>2][$a['severity']??'low']??2) <=> (['high'=>0,'medium'=>1,'low'=>2][$b['severity']??'low']??2));
+        echo json_encode(['success' => true, 'data' => ['recommendations' => array_slice($recs, 0, 15), 'source' => $src]]);
+        exit;
+
+    // ─── STUDENT RISKS ──────────────────────────────────────
+    case 'student_risks':
+        $ids = $input['student_ids'] ?? [];
+        if (!is_array($ids) || empty($ids)) { echo json_encode(['success'=>false,'message'=>'student_ids required.']); exit; }
+        $ids = array_map('intval', $ids);
+        $ph  = implode(',', array_fill(0, count($ids), '?'));
+        $rows = $db->fetchAll("SELECT s.id,s.first_name,s.last_name,s.status FROM students s WHERE s.id IN ($ph)", $ids);
+        $rr = [];
+        foreach ($rows as $s) {
+            $sid = (int) $s['id'];
+            $st  = strtolower(trim((string) ($s['status'] ?? '')));
+            $h   = $db->fetchAll("SELECT current_status,created_at FROM status_tracker WHERE student_id=? ORDER BY created_at DESC LIMIT 10", [$sid]);
+            $cc  = 0;
+            foreach ($h as $x) { $cs = strtolower((string)($x['current_status'] ?? '')); if (in_array($cs, ['at-risk','probation'])) $cc++; else break; }
+            $last = $h[0]['created_at'] ?? null;
+            $days = $last ? (int) floor((time() - strtotime($last)) / 86400) : 999;
+            $gwa  = $db->fetchColumn("SELECT gwa FROM academic_history WHERE student_id=? ORDER BY created_at DESC LIMIT 1", [$sid]);
+            $gwa  = $gwa ? (float) $gwa : null;
+            $r = 'low'; $reason = 'Stable, no red flags.';
+            if (in_array($st, ['at-risk','probation'])) { $r='high'; $reason="Currently $st"; if ($cc >= 2) $reason .= " for $cc periods"; $reason .= "."; }
+            elseif ($st === 'dropped')     { $r='medium'; $reason='Dropped.'; }
+            elseif ($gwa !== null && $gwa > 3.0) { $r='medium'; $reason="GWA $gwa above 3.0."; }
+            elseif ($days > 180)           { $r='medium'; $reason="No change for $days days."; }
+            $rr[$sid] = ['risk' => $r, 'reason' => $reason];
+        }
+        $src = 'rule';
+        if (function_exists('aiGenerateJson') && count($ids) <= 20) {
+            $ai = aiGenerateJson("Assess risk per student. JSON: {\"risks\":{\"id\":{\"risk\":\"low\"|\"medium\"|\"high\",\"reason\":str}}}", json_encode($rr), [], ['max_tokens' => 1500]);
+            if (is_array($ai) && !empty($ai['risks'])) { $rr = $ai['risks']; $src = 'ai'; }
+        }
+        echo json_encode(['success' => true, 'data' => ['risks' => $rr, 'source' => $src]]);
+        exit;
+
+    // ─── STATUS ANOMALIES ──────────────────────────────────
+    case 'status_anomalies':
+        $anom = [];
+        $freq = $db->fetchAll("SELECT st.student_id,s.first_name,s.last_name,s.student_number,COUNT(*) AS cnt FROM status_tracker st JOIN students s ON s.id=st.student_id WHERE st.created_at>=DATE_SUB(NOW(),INTERVAL 30 DAY) GROUP BY st.student_id HAVING cnt>=3");
+        if ($freq) $anom[] = ['type'=>'frequent_changes','label'=>count($freq).' student(s) changed 3+ times in 30 days','icon'=>'fas fa-sync-alt','color'=>'#f59e0b','students'=>array_map(fn($r)=>['id'=>(int)$r['student_id'],'name'=>trim(($r['first_name']??'').' '.($r['last_name']??'')),'student_number'=>(string)($r['student_number']??''),'count'=>(int)$r['cnt']],$freq)];
+        $gp = $db->fetchAll("SELECT s.id,s.first_name,s.last_name,s.student_number FROM students s JOIN document_requests dr ON dr.student_id=s.id AND dr.status NOT IN ('completed','claimed') WHERE s.status='graduated' GROUP BY s.id");
+        if ($gp) $anom[] = ['type'=>'grad_pending_docs','label'=>count($gp).' graduated with pending docs','icon'=>'fas fa-file-circle-exclamation','color'=>'#8b5cf6','students'=>array_map(fn($r)=>['id'=>(int)$r['id'],'name'=>trim(($r['first_name']??'').' '.($r['last_name']??'')),'student_number'=>(string)($r['student_number']??'')],$gp)];
+        $inact = $db->fetchAll("SELECT s.id,s.first_name,s.last_name,s.student_number FROM students s LEFT JOIN status_tracker st ON st.student_id=s.id LEFT JOIN rfid_cards rc ON rc.student_id=s.id LEFT JOIN rfid_scan_logs rl ON rl.card_uid=rc.card_uid WHERE s.status IN ('enrolled','active') AND (st.created_at IS NULL OR st.created_at<DATE_SUB(NOW(),INTERVAL 90 DAY)) GROUP BY s.id HAVING COUNT(DISTINCT rl.id)=0");
+        if ($inact) $anom[] = ['type'=>'inactive_students','label'=>count($inact).' inactive 90+ days no activity','icon'=>'fas fa-ghost','color'=>'#6366f1','students'=>array_map(fn($r)=>['id'=>(int)$r['id'],'name'=>trim(($r['first_name']??'').' '.($r['last_name']??'')),'student_number'=>(string)($r['student_number']??'')],$inact)];
+        echo json_encode(['success' => true, 'data' => ['anomalies' => $anom]]);
+        exit;
+
     default:
         echo json_encode(['success' => false, 'message' => 'Unknown action.']);
         exit;

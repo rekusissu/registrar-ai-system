@@ -71,7 +71,7 @@ $initial  = strtoupper(substr(trim($firstLast), 0, 1));
                         <div class="id-name"><?= htmlspecialchars($firstLast) ?></div>
                         <span class="pill <?= $statusBadge[$id['status']] ?? 'active' ?>"><i class="fa-solid fa-circle"></i> <?= ucfirst($id['status']) ?></span>
                     </div>
-                    <div class="id-number">#<?= htmlspecialchars($id['id_number']) ?></div>
+                    <div class="id-number"><?= $id['id_number'] ? '#' . htmlspecialchars($id['id_number']) : 'ID not yet assigned' ?></div>
 
                     <div class="id-meta">
                         <div class="id-meta-item"><div class="m-label">Issued</div><div class="m-value"><?= htmlspecialchars($id['issue_date'] ?? '—') ?></div></div>

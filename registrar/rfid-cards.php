@@ -41,16 +41,29 @@ $cards = $db->fetchAll("
     ORDER BY rf.id DESC
 ");
 
+// Split cards: pool (available/unassigned) vs table (assigned/status cards)
+$poolCards = array_filter($cards, fn($c) => $c['status'] === 'available' && empty($c['student_id']));
+$tableCards = array_values(array_filter($cards, fn($c) => !($c['status'] === 'available' && empty($c['student_id']))));
+
 $totalCards   = count($cards);
 $activeCards  = count(array_filter($cards, fn($c) => $c['status'] === 'active'));
+$availableCards = count($poolCards);
 $expiredCards = count(array_filter($cards, fn($c) => $c['status'] === 'expired'));
 $lostCards    = count(array_filter($cards, fn($c) => $c['status'] === 'lost'));
-$inactiveCards = $totalCards - $activeCards - $expiredCards - $lostCards;
+$archivedCards = count(array_filter($cards, fn($c) => $c['status'] === 'archived'));
+$inactiveCards = $totalCards - $activeCards - $availableCards - $expiredCards - $lostCards - $archivedCards;
 
 // Percentages
-$activePct  = $totalCards ? round($activeCards / $totalCards * 100) : 0;
-$expiredPct = $totalCards ? round($expiredCards / $totalCards * 100) : 0;
-$lostPct    = $totalCards ? round($lostCards / $totalCards * 100) : 0;
+$activePct    = $totalCards ? round($activeCards / $totalCards * 100) : 0;
+$availablePct = $totalCards ? round($availableCards / $totalCards * 100) : 0;
+$expiredPct   = $totalCards ? round($expiredCards / $totalCards * 100) : 0;
+$lostPct      = $totalCards ? round($lostCards / $totalCards * 100) : 0;
+$archivedPct  = $totalCards ? round($archivedCards / $totalCards * 100) : 0;
+
+// Available card pool for assign-from-pool dropdown
+$availablePool = $db->fetchAll(
+    "SELECT id, card_uid, registered_at FROM rfid_cards WHERE status = 'available' AND student_id IS NULL ORDER BY card_uid ASC"
+);
 
 // Month-over-month trend
 $thisMonthCards   = $db->fetchColumn("SELECT COUNT(*) FROM rfid_cards WHERE issued_date LIKE '" . date('Y-m') . "%'") ?: 0;
@@ -108,7 +121,7 @@ $avatarPalette = ['blue', 'green', 'purple', 'orange', 'pink'];
 $avatarClasses = [];
 foreach ($cards as $i => $c) {
     $studentKey = (string)($c['student_id'] ?? $c['id'] ?? $i);
-    $avatarClasses[$i] = $avatarPalette[abs(crc32($studentKey)) % count($avatarPalette)];
+    $avatarClasses[$c['id']] = $avatarPalette[abs(crc32($studentKey)) % count($avatarPalette)];
 }
 ?>
 <style>
@@ -383,6 +396,12 @@ foreach ($cards as $i => $c) {
 .rfid-table-wrapper tbody tr:hover { background: #f8fafc; }
 .rfid-table-wrapper tbody tr:last-child td { border-bottom: none; }
 
+/* ── Table header ── */
+.rfid-table-header { padding: 18px 20px 14px; border-bottom: 1px solid #f1f5f9; }
+.rfid-table-header h3 { font-size: 15px; font-weight: 700; color: #0f172a; margin: 0 0 2px; display: flex; align-items: center; gap: 8px; }
+.rfid-table-header p { font-size: 12px; color: #94a3b8; margin: 0; }
+.rfid-table-count { font-size: 11px; font-weight: 600; background: #eff6ff; color: #2563eb; padding: 2px 8px; border-radius: 10px; }
+
 /* â”€â”€ Student info cell â”€â”€ */
 .student-info { display: flex; align-items: center; gap: 10px; }
 .student-avatar {
@@ -464,6 +483,7 @@ foreach ($cards as $i => $c) {
     max-height: 92vh;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 .rfid-modal .rfid-modal-body-wrapper {
     overflow-y: auto;
@@ -697,6 +717,107 @@ foreach ($cards as $i => $c) {
 }
 
 /* â”€â”€ Toast on top of everything â”€â”€ */
+/* ——— Status badges ——— */
+.status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.status-badge .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.status-badge.active    { background: #dcfce7; color: #16a34a; }
+.status-badge.available { background: #e0e7ff; color: #4f46e5; }
+.status-badge.expired   { background: #fee2e2; color: #dc2626; }
+.status-badge.lost      { background: #fef3c7; color: #b45309; }
+.status-badge.inactive  { background: #f1f5f9; color: #64748b; }
+.status-badge.archived  { background: #f3f4f6; color: #6b7280; }
+
+.ai-panel { background: white; border: 1px solid #e2e8f0; border-radius: 14px; padding: 20px 24px; margin-top: 20px; }
+.ai-panel-header { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.ai-panel-header .ai-icon { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, #ede9fe, #ddd6fe); display: flex; align-items: center; justify-content: center; color: #7c3aed; font-size: 16px; }
+.ai-panel-header h3 { font-size: 15px; font-weight: 700; color: #0f172a; margin: 0; }
+.ai-panel-header p { font-size: 12px; color: #64748b; margin: 0; }
+.ai-insights { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.ai-insight-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; }
+.ai-insight-card .label { color: #64748b; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.ai-insight-card .value { color: #0f172a; font-size: 18px; font-weight: 700; margin-top: 4px; }
+.ai-insight-card .sub { color: #64748b; font-size: 12px; margin-top: 2px; }
+
+.ai-chat-fab { position: fixed; bottom: 24px; right: 24px; z-index: 9998; width: 52px; height: 52px; border-radius: 50%; background: linear-gradient(135deg, #7c3aed, #6d28d9); color: white; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 20px; box-shadow: 0 4px 14px rgba(124,58,237,0.35); transition: all 0.3s ease; }
+.ai-chat-fab:hover { transform: scale(1.08); }
+.ai-chat-window { position: fixed; bottom: 88px; right: 24px; z-index: 9999; width: 380px; max-height: 520px; background: white; border: 1px solid #e2e8f0; border-radius: 16px; box-shadow: 0 12px 40px rgba(15,23,42,0.15); display: none; flex-direction: column; overflow: hidden; }
+.ai-chat-window.open { display: flex; }
+.ai-chat-head { padding: 14px 18px; background: linear-gradient(135deg, #7c3aed, #6d28d9); color: white; display: flex; align-items: center; gap: 10px; }
+.ai-chat-head .ai-avatar { width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 14px; }
+.ai-chat-head h4 { margin: 0; font-size: 14px; font-weight: 700; flex: 1; }
+.ai-chat-head p { margin: 0; font-size: 11px; opacity: 0.8; }
+.ai-chat-head button { background: none; border: none; color: white; cursor: pointer; font-size: 16px; padding: 4px; opacity: 0.8; }
+.ai-chat-messages { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; max-height: 360px; min-height: 200px; }
+.ai-chat-msg { max-width: 85%; padding: 10px 14px; border-radius: 12px; font-size: 13px; line-height: 1.5; word-break: break-word; }
+.ai-chat-msg.bot { align-self: flex-start; background: #f1f5f9; color: #1e293b; border-bottom-left-radius: 4px; }
+.ai-chat-msg.user { align-self: flex-end; background: linear-gradient(135deg, #7c3aed, #6d28d9); color: white; border-bottom-right-radius: 4px; }
+.ai-chat-msg.typing { color: #94a3b8; font-style: italic; }
+.ai-chat-input { padding: 12px; border-top: 1px solid #e2e8f0; display: flex; gap: 8px; align-items: center; }
+.ai-chat-input input { flex: 1; padding: 10px 14px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-size: 13px; font-family: inherit; outline: none; }
+.ai-chat-input input:focus { border-color: #7c3aed; }
+.ai-chat-input button { width: 38px; height: 38px; border-radius: 10px; border: none; background: linear-gradient(135deg, #7c3aed, #6d28d9); color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+
+.register-textarea { width: 100%; height: 90px; max-height: 160px; padding: 10px 14px; border: 1.5px solid #e2e8f0; border-radius: 10px; font-family: ui-monospace, Consolas, monospace; font-size: 13px; resize: vertical; outline: none; line-height: 1.6; background: #f8fafc; transition: border-color .15s, box-shadow .15s; box-sizing: border-box; }
+.register-textarea:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,0.10); background: #fff; }
+.register-textarea::placeholder { color: #cbd5e1; font-family: inherit; }
+.uid-count-hint { font-size: 12px; color: #94a3b8; margin-top: 6px; display: flex; align-items: center; gap: 5px; }
+.uid-count-hint::before { content: '\f0eb'; font-family: 'Font Awesome 6 Free'; font-weight: 900; font-size: 11px; }
+.uid-count-hint.has-count { color: #4f46e5; font-weight: 600; }
+.uid-count-hint.has-count::before { content: '\f058'; color: #16a34a; }
+/* Register modal step panels */
+.reg-step-panel { display: none; flex-direction: column; flex: 1; min-height: 0; }
+.reg-step-panel.active { display: flex; }
+.reg-step-panel .rfid-modal-body-wrapper { margin: 0 !important; padding: 0 !important; }
+.reg-step-panel .rfid-modal-actions { margin-top: 14px; padding-top: 12px; border-top: 1px solid #f1f5f9; }
+/* Step indicators */
+.reg-steps { display: flex; align-items: center; justify-content: center; gap: 0; padding: 14px 0 10px; border-bottom: 1px solid #f1f5f9; margin-bottom: 8px; }
+.reg-step { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #94a3b8; transition: color .2s; }
+.reg-step.active { color: #4f46e5; }
+.reg-step.done { color: #16a34a; }
+.reg-step span { width: 24px; height: 24px; border-radius: 50%; background: #e2e8f0; color: #94a3b8; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; transition: all .2s; }
+.reg-step.active span { background: linear-gradient(135deg, #4f46e5, #7c3aed); color: white; box-shadow: 0 2px 8px rgba(79,70,229,0.3); }
+.reg-step.done span { background: #16a34a; color: white; }
+.reg-step-line { width: 36px; height: 2px; background: #e2e8f0; margin: 0 6px; border-radius: 2px; transition: background .2s; }
+.reg-step-line.done { background: linear-gradient(90deg, #16a34a, #4f46e5); }
+/* Summary grid */
+.reg-summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+.reg-summary-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 10px; text-align: center; }
+.reg-summary-card .rs-num { font-size: 26px; font-weight: 800; line-height: 1; }
+.reg-summary-card .rs-label { font-size: 10px; color: #64748b; margin-top: 4px; text-transform: uppercase; letter-spacing: 0.3px; font-weight: 600; }
+.reg-summary-card.green { border-color: #bbf7d0; background: #f0fdf4; }
+.reg-summary-card.green .rs-num { color: #16a34a; }
+.reg-summary-card.amber { border-color: #fde68a; background: #fffbeb; }
+.reg-summary-card.amber .rs-num { color: #d97706; }
+.reg-summary-card.red { border-color: #fecaca; background: #fef2f2; }
+.reg-summary-card.red .rs-num { color: #dc2626; }
+.reg-summary-card.gray { border-color: #e2e8f0; }
+.reg-summary-card.gray .rs-num { color: #94a3b8; }
+.reg-preview-details { max-height: 200px; overflow-y: auto; font-size: 12px; border: 1px solid #f1f5f9; border-radius: 8px; }
+.reg-preview-section { padding: 10px 14px; }
+.reg-preview-section + .reg-preview-section { border-top: 1px solid #f1f5f9; }
+.reg-preview-section h4 { font-size: 12px; font-weight: 700; color: #475569; margin: 0 0 6px; display: flex; align-items: center; gap: 6px; }
+.reg-preview-section ul { margin: 0; padding-left: 18px; color: #64748b; line-height: 1.8; }
+.reg-preview-section code { background: #f1f5f9; padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+/* Result screen */
+.reg-result-box { padding: 24px 20px; text-align: center; }
+.reg-result-box .result-icon { width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; font-size: 26px; }
+.reg-result-box .result-icon.success { background: linear-gradient(135deg, #dcfce7, #bbf7d0); color: #16a34a; box-shadow: 0 4px 12px rgba(22,163,74,0.15); }
+.reg-result-box .result-icon.partial { background: linear-gradient(135deg, #fef3c7, #fde68a); color: #d97706; box-shadow: 0 4px 12px rgba(217,119,6,0.15); }
+.reg-result-box .result-icon.error { background: linear-gradient(135deg, #fee2e2, #fecaca); color: #dc2626; box-shadow: 0 4px 12px rgba(220,38,38,0.15); }
+.reg-result-box h3 { font-size: 17px; font-weight: 700; color: #0f172a; margin: 0 0 6px; }
+.reg-result-box p { font-size: 13px; color: #64748b; margin: 0 0 12px; }
+.reg-result-breakdown { display: flex; gap: 12px; justify-content: center; margin-top: 14px; flex-wrap: wrap; }
+.reg-result-breakdown .rb-item { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 16px; text-align: center; min-width: 80px; }
+.reg-result-breakdown .rb-item .rb-num { font-size: 20px; font-weight: 800; }
+.reg-result-breakdown .rb-item .rb-label { font-size: 10px; color: #64748b; text-transform: uppercase; font-weight: 600; letter-spacing: .3px; }
+
+.assign-tabs { display: flex; gap: 0; margin-bottom: 16px; border-bottom: 2px solid #e2e8f0; }
+.assign-tab { flex: 1; padding: 10px; text-align: center; cursor: pointer; font-size: 13px; font-weight: 600; color: #64748b; border: none; border-bottom: 2px solid transparent; margin-bottom: -2px; background: none; font-family: inherit; transition: all 0.2s; }
+.assign-tab.active { color: #2563eb; border-bottom-color: #2563eb; }
+.assign-tab:hover:not(.active) { color: #475569; background: #f8fafc; }
+.assign-tab-pane { display: none; }
+.assign-tab-pane.active { display: block; }
+
 .toast-container { z-index: 100000 !important; }
 
 /* â”€â”€ Responsive â”€â”€ */
@@ -723,9 +844,27 @@ foreach ($cards as $i => $c) {
     .header { flex-direction: column; align-items: flex-start; gap: 12px; }
     .header-actions { width: 100%; }
 }
+/* ── Available Card Pool (compact table) ─────── */
+.pool-section { margin-top: 24px; margin-bottom: 20px; background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; }
+.pool-header { padding: 18px 22px 10px; }
+.pool-title { display: flex; align-items: center; gap: 10px; }
+.pool-title h3 { font-size: 16px; font-weight: 700; color: #0f172a; margin: 0; display: flex; align-items: center; gap: 8px; }
+.pool-count { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; height: 22px; padding: 0 7px; border-radius: 999px; background: #ede9fe; color: #7c3aed; font-size: 12px; font-weight: 700; }
+.pool-subtitle { font-size: 13px; color: #94a3b8; margin: 4px 0 0; padding-left: 32px; }
+.pool-table-wrap { padding: 0 12px 12px; max-height: 280px; overflow-y: auto; }
+.pool-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.pool-table thead { position: sticky; top: 0; z-index: 1; }
+.pool-table th { background: #f8fafc; color: #64748b; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; padding: 8px 10px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+.pool-table td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+.pool-row { transition: background .1s; }
+.pool-row:hover { background: #faf5ff; }
+.pool-idx { color: #94a3b8; font-size: 12px; font-weight: 500; }
+.pool-uid { font-family: ui-monospace, Consolas, monospace; font-size: 13px; font-weight: 600; color: #0f172a; letter-spacing: .3px; background: #f1f5f9; padding: 2px 8px; border-radius: 4px; }
+.pool-date { color: #94a3b8; font-size: 12px; }
+.pool-actions { text-align: center; }
+.pool-del-btn { width: 28px; height: 28px; border: 1px solid #e2e8f0; border-radius: 6px; background: #fff; color: #94a3b8; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; transition: all .15s; }
+.pool-del-btn:hover { color: #dc2626; border-color: #fecaca; background: #fef2f2; }
 </style>
-
-<!-- ID Card Styles (from student-ids.php) -->
 <style>
 .idtype-chip { display:inline-block; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:600; background:#eef4ff; color:#2563eb; }
 .qr-thumb { width:36px; height:36px; border:1px solid #e2e8f0; border-radius:8px; object-fit:contain; background:white; cursor:pointer; transition:transform .15s,box-shadow .15s; }
@@ -819,6 +958,9 @@ foreach ($cards as $i => $c) {
             <a href="rfid-scan-logs.php" class="btn btn-secondary">
                 <i class="fas fa-clock-rotate-left"></i> Scan Logs
             </a>
+            <button class="btn btn-secondary" id="openRegisterModal" onclick="openRegisterModal()">
+                <i class="fas fa-layer-group"></i> Register Cards
+            </button>
             <button class="btn btn-primary" id="openAssignModal" onclick="openAssignModal()">
                 <i class="fas fa-plus"></i> Assign Card
             </button>
@@ -826,7 +968,7 @@ foreach ($cards as $i => $c) {
     </header>
 
     <!-- Stats -->
-    <div class="rfid-stats">
+    <div class="rfid-stats" style="grid-template-columns: repeat(6, 1fr);">
         <div class="rfid-stat-card">
             <div class="stat-top">
                 <div class="stat-icon blue"><i class="fas fa-credit-card"></i></div>
@@ -838,15 +980,20 @@ foreach ($cards as $i => $c) {
         <div class="rfid-stat-card">
             <div class="stat-top">
                 <div class="stat-icon green"><i class="fas fa-check-circle"></i></div>
-                <span class="stat-trend up"><i class="fas fa-arrow-up"></i> <?= $activePct ?>%</span>
             </div>
             <div class="stat-number"><?= $activeCards ?></div>
             <div class="stat-label">Active</div>
         </div>
         <div class="rfid-stat-card">
             <div class="stat-top">
+                <div class="stat-icon" style="background:#e0e7ff;color:#4f46e5;"><i class="fas fa-box-open"></i></div>
+            </div>
+            <div class="stat-number"><?= $availableCards ?></div>
+            <div class="stat-label">Available (Pool)</div>
+        </div>
+        <div class="rfid-stat-card">
+            <div class="stat-top">
                 <div class="stat-icon yellow"><i class="fas fa-clock"></i></div>
-                <span class="stat-trend down"><i class="fas fa-arrow-down"></i> <?= $expiredPct ?>%</span>
             </div>
             <div class="stat-number"><?= $expiredCards ?></div>
             <div class="stat-label">Expired</div>
@@ -854,10 +1001,16 @@ foreach ($cards as $i => $c) {
         <div class="rfid-stat-card">
             <div class="stat-top">
                 <div class="stat-icon red"><i class="fas fa-triangle-exclamation"></i></div>
-                <span class="stat-trend down"><i class="fas fa-arrow-down"></i> <?= $lostPct ?>%</span>
             </div>
             <div class="stat-number"><?= $lostCards ?></div>
             <div class="stat-label">Lost</div>
+        </div>
+        <div class="rfid-stat-card">
+            <div class="stat-top">
+                <div class="stat-icon" style="background:#f3f4f6;color:#6b7280;"><i class="fas fa-box-archive"></i></div>
+            </div>
+            <div class="stat-number"><?= $archivedCards ?></div>
+            <div class="stat-label">Archived</div>
         </div>
     </div>
 
@@ -877,8 +1030,8 @@ foreach ($cards as $i => $c) {
                         <option value="active">Active</option>
                         <option value="expired">Expired</option>
                         <option value="lost">Lost</option>
+                        <option value="archived">Archived</option>
                         <option value="inactive">Inactive</option>
-                        <option value="unassigned">Unassigned</option>
                     </select>
                     <i class="fas fa-chevron-down filter-select-arrow"></i>
                 </div>
@@ -894,11 +1047,16 @@ foreach ($cards as $i => $c) {
             <span id="aiRfidExplanation" style="color:#1e40af;margin-left:8px;font-size:13px;"></span>
         </div>
 
-    <!-- Table -->
+    <!-- Assigned / Status Cards Table -->
     <div class="rfid-table-wrapper">
+        <div class="rfid-table-header">
+            <h3><i class="fas fa-credit-card" style="color:#2563eb;"></i> Assigned Cards <span class="rfid-table-count"><?= count($tableCards) ?></span></h3>
+            <p>Cards currently assigned to students</p>
+        </div>
         <table>
             <thead>
                 <tr>
+                    <th style="width:40px;">#</th>
                     <th>Card UID</th>
                     <th>Student</th>
                     <th>ID Number</th>
@@ -910,22 +1068,22 @@ foreach ($cards as $i => $c) {
                 </tr>
             </thead>
             <tbody id="rfidTableBody">
-                <?php if (empty($cards)): ?>
+                <?php if (empty($tableCards)): ?>
                     <tr>
-                        <td colspan="8" style="text-align:center; padding:48px 12px; color:#94a3b8;">
+                        <td colspan="9" style="text-align:center; padding:48px 12px; color:#94a3b8;">
                             <i class="fas fa-credit-card" style="font-size:42px; color:#cbd5e1; display:block; margin-bottom:10px;"></i>
-                            <p style="font-size:15px; font-weight:600; color:#64748b; margin:0;">No RFID cards found</p>
+                            <p style="font-size:15px; font-weight:600; color:#64748b; margin:0;">No assigned cards</p>
                             <p style="font-size:13px; margin:4px 0 0;">Assign cards to students to get started</p>
                         </td>
                     </tr>
                 <?php else: ?>
-                    <?php foreach ($cards as $cardIndex => $card):
+                    <?php foreach ($tableCards as $cardIndex => $card):
                         $initials = '';
                         if (!empty($card['student_name'])) {
                             $names = explode(' ', $card['student_name']);
                             $initials = strtoupper(substr($names[0], 0, 1) . (isset($names[1]) ? substr($names[1], 0, 1) : ''));
                         }
-                        $avatarClass = $avatarClasses[$cardIndex] ?? 'blue';
+                        $avatarClass = $avatarClasses[$card['id']] ?? 'blue';
                     ?>
                         <tr data-card='<?= htmlspecialchars(json_encode($card), ENT_QUOTES, 'UTF-8') ?>'
                             data-id="<?= (int)$card['id'] ?>"
@@ -940,6 +1098,7 @@ foreach ($cards as $i => $c) {
                             data-expiry="<?= htmlspecialchars($card['id_expiry_date'] ?? $card['expiry_date'] ?? '', ENT_QUOTES) ?>"
                             data-qr="<?= htmlspecialchars($card['qr_code_path'] ?? '', ENT_QUOTES) ?>"
                             data-student-number="<?= htmlspecialchars($card['student_number'] ?? '', ENT_QUOTES) ?>">
+                            <td style="color:#94a3b8;font-size:13px;font-weight:600;"><?= $cardIndex + 1 ?></td>
                             <td>
                                 <div class="card-uid-display">
                                     <span class="chip"><i class="fas fa-microchip"></i></span>
@@ -977,6 +1136,8 @@ foreach ($cards as $i => $c) {
                                          onclick="showQrModal(this)"
                                          data-name="<?= htmlspecialchars($card['student_name'] ?? '', ENT_QUOTES) ?>"
                                          data-id="<?= htmlspecialchars($card['student_number'] ?? '', ENT_QUOTES) ?>">
+                                <?php elseif (!empty($card['student_id'])): ?>
+                                    <img class="qr-thumb qr-auto" data-qr-student-id="<?= (int)$card['student_id'] ?>" data-qr-name="<?= htmlspecialchars($card['student_name'] ?? '', ENT_QUOTES) ?>" data-qr-number="<?= htmlspecialchars($card['student_number'] ?? '', ENT_QUOTES) ?>" alt="QR" style="cursor:pointer;" onclick="showQrModal(this)">
                                 <?php else: ?>
                                     <span style="color:#94a3b8;font-size:12px;">&mdash;</span>
                                 <?php endif; ?>
@@ -1008,6 +1169,11 @@ foreach ($cards as $i => $c) {
                                     <button class="action-btn edit" onclick="openEditModal(<?= (int)$card['id'] ?>)" title="Edit">
                                         <i class="fas fa-pen"></i>
                                     </button>
+                                    <?php if ($card['status'] === 'active' || $card['status'] === 'expired' || $card['status'] === 'lost'): ?>
+                                    <button class="action-btn" onclick="openArchiveModal(<?= (int)$card['id'] ?>, '<?= htmlspecialchars($card['card_uid'], ENT_QUOTES) ?>')" title="Archive" style="color:#6b7280;">
+                                        <i class="fas fa-box-archive"></i>
+                                    </button>
+                                    <?php endif; ?>
                                     <button class="action-btn delete" onclick="confirmDelete(<?= (int)$card['id'] ?>, '<?= htmlspecialchars($card['card_uid'], ENT_QUOTES) ?>')" title="Delete">
                                         <i class="fas fa-trash-alt"></i>
                                     </button>
@@ -1021,131 +1187,157 @@ foreach ($cards as $i => $c) {
     </div>
 
     <div class="table-footer">
-            <div class="info-text">Showing <strong id="showingCount"><?= count($cards) ?></strong> of <strong id="totalCount"><?= count($cards) ?></strong> cards</div>
+            <div class="info-text">Showing <strong id="showingCount"><?= count($tableCards) ?></strong> of <strong id="totalCount"><?= count($tableCards) ?></strong> assigned cards</div>
         </div>
 </div><!-- /search-table-container -->
-    </main>
 
-<!-- â”€â”€ Assign Card Modal â”€â”€ -->
+    <!-- Available Card Pool -->
+    <?php if (!empty($poolCards)): ?>
+    <div class="pool-section" id="poolSection">
+        <div class="pool-header">
+            <div class="pool-title">
+                <i class="fas fa-box-open" style="color:#7c3aed;"></i>
+                <h3>Available Card Pool <span class="pool-count"><?= count($poolCards) ?></span></h3>
+            </div>
+            <p class="pool-subtitle">Unregistered cards waiting to be assigned to students</p>
+        </div>
+        <div class="pool-table-wrap" id="poolGrid">
+            <table class="pool-table">
+                <thead>
+                    <tr>
+                        <th style="width:40px;">#</th>
+                        <th>Card UID</th>
+                        <th>Registered</th>
+                        <th style="width:50px;"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                <?php foreach ($poolCards as $pi => $pc): ?>
+                    <tr class="pool-row" data-uid="<?= htmlspecialchars($pc['card_uid']) ?>" data-id="<?= (int)$pc['id'] ?>">
+                        <td class="pool-idx"><?= $pi + 1 ?></td>
+                        <td><span class="pool-uid"><?= htmlspecialchars($pc['card_uid']) ?></span></td>
+                        <td class="pool-date"><?= $pc['registered_at'] ? date('M d, Y', strtotime($pc['registered_at'])) : '—' ?></td>
+                        <td class="pool-actions">
+                            <button class="pool-del-btn" onclick="confirmDelete(<?= (int)$pc['id'] ?>, '<?= htmlspecialchars($pc['card_uid'], ENT_QUOTES) ?>')" title="Delete">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <?php endif; ?>
+    
+    <!-- AI Inventory Insights Panel -->
+    <div class="ai-panel" id="aiInventoryPanel">
+        <div class="ai-panel-header">
+            <div class="ai-icon"><i class="fas fa-brain"></i></div>
+            <div>
+                <h3>AI Inventory Insights</h3>
+                <p>Smart analysis of your RFID card inventory</p>
+            </div>
+            <button class="btn btn-light" style="margin-left:auto;" onclick="refreshAiPanel()"><i class="fas fa-sync-alt"></i> Refresh</button>
+        </div>
+        <div class="ai-insights" id="aiInsightsGrid">
+            <div class="ai-insight-card"><div class="label">Loading...</div><div class="value">-</div></div>
+        </div>
+    </div>
+</main>
+
+﻿<!-- -- Assign Card Modal -- -->
 <div class="logout-modal-overlay" id="assignModal">
     <div class="logout-modal rfid-modal">
         <div class="rfid-modal-header">
             <div class="header-icon assign"><i class="fas fa-credit-card"></i></div>
             <div>
                 <h3>Assign RFID Card</h3>
-                <p>Enter UID, assign to student, set validity.</p>
+                <p>Pick a card from the pool or enter a new UID.</p>
             </div>
         </div>
-
         <form id="assignCardForm">
             <input type="hidden" id="selectedStudentId" name="student_id" value="">
+            <input type="hidden" id="assignMode" value="pool">
+            <input type="hidden" id="selectedPoolCardId" value="">
             <div class="rfid-modal-body-wrapper">
-
                 <div class="form-section">
                     <div class="form-section-header">
                         <div class="form-section-icon"><i class="fas fa-user-graduate"></i></div>
-                        <div>
-                            <div class="form-section-title">Student</div>
-                            <div class="form-section-subtitle">Search and select</div>
-                        </div>
+                        <div><div class="form-section-title">Student</div><div class="form-section-subtitle">Search and select</div></div>
                     </div>
-
                     <div class="student-search-wrapper" style="position:relative;">
                         <input type="text" id="studentSearchInput" class="form-control" placeholder="Type student name..." autocomplete="off" />
                         <div class="student-search-results" id="studentSearchResults"></div>
                     </div>
-
-                    <select id="studentSelect" style="display:none;">
-                        <option value="">Select a student</option>
-                        <?php foreach ($students as $student): ?>
-                            <option value="<?= (int)$student['id'] ?>">
-                                <?= htmlspecialchars($student['name']) ?> &middot; <?= htmlspecialchars($student['student_number']) ?> &middot; <?= htmlspecialchars($student['course']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-
                     <div class="selected-student-chip" id="selectedStudentDisplay">
                         <i class="fas fa-check-circle"></i>
-                        <div style="flex:1;">
-                            <span class="chip-name" id="selectedName"></span>
-                            <span class="chip-id" id="selectedId" style="display:block;font-size:11px;color:#16a34a;margin-top:1px;">Selected</span>
-                        </div>
-                        <button type="button" class="chip-clear" onclick="clearSelectedStudent()" title="Clear">
-                            <i class="fas fa-times"></i>
-                        </button>
+                        <div style="flex:1;"><span class="chip-name" id="selectedName"></span><span class="chip-id" id="selectedId" style="display:block;font-size:11px;color:#16a34a;margin-top:1px;">Selected</span></div>
+                        <button type="button" class="chip-clear" onclick="clearSelectedStudent()" title="Clear"><i class="fas fa-times"></i></button>
                     </div>
                 </div>
-
-                <div class="form-section">
-                    <div class="form-section-header">
-                        <div class="form-section-icon"><i class="fas fa-microchip"></i></div>
-                        <div>
-                            <div class="form-section-title">Card UID</div>
-                            <div class="form-section-subtitle">10-digit identifier</div>
+                <div class="assign-tabs">
+                    <button type="button" class="assign-tab active" onclick="switchAssignTab('pool')"><i class="fas fa-box-open"></i> From Pool</button>
+                    <button type="button" class="assign-tab" onclick="switchAssignTab('new')"><i class="fas fa-keyboard"></i> New UID</button>
+                </div>
+                <div class="assign-tab-pane active" id="tabPool">
+                    <div class="form-section" style="border-bottom:none;">
+                        <div class="form-section-header">
+                            <div class="form-section-icon" style="background:#e0e7ff;color:#4f46e5;"><i class="fas fa-box-open"></i></div>
+                            <div><div class="form-section-title">Available Cards</div><div class="form-section-subtitle">Select from unassigned pool</div></div>
                         </div>
-                    </div>
-
-                    <div class="uid-row">
-                        <div style="flex:1;position:relative;">
-                            <input type="text" id="cardUid" class="form-control" maxlength="10" inputmode="numeric" placeholder="e.g. 1234567890" style="padding-right:50px;" />
-                            <span id="uidLengthBadge" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:600;color:#94a3b8;background:#f1f5f9;padding:2px 8px;border-radius:6px;">0/10</span>
-                        </div>
-                        <div style="width:42px;height:42px;border:1.5px solid #e2e8f0;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#94a3b8;background:#f8fafc;flex-shrink:0;">
-                            <i class="fas fa-wave-square" style="font-size:16px;"></i>
+                        <div class="form-group">
+                            <label>Select Card</label>
+                            <select id="poolCardSelect" class="form-control" onchange="onPoolCardSelect(this)">
+                                <option value="">-- Select from pool --</option>
+                                <?php foreach ($availablePool as $pc): ?>
+                                <option value="<?= (int)$pc['id'] ?>" data-uid="<?= htmlspecialchars($pc['card_uid']) ?>"><?= htmlspecialchars($pc['card_uid']) ?><?php if ($pc['registered_at']): ?> (<?= date('M d', strtotime($pc['registered_at'])) ?>)<?php endif; ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                     </div>
                 </div>
-
+                <div class="assign-tab-pane" id="tabNew">
+                    <div class="form-section" style="border-bottom:none;">
+                        <div class="form-section-header">
+                            <div class="form-section-icon"><i class="fas fa-microchip"></i></div>
+                            <div><div class="form-section-title">Card UID</div><div class="form-section-subtitle">10-digit identifier</div></div>
+                        </div>
+                        <div class="uid-row">
+                            <div style="flex:1;position:relative;">
+                                <input type="text" id="cardUid" class="form-control" maxlength="10" inputmode="numeric" placeholder="e.g. 1234567890" style="padding-right:50px;" />
+                                <span id="uidLengthBadge" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:600;color:#94a3b8;background:#f1f5f9;padding:2px 8px;border-radius:6px;">0/10</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <div class="form-section">
                     <div class="form-section-header">
                         <div class="form-section-icon"><i class="fas fa-calendar"></i></div>
-                        <div>
-                            <div class="form-section-title">Validity Period</div>
-                            <div class="form-section-subtitle">Issued and expiry dates</div>
-                        </div>
+                        <div><div class="form-section-title">Validity Period</div><div class="form-section-subtitle">Issued and expiry dates</div></div>
                     </div>
                     <div class="form-row">
-                        <div class="form-group">
-                            <label>Issued</label>
-                            <input type="date" id="issuedDate" name="issued_date" class="form-control" value="<?= date('Y-m-d') ?>" />
-                        </div>
-                        <div class="form-group">
-                            <label>Expiry</label>
-                            <input type="date" id="expiryDate" name="expiry_date" class="form-control" value="<?= date('Y-m-d', strtotime('+1 year')) ?>" />
-                        </div>
+                        <div class="form-group"><label>Issued</label><input type="date" id="issuedDate" name="issued_date" class="form-control" value="<?= date('Y-m-d') ?>" /></div>
+                        <div class="form-group"><label>Expiry</label><input type="date" id="expiryDate" name="expiry_date" class="form-control" value="<?= date('Y-m-d', strtotime('+1 year')) ?>" /></div>
                     </div>
                 </div>
-
                 <div class="form-section" style="border-bottom:none;">
                     <div class="form-section-header">
                         <div class="form-section-icon"><i class="fas fa-sticky-note"></i></div>
-                        <div>
-                            <div class="form-section-title">Notes</div>
-                            <div class="form-section-subtitle">Optional remarks</div>
-                        </div>
+                        <div><div class="form-section-title">Notes</div><div class="form-section-subtitle">Optional remarks</div></div>
                     </div>
-                    <div class="form-group">
-                        <textarea id="cardNotes" name="notes" class="form-control" rows="2" placeholder="e.g. Replacement card, lost card reported..."></textarea>
-                    </div>
+                    <div class="form-group"><textarea id="cardNotes" name="notes" class="form-control" rows="2" placeholder="e.g. Replacement card..."></textarea></div>
                 </div>
-
-            </div><!-- /rfid-modal-body-wrapper -->
-
-            <div style="padding:10px 20px;font-size:12px;color:#64748b;background:#f8fafc;border-top:1px solid #e2e8f0;">
-                <i class="fas fa-info-circle" style="color:#2563eb;"></i> A Student ID (school_id) with QR code will also be issued automatically.
             </div>
-
+            <div style="padding:10px 20px;font-size:12px;color:#64748b;background:#f8fafc;border-top:1px solid #e2e8f0;"><i class="fas fa-info-circle" style="color:#2563eb;"></i> A Student ID (school_id) with QR code will also be issued automatically.</div>
             <div class="rfid-modal-actions">
                 <button type="button" class="btn btn-light" data-close-modal="assign">Cancel</button>
-                <button type="submit" class="btn btn-primary" id="assignSubmitBtn" disabled>
-                    <i class="fas fa-save"></i> Assign Card
-                </button>
+                <button type="submit" class="btn btn-primary" id="assignSubmitBtn" disabled><i class="fas fa-save"></i> Assign Card</button>
             </div>
         </form>
     </div>
 </div>
 
-<!-- â”€â”€ Edit Card Modal â”€â”€ -->
 <div class="logout-modal-overlay" id="editModal">
     <div class="logout-modal rfid-modal">
         <div class="rfid-modal-header">
@@ -1296,7 +1488,7 @@ foreach ($cards as $i => $c) {
                 <ul class="rfid-view-kv">
                     <li><span class="kv-label">Name</span><span class="kv-value" id="viewStudent">&mdash;</span></li>
                     <li><span class="kv-label">Student #</span><span class="kv-value" id="viewStudentNumber">&mdash;</span></li>
-                    <li><span class="kv-label">ID Number</span><span class="kv-value" id="viewIdNumber">&mdash;</span></li>
+                    <li><span class="kv-label">Student ID</span><span class="kv-value" id="viewIdNumber">&mdash;</span></li>
                     <li><span class="kv-label">Course</span><span class="kv-value" id="viewCourse">&mdash;</span></li>
                     <li><span class="kv-label">Year</span><span class="kv-value" id="viewYearLevel">&mdash;</span></li>
                 </ul>
@@ -1399,7 +1591,7 @@ foreach ($cards as $i => $c) {
                     <div class="idcard-sec">
                         <div class="idcard-fields">
                             <div class="idcard-field"><div class="k">Course</div><div class="v" id="cardCourse">&mdash;</div></div>
-                            <div class="idcard-field"><div class="k">ID Number</div><div class="v mono" id="cardNumber">&mdash;</div></div>
+                            <div class="idcard-field"><div class="k">Student ID</div><div class="v mono" id="cardNumber">&mdash;</div></div>
                             <div style="display:flex;gap:16px;">
                                 <div class="idcard-field" style="flex:1;"><div class="k">Issued</div><div class="v" id="cardIssued">&mdash;</div></div>
                                 <div class="idcard-field" style="flex:1;"><div class="k">Valid Until</div><div class="v" id="cardExpiry">&mdash;</div></div>
@@ -1474,6 +1666,131 @@ foreach ($cards as $i => $c) {
     </div>
 </div>
 
+<!-- QR Preview Modal -->
+<div id="qrModalOverlay">
+    <div class="qr-modal-box">
+        <img src="" alt="QR Code">
+        <div class="qr-modal-name"></div>
+        <div class="qr-modal-sub"></div>
+        <button class="qr-modal-close" onclick="closeQrModal()"><i class="fas fa-times"></i> Close</button>
+    </div>
+</div>
+
+<!-- Register Cards Modal -->
+<div class="logout-modal-overlay" id="registerModal">
+    <div class="logout-modal rfid-modal" style="max-width:580px;">
+        <div class="rfid-modal-header">
+            <div class="header-icon" style="background:#e0e7ff;color:#4f46e5;"><i class="fas fa-layer-group"></i></div>
+            <div>
+                <h3>Bulk Register Cards</h3>
+                <p id="registerSubheader">Paste card UIDs (one per line, 10 digits each).</p>
+            </div>
+        </div>
+        <div class="reg-steps" id="regSteps">
+            <div class="reg-step active" id="regStep1"><span>1</span> Enter UIDs</div>
+            <div class="reg-step-line" id="regLine1"></div>
+            <div class="reg-step" id="regStep2"><span>2</span> Preview</div>
+            <div class="reg-step-line" id="regLine2"></div>
+            <div class="reg-step" id="regStep3"><span>3</span> Result</div>
+        </div>
+        <div class="reg-step-panel active" id="regPanel1">
+            <div class="rfid-modal-body-wrapper">
+                <div class="form-section" style="border-bottom:none;">
+                    <div class="form-group">
+                        <label>Card UIDs <span style="color:#94a3b8;font-weight:400;">(max 1000, one per line or comma-separated)</span></label>
+                        <textarea id="registerUids" class="register-textarea" placeholder="1234567890&#10;0987654321&#10;1111111111&#10;..."></textarea>
+                        <div id="uidCountHint" class="uid-count-hint"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>Notes <span style="color:#94a3b8;font-weight:400;">(optional)</span></label>
+                        <input type="text" id="registerNotes" class="form-control" placeholder="e.g. Batch received from supplier" />
+                    </div>
+                </div>
+            </div>
+            <div class="rfid-modal-actions">
+                <button type="button" class="btn btn-light" onclick="closeRegisterModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" id="registerPreviewBtn" onclick="previewBulkRegister()" disabled>
+                    <i class="fas fa-magnifying-glass-chart"></i> Validate &amp; Preview
+                </button>
+            </div>
+        </div>
+        <div class="reg-step-panel" id="regPanel2">
+            <div class="rfid-modal-body-wrapper">
+                <div class="reg-summary-grid" id="regSummaryGrid"></div>
+                <div id="regPreviewDetails" class="reg-preview-details"></div>
+            </div>
+            <div class="rfid-modal-actions">
+                <button type="button" class="btn btn-light" onclick="regGoStep(1)"><i class="fas fa-arrow-left"></i> Back</button>
+                <button type="button" class="btn btn-primary" id="registerProceedBtn" onclick="submitBulkRegister()">
+                    <i class="fas fa-check-circle"></i> Register <span id="regProceedCount">0</span> Cards
+                </button>
+            </div>
+        </div>
+        <div class="reg-step-panel" id="regPanel3">
+            <div class="rfid-modal-body-wrapper">
+                <div id="regResultContent"></div>
+            </div>
+            <div class="rfid-modal-actions">
+                <button type="button" class="btn btn-secondary" id="regViewPoolBtn" onclick="viewInPool()">
+                    <i class="fas fa-box-open"></i> View in Available Pool
+                </button>
+                <button type="button" class="btn btn-primary" onclick="closeRegisterModal()">Done</button>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Archive Confirmation Modal -->
+<div class="logout-modal-overlay" id="archiveModal">
+    <div class="logout-modal">
+        <div class="logout-modal-icon" style="background: #f3f4f6;">
+            <i class="fas fa-box-archive" style="color: #6b7280;"></i>
+        </div>
+        <h3 class="logout-modal-title">Archive Card</h3>
+        <p class="logout-modal-message" id="archiveMessage">Archive this RFID card? It will be removed from active use.</p>
+        <div style="padding:0 16px;margin-top:8px;">
+            <label style="font-size:12px;font-weight:600;color:#475569;display:block;margin-bottom:4px;">Reason</label>
+            <select id="archiveReason" class="form-control" style="width:100%;">
+                <option value="">Select reason...</option>
+                <option value="Graduated">Graduated</option>
+                <option value="Dropped Out">Dropped Out</option>
+                <option value="Transferred">Transferred</option>
+                <option value="Card Damaged">Card Damaged</option>
+                <option value="Card Lost">Card Lost</option>
+                <option value="Other">Other</option>
+            </select>
+        </div>
+        <div class="logout-modal-actions">
+            <button class="logout-btn-cancel" id="archiveCancel" type="button">Cancel</button>
+            <button class="logout-btn-confirm" id="archiveConfirm" type="button" style="background: #6b7280;">
+                <i class="fas fa-box-archive"></i> Archive
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- AI Chat FAB + Window -->
+<button class="ai-chat-fab" id="aiChatFab" onclick="toggleAiChat()" title="AI RFID Assistant">
+    <i class="fas fa-robot"></i>
+</button>
+<div class="ai-chat-window" id="aiChatWindow">
+    <div class="ai-chat-head">
+        <div class="ai-avatar"><i class="fas fa-robot"></i></div>
+        <div>
+            <h4>RFID AI Assistant</h4>
+            <p>Ask about card inventory, assignments, trends...</p>
+        </div>
+        <button onclick="toggleAiChat()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="ai-chat-messages" id="aiChatMessages">
+        <div class="ai-chat-msg bot">Hello! I'm your RFID card inventory assistant. Ask me anything about card status, inventory stats, or best practices.</div>
+    </div>
+    <div class="ai-chat-input">
+        <input type="text" id="aiChatInput" placeholder="Ask about RFID cards..." onkeydown="if(event.key==='Enter')sendAiChat()" />
+        <button onclick="sendAiChat()" id="aiChatSendBtn"><i class="fas fa-paper-plane"></i></button>
+    </div>
+</div>
+
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
 <script>
@@ -1521,16 +1838,16 @@ function confirmDelete(id, uid) {
     document.getElementById('deleteModal').classList.add('active');
     document.body.style.overflow = 'hidden';
 }
-document.getElementById('deleteCancel').addEventListener('click', () => {
+document.getElementById('deleteCancel')?.addEventListener('click', () => {
     document.getElementById('deleteModal').classList.remove('active');
     document.body.style.overflow = '';
     deleteTarget = null;
 });
-document.getElementById('deleteConfirm').addEventListener('click', () => {
+document.getElementById('deleteConfirm')?.addEventListener('click', () => {
     if (!deleteTarget) return;
     fetch('../api/rfid.php?id=' + deleteTarget, { method: 'DELETE' }).then(() => window.location.reload());
 });
-document.getElementById('deleteModal').addEventListener('click', (e) => {
+document.getElementById('deleteModal')?.addEventListener('click', (e) => {
     if (e.target === e.currentTarget) {
         e.currentTarget.classList.remove('active');
         document.body.style.overflow = '';
@@ -1565,8 +1882,7 @@ function applyRfidSearch() {
         const data = (row.getAttribute('data-card') || '').toLowerCase();
         let match = true;
         if (query) match = data.indexOf(query) !== -1;
-        if (match && filterStatus === 'unassigned') match = data.indexOf('"student_id":null') !== -1 || data.indexOf('"student_id":""') !== -1;
-        else if (match && filterStatus) match = data.indexOf('"status":"' + filterStatus + '"') !== -1;
+        if (match && filterStatus) match = data.indexOf('"status":"' + filterStatus + '"') !== -1;
         row.style.display = match ? '' : 'none';
         if (match) visible++;
     });
@@ -1693,6 +2009,7 @@ if (studentSearchInput) {
 // â”€â”€ UID input + duplicate check â”€â”€
 const cardUidInput = document.getElementById('cardUid');
 let uidCheckTimeout;
+let uidSubmitting = false; // guard: prevent post-submit check_uid from showing false "Duplicate UID" toast
 
 if (cardUidInput) {
     cardUidInput.addEventListener('input', function () {
@@ -1711,10 +2028,11 @@ if (cardUidInput) {
         const uid = this.value;
         if (uid.length === 10) {
             uidCheckTimeout = setTimeout(() => {
+                if (uidSubmitting) return;
                 fetch('../api/rfid.php?check_uid=' + encodeURIComponent(uid))
                     .then(r => r.json())
                     .then(d => {
-                        if (d.exists) {
+                        if (d.exists && !uidSubmitting) {
                             this.style.borderColor = '#dc2626';
                             this.style.background = '#fee2e2';
                             const badge2 = document.getElementById('uidLengthBadge');
@@ -1732,9 +2050,14 @@ if (cardUidInput) {
 // â”€â”€ Form validation for Assign modal â”€â”€
 function validateAssignForm() {
     const studentId = document.getElementById('selectedStudentId').value;
-    const cardUid = document.getElementById('cardUid').value.trim();
+    const mode = document.getElementById('assignMode').value;
     const submitBtn = document.getElementById('assignSubmitBtn');
-    if (submitBtn) {
+    if (!submitBtn) return;
+    if (mode === 'pool') {
+        const cardId = document.getElementById('selectedPoolCardId').value;
+        submitBtn.disabled = !(studentId && cardId);
+    } else {
+        const cardUid = document.getElementById('cardUid').value.trim();
         submitBtn.disabled = !(studentId && cardUid && cardUid.length === 10);
     }
 }
@@ -1751,6 +2074,8 @@ function closeAssignModal() {
     const f = document.getElementById('assignCardForm');
     if (f) f.reset();
     clearSelectedStudent();
+    clearTimeout(uidCheckTimeout);
+    uidSubmitting = false;
     document.getElementById('issuedDate').value = new Date().toISOString().slice(0, 10);
     const d = new Date(); d.setFullYear(d.getFullYear() + 1);
     document.getElementById('expiryDate').value = d.toISOString().slice(0, 10);
@@ -1763,46 +2088,43 @@ function closeViewDrawer() {
     closeViewModal();
 }
 
-// â”€â”€ Assign form submit â”€â”€
-document.getElementById('assignCardForm').addEventListener('submit', async function (e) {
+// Assign form submit
+document.getElementById('assignCardForm')?.addEventListener('submit', async function (e) {
     e.preventDefault();
     const studentId = document.getElementById('selectedStudentId').value;
-    const cardUid = document.getElementById('cardUid').value.trim();
+    const mode = document.getElementById('assignMode').value;
     if (!studentId) { showToast('Error', 'Please select a student.', 'error'); return; }
-    if (!cardUid || cardUid.length !== 10) { showToast('Error', 'Card UID must be exactly 10 digits.', 'error'); return; }
+
+    clearTimeout(uidCheckTimeout);
+    uidSubmitting = true;
 
     const submitBtn = document.getElementById('assignSubmitBtn');
     submitBtn.disabled = true;
     submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Assigning...';
 
     try {
-        const res = await fetch('../api/rfid.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                student_id: studentId,
-                card_uid: cardUid,
-                issued_date: document.getElementById('issuedDate').value,
-                expiry_date: document.getElementById('expiryDate').value,
-                notes: document.getElementById('cardNotes').value
-            })
-        });
-        const data = await res.json();
-        if (data.success) {
-            showToast('Success', data.message, 'success');
-            setTimeout(() => window.location.reload(), 1000);
+        let url, body;
+        if (mode === 'pool') {
+            const cardId = document.getElementById('selectedPoolCardId').value;
+            if (!cardId) { showToast('Error', 'Select a card from the pool.', 'error'); submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fas fa-save"></i> Assign Card'; return; }
+            url = '../api/rfid.php?action=quick-assign';
+            body = { card_id: parseInt(cardId), student_id: parseInt(studentId), issued_date: document.getElementById('issuedDate').value, expiry_date: document.getElementById('expiryDate').value, notes: document.getElementById('cardNotes').value };
         } else {
-            showToast('Error', data.message, 'error');
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = '<i class="fas fa-save"></i> Assign Card';
+            const cardUid = document.getElementById('cardUid').value.trim();
+            if (!cardUid || cardUid.length !== 10) { showToast('Error', 'UID must be exactly 10 digits.', 'error'); submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fas fa-save"></i> Assign Card'; return; }
+            url = '../api/rfid.php';
+            body = { student_id: studentId, card_uid: cardUid, issued_date: document.getElementById('issuedDate').value, expiry_date: document.getElementById('expiryDate').value, notes: document.getElementById('cardNotes').value };
         }
+        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        const data = await res.json();
+        if (data.success) { showToast('Success', data.message, 'success'); setTimeout(() => window.location.reload(), 1000); }
+        else { showToast('Error', data.message, 'error'); submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fas fa-save"></i> Assign Card'; }
     } catch (err) {
         showToast('Error', 'Network error. Please try again.', 'error');
         submitBtn.disabled = false;
         submitBtn.innerHTML = '<i class="fas fa-save"></i> Assign Card';
     }
 });
-
 // â”€â”€ Edit modal â”€â”€
 async function openEditModal(id) {
     const m = document.getElementById('editModal');
@@ -1832,7 +2154,7 @@ async function openEditModal(id) {
     }
 }
 
-document.getElementById('editCardForm').addEventListener('submit', async function (e) {
+document.getElementById('editCardForm')?.addEventListener('submit', async function (e) {
     e.preventDefault();
     const id = document.getElementById('editCardId').value;
     if (!id) return;
@@ -1875,7 +2197,7 @@ async function openViewDrawer(id) {
 
     const setText = (sel, v) => {
         const el = modal.querySelector(sel);
-        if (el) el.textContent = (v === null || v === undefined || v === '') ? '&mdash;' : v;
+        if (el) el.textContent = (v === null || v === undefined || v === '') ? '—' : v;
     };
 
     setText('#viewUid', 'â€¦');
@@ -2026,6 +2348,19 @@ function generateQrDataUrl(studentId) {
     } catch (e) { return ''; }
 }
 
+// Auto-populate QR thumbnails for rows where server QR is missing
+document.querySelectorAll('img.qr-auto[data-qr-student-id]').forEach(function(img) {
+    var sid = img.getAttribute('data-qr-student-id');
+    var url = generateQrDataUrl(sid);
+    if (url) {
+        img.src = url;
+        img.setAttribute('data-name', img.getAttribute('data-qr-name') || '');
+        img.setAttribute('data-id', img.getAttribute('data-qr-number') || '');
+    } else {
+        img.style.display = 'none';
+    }
+});
+
 function viewIdCard(btn) {
     const tr = btn.closest('tr');
     const d = tr.dataset;
@@ -2041,10 +2376,10 @@ function viewIdCard(btn) {
     ini.style.display = 'none';
     if (src) { img.style.display = 'block'; img.src = src; }
     else { img.style.display = 'none'; ini.textContent = idInitialsOf(d.name); ini.style.display = 'flex'; }
-    document.getElementById('cardName').textContent = d.name || '&mdash;';
-    document.getElementById('cardCourse').textContent = d.course || '&mdash;';
-    document.getElementById('cardNumber').textContent = d.idnumber || '&mdash;';
-    document.getElementById('cardIssued').textContent = d.issued ? new Date(d.issued).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '&mdash;';
+    document.getElementById('cardName').textContent = d.name || '—';
+    document.getElementById('cardCourse').textContent = d.course || '—';
+    document.getElementById('cardNumber').textContent = d.idnumber || '—';
+    document.getElementById('cardIssued').textContent = d.issued ? new Date(d.issued).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
     document.getElementById('cardExpiry').textContent = d.expiry ? new Date(d.expiry).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'No expiry';
     const qrImg = document.getElementById('cardQr');
     const cap = document.getElementById('cardQrCap');
@@ -2052,7 +2387,8 @@ function viewIdCard(btn) {
     qrImg.style.display = 'block';
     idCardData.qrData = generateQrDataUrl(d.studentId);
     if (d.qr) {
-        qrImg.onerror = function () { this.onerror = null; if (idCardData.qrData) this.src = idCardData.qrData; };
+        qrImg.onerror = function () { this.onerror = null; if (idCardData.qrData) { this.src = idCardData.qrData; cap.classList.add('ok'); } };
+        qrImg.onload = function () { cap.classList.add('ok'); };
         qrImg.src = normalizePhotoPath(d.qr);
     } else {
         qrImg.onerror = null;
@@ -2130,7 +2466,7 @@ function printIdCard() {
 
 
 // Wire up ID card modal close-on-overlay + Esc
-document.getElementById('idCardModal').addEventListener('click', function(e) {
+document.getElementById('idCardModal')?.addEventListener('click', function(e) {
     if (e.target === this) { this.classList.remove('active'); document.body.style.overflow = ''; }
 });
 
@@ -2145,19 +2481,264 @@ function showQrModal(img) {
 function closeQrModal() {
     document.getElementById('qrModalOverlay').classList.remove('active');
 }
-document.getElementById('qrModalOverlay').addEventListener('click', function(e) {
+document.getElementById('qrModalOverlay')?.addEventListener('click', function(e) {
     if (e.target === this) closeQrModal();
 });
-</script>
 
-<!-- QR Preview Modal -->
-<div id="qrModalOverlay">
-    <div class="qr-modal-box">
-        <img src="" alt="QR Code">
-        <div class="qr-modal-name"></div>
-        <div class="qr-modal-sub"></div>
-        <button class="qr-modal-close" onclick="closeQrModal()"><i class="fas fa-times"></i> Close</button>
-    </div>
-</div>
+// ── Assign Tab Switching ──────────────────────────────────────────
+function switchAssignTab(tab) {
+    document.querySelectorAll('.assign-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.assign-tab-pane').forEach(p => p.classList.remove('active'));
+    if (tab === 'pool') {
+        document.querySelector('.assign-tab:first-child').classList.add('active');
+        document.getElementById('tabPool').classList.add('active');
+        document.getElementById('assignMode').value = 'pool';
+    } else {
+        document.querySelectorAll('.assign-tab')[1].classList.add('active');
+        document.getElementById('tabNew').classList.add('active');
+        document.getElementById('assignMode').value = 'new';
+    }
+    validateAssignForm();
+}
+function onPoolCardSelect(sel) {
+    document.getElementById('selectedPoolCardId').value = sel.value;
+    validateAssignForm();
+}
+
+// Register Modal - Two-Step Wizard
+var regPreviewData = null;
+function openRegisterModal() {
+    document.getElementById('registerModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+    regGoStep(1);
+    document.getElementById('registerUids').value = '';
+    document.getElementById('registerNotes').value = '';
+    document.getElementById('uidCountHint').textContent = '';
+    regPreviewData = null;
+    var ta = document.getElementById('registerUids');
+    ta.oninput = function() {
+        var lines = this.value.split(/\s*[\n\r,;]+\s*/).filter(function(u){ return u.trim(); });
+        var hint = document.getElementById('uidCountHint');
+        if (lines.length > 0) {
+            hint.textContent = lines.length + ' UID' + (lines.length !== 1 ? 's' : '') + ' detected';
+            hint.classList.add('has-count');
+        } else { hint.textContent = ''; hint.classList.remove('has-count'); }
+        document.getElementById('registerPreviewBtn').disabled = (lines.length === 0);
+    };
+}
+function closeRegisterModal() {
+    document.getElementById('registerModal').classList.remove('active');
+    document.body.style.overflow = '';
+}
+function viewInPool() {
+    closeRegisterModal();
+    var pool = document.getElementById('poolSection');
+    if (pool) pool.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    else showToast('Info', 'No available cards in pool.', 'info');
+}
+function regGoStep(step) {
+    [1,2,3].forEach(function(s){ document.getElementById('regPanel'+s).classList.toggle('active', s===step); });
+    ['regStep1','regStep2','regStep3'].forEach(function(id,i) {
+        var el = document.getElementById(id);
+        el.classList.remove('active','done');
+        if (i+1 === step) el.classList.add('active');
+        else if (i+1 < step) el.classList.add('done');
+    });
+    ['regLine1','regLine2'].forEach(function(id,i) {
+        document.getElementById(id).classList.toggle('done', i+1 < step);
+    });
+    document.getElementById('registerSubheader').textContent =
+        step===1 ? 'Paste card UIDs (one per line, 10 digits each).' :
+        step===2 ? 'Review the validation before registering.' :
+        'Registration complete.';
+}
+async function previewBulkRegister() {
+    var raw = document.getElementById('registerUids').value.trim();
+    if (!raw) { showToast('Error', 'Paste at least one UID.', 'error'); return; }
+    var uids = raw.split(/\s*[\n\r,;]+\s*/).filter(function(u){ return u.trim(); });
+    if (uids.length === 0) { showToast('Error', 'Paste at least one UID.', 'error'); return; }
+    var btn = document.getElementById('registerPreviewBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validating...';
+    try {
+        var res = await fetch('../api/rfid.php?action=preview-register', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uids: uids })
+        });
+        var data = await res.json();
+        btn.disabled = false; btn.innerHTML = '<i class="fas fa-magnifying-glass-chart"></i> Validate &amp; Preview';
+        if (!data.success) { showToast('Error', data.message, 'error'); return; }
+        regPreviewData = data;
+        var s = data.summary;
+        document.getElementById('regSummaryGrid').innerHTML =
+            '<div class="reg-summary-card green"><div class="rs-num">' + s.new + '</div><div class="rs-label">New</div></div>' +
+            '<div class="reg-summary-card amber"><div class="rs-num">' + s.already_registered + '</div><div class="rs-label">Already Registered</div></div>' +
+            '<div class="reg-summary-card gray"><div class="rs-num">' + s.duplicates_in_list + '</div><div class="rs-label">Duplicates</div></div>' +
+            '<div class="reg-summary-card red"><div class="rs-num">' + s.format_errors + '</div><div class="rs-label">Invalid</div></div>';
+        var details = '';
+        if (data.already_registered.length > 0) {
+            details += '<div class="reg-preview-section"><h4><i class="fas fa-copy" style="color:#d97706;"></i> Already in Database (' + data.already_registered.length + ')</h4><ul>';
+            data.already_registered.forEach(function(r) { details += '<li><code style="background:#f1f5f9;padding:1px 5px;border-radius:4px;font-size:11px;">' + r.uid + '</code> <span style="color:#94a3b8;">(' + r.status + ')</span></li>'; });
+            details += '</ul></div>';
+        }
+        if (data.dupes_in_list.length > 0) {
+            details += '<div class="reg-preview-section"><h4><i class="fas fa-arrows-rotate" style="color:#6b7280;"></i> Duplicated in List (' + data.dupes_in_list.length + ')</h4><ul>';
+            data.dupes_in_list.forEach(function(uid) { details += '<li><code style="background:#f1f5f9;padding:1px 5px;border-radius:4px;font-size:11px;">' + uid + '</code></li>'; });
+            details += '</ul></div>';
+        }
+        if (data.format_errors.length > 0) {
+            details += '<div class="reg-preview-section"><h4><i class="fas fa-triangle-exclamation" style="color:#dc2626;"></i> Invalid Format (' + data.format_errors.length + ')</h4><ul>';
+            data.format_errors.forEach(function(uid) { details += '<li><code style="background:#fef2f2;padding:1px 5px;border-radius:4px;font-size:11px;color:#991b1b;">' + uid + '</code></li>'; });
+            details += '</ul></div>';
+        }
+        document.getElementById('regPreviewDetails').innerHTML = details;
+        document.getElementById('regProceedCount').textContent = s.new;
+        var proceedBtn = document.getElementById('registerProceedBtn');
+        if (s.new === 0) {
+            proceedBtn.disabled = true;
+            proceedBtn.innerHTML = '<i class="fas fa-ban"></i> Nothing New to Register';
+        } else {
+            proceedBtn.disabled = false;
+            proceedBtn.innerHTML = '<i class="fas fa-check-circle"></i> Register ' + s.new + ' Card' + (s.new !== 1 ? 's' : '');
+        }
+        regGoStep(2);
+    } catch(e) {
+        showToast('Error', 'Network error.', 'error');
+        btn.disabled = false; btn.innerHTML = '<i class="fas fa-magnifying-glass-chart"></i> Validate &amp; Preview';
+    }
+}
+async function submitBulkRegister() {
+    if (!regPreviewData || !regPreviewData.new_uids || regPreviewData.new_uids.length === 0) return;
+    var notes = document.getElementById('registerNotes').value.trim();
+    var btn = document.getElementById('registerProceedBtn');
+    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registering...';
+    try {
+        var res = await fetch('../api/rfid.php?action=register', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uids: regPreviewData.new_uids, notes: notes })
+        });
+        var data = await res.json();
+        if (data.success) {
+            var rc = data.registered || 0;
+            var skipped = (data.skipped || []).length;
+            var isPartial = skipped > 0 || (data.errors && data.errors.length > 0);
+            var html = '<div class="reg-result-box">' +
+                '<div class="result-icon ' + (isPartial ? 'partial' : 'success') + '"><i class="fas fa-' + (isPartial ? 'circle-check' : 'check-double') + '"></i></div>' +
+                '<h3>' + (isPartial ? 'Partial Success' : 'Registration Complete!') + '</h3>' +
+                '<p>' + rc + ' card' + (rc !== 1 ? 's' : '') + ' added to Available pool' + (skipped > 0 ? ' (' + skipped + ' skipped)' : '') + '</p>';
+            if (rc > 0 || skipped > 0) {
+                html += '<div class="reg-result-breakdown">';
+                if (rc > 0) html += '<div class="rb-item"><div class="rb-num" style="color:#16a34a;">' + rc + '</div><div class="rb-label">Registered</div></div>';
+                if (skipped > 0) html += '<div class="rb-item"><div class="rb-num" style="color:#d97706;">' + skipped + '</div><div class="rb-label">Skipped</div></div>';
+                if (data.errors && data.errors.length > 0) html += '<div class="rb-item"><div class="rb-num" style="color:#dc2626;">' + data.errors.length + '</div><div class="rb-label">Errors</div></div>';
+                html += '</div>';
+            }
+            if (skipped > 0) {
+                html += '<div style="margin-top:12px;font-size:12px;color:#64748b;text-align:left;"><strong>Skipped UIDs:</strong><br>';
+                data.skipped.forEach(function(u) { html += '<code style="background:#f1f5f9;padding:1px 5px;border-radius:4px;">' + u + '</code> '; });
+                html += '</div>';
+            }
+            if (data.errors && data.errors.length > 0) {
+                html += '<div style="margin-top:8px;font-size:12px;color:#991b1b;text-align:left;"><strong>Invalid:</strong><br>' + data.errors.join(', ') + '</div>';
+            }
+            html += '</div>';
+            document.getElementById('regResultContent').innerHTML = html;
+        } else {
+            document.getElementById('regResultContent').innerHTML =
+                '<div class="reg-result-box"><div class="result-icon error"><i class="fas fa-xmark"></i></div>' +
+                '<h3>Registration Failed</h3><p>' + (data.message || 'Unknown error') + '</p></div>';
+        }
+        regGoStep(3);
+    } catch(e) { showToast('Error', 'Network error.', 'error'); }
+    btn.disabled = false;
+}
+// ── Archive Modal ─────────────────────────────────────────────────
+let archiveCardId = null;
+function openArchiveModal(id, uid) {
+    archiveCardId = id;
+    document.getElementById('archiveMessage').textContent = 'Archive card ' + uid + '?';
+    document.getElementById('archiveReason').value = '';
+    document.getElementById('archiveModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+document.getElementById('archiveCancel')?.addEventListener('click', () => {
+    document.getElementById('archiveModal').classList.remove('active');
+    document.body.style.overflow = ''; archiveCardId = null;
+});
+document.getElementById('archiveConfirm')?.addEventListener('click', async () => {
+    if (!archiveCardId) return;
+    try {
+        const res = await fetch('../api/rfid.php?action=archive', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ card_id: archiveCardId, reason: document.getElementById('archiveReason').value })
+        });
+        const data = await res.json();
+        if (data.success) { showToast('Archived', data.message, 'success'); setTimeout(() => window.location.reload(), 800); }
+        else showToast('Error', data.message, 'error');
+    } catch(e) { showToast('Error', 'Network error.', 'error'); }
+    document.getElementById('archiveModal').classList.remove('active');
+    document.body.style.overflow = ''; archiveCardId = null;
+});
+['registerModal','archiveModal'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('click', e => { if (e.target === e.currentTarget) { el.classList.remove('active'); document.body.style.overflow = ''; } });
+});
+
+// ── AI Inventory Panel ────────────────────────────────────────────
+async function refreshAiPanel() {
+    const grid = document.getElementById('aiInsightsGrid');
+    if (!grid) return;
+    grid.innerHTML = '<div class="ai-insight-card" style="grid-column:1/-1;text-align:center;padding:20px;color:#94a3b8;"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+    try {
+        const res = await fetch('../api/rfid.php?action=inventory-stats');
+        const json = await res.json();
+        if (!json.success) throw new Error(json.message);
+        const d = json.data;
+        const runwayText = d.runway_weeks >= 999 ? 'No churn' : (d.runway_weeks > 0 ? d.runway_weeks + ' weeks' : 'Overstocked');
+        grid.innerHTML =
+            '<div class="ai-insight-card"><div class="label">Pool Runway</div><div class="value">' + runwayText + '</div><div class="sub">' + d.weekly_rate + ' cards/week</div></div>' +
+            '<div class="ai-insight-card"><div class="label">Utilization</div><div class="value">' + (d.total > 0 ? Math.round(d.active / d.total * 100) : 0) + '%</div><div class="sub">' + d.active + ' of ' + d.total + '</div></div>' +
+            '<div class="ai-insight-card"><div class="label">Expiring Soon</div><div class="value" style="color:' + (d.expiring_soon > 5 ? '#dc2626' : '#0f172a') + ';">' + d.expiring_soon + '</div><div class="sub">within 60 days</div></div>' +
+            '<div class="ai-insight-card"><div class="label">Recent Batches</div><div class="value">' + (d.batches ? d.batches.length : 0) + '</div><div class="sub">' + (d.batches && d.batches.length ? d.batches[0].cnt + ' latest' : 'None') + '</div></div>';
+    } catch(e) { grid.innerHTML = '<div class="ai-insight-card" style="grid-column:1/-1;color:#dc2626;">Failed to load insights.</div>'; }
+}
+setTimeout(refreshAiPanel, 500);
+
+// ── AI Chat Widget ────────────────────────────────────────────────
+let aiChatHistory = [];
+function toggleAiChat() {
+    const w = document.getElementById('aiChatWindow');
+    const fab = document.getElementById('aiChatFab');
+    if (w.classList.contains('open')) { w.classList.remove('open'); fab.style.display = ''; }
+    else { w.classList.add('open'); fab.style.display = 'none'; document.getElementById('aiChatInput').focus(); }
+}
+async function sendAiChat() {
+    const input = document.getElementById('aiChatInput');
+    const msg = input.value.trim();
+    if (!msg) return;
+    input.value = '';
+    const msgsDiv = document.getElementById('aiChatMessages');
+    msgsDiv.innerHTML += '<div class="ai-chat-msg user">' + msg.replace(/</g, '&lt;') + '</div>';
+    aiChatHistory.push({ role: 'user', content: msg });
+    const typingDiv = document.createElement('div');
+    typingDiv.className = 'ai-chat-msg bot typing';
+    typingDiv.textContent = 'Thinking...';
+    msgsDiv.appendChild(typingDiv);
+    msgsDiv.scrollTop = msgsDiv.scrollHeight;
+    document.getElementById('aiChatSendBtn').disabled = true;
+    try {
+        const res = await fetch('../api/rfid-ai-chat.php', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: msg, history: aiChatHistory.slice(-20) })
+        });
+        const data = await res.json();
+        typingDiv.remove();
+        const reply = data.success ? data.reply : (data.message || 'Could not process.');
+        msgsDiv.innerHTML += '<div class="ai-chat-msg bot">' + reply.replace(/</g, '&lt;').replace(/\*\*/g, '').replace(/\n/g, '<br>') + '</div>';
+        aiChatHistory.push({ role: 'assistant', content: reply });
+    } catch(e) { typingDiv.remove(); msgsDiv.innerHTML += '<div class="ai-chat-msg bot">Network error.</div>'; }
+    msgsDiv.scrollTop = msgsDiv.scrollHeight;
+    document.getElementById('aiChatSendBtn').disabled = false;
+}
+</script>
 
 <?php include '../includes/footer.php'; ?>

@@ -607,7 +607,8 @@ try {
             $allowedFields = ['first_name', 'middle_name', 'last_name', 'gender', 'civil_status', 'birth_date', 'place_of_birth',
                               'birth_country', 'lrn', 'name_suffix', 'mother_name', 'father_name',
                               'nationality', 'religion', 'address', 'contact_number', 'email',
-                              'course', 'major', 'year_level', 'school_year', 'semester', 'section', 'adviser_id', 'status'];
+                              'course', 'major', 'year_level', 'school_year', 'semester', 'section', 'adviser_id', 'status',
+                              'student_number'];
 
             foreach ($allowedFields as $field) {
                 if (array_key_exists($field, $input)) {

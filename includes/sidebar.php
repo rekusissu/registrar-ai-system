@@ -485,13 +485,22 @@ if ($USER_ROLE === 'student') {
 
     var notifications = [];
 
+    var USER_ROLE = '<?= $USER_ROLE ?>';
+
     function loadNotifications() {
-        fetch('../api/notifications.php')
+        var url = USER_ROLE === 'student'
+            ? '../api/student-notifications.php'
+            : '../api/notifications.php';
+        fetch(url)
             .then(function(r) { return r.json(); })
             .then(function(d) {
                 if (d.success && d.data) {
                     notifications = d.data;
                     renderNotifications();
+                    if (USER_ROLE === 'student' && typeof d.unread !== 'undefined') {
+                        bellBadge.textContent = d.unread;
+                        bellBadge.style.display = d.unread > 0 ? 'flex' : 'none';
+                    }
                 }
             })
             .catch(function() {});
@@ -508,7 +517,7 @@ if ($USER_ROLE === 'student') {
         var html = '';
         notifications.forEach(function(n) {
             if (n.unread) unreadCount++;
-            html += '<div class="notif-item ' + (n.unread ? 'unread' : '') + '">' +
+            html += '<div class="notif-item ' + (n.unread ? 'unread' : '') + '" data-notif-id="' + (n.id || '') + '">' +
                 '<div class="notif-icon"><i class="fas ' + (n.icon || 'fa-circle-info') + '"></i></div>' +
                 '<div class="notif-content">' +
                     '<div class="notif-title">' + (n.title || '') + '</div>' +
@@ -534,9 +543,21 @@ if ($USER_ROLE === 'student') {
     }
 
     function markAllRead() {
-        notifications.forEach(function(n) { n.unread = false; });
-        renderNotifications();
-        closeNotifModal();
+        if (USER_ROLE === 'student') {
+            fetch('../api/student-notifications.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'action=read_all'
+            }).then(function() {
+                notifications.forEach(function(n) { n.unread = false; });
+                renderNotifications();
+                closeNotifModal();
+            }).catch(function() { closeNotifModal(); });
+        } else {
+            notifications.forEach(function(n) { n.unread = false; });
+            renderNotifications();
+            closeNotifModal();
+        }
     }
 
     if (bellBtn) bellBtn.addEventListener('click', openNotifModal);

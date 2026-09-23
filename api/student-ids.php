@@ -98,6 +98,7 @@ if ($method === 'POST') {
     $status     = trim($input['status'] ?? 'active');
     $issueDate  = $input['issue_date'] ?? date('Y-m-d');
     $expiryDate = $input['expiry_date'] ?? '';
+    // Student ID is assigned by the enrollment department — leave empty if not provided.
     $idNumber   = trim($input['id_number'] ?? '');
 
     if (!$studentId) {
@@ -111,19 +112,18 @@ if ($method === 'POST') {
         $status = 'active';
     }
 
-    // No auto-generation — id_number left blank, ready for integration.
-    // Only enforce uniqueness when a value is provided.
+    // Enforce uniqueness when a value is provided.
     if ($idNumber !== '') {
         $existingNum = $db->fetchOne("SELECT id FROM student_ids WHERE id_number = ?", [$idNumber]);
         if ($existingNum) {
-            echo json_encode(['success' => false, 'message' => 'ID number already exists.']);
+            echo json_encode(['success' => false, 'message' => 'Student ID already exists.']);
             exit;
         }
     }
 
     $data = [
         'student_id'  => $studentId,
-        'id_number'   => $idNumber ?: null,
+        'id_number'   => $idNumber,
         'id_type'     => $idType,
         'issue_date'  => $issueDate,
         'expiry_date' => $expiryDate !== '' ? $expiryDate : null,

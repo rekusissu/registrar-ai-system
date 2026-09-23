@@ -11,7 +11,16 @@ if ($studentId > 0) {
         $isValid = $row['status'] === 'active' && ($row['expiry_date'] === null || $row['expiry_date'] >= date('Y-m-d'));
         $verified = $isValid;
         if (!$isValid) $notFound = true;
-    } else { $notFound = true; }
+    } else {
+        // Fallback: check if the student exists at all (enrolled but no ID card issued yet)
+        $student = $db->fetchOne("SELECT id, status FROM students WHERE id = ? LIMIT 1", [$studentId]);
+        if ($student && in_array($student['status'], ['active','enrolled','probation','at-risk'], true)) {
+            $verified = true;
+            $autoCreatedSid = false;
+        } else {
+            $notFound = true;
+        }
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -41,10 +50,6 @@ body{font-family:"Inter","Segoe UI",-apple-system,sans-serif;background:linear-g
 .cb{padding:28px 22px}
 .vm{font-size:15px;font-weight:700;color:#15803d;line-height:1.5;padding:16px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px}
 .nm{font-size:14px;font-weight:600;color:#b91c1c;line-height:1.5;padding:16px;background:#fef2f2;border:1px solid #fecaca;border-radius:12px}
-.sf{display:flex;gap:8px;margin-top:16px}
-.sf input{flex:1;padding:11px 13px;border:1px solid #cbd5e1;border-radius:10px;font-size:13px;font-family:inherit}
-.sf button{border:none;border-radius:10px;padding:0 16px;font-size:13px;font-weight:700;cursor:pointer;background:var(--blue);color:#fff}
-.sf button:hover{filter:brightness(.96)}
 .ft{text-align:center;margin-top:16px;font-size:11px;color:#94a3b8}
 </style>
 </head>
@@ -63,13 +68,11 @@ body{font-family:"Inter","Segoe UI",-apple-system,sans-serif;background:linear-g
             <div class="ch nf"><div class="ic"><i class="fa-solid fa-circle-xmark"></i></div><h2>Not Verified</h2></div>
             <div class="cb">
                 <div class="nm"><i class="fa-solid fa-triangle-exclamation" style="margin-right:6px;"></i>No verified student record found.</div>
-                <form class="sf" method="get" action="verify-student.php"><input type="text" name="student_id" placeholder="Student ID (e.g. 5)" required /><button type="submit"><i class="fa-solid fa-magnifying-glass"></i> Verify</button></form>
             </div>
         <?php else: ?>
             <div class="ch nu"><div class="ic"><i class="fa-solid fa-qrcode"></i></div><h2>Student Verification</h2></div>
             <div class="cb">
-                <p style="font-size:13px;color:var(--mut);margin-bottom:16px;">Scan a student ID QR code or enter the student ID manually.</p>
-                <form class="sf" method="get" action="verify-student.php"><input type="text" name="student_id" placeholder="Student ID (e.g. 5)" required /><button type="submit"><i class="fa-solid fa-magnifying-glass"></i> Verify</button></form>
+                <p style="font-size:13px;color:var(--mut);">Scan the QR code on a student ID to verify.</p>
             </div>
         <?php endif; ?>
     </div>

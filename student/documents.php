@@ -166,6 +166,39 @@ $claimed     = $counts['Claimed'];
         </div>
         <?php endif; ?>
 
+        <!-- Document Requirements Checklist -->
+        <?php
+        $studentId = $student['id'];
+        $requiredDocs = [
+            'form_137' => ['label' => 'Form 137', 'icon' => 'fa-file-alt', 'color' => '#2563eb'],
+            'psa'      => ['label' => 'PSA Birth Certificate', 'icon' => 'fa-certificate', 'color' => '#7c3aed'],
+            'photo'    => ['label' => '1x1 ID Photo', 'icon' => 'fa-camera', 'color' => '#db2777'],
+        ];
+        $studentDocs = $db->fetchAll("SELECT doc_type FROM documents WHERE student_id = ?", [$studentId]);
+        $presentTypes = array_column($studentDocs, 'doc_type');
+        $reqMissing = [];
+        foreach ($requiredDocs as $type => $info) {
+            if (!in_array($type, $presentTypes)) $reqMissing[$type] = $info;
+        }
+        ?>
+        <?php if (!empty($reqMissing)): ?>
+        <div class="panel" style="margin-bottom:16px;border-left:4px solid #f59e0b;">
+            <div style="padding:16px;">
+                <div style="font-weight:600;font-size:14px;color:#92400e;margin-bottom:10px;"><i class="fas fa-triangle-exclamation" style="color:#f59e0b;"></i> Required Documents — Action Needed</div>
+                <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                <?php foreach ($requiredDocs as $type => $info): ?>
+                    <?php $uploaded = in_array($type, $presentTypes); ?>
+                    <div style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:8px;background:<?= $uploaded ? '#f0fdf4' : '#fef3c7' ?>;border:1px solid <?= $uploaded ? '#bbf7d0' : '#fde68a' ?>;">
+                        <i class="fas <?= $uploaded ? 'fa-circle-check' : $info['icon'] ?>" style="color:<?= $uploaded ? '#16a34a' : $info['color'] ?>;"></i>
+                        <span style="font-size:13px;<?= $uploaded ? 'text-decoration:line-through;color:#16a34a;' : 'font-weight:500;color:#92400e;' ?>"><?= $info['label'] ?></span>
+                        <?= $uploaded ? '<span style="font-size:10px;color:#16a34a;">✓ Uploaded</span>' : '<span style="font-size:10px;color:#dc2626;">Missing</span>' ?>
+                    </div>
+                <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
+
         <!-- Document Catalog -->
         <div class="panel">
             <div class="panel-header">
@@ -464,6 +497,7 @@ document.querySelectorAll('.payment-option input[type=radio]').forEach(r => {
 document.getElementById('requestModal').addEventListener('click', function(e) { if (e.target === this) closeRequestModal(); });
 document.getElementById('payModal').addEventListener('click', function(e) { if (e.target === this) closePayModal(); });
 document.addEventListener('keydown', function(e) { if (e.key === 'Escape') { closeRequestModal(); closePayModal(); } });
+</script>
 
 <script>
 document.getElementById('requestForm').addEventListener('submit', async function(e) {
@@ -539,6 +573,7 @@ function simulatePayment(status) {
 }
 document.getElementById('simulateSuccessBtn').addEventListener('click', () => simulatePayment('COMPLETED'));
 document.getElementById('simulateFailBtn').addEventListener('click', () => simulatePayment('FAILED'));
+</script>
 
 <script>
 let pollTimer = null;

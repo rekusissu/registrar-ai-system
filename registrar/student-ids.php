@@ -186,12 +186,12 @@ include '../includes/sidebar.php';
                     data-course="<?= htmlspecialchars($i['course'] ?? '', ENT_QUOTES) ?>"
                     data-search="<?= htmlspecialchars(strtolower($i['student_name'] . ' ' . $i['student_number'] . ' ' . $i['id_number']), ENT_QUOTES) ?>">
                     <td><strong><?= htmlspecialchars($i['student_name']) ?></strong><br><span style="font-size:11px;color:#94a3b8;"><?= htmlspecialchars($i['student_number']) ?></span></td>
-                    <td><code style="background:#f1f5f9;padding:3px 8px;border-radius:5px;font-size:12px;"><?= htmlspecialchars($i['id_number']) ?></code></td>
+                    <td><code style="background:#f1f5f9;padding:3px 8px;border-radius:5px;font-size:12px;"><?= $i['id_number'] ? htmlspecialchars($i['id_number']) : '—' ?></code></td>
                     <td><span class="idtype-chip"><?= ucfirst(str_replace('_', ' ', $i['id_type'])) ?></span></td>
                     <td><?= $i['issue_date'] ? date('M d, Y', strtotime($i['issue_date'])) : '—' ?></td>
                     <td><?= $i['expiry_date'] ? date('M d, Y', strtotime($i['expiry_date'])) : '—' ?></td>
                     <td><span class="badge <?= $i['status'] ?>"><?= ucfirst($i['status']) ?></span></td>
-                    <td><?= $i['qr_code_path'] ? '<img class="qr-thumb" src="' . htmlspecialchars($i['qr_code_path']) . '" alt="QR" onclick="showQrModal(this)" data-name="' . htmlspecialchars($i['student_name'], ENT_QUOTES) . '" data-id="' . htmlspecialchars($i['student_number'], ENT_QUOTES) . '">' : '—' ?></td>
+                    <td><?php if ($i['qr_code_path']): ?><img class="qr-thumb" src="<?= htmlspecialchars($i['qr_code_path']) ?>" alt="QR" onclick="showQrModal(this)" data-name="<?= htmlspecialchars($i['student_name'], ENT_QUOTES) ?>" data-id="<?= htmlspecialchars($i['student_number'], ENT_QUOTES) ?>"><?php elseif (!empty($i['student_id'])): ?><img class="qr-thumb qr-auto" data-qr-student-id="<?= (int)$i['student_id'] ?>" data-qr-name="<?= htmlspecialchars($i['student_name'], ENT_QUOTES) ?>" data-qr-number="<?= htmlspecialchars($i['student_number'], ENT_QUOTES) ?>" alt="QR" style="cursor:pointer;" onclick="showQrModal(this)"><?php else: ?>—<?php endif; ?></td>
                     <td><div class="action-group">
                         <button class="action-btn view" onclick="viewCard(this)" title="View ID Card"><i class="fas fa-id-card"></i></button>
                         <button class="action-btn edit" onclick="editStatus(this)" title="Update Status"><i class="fas fa-pen"></i></button>
@@ -240,8 +240,8 @@ include '../includes/sidebar.php';
                     <label>Expiry Date</label><input type="date" id="issueExpiry" class="form-control">
                 </div>
             </div>
-            <div class="form-group"><label>ID Number (for integration — leave blank)</label><input type="text" id="issueNumber" class="form-control" placeholder="Leave blank — set via integration"></div>
-            <p style="font-size:11px;color:#64748b;margin:0;"><i class="fas fa-info-circle"></i> QR code is generated automatically when an ID number is provided.</p>
+            <div class="form-group"><label>Student ID</label><input type="text" id="issueNumber" class="form-control" placeholder="Assigned by enrollment department"></div>
+            <p style="font-size:11px;color:#64748b;margin:0;"><i class="fas fa-info-circle"></i> Leave blank if not yet assigned by the enrollment department.</p>
         </div>
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="closeModal('issueModal')">Cancel</button>
@@ -272,7 +272,7 @@ include '../includes/sidebar.php';
                     <div class="idcard-sec">
                         <div class="idcard-fields">
                             <div class="idcard-field"><div class="k">Course</div><div class="v" id="cardCourse">—</div></div>
-                            <div class="idcard-field"><div class="k">ID Number</div><div class="v mono" id="cardNumber">—</div></div>
+                            <div class="idcard-field"><div class="k">Student ID</div><div class="v mono" id="cardNumber">—</div></div>
                             <div style="display:flex;gap:16px;">
                                 <div class="idcard-field" style="flex:1;"><div class="k">Issued</div><div class="v" id="cardIssued">—</div></div>
                                 <div class="idcard-field" style="flex:1;"><div class="k">Valid Until</div><div class="v" id="cardExpiry">—</div></div>
@@ -432,6 +432,20 @@ function generateQrDataUrl(studentId) {
         return '';
     }
 }
+
+// Auto-populate QR thumbnails for rows where server QR is missing
+document.querySelectorAll('img.qr-auto[data-qr-student-id]').forEach(function(img) {
+    var sid = img.getAttribute('data-qr-student-id');
+    var url = generateQrDataUrl(sid);
+    if (url) {
+        img.src = url;
+        img.setAttribute('data-name', img.getAttribute('data-qr-name') || '');
+        img.setAttribute('data-id', img.getAttribute('data-qr-number') || '');
+    } else {
+        img.style.display = 'none';
+    }
+});
+
 function showInitialsFallback() {
     const img = document.getElementById('cardPhoto');
     const ini = document.getElementById('cardInitials');
@@ -486,7 +500,7 @@ function viewCard(btn) {
 
     document.getElementById('cardName').textContent = d.name;
     document.getElementById('cardCourse').textContent = d.course || '—';
-    document.getElementById('cardNumber').textContent = d.idnumber;
+    document.getElementById('cardNumber').textContent = d.idnumber || '—';
     document.getElementById('cardIssued').textContent = d.issued ? new Date(d.issued).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
     document.getElementById('cardExpiry').textContent = d.expiry ? new Date(d.expiry).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'No expiry';
 
@@ -498,7 +512,8 @@ function viewCard(btn) {
     qrImg.style.display = 'block';
     currentCardData.qrData = generateQrDataUrl(d.studentId);
     if (d.qr) {
-        qrImg.onerror = function () { this.onerror = null; if (currentCardData.qrData) this.src = currentCardData.qrData; };
+        qrImg.onerror = function () { this.onerror = null; if (currentCardData.qrData) { this.src = currentCardData.qrData; cap.classList.add('ok'); } };
+        qrImg.onload = function () { cap.classList.add('ok'); };
         qrImg.src = normalizePhotoPath(d.qr);
     } else {
         qrImg.onerror = null;
