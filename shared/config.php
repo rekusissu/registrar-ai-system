@@ -11,13 +11,13 @@ define('CONFIG_LOADED', true);
 //   DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_CHARSET, DB_NAME
 // PaaS platforms often use the Laravel-style names instead, so those are
 // accepted as fallbacks: DB_DATABASE (→ DB_NAME), DB_USERNAME (→ DB_USER).
-$host = getenv('DB_HOST') ?: 'localhost';
-$user = getenv('DB_USER') ?: 'root';
+$host = env('DB_HOST') ?: 'localhost';
+$user = env('DB_USER') ?: 'root';
 // Accept DB_PASSWORD (docker-compose / PaaS standard) and DB_PASS (legacy).
-$pass = getenv('DB_PASSWORD') ?: getenv('DB_PASS') ?: '';
-$db   = getenv('DB_NAME') ?: 'registrar_ai';
-$port = (int)(getenv('DB_PORT') ?: 3306);
-$charset = getenv('DB_CHARSET') ?: 'utf8mb4';
+$pass = env('DB_PASSWORD') ?: env('DB_PASS') ?: '';
+$db   = env('DB_NAME') ?: 'registrar_ai';
+$port = (int)(env('DB_PORT') ?: 3306);
+$charset = env('DB_CHARSET') ?: 'utf8mb4';
 
 // Constants used by shared/database.php (PDO layer)
 define('DB_HOST', $host);
@@ -208,19 +208,19 @@ define('KIOSK_ACCESS_TOKEN', secretFromEnvOrLocal('KIOSK_ACCESS_TOKEN', 'kiosk-t
 //   AI_MODEL - model to use (default: inclusionai/ling-3.0-flash-vl:free; NO "openrouter/" prefix)
 //   AI_API_URL - override URL if needed (default: https://openrouter.ai/api/v1/chat/completions)
 
-$aiProvider    = getenv('AI_PROVIDER') ?: 'openrouter';
-$aiApiUrl      = getenv('AI_API_URL') ?: 'https://openrouter.ai/api/v1/chat/completions';
+$aiProvider    = env('AI_PROVIDER') ?: 'openrouter';
+$aiApiUrl      = env('AI_API_URL') ?: 'https://openrouter.ai/api/v1/chat/completions';
 $aiApiKey      = '';
-$aiGeminiModel = getenv('GEMINI_MODEL') ?: getenv('AI_GEMINI_MODEL') ?: 'gemini-2.0-flash';
-$aiModel       = getenv('AI_MODEL') ?: ($aiProvider === 'gemini' ? $aiGeminiModel : 'inclusionai/ling-3.0-flash-vl:free');
-$aiCacheTtl    = (int) (getenv('AI_CACHE_TTL') ?: 3600);   // seconds
+$aiGeminiModel = env('GEMINI_MODEL') ?: env('AI_GEMINI_MODEL') ?: 'gemini-2.0-flash';
+$aiModel       = env('AI_MODEL') ?: ($aiProvider === 'gemini' ? $aiGeminiModel : 'inclusionai/ling-3.0-flash-vl:free');
+$aiCacheTtl    = (int) (env('AI_CACHE_TTL') ?: 3600);   // seconds
 
 // Optional OpenRouter (or gateway) failover chain, comma-separated:
 //   AI_MODELS="openai/gpt-4o-mini,google/gemini-2.0-flash-001"
 // ai_client.php walks this list in order when a model fails, so one
 // overloaded model never takes the AI Insight report down with it.
 $aiModels    = [];
-$aiModelsEnv = trim((string) (getenv('AI_MODELS') ?: ''));
+$aiModelsEnv = trim((string) (env('AI_MODELS') ?: ''));
 if ($aiModelsEnv !== '') {
     foreach (explode(',', $aiModelsEnv) as $m) {
         $m = trim($m);
@@ -235,7 +235,7 @@ if (!in_array($aiModel, $aiModels, true)) {
 }
 
 // Load API key from env or local file
-$aiApiKey = getenv('OPENROUTER_API_KEY') ?: getenv('AI_API_KEY') ?: '';
+$aiApiKey = env('OPENROUTER_API_KEY') ?: env('AI_API_KEY') ?: '';
 if ($aiApiKey === '' && is_file(__DIR__ . '/ai_key.local')) {
     $aiApiKey = trim((string) file_get_contents(__DIR__ . '/ai_key.local'));
 }
@@ -243,7 +243,7 @@ if ($aiApiKey === '' && is_file(__DIR__ . '/ai_key.local')) {
 // Gemini provider key (used only when AI_PROVIDER=gemini). Read from
 // GEMINI_API_KEY (Google's official env name) first, then AI_GEMINI_API_KEY,
 // then the same git-ignored shared/ai_key.local fallback.
-$aiGeminiKey = getenv('GEMINI_API_KEY') ?: getenv('AI_GEMINI_API_KEY') ?: '';
+$aiGeminiKey = env('GEMINI_API_KEY') ?: env('AI_GEMINI_API_KEY') ?: '';
 if ($aiGeminiKey === '' && is_file(__DIR__ . '/ai_key.local')) {
     $aiGeminiKey = trim((string) file_get_contents(__DIR__ . '/ai_key.local'));
 }
@@ -302,6 +302,28 @@ define('PAYMONGO_API_BASE', rtrim((string) getenv('PAYMONGO_API_BASE') ?: 'https
 //   MAIL_FROM_NAME=BCP Registrar System
 // Missing credentials ⇒ EMAIL_CONFIGURED=false and every sender no-ops
 // (the app keeps working, exactly like the PayMongo mock fallback).
+//
+// Env var lookup: shared hosting (cPanel, PHP-FPM, suPHP) often hides
+// env vars from getenv(). This helper checks getenv(), $_ENV, $_SERVER,
+// and apache_getenv() — whichever one the host exposes.
+function env(string $key, ?string $default = null): ?string {
+    // 1) getenv() (CGI / CLI / some FPM setups)
+    if (function_exists('getenv')) {
+        $v = getenv($key);
+        if ($v !== false && $v !== '') return $v;
+    }
+    // 2) $_ENV (php.ini: variables_order must include 'E')
+    if (isset($_ENV[$key]) && $_ENV[$key] !== '') return (string) $_ENV[$key];
+    // 3) $_SERVER (cPanel SetEnv, .htaccess SetEnv, some FPM fastcgi_param)
+    if (isset($_SERVER[$key]) && $_SERVER[$key] !== '') return (string) $_SERVER[$key];
+    // 4) apache_getenv() (mod_php only)
+    if (function_exists('apache_getenv')) {
+        $v = apache_getenv($key, true);
+        if ($v !== false && $v !== '') return $v;
+    }
+    return $default;
+}
+
 function emailSecretFromLocal(string $key): string {
     static $parsed = null;
     if ($parsed === null) {
@@ -319,12 +341,12 @@ function emailSecretFromLocal(string $key): string {
     }
     return $parsed[$key] ?? '';
 }
-define('SMTP_HOST',     getenv('SMTP_HOST') ?: emailSecretFromLocal('SMTP_HOST'));
-define('SMTP_PORT',     (int) (getenv('SMTP_PORT') ?: emailSecretFromLocal('SMTP_PORT')) ?: 587);
-define('SMTP_USER',     getenv('SMTP_USER') ?: emailSecretFromLocal('SMTP_USER'));
-define('SMTP_PASS',     getenv('SMTP_PASS') ?: emailSecretFromLocal('SMTP_PASS'));
-define('MAIL_FROM',     getenv('MAIL_FROM') ?: emailSecretFromLocal('MAIL_FROM'));
-define('MAIL_FROM_NAME',getenv('MAIL_FROM_NAME') ?: emailSecretFromLocal('MAIL_FROM_NAME'));
+define('SMTP_HOST',     env('SMTP_HOST') ?: emailSecretFromLocal('SMTP_HOST'));
+define('SMTP_PORT',     (int) (env('SMTP_PORT') ?: emailSecretFromLocal('SMTP_PORT')) ?: 587);
+define('SMTP_USER',     env('SMTP_USER') ?: emailSecretFromLocal('SMTP_USER'));
+define('SMTP_PASS',     env('SMTP_PASS') ?: emailSecretFromLocal('SMTP_PASS'));
+define('MAIL_FROM',     env('MAIL_FROM') ?: emailSecretFromLocal('MAIL_FROM'));
+define('MAIL_FROM_NAME',env('MAIL_FROM_NAME') ?: emailSecretFromLocal('MAIL_FROM_NAME'));
 define('EMAIL_CONFIGURED', SMTP_HOST !== '' && SMTP_USER !== '' && SMTP_PASS !== '');
 
 // Timezone

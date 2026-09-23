@@ -97,9 +97,9 @@ if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 }
 
 // ---- diagnostics ----
-$envSet  = getenv('SMTP_HOST') !== false && getenv('SMTP_HOST') !== '';
+$envSet  = env('SMTP_HOST') !== '' && env('SMTP_HOST') !== false;
 $fileSet = is_file(__DIR__ . '/../shared/email_secret.local');
-$credSource = $envSet ? 'Environment variables (getenv)' : ($fileSet ? 'shared/email_secret.local' : 'Not found (falling back to empty)');
+$credSource = $envSet ? 'Environment variables' : ($fileSet ? 'shared/email_secret.local' : 'Not found (falling back to empty)');
 $configured = defined('EMAIL_CONFIGURED') && EMAIL_CONFIGURED;
 $hasOpenssl = extension_loaded('openssl');
 
