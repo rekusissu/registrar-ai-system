@@ -262,11 +262,6 @@ if ($USER_ROLE === 'student') {
             <span class="sidebar-text">Intelligent Analytics and Reports</span>
         </a>
 
-        <a href="<?= $APP_ROOT ?>ai/search.php" class="sidebar-item <?= $ACTIVE_NAV === 'aisearch' ? 'active' : '' ?>">
-            <i class="fa-solid fa-robot"></i>
-            <span class="sidebar-text">AI Search</span>
-        </a>
-
         <?php if ($USER_ROLE !== 'admin'): ?>
         <div class="sidebar-divider"></div>
 
@@ -296,6 +291,11 @@ if ($USER_ROLE === 'student') {
             <i class="fa-solid fa-user-gear"></i>
             <span class="sidebar-text">Users</span>
         </a>
+        <a href="<?= $APP_ROOT ?>registrar/smtp-status.php" class="sidebar-item <?= $ACTIVE_NAV === 'smtp' ? 'active' : '' ?>">
+            <i class="fa-solid fa-envelope-circle-check"></i>
+            <span class="sidebar-text">SMTP Status</span>
+        </a>
+
         <a href="<?= $APP_ROOT ?>registrar/audit-logs.php" class="sidebar-item <?= $ACTIVE_NAV === 'audit' ? 'active' : '' ?>">
             <i class="fa-solid fa-file-shield"></i>
             <span class="sidebar-text">Audit Logs</span>

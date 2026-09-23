@@ -31,7 +31,7 @@ Canonical schema is `registrar_ai.sql` (base dump) + `database/registrar_upgrade
 
 ## Users, queue & observability
 
-- [[users]] — login accounts (roles: admin / registrar / staff / teacher / student); `username`, `student_id`, `login_attempts`, `locked_until` (Phase 5)
+- [[users]] — login accounts (roles: admin / registrar / staff / student); `username`, `student_id`, `login_attempts`, `locked_until` (Phase 5)
 - [[otp_codes]] — one-time codes for login + reset (Phase 5)
 - [[queue_tickets]] — queue numbers per day (waiting / serving / completed / no-show / removed / cancelled)
 - [[audit_logs]] — full action history with old/new JSON values

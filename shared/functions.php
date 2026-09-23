@@ -125,8 +125,16 @@ function isValidEmail($email) {
  * Validate phone number (Philippines format)
  */
 function isValidPhone($phone) {
-    $phone = preg_replace('/[^0-9]/', '', $phone);
-    return preg_match('/^(09|\\+63)[0-9]{9,10}$/', $phone);
+    $phone = preg_replace('/[^0-9]/', '', (string) $phone);
+    // +63/63 prefix → drop the country code so we get a leading 09.
+    if (strlen($phone) === 12 && strpos($phone, '63') === 0) {
+        $phone = '0' . substr($phone, 2);
+    }
+    if (strlen($phone) === 13 && strpos($phone, '63') === 0) {
+        $phone = '0' . substr($phone, 2);
+    }
+    // Exactly 11 digits: 09XXXXXXXXX.
+    return preg_match('/^09\d{9}$/', $phone) === 1;
 }
 
 /**
@@ -395,20 +403,22 @@ function decryptData($encrypted, $key = null) {
 // ─── STUDENT HELPERS ────────────────────────────────────────────
 
 /**
- * Generate the next student number in the 9-digit sequence:
- *   100000001, 100000002, 100000003, … (matches database/update_student_numbers.sql).
+ * Generate the next student number, starting at 1 and counting up
+ * sequentially: 1, 2, 3, ... Legacy 9-digit numbers (100000001, ...)
+ * are skipped so a fresh series begins at 1 even if old records exist.
  */
 function generateStudentNumber() {
     $db = Database::getInstance();
     $last = $db->fetchColumn(
         "SELECT student_number FROM students
-         WHERE student_number REGEXP '^10000000[0-9]+$'
+         WHERE student_number REGEXP '^[0-9]+$'
+           AND NOT (student_number REGEXP '^10000000[0-9]+$')
          ORDER BY CAST(student_number AS UNSIGNED) DESC LIMIT 1"
     );
     if ($last) {
         return (string) ((int) $last + 1);
     }
-    return '100000001';
+    return '1';
 }
 
 /**
@@ -974,6 +984,17 @@ function createStudentFromInput(array $input, $db): array
     $firstName = normalizeNameCase($firstName);
     $lastName  = normalizeNameCase($lastName);
     $address   = trim($address);
+    // Contact number: required, must be an 11-digit PH mobile (09XXXXXXXXX).
+    $contactNumber = normalizePhone(trim((string) ($input['contact_number'] ?? '')));
+    if ($contactNumber === '' || !isValidPhone($contactNumber)) {
+        throw new InvalidArgumentException('Contact number is required and must be an 11-digit mobile number (e.g. 09171234567).');
+    }
+
+    // Email: required, must be a valid address (the welcome email needs it).
+    $studentEmail = strtolower(trim((string) ($input['email'] ?? '')));
+    if ($studentEmail === '' || !isValidEmail($studentEmail)) {
+        throw new InvalidArgumentException('Email is required and must be a valid address.');
+    }
 
     $data = [
         'student_number' => $studentNumber,
@@ -988,8 +1009,8 @@ function createStudentFromInput(array $input, $db): array
         'nationality' => isset($input['nationality']) && trim($input['nationality']) !== '' ? trim($input['nationality']) : null,
         'religion' => isset($input['religion']) && trim($input['religion']) !== '' ? normalizeNameCase(trim($input['religion'])) : null,
         'address' => $address,
-        'contact_number' => isset($input['contact_number']) && trim($input['contact_number']) !== '' ? normalizePhone(trim($input['contact_number'])) : null,
-        'email' => isset($input['email']) && trim($input['email']) !== '' ? strtolower(trim($input['email'])) : null,
+        'contact_number' => $contactNumber,
+        'email' => $studentEmail,
         'course' => isset($input['course']) && trim($input['course']) !== '' ? courseStandardize(trim($input['course'])) : null,
         'major' => isset($input['major']) && trim($input['major']) !== '' ? trim($input['major']) : null,
         'year_level' => isset($input['year_level']) && $input['year_level'] !== '' ? (int) $input['year_level'] : null,
@@ -1020,13 +1041,23 @@ function createStudentFromInput(array $input, $db): array
 
     // Insert guardian (optional explicit guardian section).
     $guardianName = trim($input['guardian_name'] ?? '');
+    $guardianContact = trim((string) ($input['guardian_contact'] ?? ''));
+    if ($guardianContact !== '') {
+        $guardianContact = normalizePhone($guardianContact);
+        if (!isValidPhone($guardianContact)) {
+            throw new InvalidArgumentException('Guardian contact number must be an 11-digit mobile number (e.g. 09171234567).');
+        }
+    }
+    if ($guardianName !== '' && $guardianContact === '') {
+            throw new InvalidArgumentException('Guardian contact number is required and must be an 11-digit mobile number (e.g. 09171234567).');
+    }
     if ($guardianName !== '') {
         try {
             $db->insert('guardians', [
                 'student_id' => $newId,
                 'full_name' => $guardianName,
                 'relationship' => $input['guardian_relationship'] ?? 'guardian',
-                'contact_number' => $input['guardian_contact'] ?? '',
+                'contact_number' => $guardianContact,
                 'email' => $input['guardian_email'] ?? null,
             ]);
         } catch (Exception $e) {
@@ -1038,7 +1069,7 @@ function createStudentFromInput(array $input, $db): array
     if (function_exists('syncFatherMotherGuardians')) {
         syncFatherMotherGuardians($newId, $input['father_name'] ?? null, $input['mother_name'] ?? null, [
             'relationship'   => $input['guardian_relationship'] ?? 'guardian',
-            'contact_number' => $input['guardian_contact'] ?? '',
+            'contact_number' => $guardianContact,
             'email'          => $input['guardian_email'] ?? '',
         ]);
     }
@@ -1059,13 +1090,23 @@ function createStudentFromInput(array $input, $db): array
 
     // ── Emergency contact → emergency_contacts ─────────────────
     $emergName = trim($input['emergency_name'] ?? '');
+    $emergencyContact = trim((string) ($input['emergency_contact'] ?? ''));
+    if ($emergencyContact !== '') {
+        $emergencyContact = normalizePhone($emergencyContact);
+        if (!isValidPhone($emergencyContact)) {
+            throw new InvalidArgumentException('Emergency contact number must be an 11-digit mobile number (e.g. 09171234567).');
+        }
+    }
+    if ($emergName !== '' && $emergencyContact === '') {
+            throw new InvalidArgumentException('Emergency contact number is required and must be an 11-digit mobile number (e.g. 09171234567).');
+    }
     if ($emergName !== '') {
         try {
             $db->insert('emergency_contacts', [
                 'student_id'     => $newId,
                 'full_name'      => $emergName,
                 'relationship'   => $input['emergency_relationship'] ?? null,
-                'contact_number' => $input['emergency_contact'] ?? null,
+                'contact_number' => $emergencyContact,
                 'is_primary'     => 1,
             ]);
         } catch (Exception $e) {
@@ -1080,8 +1121,9 @@ function createStudentFromInput(array $input, $db): array
     // receives the credentials to share with the student.
     //
     // Credential scheme (as specified):
-    //   username = first letter of first name + 9-digit student id
+    //   username = first letter of first name + last digits of student number
     //             e.g. Juan / 100000001  ->  j100000001
+    //             e.g. Juan / 1          ->  j1
     //   password = '#' + first 2 letters of first name + 4-digit birth year
     //             e.g. Juan / 2005        ->  #ju2005
     $portalAccount = null;

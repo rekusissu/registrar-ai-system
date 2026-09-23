@@ -250,6 +250,10 @@ try {
         foreach (['first_name', 'middle_name', 'last_name', 'name_suffix', 'place_of_birth', 'nationality', 'religion', 'father_name', 'mother_name', 'email', 'address', 'contact_number', 'course', 'major', 'school_year', 'semester', 'section', 'prev_school_name', 'prev_school_last_year', 'prev_school_graduated_sy', 'emergency_name', 'emergency_relationship', 'emergency_contact'] as $f) {
             $payload[$f] = trim((string) $payload[$f]);
         }
+        if (trim((string) $payload['emergency_contact']) !== '' && !isValidPhone((string) $payload['emergency_contact'])) {
+            echo json_encode(['success' => false, 'message' => 'Emergency contact number must be an 11-digit mobile number (e.g. 09171234567).']);
+            exit;
+        }
         $payload['gender'] = in_array(strtolower(trim((string) $payload['gender'])), ['male', 'female'], true)
             ? ucfirst(strtolower(trim((string) $payload['gender']))) : null;
         $payload['civil_status'] = in_array(strtolower(trim((string) $payload['civil_status'])), ['single', 'married', 'widowed', 'separated'], true)

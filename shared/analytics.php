@@ -30,7 +30,7 @@ define('ANALYTICS_LOADED', true);
  * ("AI Tools" group is hidden for student / nurse accounts).
  */
 function aiInsightRoles(): array {
-    return ['admin', 'registrar', 'staff', 'teacher'];
+    return ['admin', 'registrar', 'staff'];
 }
 
 // ─── Reporting period ────────────────────────────────────────

@@ -63,13 +63,14 @@ try {
         $gData = [
             'full_name'      => trim($input['full_name'] ?? ''),
             'relationship'   => $input['relationship'],
-            'contact_number' => trim($input['contact_number'] ?? ''),
+            'contact_number' => normalizePhone(trim((string) ($input['contact_number'] ?? ''))),
             'email'          => ($input['email'] ?? '') !== '' ? trim($input['email']) : null,
             'address'        => ($input['address'] ?? '') !== '' ? trim($input['address']) : null,
             'is_primary'     => !empty($input['is_primary']) ? 1 : 0,
             'is_emergency'   => !empty($input['is_emergency']) ? 1 : 0,
         ];
         if ($gData['full_name'] === '') { echo json_encode(['success' => false, 'message' => 'Guardian name required.']); exit; }
+        if ($gData['contact_number'] === '' || !isValidPhone($gData['contact_number'])) { echo json_encode(['success' => false, 'message' => 'Guardian contact number is required and must be an 11-digit mobile number (e.g. 09171234567).']); exit; }
         if ($gId > 0) {
             $db->update('guardians', $gData, 'id = ? AND student_id = ?', [$gId, $studentId]);
         } else {
@@ -124,11 +125,12 @@ try {
         $eData = [
             'full_name'      => trim($input['full_name'] ?? ''),
             'relationship'   => trim($input['relationship'] ?? ''),
-            'contact_number' => trim($input['contact_number'] ?? ''),
+            'contact_number' => normalizePhone(trim((string) ($input['contact_number'] ?? ''))),
             'address'        => ($input['address'] ?? '') !== '' ? trim($input['address']) : null,
             'is_primary'     => !empty($input['is_primary']) ? 1 : 0,
         ];
         if ($eData['full_name'] === '') { echo json_encode(['success' => false, 'message' => 'Contact name required.']); exit; }
+        if ($eData['contact_number'] === '' || !isValidPhone($eData['contact_number'])) { echo json_encode(['success' => false, 'message' => 'Emergency contact number is required and must be an 11-digit mobile number (e.g. 09171234567).']); exit; }
         if ($id > 0) {
             $db->update('emergency_contacts', $eData, 'id = ? AND student_id = ?', [$id, $studentId]);
         } else {
@@ -476,6 +478,76 @@ try {
     // Delegates to the shared createStudentFromInput() helper (shared/
     // functions.php) so the manual Add form and the Receive-Student
     // Accept flow share one code path.
+    // Resend the portal welcome email (also resets the temporary password).
+    if ($method === 'POST' && isset($_GET['action']) && $_GET['action'] === 'resend_welcome_email') {
+        $input = json_decode(file_get_contents('php://input'), true);
+        $studentId = intval($input['student_id'] ?? 0);
+        if (!$studentId) { echo json_encode(['success' => false, 'message' => 'Student required.']); exit; }
+        $student = $db->fetchOne("SELECT * FROM students WHERE id = ?", [$studentId]);
+        if (!$student) { echo json_encode(['success' => false, 'message' => 'Student not found.']); exit; }
+        if (trim((string) ($student['email'] ?? '')) === '' || !isValidEmail((string) $student['email'])) {
+            echo json_encode(['success' => false, 'message' => 'This student has no valid email address - add one first.']); exit;
+        }
+        $portalUser = $db->fetchOne("SELECT * FROM users WHERE student_id = ? AND role = 'student' ORDER BY id ASC LIMIT 1", [$studentId]);
+        $firstName = trim((string) $student['first_name']);
+        $birthYear = (int) substr(trim((string) $student['birth_date']), 0, 4);
+        $firstTwo = mb_strtolower(mb_substr($firstName, 0, 2));
+        $password = '#' . $firstTwo . $birthYear;
+        if ($portalUser) {
+            $username = (string) ($portalUser['username'] ?? '');
+            $db->update('users', [
+                'password_hash' => password_hash($password, PASSWORD_DEFAULT),
+                'updated_at'    => date('Y-m-d H:i:s'),
+            ], 'id = ?', [$portalUser['id']]);
+        } else {
+            $idDigits = preg_replace('/[^0-9]/', '', (string) $student['student_number']);
+            $id9 = substr($idDigits, -9);
+            $username = mb_strtolower(mb_substr($firstName, 0, 1)) . $id9;
+            $dup = $db->fetchOne("SELECT id FROM users WHERE username = ?", [$username]);
+            if ($dup) { $username .= '_' . date('ymd'); }
+            $db->insert('users', [
+                'email'         => strtolower(trim((string) $student['email'])),
+                'username'      => strtolower($username),
+                'password_hash' => password_hash($password, PASSWORD_DEFAULT),
+                'full_name'     => trim((string) $student['first_name'] . ' ' . $student['last_name']),
+                'role'          => 'student',
+                'student_id'    => (int) $student['id'],
+                'is_active'     => 1,
+                'created_at'    => date('Y-m-d H:i:s'),
+                'updated_at'    => date('Y-m-d H:i:s'),
+            ]);
+        }
+        $account = [
+            'username' => $username,
+            'email'    => strtolower(trim((string) $student['email'])),
+            'password' => $password,
+            'full_name'=> trim((string) $student['first_name'] . ' ' . $student['last_name']),
+        ];
+        if (!function_exists('sendStudentWelcomeEmail')) {
+            $ml = __DIR__ . '/../shared/mail_client.php';
+            if (is_file($ml)) require_once $ml;
+        }
+        if (!function_exists('sendStudentWelcomeEmail') || !emailConfigured()) {
+            echo json_encode(['success' => false, 'message' => 'Email sending is not configured (SMTP).']); exit;
+        }
+        try {
+            $sent = sendStudentWelcomeEmail(
+                ['id' => (int) $student['id'], 'student_number' => (string) $student['student_number']],
+                $account,
+                (int) ($_SESSION['user_id'] ?? 0)
+            );
+        } catch (Throwable $e) {
+            error_log('[students.php] resend welcome failed: ' . $e->getMessage());
+            $sent = ['sent' => false];
+        }
+        logActivity($_SESSION['user_id'] ?? 0, 'student_welcome_resend', json_encode(['student_id' => $studentId, 'sent' => !empty($sent['sent'])]), 'users', (int) ($portalUser['id'] ?? $studentId));
+        echo json_encode([
+            'success' => !empty($sent['sent']),
+            'message' => !empty($sent['sent']) ? 'Welcome email sent to ' . trim((string) $student['email']) . '. Temporary password was reset.' : 'Email could not be sent. Check the PHP error log.'
+        ]);
+        exit;
+    }
+
     if ($method === 'POST') {
         $input = json_decode(file_get_contents('php://input'), true);
 
@@ -563,6 +635,10 @@ try {
                             $value = normalizeNameCase((string) $value);
                         } elseif ($field === 'contact_number') {
                             $value = normalizePhone((string) $value);
+                            if ($value === '' || !isValidPhone($value)) {
+                                echo json_encode(['success' => false, 'message' => 'Contact number is required and must be an 11-digit mobile number (e.g. 09171234567).']);
+                                exit;
+                            }
                         } elseif ($field === 'email') {
                             $value = strtolower(trim((string) $value));
                         } elseif ($field === 'course') {
@@ -580,6 +656,17 @@ try {
                 exit;
             }
 
+            // Email is required on every update (welcome email needs it).
+            if (array_key_exists('email', $data)) {
+                if ($data['email'] === null || trim((string) $data['email']) === '') {
+                    echo json_encode(['success' => false, 'message' => 'Email is required.']);
+                    exit;
+                }
+                if (!isValidEmail((string) $data['email'])) {
+                    echo json_encode(['success' => false, 'message' => 'A valid email address is required.']);
+                    exit;
+                }
+            }
             $db->update('students', $data, 'id = ?', [$id]);
             // Track status change in status_tracker
             if (array_key_exists('status', $data)) {
@@ -587,12 +674,24 @@ try {
             }
             // Update guardian if provided
             $guardianName = trim($input['guardian_name'] ?? '');
+            $gContact = trim((string) ($input['guardian_contact'] ?? ''));
+            if ($gContact !== '') {
+                $gContact = normalizePhone($gContact);
+                if (!isValidPhone($gContact)) {
+                    echo json_encode(['success' => false, 'message' => 'Guardian contact number must be an 11-digit mobile number (e.g. 09171234567).']);
+                    exit;
+                }
+            }
             if ($guardianName !== '') {
+                if ($gContact === '') {
+                    echo json_encode(['success' => false, 'message' => 'Guardian contact number is required and must be an 11-digit mobile number (e.g. 09171234567).']);
+                    exit;
+                }
                 $existingGuardian = $db->fetchOne("SELECT id FROM guardians WHERE student_id = ?", [$id]);
                 $gData = [
                     'full_name' => $guardianName,
                     'relationship' => $input['guardian_relationship'] ?? 'guardian',
-                    'contact_number' => $input['guardian_contact'] ?? '',
+                    'contact_number' => $gContact,
                     'email' => $input['guardian_email'] ?? null
                 ];
                 if ($existingGuardian) {

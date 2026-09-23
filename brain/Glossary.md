@@ -35,7 +35,7 @@ The 5 **canonical** portal labels (Enrolled / Active / Graduated / Transferred /
 
 ## Roles
 
-- **`users.role`:** `admin` · `registrar` · `staff` · `teacher` · `student` *(Phase 5)*
+- **`users.role`:** `admin` · `registrar` · `staff` · `student` *(Phase 5)*
 - **`authorized_cards.role`:** `admin` · `registrar` · `superadmin`
 
 ## Queue statuses (`queue_tickets.status`)

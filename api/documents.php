@@ -163,6 +163,34 @@ try {
             exit;
         }
 
+        // --- NOTIFY STUDENTS WITH MISSING DOCUMENTS ---
+        if ($method === 'POST' && isset($_GET['action']) && $_GET['action'] === 'notify_missing') {
+            $requiredTypes = ['enrollment','transcript','health','photo','clearance'];
+            $students = $db->fetchAll("SELECT id, student_number, CONCAT(first_name,' ',last_name) AS name FROM students WHERE status != 'archived'");
+            $presentRows = $db->fetchAll("SELECT DISTINCT student_id, doc_type FROM documents WHERE doc_type IS NOT NULL");
+            $presentByStudent = [];
+            foreach ($presentRows as $pr) {
+                $presentByStudent[(int)$pr['student_id']][] = $pr['doc_type'];
+            }
+            $notified = 0;
+            foreach ($students as $st) {
+                $present = $presentByStudent[(int)$st['id']] ?? [];
+                $missing = array_diff($requiredTypes, $present);
+                if (count($missing) === 0) continue;
+                $message = 'Reminder: you have missing required documents in the Digital File Storage (' . implode(', ', $missing) . '). Please upload them as soon as possible.';
+                logActivity(
+                    $_SESSION['user_id'],
+                    'documents_missing_reminder',
+                    json_encode(['student_id' => (int)$st['id'], 'student' => $st['name'], 'missing' => array_values($missing), 'message' => $message]),
+                    'documents',
+                    (int)$st['id']
+                );
+                $notified++;
+            }
+            echo json_encode(['success' => true, 'message' => $notified > 0 ? ($notified . ' student(s) notified about missing documents.') : 'All students have complete documents.']);
+            exit;
+        }
+
         echo json_encode(['success' => false, 'message' => 'Unknown file action.']);
         exit;
     }

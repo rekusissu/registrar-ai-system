@@ -334,9 +334,42 @@ openssl s_client -connect registrar.bestlink.edu.ph:443
 ### Step 8.3: OTP Email Delivery Test
 ```bash
 # Test password reset flow to verify mail() or SMTP works
+# Faster: log in as admin -> System -> SMTP Status, then use
+#   "Test Connection" (connect + authenticate, nothing sent)
+#   "Send Test Email" (delivers one message to MAIL_FROM)
 # Navigate to login → forgot password → enter test email
 # Check email for OTP delivery
 ```
+
+### Step 8.3.1: SMTP Configuration (Gmail / delivery)
+
+The app reads SMTP credentials from environment variables first, then from
+the git-ignored `shared/email_secret.local` (KEY=VALUE lines). Neither is
+committed, so each deployment must provide them.
+
+Example `shared/email_secret.local` (never commit this file):
+
+    SMTP_HOST=smtp.gmail.com
+    SMTP_PORT=587
+    SMTP_USER=registrar@yourdomain.edu.ph
+    SMTP_PASS=xxxx xxxx xxxx xxxx     (Gmail App Password, not the login password)
+    MAIL_FROM=registrar@yourdomain.edu.ph
+    MAIL_FROM_NAME=BCP Registrar System
+
+Hosting requirements:
+- Outbound access to smtp.gmail.com:587 must be allowed (almost all hosts allow it).
+- PHP `openssl` extension must be enabled (STARTTLS needs it).
+- PHPMailer must be installed (`vendor/autoload.php` present).
+
+Quick diagnostic (recommended):
+1. Log in as admin -> System -> SMTP Status.
+2. Click "Test Connection" to verify connect + authenticate (no email sent).
+3. Click "Send Test Email" to deliver one message to MAIL_FROM.
+   These screens never display the SMTP password.
+
+If a send still fails:
+- Check the PHP error log for lines starting with "mail:" (PHPMailer details).
+- Check the `communication_log` table: status `sent` vs `failed` with a detail column.
 
 ### Step 8.4: Database Connection Test
 ```bash
@@ -456,8 +489,8 @@ openssl x509 -enddate -noout -in /etc/letsencrypt/live/registrar.bestlink.edu.ph
 ```
 
 ### OTP Not Sending
-1. Check `logs/php_errors.log` for mail() errors
-2. Verify SMTP configuration in `.env` (if configured)
+1. Check the PHP error log (XAMPP: `C:\xampp\php\logs\php_error_log`) for lines starting with "mail:"
+2. Verify SMTP configuration (env vars or `shared/email_secret.local`) via System -> SMTP Status (see Step 8.3.1)
 3. Check email address in user profile is valid
 4. In development, set `OTP_SHOW_ONSCREEN=true` to see OTP on screen
 

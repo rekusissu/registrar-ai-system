@@ -60,7 +60,7 @@ $sql .= " ORDER BY TRIM(course) ASC, COALESCE(year_level, 0) ASC, section ASC, l
 $students = $db->fetchAll($sql, $params);
 
 // Adviser name lookup (users.id → full_name)
-$advisers = $db->fetchAll("SELECT id, full_name FROM users WHERE role IN ('teacher','staff') ORDER BY full_name");
+$advisers = $db->fetchAll("SELECT id, full_name FROM users WHERE role = 'staff' ORDER BY full_name");
 $adviserNames = [];
 foreach ($advisers as $ad) { $adviserNames[(int)$ad['id']] = $ad['full_name']; }
 

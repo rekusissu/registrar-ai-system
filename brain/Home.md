@@ -12,7 +12,7 @@ Use this as your entry point. Everything below is linked; navigate with Ctrl+Cli
 
 - **Stack:** PHP 8.x + PDO · MySQL/MariaDB · Vanilla JS + Chart.js + Tailwind
 - **DB:** `registrar_ai` (see [[registrar_ai.sql]] for the canonical schema)
-- **Auth:** session-based (`BCP_REGISTRAR_SESSION`) with **ID-number/username + password → OTP → session**; roles `admin / registrar / staff / teacher / student`
+- **Auth:** session-based (`BCP_REGISTRAR_SESSION`) with **ID-number/username + password → OTP → session**; roles `admin / registrar / staff / student`
 - **AI:** local **9Router** OpenAI-compatible gateway · Ollama/OpenRouter models (`minimax-m3`, `gpt-oss:120b`, `kimi-k2.5`), cached in `ai_cache`
 - **Student portal:** logged-in student hub ([[Student Portal]]) — dashboard, profile, queue, documents, academic & health records, AI chat
 - **Migrations:** [[registrar_ai.sql]] (base) → [[registrar_upgrade.sql]] (Phase 1) → [[security_upgrade.sql]] (Phase 5)

@@ -198,18 +198,18 @@ include '../includes/sidebar.php';
                                 </div>
                             <?php endif; ?>
                             <?php foreach ($stu['files'] as $f):
-                                $ext = strtolower(pathinfo($f['file_name'], PATHINFO_EXTENSION));
+                                $ext = strtolower(pathinfo($f['filename'], PATHINFO_EXTENSION));
                                 $ic = $iconMap[$ext] ?? 'fa-file';
                                 $cl = $colorMap[$ext] ?? '#94a3b8';
                             ?>
-                                <div class="file-expand-row" data-id="<?= (int)$f['id'] ?>" data-name="<?= htmlspecialchars($f['file_name']) ?>" data-path="<?= htmlspecialchars($f['file_path']) ?>" data-type="<?= htmlspecialchars($ext) ?>" data-student="<?= htmlspecialchars($stu['student_name']) ?>" data-desc="<?= htmlspecialchars($f['description'] ?? '') ?>">
+                                <div class="file-expand-row" data-id="<?= (int)$f['id'] ?>" data-name="<?= htmlspecialchars($f['filename']) ?>" data-path="<?= htmlspecialchars($f['file_path']) ?>" data-type="<?= htmlspecialchars($ext) ?>" data-student="<?= htmlspecialchars($stu['student_name']) ?>" data-desc="<?= htmlspecialchars($f['description'] ?? '') ?>">
                                     <?php if ($isImage($ext)): ?>
                                         <img src="<?= htmlspecialchars($f['file_path']) ?>" alt="" class="thumb">
                                     <?php else: ?>
                                         <div class="file-icon" style="background:<?= $cl ?>14;color:<?= $cl ?>;"><i class="fas <?= $ic ?>"></i></div>
                                     <?php endif; ?>
                                     <div style="flex:1;min-width:0;">
-                                        <div class="fname"><?= htmlspecialchars($f['file_name']) ?></div>
+                                        <div class="fname"><?= htmlspecialchars($f['filename']) ?></div>
                                         <div class="fmeta">
                                             <span class="chip blue" style="font-size:10px;"><?= htmlspecialchars(ucfirst($f['doc_type'])) ?></span>
                                             &middot; <?= fmtBytes((int)$f['file_size']) ?>
@@ -360,11 +360,41 @@ function toggleFiles(studentId) {
 
 // ─── QUICK UPLOAD (pre-select student) ────────────────────
 function quickUpload(studentId) {
+    openUpload();
     var sel = document.getElementById('upStudent');
     if (sel) sel.value = studentId;
-    openUpload();
 }
 
+
+// UPLOAD MODAL (open + dropzone)
+var upDropzone  = document.getElementById('upDropzone');
+var upFileInput = document.getElementById('upFile');
+var upFileName  = document.getElementById('upFileName');
+function showSelectedFile() {
+    if (!upFileName || !upFileInput) return;
+    upFileName.textContent = upFileInput.files.length ? 'Selected: ' + upFileInput.files[0].name : '';
+}
+function openUpload() {
+    document.getElementById('upStudent').value = '';
+    document.getElementById('upType').value = 'enrollment';
+    document.getElementById('upCategory').value = '';
+    document.getElementById('upDesc').value = '';
+    if (upFileInput) upFileInput.value = '';
+    showSelectedFile();
+    openModal('uploadModal');
+}
+if (upDropzone && upFileInput) {
+    upDropzone.addEventListener('click', function() { upFileInput.click(); });
+    upDropzone.addEventListener('dragover', function(e) { e.preventDefault(); upDropzone.classList.add('over'); });
+    upDropzone.addEventListener('dragleave', function(e) { upDropzone.classList.remove('over'); });
+    upDropzone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        upDropzone.classList.remove('over');
+        if (e.dataTransfer && e.dataTransfer.files.length) upFileInput.files = e.dataTransfer.files;
+        showSelectedFile();
+    });
+    upFileInput.addEventListener('change', showSelectedFile);
+}
 
 document.getElementById('uploadForm').addEventListener('submit', async function(e) {
     e.preventDefault();
@@ -393,6 +423,7 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
     } catch(err) { alert('Network error.'); }
     btn.disabled = false;
     btn.innerHTML = '<i class="fas fa-upload"></i> Upload';
+});
 
 // ─── SEARCH / FILTER ─────────────────────────────────────
 var searchInput   = document.getElementById('stuSearch');

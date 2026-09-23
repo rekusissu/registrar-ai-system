@@ -40,8 +40,8 @@ $courses = $db->fetchAll("SELECT DISTINCT course FROM students WHERE course IS N
 // Single source of truth (shared with the Masterlist via shared/functions.php).
 $offeredCourses = getOfferedCourses();
 
-// Teachers/advisers for the adviser dropdown (role teacher or staff, active)
-$advisers = $db->fetchAll("SELECT id, full_name FROM users WHERE role IN ('teacher','staff') AND is_active = 1 ORDER BY full_name");
+// Advisers for the adviser dropdown (active staff accounts)
+$advisers = $db->fetchAll("SELECT id, full_name FROM users WHERE role = 'staff' AND is_active = 1 ORDER BY full_name");
 
 // RFID cards lookup for indicator
 $rfidCards = $db->fetchAll("SELECT student_id, card_uid, status FROM rfid_cards");
@@ -461,7 +461,7 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 <!-- Tab: Health -->
 <div class="vtab-content" id="tabHealth" style="display:none;"><div id="vHealth" style="padding:8px 0;"><p style="color:#94a3b8;font-size:13px;">Loading...</p></div></div>
 </div>
-<div class="modal-footer"><button class="btn btn-primary" onclick="closeViewModal()"><i class="fas fa-times"></i> Close</button></div></div></div>
+<div class="modal-footer"><button class="btn btn-secondary" onclick="resendWelcomeEmail()" id="resendWelcomeBtn"><i class="fas fa-envelope"></i> Resend Welcome Email</button> <button class="btn btn-primary" onclick="closeViewModal()"><i class="fas fa-times"></i> Close</button></div></div></div>
 
 <!-- Data Quality Panel Modal -->
 <div class="modal-overlay" id="qualityModal"><div class="modal-content" style="max-width:760px;"><div class="modal-header"><h2><i class="fas fa-shield-halved"></i> Data Quality</h2><button class="modal-close" onclick="closeQualityPanel()"><i class="fas fa-times"></i></button></div><div class="modal-body">
@@ -479,7 +479,7 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 <div class="form-row"><div class="form-group"><label>Civil Status</label><select id="addCivilStatus" class="form-control"><option value="">Select</option><option value="Single">Single</option><option value="Married">Married</option><option value="Widowed">Widowed</option><option value="Separated">Separated</option></select></div><div class="form-group"><label>Birth Date <span style="color:#dc2626;">*</span></label><input type="date" id="addBirthDate" class="form-control" required></div><div class="form-group"><label>Place of Birth</label><input type="text" id="addBirthPlace" class="form-control" placeholder="City, Province"></div></div>
 <div class="form-row"><div class="form-group"><label>Nationality</label><input type="text" id="addNationality" class="form-control" value="Filipino"></div><div class="form-group"><label>Religion</label><input type="text" id="addReligion" class="form-control"></div></div>
 <div class="form-row"><div class="form-group"><label>Father's Name</label><input type="text" id="addFather" class="form-control" placeholder="Full name of father"></div><div class="form-group"><label>Mother's Name</label><input type="text" id="addMother" class="form-control" placeholder="Full name of mother"></div></div>
-<div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="addEmail" class="form-control" placeholder="student@school.edu.ph"></div><div class="form-group"><label>Contact No.</label><input type="text" id="addContact" class="form-control" placeholder="0917xxx"></div></div>
+<div class="form-row"><div class="form-group"><label>Email <span style="color:#dc2626;">*</span></label><input type="email" id="addEmail" class="form-control" placeholder="student@school.edu.ph" required></div><div class="form-group"><label>Contact No. <span style="color:#dc2626;">*</span></label><input type="text" id="addContact" class="form-control" placeholder="09XXXXXXXXX" required pattern="09[0-9]{9}" title="11-digit mobile number (e.g. 09171234567)"></div></div>
 <div class="form-row"><div class="form-group"><label>Address <span style="color:#dc2626;">*</span></label><textarea id="addAddress" class="form-control" rows="2" required></textarea></div></div>
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-book"></i> Enrollment Details</div>
@@ -488,7 +488,7 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-users"></i> Guardian / Parent</div>
 <div class="form-row"><div class="form-group"><label>Full Name <span style="color:#dc2626;">*</span></label><input type="text" id="addGuardianName" class="form-control" required></div><div class="form-group"><label>Relationship</label><select id="addGuardianRel" class="form-control"><option value="father">Father</option><option value="mother">Mother</option><option value="guardian">Guardian</option></select></div></div>
-<div class="form-row"><div class="form-group"><label>Contact No.</label><input type="text" id="addGuardianContact" class="form-control"></div><div class="form-group"><label>Email (optional)</label><input type="email" id="addGuardianEmail" class="form-control"></div></div>
+<div class="form-row"><div class="form-group"><label>Contact No.</label><input type="text" id="addGuardianContact" class="form-control" pattern="09[0-9]{9}" title="11-digit mobile number (e.g. 09171234567)"></div><div class="form-group"><label>Email (optional)</label><input type="email" id="addGuardianEmail" class="form-control"></div></div>
 </div><div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeAddModal()">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Enroll</button></div></form></div></div>
 
 <!-- Auto-created Student Portal Account Modal -->
@@ -527,7 +527,7 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 <div class="form-row"><div class="form-group"><label>Civil Status</label><select id="editCivilStatus" class="form-control"><option value="">Select</option><option value="Single">Single</option><option value="Married">Married</option><option value="Widowed">Widowed</option><option value="Separated">Separated</option></select></div><div class="form-group"><label>Birth Date</label><input type="date" id="editBirthDate" class="form-control"></div><div class="form-group"><label>Place of Birth</label><input type="text" id="editBirthPlace" class="form-control"></div></div>
 <div class="form-row"><div class="form-group"><label>Nationality</label><input type="text" id="editNationality" class="form-control"></div><div class="form-group"><label>Religion</label><input type="text" id="editReligion" class="form-control"></div><div class="form-group"><label>Father's Name</label><input type="text" id="editFather" class="form-control"></div></div>
 <div class="form-row"><div class="form-group"><label>Mother's Name</label><input type="text" id="editMother" class="form-control"></div></div>
-<div class="form-row"><div class="form-group"><label>Email</label><input type="email" id="editEmail" class="form-control"></div><div class="form-group"><label>Contact No.</label><input type="text" id="editContact" class="form-control"></div></div>
+<div class="form-row"><div class="form-group"><label>Email <span style="color:#dc2626;">*</span></label><input type="email" id="editEmail" class="form-control" required></div><div class="form-group"><label>Contact No. <span style="color:#dc2626;">*</span></label><input type="text" id="editContact" class="form-control" required pattern="09[0-9]{9}" title="11-digit mobile number (e.g. 09171234567)"></div></div>
 <div class="form-row"><div class="form-group"><label>Address <span style="color:#dc2626;">*</span></label><textarea id="editAddress" class="form-control" rows="2" required></textarea></div></div>
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-book"></i> Enrollment Details</div>
@@ -536,7 +536,7 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-users"></i> Guardian</div>
 <div class="form-row"><div class="form-group"><label>Full Name</label><input type="text" id="editGuardianName" class="form-control"></div><div class="form-group"><label>Relationship</label><select id="editGuardianRel" class="form-control"><option value="">Select</option><option value="father">Father</option><option value="mother">Mother</option><option value="guardian">Guardian</option></select></div></div>
-<div class="form-row"><div class="form-group"><label>Contact No.</label><input type="text" id="editGuardianContact" class="form-control"></div><div class="form-group"><label>Email</label><input type="email" id="editGuardianEmail" class="form-control"></div></div>
+<div class="form-row"><div class="form-group"><label>Contact No.</label><input type="text" id="editGuardianContact" class="form-control" pattern="09[0-9]{9}" title="11-digit mobile number (e.g. 09171234567)"></div><div class="form-group"><label>Email</label><input type="email" id="editGuardianEmail" class="form-control"></div></div>
 </div><div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeEditModal()">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save</button></div></form></div></div>
 
 <!-- Receive Student Modal (enrollment intake) -->
@@ -775,6 +775,20 @@ function uploadPhoto() {
     .then(r=>r.json()).then(d=>{ if(d.success) window.location.reload(); else alert(d.message); })
     .catch(()=>alert('Upload failed.'));
 }
+async function resendWelcomeEmail() {
+    if (!currentViewId) return;
+    const btn = document.getElementById('resendWelcomeBtn');
+    if (!confirm('Resend the portal welcome email? This resets the temporary password.')) return;
+    if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...'; }
+    try {
+        const res = await fetch('../api/students.php?action=resend_welcome_email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ student_id: currentViewId }) });
+        const d = await res.json();
+        if (d.success) showToast('Sent', d.message || 'Welcome email sent.', 'success');
+        else alert(d.message || 'Could not send the email.');
+    } catch (e) { alert('Network error.'); }
+    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-envelope"></i> Resend Welcome Email'; }
+}
+
 function closeViewModal() { viewModal.classList.remove('active'); document.body.style.overflow = ''; }
 viewModal.addEventListener('click', function(e) { if (e.target === this) closeViewModal(); });
 
@@ -833,6 +847,12 @@ document.getElementById('editModal').addEventListener('click', function(e) { if 
 
 document.getElementById('editForm').addEventListener('submit', async function(e) {
     e.preventDefault();
+    const ec = document.getElementById('editContact').value;
+    if (!ph11(ec)) { alert('Student contact number is required and must be an 11-digit mobile number (e.g. 09171234567).'); return; }
+    const egn = document.getElementById('editGuardianName').value.trim();
+    if (egn !== '' && !ph11(document.getElementById('editGuardianContact').value)) { alert('Guardian contact number is required and must be an 11-digit mobile number (e.g. 09171234567).'); return; }
+    const ee = document.getElementById('editEmail').value.trim();
+    if (!ee || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ee)) { alert('Email is required and must be a valid address.'); return; }
     const id = document.getElementById('editId').value;
     const btn = this.querySelector('button[type="submit"]');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
@@ -967,8 +987,21 @@ function openAddModal() {
 function closeAddModal() { document.getElementById('addModal').classList.remove('active'); document.body.style.overflow = ''; }
 document.getElementById('addModal').addEventListener('click', function(e) { if (e.target === this) closeAddModal(); });
 
+function ph11(v) {
+    let d = String(v || '').replace(/\D/g, '');
+    if (d.length === 12 && d.startsWith('63')) d = '0' + d.slice(2);
+    if (d.length === 13 && d.startsWith('63')) d = '0' + d.slice(2);
+    return /^09\d{9}$/.test(d);
+}
+
 document.getElementById('addForm').addEventListener('submit', async function(e) {
     e.preventDefault();
+    const ac = document.getElementById('addContact').value;
+    if (!ph11(ac)) { alert('Student contact number is required and must be an 11-digit mobile number (e.g. 09171234567).'); return; }
+    const agn = document.getElementById('addGuardianName').value.trim();
+    if (agn !== '' && !ph11(document.getElementById('addGuardianContact').value)) { alert('Guardian contact number is required and must be an 11-digit mobile number (e.g. 09171234567).'); return; }
+    const ae = document.getElementById('addEmail').value.trim();
+    if (!ae || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ae)) { alert('Email is required and must be a valid address.'); return; }
     const btn = this.querySelector('button[type="submit"]');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
     try {

@@ -32,7 +32,7 @@ Shared hardening lives in [[shared/auth_security.php]] (note not yet written —
 
 ## Roles
 
-Defined in `users.role` enum: `admin`, `registrar`, `staff`, `teacher`, `student`. Admin bypasses all `requireRole` checks. Student-format accounts have a `users.username` for login; student accounts log in with `students.student_number`.
+Defined in `users.role` enum: `admin`, `registrar`, `staff`, `student`. Admin bypasses all `requireRole` checks. Student-format accounts have a `users.username` for login; student accounts log in with `students.student_number`.
 
 ## Forgot password
 

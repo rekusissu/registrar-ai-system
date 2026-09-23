@@ -15,7 +15,7 @@ Login accounts.
 | `username` | varchar(60) **UNIQUE** (NULL) | login identifier for staff (added Phase 5, [[security_upgrade.sql]]) |
 | `password_hash` | varchar(255) | bcrypt via `password_hash` |
 | `full_name` | varchar(100) | |
-| `role` | enum `admin/registrar/staff/teacher/student` | default `staff` |
+| `role` | enum `admin/registrar/staff/student` | default `staff` |
 | `student_id` | int | FK → `students.id` (links a student account to its record) |
 | `login_attempts` | int | failed-password counter (Phase 5) |
 | `locked_until` | datetime NULL | lockout deadline — **PHP wall-clock**, never `NOW()` (see [[mysql-timezone-skew]]) |

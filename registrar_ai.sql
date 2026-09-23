@@ -1400,7 +1400,7 @@ CREATE TABLE `users` (
   `email` varchar(100) NOT NULL,
   `password_hash` varchar(255) NOT NULL,
   `full_name` varchar(100) NOT NULL,
-  `role` enum('admin','registrar','staff','teacher','student','nurse') NOT NULL DEFAULT 'staff',
+  `role` enum('admin','registrar','staff','student','nurse') NOT NULL DEFAULT 'staff',
   `rfid_uid` varchar(20) DEFAULT NULL,
   `is_active` tinyint(1) DEFAULT 1,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),

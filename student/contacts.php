@@ -563,6 +563,13 @@ function collectFields(type) {
 }
 
 // ── Submit ─────────────────────────────────────────────────────
+function ph11(v) {
+    let d = String(v || '').replace(/\D/g, '');
+    if (d.length === 12 && d.startsWith('63')) d = '0' + d.slice(2);
+    if (d.length === 13 && d.startsWith('63')) d = '0' + d.slice(2);
+    return /^09\d{9}$/.test(d);
+}
+
 document.getElementById('reqForm').addEventListener('submit', async function (e) {
     e.preventDefault();
     const btn = document.getElementById('reqSubmit');
@@ -591,6 +598,10 @@ document.getElementById('reqForm').addEventListener('submit', async function (e)
         payload.payload = collectFields(type);
     }
 
+    // Contact numbers must be 11 digits (09XXXXXXXXX).
+    const pf = payload.payload || {};
+    if (pf.contact_number && !ph11(pf.contact_number)) { showToast('Contact number must be an 11-digit mobile number (e.g. 09171234567).', 'error'); return; }
+    if (pf.phone && !ph11(pf.phone)) { showToast('Phone must be an 11-digit mobile number (e.g. 09171234567).', 'error'); return; }
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
     try {
         const d = await csrfFetch(API_URL, payload);

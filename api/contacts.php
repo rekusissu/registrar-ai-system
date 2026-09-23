@@ -225,7 +225,7 @@ try {
                             $data = [
                                 'full_name'      => trim((string) ($payload['full_name'] ?? '')),
                                 'relationship'   => $rel,
-                                'contact_number' => trim((string) ($payload['contact_number'] ?? '')),
+                                'contact_number' => normalizePhone(trim((string) ($payload['contact_number'] ?? ''))),
                                 'email'          => trim((string) ($payload['email'] ?? '')) !== '' ? strtolower(trim((string) $payload['email'])) : null,
                                 'address'        => trim((string) ($payload['address'] ?? '')) !== '' ? trim((string) $payload['address']) : null,
                                 'is_primary'     => !empty($payload['is_primary']) ? 1 : 0,
@@ -233,6 +233,9 @@ try {
                             ];
                             if ($data['full_name'] === '') {
                                 throw new RuntimeException('Guardian name is required.');
+                            }
+                            if ($data['contact_number'] === '' || !isValidPhone($data['contact_number'])) {
+                                throw new RuntimeException('Guardian contact number is required and must be an 11-digit mobile number (e.g. 09171234567).');
                             }
                             if ($requestType === 'update' && $targetId > 0) {
                                 $db->update('guardians', $data, 'id = ? AND student_id = ?', [$targetId, $studentId]);
@@ -252,12 +255,15 @@ try {
                             $data = [
                                 'full_name'      => trim((string) ($payload['full_name'] ?? '')),
                                 'relationship'   => trim((string) ($payload['relationship'] ?? '')),
-                                'contact_number' => trim((string) ($payload['contact_number'] ?? '')),
+                                'contact_number' => normalizePhone(trim((string) ($payload['contact_number'] ?? ''))),
                                 'address'        => trim((string) ($payload['address'] ?? '')) !== '' ? trim((string) $payload['address']) : null,
                                 'is_primary'     => !empty($payload['is_primary']) ? 1 : 0,
                             ];
                             if ($data['full_name'] === '') {
                                 throw new RuntimeException('Contact name is required.');
+                            }
+                            if ($data['contact_number'] === '' || !isValidPhone($data['contact_number'])) {
+                                throw new RuntimeException('Emergency contact number is required and must be an 11-digit mobile number (e.g. 09171234567).');
                             }
                             if ($requestType === 'update' && $targetId > 0) {
                                 $db->update('emergency_contacts', $data, 'id = ? AND student_id = ?', [$targetId, $studentId]);
@@ -286,6 +292,9 @@ try {
                             ];
                             if ($data['full_name'] === '' || !isValidEmail($email)) {
                                 throw new RuntimeException('A valid name and email address are required.');
+                            }
+                            if (($data['phone'] ?? '') !== '' && !isValidPhone($data['phone'])) {
+                                throw new RuntimeException('Phone must be an 11-digit mobile number (e.g. 09171234567).');
                             }
                             if ($requestType === 'update' && $targetId > 0) {
                                 $dup = $db->fetchOne('SELECT id FROM contact_recipients WHERE student_id = ? AND email = ? AND id <> ?', [$studentId, $email, $targetId]);
@@ -420,6 +429,10 @@ try {
 
             if ($fullName === '' || !isValidEmail($email)) {
                 echo json_encode(['success' => false, 'message' => 'A valid name and email are required.']);
+                exit;
+            }
+            if ($phone !== '' && !isValidPhone($phone)) {
+                echo json_encode(['success' => false, 'message' => 'Phone must be an 11-digit mobile number (e.g. 09171234567).']);
                 exit;
             }
             if ($relationship === '' || strlen($relationship) > 40) {
