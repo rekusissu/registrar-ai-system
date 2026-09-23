@@ -1176,14 +1176,19 @@ function createStudentFromInput(array $input, $db): array
 
         // Fall back to the student's email (or generate one) as the
         // email field — kept separate from the username login.
+        // Derive domain from MAIL_FROM so auto-generated addresses
+        // land on a domain that actually accepts mail.
         $studentEmail = $data['email'] ?? null;
         if (!$studentEmail || !isValidEmail($studentEmail)) {
-            $studentEmail = 'student_' . $newId . '@bestlink.edu.ph';
+            $fallbackDomain = (defined('MAIL_FROM') && MAIL_FROM !== '')
+                ? substr(MAIL_FROM, strrpos(MAIL_FROM, '@') + 1)
+                : 'bestlink.edu.ph';
+            $studentEmail = 'student_' . $newId . '@' . $fallbackDomain;
         }
         // Ensure email uniqueness — append a suffix if it already exists.
         $emailCheck = $db->fetchOne("SELECT id FROM users WHERE email = ?", [$studentEmail]);
         if ($emailCheck) {
-            $studentEmail = 'student_' . $newId . '_' . date('ymd') . '@bestlink.edu.ph';
+            $studentEmail = 'student_' . $newId . '_' . date('ymd') . '@' . substr($studentEmail, strrpos($studentEmail, '@') + 1);
         }
         // Ensure username uniqueness — append a suffix if it already exists.
         $userCheck = $db->fetchOne("SELECT id FROM users WHERE username = ?", [$username]);

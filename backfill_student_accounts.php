@@ -71,7 +71,10 @@ foreach ($students as $s) {
     // Email: use student email if valid, else generate
     $email = trim((string)($s['email'] ?? ''));
     if (!isValidEmail($email)) {
-        $email = 'student_' . $s['student_number'] . '@bestlink.edu.ph';
+        $fallbackDomain = (defined('MAIL_FROM') && MAIL_FROM !== '')
+            ? substr(MAIL_FROM, strrpos(MAIL_FROM, '@') + 1)
+            : 'bestlink.edu.ph';
+        $email = 'student_' . $s['student_number'] . '@' . $fallbackDomain;
     }
 
     // Collision guards (username & email are UNIQUE)
@@ -83,9 +86,10 @@ foreach ($students as $s) {
     $emailBase = $email;
     $n = 0;
     while (($db->fetchOne("SELECT id FROM users WHERE email = ?", [$email]) !== false) && $n < 5) {
-        $email = 'student_' . $s['student_number'] . '_' . date('ymd') . ($n ? "_$n" : '') . '@bestlink.edu.ph';
+        $emailDomain = substr($email, strrpos($email, '@') + 1);
+        $email = 'student_' . $s['student_number'] . '_' . date('ymd') . ($n ? "_$n" : '') . '@' . $emailDomain;
         $n++;
-        if ($n === 1) { $email = 'student_' . $s['student_number'] . '_' . date('ymd') . '@bestlink.edu.ph'; }
+        if ($n === 1) { $email = 'student_' . $s['student_number'] . '_' . date('ymd') . '@' . $emailDomain; }
     }
     unset($emailBase);
 
