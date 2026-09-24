@@ -3,13 +3,12 @@
 //  API/AI-TOOLS.PHP
 //  Batch AI tools for the student list page.
 //  Actions:
-//    action=quality      → data-quality summary + flags for all students
-//    action=standardize  → draft standardization changes (AI-assisted)
-//    action=apply_std    → apply a specific standardization change
-//    action=scan_dupes   → fuzzy duplicate scan across the table
-//    action=profile      → AI digest of one student (academic+scans+docs)
-//  LLM calls are cached in ai_cache. Writes only happen via
-//  apply_std (a registrar confirms each change).
+//    action=quality           → deterministic student-record quality queue
+//    action=quality_summary   → AI explanation of one student's detected issues
+//    action=apply_safe_repairs → apply registrar-confirmed safe corrections
+//    action=report            → AI population report
+//  LLM responses are cached in ai_cache. Deterministic checks create findings;
+//  writes are limited to explicitly confirmed safe repairs.
 // ============================================================
 
 require_once __DIR__ . '/../shared/security_headers.php';
@@ -25,8 +24,10 @@ if (empty($_SESSION['user_id'])) {
 
 require_once __DIR__ . '/../shared/config.php';
 require_once __DIR__ . '/../shared/database.php';
+require_once __DIR__ . '/../shared/functions.php';
 require_once __DIR__ . '/../shared/ai_client.php';
 require_once __DIR__ . '/../shared/normalize.php';
+require_once __DIR__ . '/../shared/student_quality.php';
 
 header('Content-Type: application/json');
 
@@ -36,12 +37,152 @@ if (!is_array($input)) {
     $input = [];
 }
 
+$qualityActions = ['quality', 'quality_summary', 'apply_safe_repairs'];
+if (in_array($action, $qualityActions, true) && !in_array(getCurrentUserRole(), ['admin', 'registrar'], true)) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Forbidden.']);
+    exit;
+}
+
 $db = Database::getInstance();
 
 switch ($action) {
 
+    // ─── STUDENT PAGE: DATA QUALITY SCAN ────────────────────────
+    case 'quality':
+        $students = $db->fetchAll(
+            "SELECT id, student_number, first_name, middle_name, last_name, gender,
+                    birth_date, nationality, address, contact_number, email, course,
+                    major, year_level, school_year, semester, section, status
+             FROM students ORDER BY last_name, first_name, id"
+        );
+        $reports = [];
+        $issueCounts = ['identity' => 0, 'contact' => 0, 'academic' => 0, 'duplicate' => 0];
+        foreach ($students as $student) {
+            $report = buildStudentQualityReport($student);
+            $report['duplicates'] = studentQualityDuplicateCandidates($student, $students);
+            if (!empty($report['duplicates'])) $report['score'] = max(0, $report['score'] - 20);
+            if (empty($report['issues']) && empty($report['duplicates'])) continue;
+            $report['student'] = [
+                'id' => (int)$student['id'],
+                'student_number' => (string)($student['student_number'] ?? ''),
+                'name' => trim(($student['first_name'] ?? '') . ' ' . ($student['last_name'] ?? '')),
+                'course' => (string)($student['course'] ?? ''),
+                'year_level' => $student['year_level'],
+                'status' => (string)($student['status'] ?? ''),
+            ];
+            $categories = array_unique(array_column($report['issues'], 'category'));
+            if (!empty($report['duplicates'])) $categories[] = 'duplicate';
+            foreach ($categories as $category) $issueCounts[$category] = ($issueCounts[$category] ?? 0) + 1;
+            $reports[] = $report;
+        }
+        usort($reports, static function (array $a, array $b): int {
+            return count($b['issues']) <=> count($a['issues']) ?: $a['score'] <=> $b['score'];
+        });
+        echo json_encode(['success' => true, 'data' => [
+            'total_students' => count($students),
+            'needs_review' => count($reports),
+            'issue_counts' => $issueCounts,
+            'students' => $reports,
+            'generated_at' => date('c'),
+        ]]);
+        exit;
+
+    // ─── AI EXPLANATION OF ONE STUDENT'S DETECTED ISSUES ─────────
+    case 'quality_summary':
+        $studentId = (int)($input['student_id'] ?? 0);
+        if (!$studentId) {
+            echo json_encode(['success' => false, 'message' => 'Student is required.']);
+            exit;
+        }
+        $student = $db->fetchOne("SELECT * FROM students WHERE id = ?", [$studentId]);
+        if (!$student) {
+            echo json_encode(['success' => false, 'message' => 'Student not found.']);
+            exit;
+        }
+        $report = buildStudentQualityReport($student);
+        $facts = [
+            'name' => trim(($student['first_name'] ?? '') . ' ' . ($student['last_name'] ?? '')),
+            'score' => $report['score'],
+            'issues' => array_map(static fn(array $issue): array => [
+                'field' => $issue['label'], 'severity' => $issue['severity'],
+                'message' => $issue['message'],
+            ], $report['issues']),
+        ];
+        $summary = aiGenerate(
+            'You explain deterministic student data-quality findings to a registrar. Write one concise paragraph. Use only supplied facts, do not invent values, and do not recommend automatic identity changes.',
+            json_encode($facts),
+            ['max_tokens' => 220, 'temperature' => 0.1]
+        );
+        echo json_encode(['success' => true, 'data' => [
+            'summary' => $summary !== '' ? $summary : $report['summary'],
+            'source' => $summary !== '' ? 'ai' : 'rules',
+            'report' => $report,
+        ]]);
+        exit;
+
+    // ─── APPLY EXPLICITLY CONFIRMED SAFE REPAIRS ────────────────
+    case 'apply_safe_repairs':
+        $studentId = (int)($input['student_id'] ?? 0);
+        $requested = $input['repairs'] ?? [];
+        if (!$studentId || !is_array($requested) || empty($requested)) {
+            echo json_encode(['success' => false, 'message' => 'Student and safe repairs are required.']);
+            exit;
+        }
+        $conn = $db->getConnection();
+        $conn->beginTransaction();
+        try {
+            $student = $db->fetchOne("SELECT * FROM students WHERE id = ? FOR UPDATE", [$studentId]);
+            if (!$student) {
+                $conn->rollBack();
+                echo json_encode(['success' => false, 'message' => 'Student not found.']);
+                exit;
+            }
+            $allowed = ['contact_number', 'email', 'course'];
+            $report = buildStudentQualityReport($student);
+            $safeByField = [];
+            foreach ($report['safe_repairs'] as $repair) $safeByField[$repair['field']] = $repair;
+            $updates = [];
+            $oldValues = [];
+            foreach ($requested as $request) {
+                $field = (string)($request['field'] ?? '');
+                $expected = (string)($request['expected_value'] ?? '');
+                $suggested = (string)($request['suggested_value'] ?? '');
+                if (!in_array($field, $allowed, true) || !isset($safeByField[$field])) continue;
+                if ($safeByField[$field]['current_value'] !== $expected) {
+                    $conn->rollBack();
+                    echo json_encode(['success' => false, 'message' => 'The record changed. Refresh the quality check before applying.']);
+                    exit;
+                }
+                if ($safeByField[$field]['suggested_value'] !== $suggested) continue;
+                $updates[$field] = $suggested;
+                $oldValues[$field] = $expected;
+            }
+            if (empty($updates)) {
+                $conn->rollBack();
+                echo json_encode(['success' => false, 'message' => 'No verified safe repairs were selected.']);
+                exit;
+            }
+            $db->update('students', $updates, 'id = ?', [$studentId]);
+            logActivity(
+                (int)($_SESSION['user_id'] ?? 0), 'student_quality_safe_repair', null,
+                'students', $studentId, $oldValues, $updates
+            );
+            $conn->commit();
+        } catch (Throwable $e) {
+            if ($conn->inTransaction()) $conn->rollBack();
+            error_log('[ai-tools] safe repair failed: ' . $e->getMessage());
+            echo json_encode(['success' => false, 'message' => 'Corrections could not be applied.']);
+            exit;
+        }
+        echo json_encode(['success' => true, 'message' => 'Safe corrections applied.', 'data' => ['updated_fields' => array_keys($updates)]]);
+        exit;
+
+
+
     // ─── BATCH AI REPORT (whole list summary) ─────────────────
     case 'report':
+
         $students = $db->fetchAll("SELECT * FROM students");
         $total = count($students);
         $active = 0; $atRisk = 0; $noGender = 0; $noCourse = 0;

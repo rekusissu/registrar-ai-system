@@ -160,8 +160,30 @@ include '../includes/sidebar.php';
 .table-footer .info-text{font-size:13px;color:#64748b}
 .table-footer .info-text strong{color:#0f172a}
 
+/* Data Quality review modal */
+#qualityModal .modal-content{max-width:1040px;height:min(760px,88vh);padding:0;overflow:hidden;display:flex;flex-direction:column}
+.quality-shell{display:flex;flex:1;min-height:0}
+.quality-queue{width:330px;flex:0 0 330px;border-right:1px solid #e5e7eb;background:#f8fafc;display:flex;flex-direction:column;min-height:0}
+.quality-queue-head{padding:18px;border-bottom:1px solid #e2e8f0}
+.quality-queue-head h3{font-family:Fraunces,serif;font-size:19px;color:#14213d;margin:0 0 3px}.quality-queue-head p{font-size:12px;color:#64748b;margin:0 0 12px}
+.quality-search{position:relative}.quality-search i{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:12px}.quality-search input{width:100%;padding:9px 10px 9px 32px;border:1px solid #dbe2ea;border-radius:9px;font-size:13px;background:#fff}
+.quality-filters{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.quality-filter{border:1px solid #dbe2ea;background:#fff;color:#64748b;border-radius:999px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer}.quality-filter.active{background:#14213d;border-color:#14213d;color:#fff}
+.quality-list{overflow:auto;padding:8px;flex:1}.quality-student{width:100%;border:1px solid transparent;background:transparent;border-radius:11px;padding:11px;text-align:left;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:4px 8px;margin-bottom:4px}.quality-student:hover{background:#fff}.quality-student.active{background:#fff;border-color:#bfdbfe;box-shadow:0 3px 12px rgba(15,23,42,.06)}
+.quality-student-name{font-size:13px;font-weight:700;color:#0f172a}.quality-student-num{font-size:11px;color:#64748b;font-family:'JetBrains Mono',monospace}.quality-student-count{grid-row:1/3;align-self:center;min-width:25px;height:25px;border-radius:999px;display:grid;place-items:center;background:#fee2e2;color:#b91c1c;font-size:11px;font-weight:800}
+.quality-detail{flex:1;min-width:0;overflow:auto;background:#fff}.quality-detail-empty{height:100%;display:grid;place-items:center;padding:40px;text-align:center;color:#94a3b8}
+.quality-detail-inner{padding:24px 26px 88px}.quality-person{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;padding-bottom:18px;border-bottom:1px solid #e2e8f0}.quality-person h2{font-family:Fraunces,serif;font-size:24px;color:#14213d;margin:0 0 5px}.quality-person p{font-size:12px;color:#64748b;margin:0}
+.quality-score{text-align:right;flex:0 0 auto}.quality-score strong{display:block;font-size:29px;line-height:1;color:#14213d}.quality-score span{font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px}
+.quality-ai{margin:18px 0;padding:15px 16px;background:#f5f8ff;border:1px solid #c7d7fe;border-left:4px solid #2563eb;border-radius:10px}.quality-ai-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:7px}.quality-ai-head strong{font-size:12px;color:#1e40af}.quality-ai p{font-size:13px;line-height:1.6;color:#334155;margin:0}.quality-ai-actions{display:flex;gap:8px;margin-top:11px}
+.quality-section-title{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:#64748b;margin:22px 0 9px}
+.quality-issue{border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:8px;border-left-width:4px}.quality-issue.high{border-left-color:#b91c1c}.quality-issue.medium{border-left-color:#b45309}.quality-issue.low{border-left-color:#2563eb}.quality-issue-top{display:flex;justify-content:space-between;gap:12px}.quality-issue strong{font-size:13px;color:#0f172a}.quality-issue p{font-size:12px;color:#64748b;margin:4px 0 0}.quality-value-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px}.quality-value{padding:8px 10px;background:#f8fafc;border-radius:7px}.quality-value label{display:block;font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:2px}.quality-value span{font-size:12px;color:#334155;word-break:break-word}.quality-value.suggested{background:#f0fdf4}.quality-value.suggested label{color:#15803d}
+.quality-duplicate{padding:12px 14px;border:1px solid #fed7aa;background:#fffaf1;border-radius:10px;font-size:12px;color:#7c2d12}.quality-duplicate + .quality-duplicate{margin-top:7px}
+.quality-actions{position:absolute;left:0;right:0;bottom:0;min-height:68px;padding:12px 26px;border-top:1px solid #e2e8f0;background:rgba(255,255,255,.96);display:flex;justify-content:flex-end;align-items:center;gap:8px}.quality-detail{position:relative}
+.quality-empty{padding:32px;text-align:center;color:#64748b;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px}.quality-empty i{font-size:30px;color:#94a3b8;display:block;margin-bottom:8px}
+@media(max-width:760px){#qualityModal .modal-content{height:94vh;max-height:94vh}.quality-shell{display:block;overflow:auto}.quality-queue{width:100%;height:250px;border-right:0;border-bottom:1px solid #e2e8f0}.quality-detail{overflow:visible}.quality-detail-inner{padding:18px 16px 86px}.quality-actions{position:sticky;padding:10px 16px}.quality-person{display:block}.quality-score{text-align:left;margin-top:10px}.quality-value-grid{grid-template-columns:1fr}.quality-ai-actions{flex-wrap:wrap}}
+@media(prefers-reduced-motion:reduce){.quality-student{transition:none}}
 /* Empty state */
 .vtab.active{border-bottom-color:#2563eb !important;color:#2563eb !important;}
+
 .vtab-content.active{display:block}
 .empty-state{text-align:center;padding:30px 20px;color:#94a3b8;min-height:200px}
 .empty-state i{font-size:36px;color:#e2e8f0;display:block;margin-bottom:8px}
@@ -465,11 +487,32 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 </div>
 <div class="modal-footer"><button class="btn btn-secondary" onclick="resendWelcomeEmail()" id="resendWelcomeBtn"><i class="fas fa-envelope"></i> Resend Welcome Email</button> <button class="btn btn-primary" onclick="closeViewModal()"><i class="fas fa-times"></i> Close</button></div></div></div>
 
-<!-- Data Quality Panel Modal -->
-<div class="modal-overlay" id="qualityModal"><div class="modal-content" style="max-width:760px;"><div class="modal-header"><h2><i class="fas fa-shield-halved"></i> Data Quality</h2><button class="modal-close" onclick="closeQualityPanel()"><i class="fas fa-times"></i></button></div><div class="modal-body">
-<div id="qualityLoading" style="text-align:center;padding:30px;color:#94a3b8;"><i class="fas fa-spinner fa-spin"></i> Analyzing records...</div>
-<div id="qualityContent" style="display:none;"></div>
-</div><div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeQualityPanel()">Close</button><button id="qualityRefreshBtn" type="button" class="btn btn-secondary" onclick="openQualityPanel(true)"><i class="fas fa-rotate"></i> Refresh</button></div></div></div>
+<!-- Data Quality Review Desk -->
+<div class="modal-overlay" id="qualityModal" role="dialog" aria-modal="true" aria-labelledby="qualityModalTitle">
+    <div class="modal-content">
+        <div class="modal-header" style="padding:18px 22px;margin:0;border-bottom:1px solid #e2e8f0">
+            <div><h2 id="qualityModalTitle"><i class="fas fa-shield-halved"></i> Student Data Quality</h2><p style="font-size:12px;color:#64748b;margin:4px 0 0">Review incomplete and inconsistent student records.</p></div>
+            <div style="display:flex;gap:8px;align-items:center"><button type="button" class="btn btn-secondary" id="qualityRefreshBtn" style="padding:8px 12px;font-size:12px"><i class="fas fa-rotate"></i> Refresh</button><button class="modal-close" aria-label="Close Data Quality" onclick="closeQualityPanel()"><i class="fas fa-times"></i></button></div>
+        </div>
+        <div class="quality-shell">
+            <section class="quality-queue" aria-label="Students needing review">
+                <div class="quality-queue-head">
+                    <h3>Records to review</h3><p id="qualityQueueMeta">Checking student records…</p>
+                    <div class="quality-search"><i class="fas fa-search"></i><input id="qualitySearch" type="search" placeholder="Search name or student #" autocomplete="off"></div>
+                    <div class="quality-filters" id="qualityFilters">
+                        <button type="button" class="quality-filter active" data-filter="all">All</button>
+                        <button type="button" class="quality-filter" data-filter="identity">Identity</button>
+                        <button type="button" class="quality-filter" data-filter="contact">Contact</button>
+                        <button type="button" class="quality-filter" data-filter="academic">Academic</button>
+                        <button type="button" class="quality-filter" data-filter="duplicate">Duplicates</button>
+                    </div>
+                </div>
+                <div class="quality-list" id="qualityList"></div>
+            </section>
+            <section class="quality-detail" id="qualityDetail" aria-live="polite"><div class="quality-detail-empty"><div><i class="fas fa-user-check"></i><p>Select a student to review their record.</p></div></div></section>
+        </div>
+    </div>
+</div>
 
 <!-- Add Modal (inline, with guardian) -->
 <div class="modal-overlay" id="addModal"><div class="modal-content" style="max-width:760px;"><div class="modal-header"><h2><i class="fas fa-plus-circle"></i> Enroll New Student</h2><div style="display:flex;gap:8px;align-items:center;"><button class="btn btn-secondary" style="padding:6px 12px;font-size:12px;" onclick="openPasteModal()"><i class="fas fa-magic"></i> Paste to Fill</button><button class="modal-close" onclick="closeAddModal()"><i class="fas fa-times"></i></button></div></div><form id="addForm"><div class="modal-body">
@@ -551,6 +594,7 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 </div>
 <div class="modal-footer"><button class="btn btn-secondary" onclick="loadEnrollments()"><i class="fas fa-rotate"></i> Refresh</button><button class="btn btn-light" onclick="closeReceiveModal()"><i class="fas fa-times"></i> Close</button></div></div></div>
 
+<script src="<?= $APP_ROOT ?>js/student-data-quality.js?v=<?= is_file(__DIR__ . '/../js/student-data-quality.js') ? filemtime(__DIR__ . '/../js/student-data-quality.js') : time() ?>"></script>
 <script>
 // ─── DATA ────────────────────────────────────────────────────
 const searchInput = document.getElementById('studentSearch');
@@ -1084,9 +1128,11 @@ async function aiPost(action, body) {
 // Batch AI tools (data quality, standardization, duplicate scan) live
 // in api/ai-tools.php, not ai-assist.php.
 async function aiToolsPost(action, body) {
+    const csrfMeta = document.querySelector('meta[name=csrf-token]');
+    const headers = { 'Content-Type': 'application/json' };
+    if (csrfMeta) headers['X-CSRF-Token'] = csrfMeta.getAttribute('content') || '';
     const res = await fetch('../api/ai-tools.php?action=' + action, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body || {})
+        method: 'POST', headers: headers, body: JSON.stringify(body || {})
     });
     return await res.json();
 }
@@ -1227,123 +1273,7 @@ function standardizeCourse() {
 }
 document.getElementById('addCourse').addEventListener('blur', standardizeCourse);
 
-// ─── DATA QUALITY PANEL ─────────────────────────────────────
-let qualityData = null;
-function openQualityPanel(force) {
-    const modal = document.getElementById('qualityModal');
-    const loading = document.getElementById('qualityLoading');
-    const content = document.getElementById('qualityContent');
-    modal.classList.add('active');
-    document.body.style.overflow = 'hidden';
-    loading.style.display = '';
-    content.style.display = 'none';
-    aiToolsPost('quality').then(d => {
-        loading.style.display = 'none';
-        if (!d.success || !d.data) { content.innerHTML = '<p style="color:#dc2626;">Failed to analyze.</p>'; content.style.display='block'; return; }
-        qualityData = d.data;
-        renderQualityPanel();
-    }).catch(() => { loading.style.display='none'; content.innerHTML='<p style="color:#dc2626;">Error analyzing data.</p>'; content.style.display='block'; });
-}
-function closeQualityPanel() { document.getElementById('qualityModal').classList.remove('active'); document.body.style.overflow = ''; }
-document.getElementById('qualityModal').addEventListener('click', function(e) { if (e.target === this) closeQualityPanel(); });
-
-function renderQualityPanel() {
-    const d = qualityData;
-    let html = '<div style="margin-bottom:14px;"><b style="font-size:14px;color:#0f172a;">' + d.total_students + ' student records</b></div>';
-    // Issue summary
-    const issues = d.issue_counts || {};
-    const issueKeys = Object.keys(issues);
-    if (issueKeys.length) {
-        html += '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:6px;">Data Issues</div><div style="margin-bottom:12px;">';
-        issueKeys.forEach(k => {
-            html += '<div style="display:flex;justify-content:space-between;padding:5px 8px;background:#fef2f2;border-radius:6px;margin-bottom:4px;font-size:13px;color:#991b1b;"><span>' + k + '</span><b>' + issues[k] + '</b></div>';
-        });
-        html += '</div>';
-    } else {
-        html += '<p style="color:#16a34a;font-size:13px;"><i class="fas fa-check-circle"></i> No data issues found.</p>';
-    }
-    // Non-standard courses
-    const nsc = d.non_standard_courses || [];
-    if (nsc.length) {
-        html += '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin:10px 0 6px;">Non-standard course names</div>';
-        nsc.forEach(c => {
-            const btn = c.standardized
-                ? '<button class="btn btn-secondary" style="padding:3px 10px;font-size:11px;margin-left:6px;" onclick="applyStd(\'' + c.raw.replace(/'/g,"\\'") + '\',\'' + c.standardized.replace(/'/g,"\\'") + '\')">Fix → ' + c.standardized + '</button>'
-                : '<span style="color:#94a3b8;font-size:11px;margin-left:6px;">(no confident match)</span>';
-            html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 8px;background:#fffbeb;border-radius:6px;margin-bottom:4px;font-size:13px;color:#92400e;"><span><b>' + c.raw + '</b> × ' + c.count + '</span>' + btn + '</div>';
-        });
-    }
-    html += '<div style="margin-top:14px;border-top:1px solid #e2e8f0;padding-top:12px;">';
-    html += '<button class="btn btn-secondary" style="margin-right:6px;" onclick="runDupScan()"><i class="fas fa-clone"></i> Scan for Duplicates</button>';
-    html += '<button class="btn btn-secondary" onclick="runStandardizeAll()"><i class="fas fa-magic"></i> Standardize All Courses</button>';
-    html += '</div><div id="qualityResult" style="margin-top:12px;"></div>';
-    document.getElementById('qualityContent').innerHTML = html;
-    document.getElementById('qualityContent').style.display = 'block';
-}
-
-function runDupScan() {
-    const box = document.getElementById('qualityResult');
-    box.innerHTML = '<p style="color:#64748b;font-size:13px;"><i class="fas fa-spinner fa-spin"></i> Scanning...</p>';
-    aiToolsPost('scan_dupes').then(d => {
-        if (!d.success) { box.innerHTML = '<p style="color:#dc2626;">Scan failed.</p>'; return; }
-        const pairs = (d.data && d.data.pairs) || [];
-        if (!pairs.length) { box.innerHTML = '<p style="color:#16a34a;font-size:13px;"><i class="fas fa-check-circle"></i> No likely duplicates found.</p>'; return; }
-        let html = '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94a3b8;margin-bottom:6px;">Potential duplicates</div>';
-        pairs.forEach(p => {
-            html += '<div style="background:#f8fafc;border-radius:6px;padding:8px;margin-bottom:6px;font-size:13px;color:#334155;">'
-                + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;"><span><b>' + p.a.name + '</b> (' + p.a.sn + ') <span style="color:#94a3b8;">vs</span> <b>' + p.b.name + '</b> (' + p.b.sn + ') <span style="color:#64748b;font-size:11px;">· score ' + p.score + '</span></span>'
-                + '<button class="btn btn-secondary" style="padding:3px 10px;font-size:11px;" onclick="mergeDupes(' + p.a.id + ',' + p.b.id + ',this)"><i class="fas fa-code-merge"></i> Merge</button></div></div>';
-        });
-        box.innerHTML = html;
-    }).catch(() => { box.innerHTML = '<p style="color:#dc2626;">Scan error.</p>'; });
-}
-
-function runStandardizeAll() {
-    const box = document.getElementById('qualityResult');
-    box.innerHTML = '<p style="color:#64748b;font-size:13px;"><i class="fas fa-spinner fa-spin"></i> Drafting standardization...</p>';
-    aiToolsPost('standardize').then(d => {
-        if (!d.success) { box.innerHTML = '<p style="color:#dc2626;">Failed.</p>'; return; }
-        const changes = (d.data && d.data.changes) || [];
-        if (!changes.length) { box.innerHTML = '<p style="color:#16a34a;font-size:13px;"><i class="fas fa-check-circle"></i> All course names already standardized.</p>'; return; }
-        let html = '<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#94a3b8;margin-bottom:6px;">' + changes.length + ' course change(s) ready</div>';
-        changes.forEach(c => {
-            html += '<div style="display:flex;align-items:center;justify-content:space-between;background:#f8fafc;border-radius:6px;padding:6px 8px;margin-bottom:4px;font-size:13px;color:#334155;"><span>' + c.from + ' <span style="color:#94a3b8;">→</span> <b>' + c.to + '</b></span><button class="btn btn-secondary" style="padding:3px 10px;font-size:11px;" onclick="applyStdById(' + c.id + ',\'' + c.to.replace(/'/g,"\\'") + '\',this)">Apply</button></div>';
-        });
-        box.innerHTML = html;
-    }).catch(() => { box.innerHTML = '<p style="color:#dc2626;">Error.</p>'; });
-}
-
-function applyStd(from, to) {
-    if (!confirm('Change "' + from + '" → "' + to + '"?')) return;
-    aiToolsPost('standardize').then(d => {
-        if (!d.success) return;
-        const changes = (d.data && d.data.changes) || [];
-        const match = changes.filter(c => c.from === from).map(c => c.id);
-        const chain = match.map(id => aiToolsPost('apply_std', { id, to }));
-        return Promise.all(chain);
-    }).then(() => { showToast('Course standardized.', 'success'); openQualityPanel(true); }).catch(() => showToast('Error applying.', 'error'));
-}
-function applyStdById(id, to, btn) {
-    if (!confirm('Apply course change?')) return;
-    btn.disabled = true;
-    aiToolsPost('apply_std', { id, to }).then(d => {
-        if (d.success) { showToast('Course updated.', 'success'); btn.parentElement.remove(); }
-        else { showToast(d.message || 'Failed.', 'error'); btn.disabled = false; }
-    }).catch(() => { showToast('Error.', 'error'); btn.disabled = false; });
-}
-
-// ─── MERGE DUPLICATES ───────────────────────────────────────
-function mergeDupes(idA, idB, btn) {
-    const which = confirm('Merge these duplicates?\n\nKeep A (record ' + idA + ') and remove B (record ' + idB + ')?\n\nClick OK to keep the FIRST record, or Cancel to keep the SECOND.');
-    const keeperId = which ? idA : idB;
-    const removeId = which ? idB : idA;
-    if (!confirm('Keep record ' + keeperId + ' and delete record ' + removeId + '? This moves all related records (documents, guardians, RFID, etc.) to the keeper. This cannot be undone.')) return;
-    btn.disabled = true;
-    aiToolsPost('merge', { keeper_id: keeperId, remove_id: removeId }).then(d => {
-        if (d.success) { showToast('Records merged.', 'success'); setTimeout(() => window.location.reload(), 800); }
-        else { showToast(d.message || 'Merge failed.', 'error'); btn.disabled = false; }
-    }).catch(() => { showToast('Merge error.', 'error'); btn.disabled = false; });
-}
+// Data Quality review behavior is defined in js/student-data-quality.js.
 
 // ─── SECTION SUGGESTION ─────────────────────────────────────
 function suggestSection() {
