@@ -771,7 +771,9 @@ foreach ($cards as $i => $c) {
 .uid-count-hint::before { content: '\f0eb'; font-family: 'Font Awesome 6 Free'; font-weight: 900; font-size: 11px; }
 .uid-count-hint.has-count { color: #4f46e5; font-weight: 600; }
 .uid-count-hint.has-count::before { content: '\f058'; color: #16a34a; }
-/* Register modal step panels */
+/* RFID Distribution Assistant */
+.rfid-distribution-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}.rfid-distribution-summary>div{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;text-align:center}.rfid-distribution-summary strong{display:block;font-family:Fraunces,serif;font-size:24px;color:#14213d}.rfid-distribution-summary span{font-size:10px;color:#64748b}.rfid-distribution-list{display:flex;flex-direction:column;gap:8px}.rfid-distribution-row{display:grid;grid-template-columns:22px 150px 24px minmax(220px,1fr) minmax(180px,.7fr);align-items:center;gap:10px;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;background:#fff;cursor:pointer}.rfid-distribution-row:hover{border-color:#bfdbfe;background:#f8fbff}.rfid-distribution-row input{accent-color:#2563eb}.rfid-distribution-card,.rfid-distribution-student{display:flex;flex-direction:column;gap:2px}.rfid-distribution-card i{color:#2563eb}.rfid-distribution-card strong,.rfid-distribution-student strong{font-size:13px;color:#0f172a}.rfid-distribution-card small,.rfid-distribution-student small{font-size:11px;color:#64748b}.rfid-distribution-card strong{font-family:'JetBrains Mono',monospace;letter-spacing:.3px}.rfid-distribution-arrow{color:#94a3b8;text-align:center}.rfid-distribution-reason{font-size:11px;color:#64748b;line-height:1.4}.rfid-distribution-review{display:flex;align-items:center;gap:8px;padding:10px 12px;background:#fffaf1;border:1px solid #fed7aa;border-radius:9px;color:#7c2d12;font-size:12px;margin-top:7px}.rfid-distribution-ai{margin:0 0 14px;padding:12px 14px;background:#f5f8ff;border:1px solid #c7d7fe;border-left:4px solid #2563eb;border-radius:9px}.rfid-distribution-ai strong{font-size:12px;color:#1e40af}.rfid-distribution-ai p{font-size:12px;line-height:1.5;color:#475569;margin:5px 0 0}@media(max-width:760px){.rfid-distribution-summary{grid-template-columns:repeat(2,1fr)}.rfid-distribution-row{grid-template-columns:22px 1fr 1fr}.rfid-distribution-arrow{display:none}.rfid-distribution-reason{grid-column:2/4}.rfid-distribution-row{min-height:72px}}
+
 .reg-step-panel { display: none; flex-direction: column; flex: 1; min-height: 0; }
 .reg-step-panel.active { display: flex; }
 .reg-step-panel .rfid-modal-body-wrapper { margin: 0 !important; padding: 0 !important; }
@@ -1042,8 +1044,8 @@ foreach ($cards as $i => $c) {
                     </select>
                     <i class="fas fa-chevron-down filter-select-arrow"></i>
                 </div>
-                                <button type="button" id="aiRfidSearchBtn" class="btn btn-secondary" title="Ask AI to search cards - e.g. 'expired cards', 'lost cards', 'BSIT students'">
-                    <i class="fas fa-wand-magic-sparkles" style="color:#7c3aed;"></i> AI
+                <button type="button" id="rfidDistributionBtn" class="btn btn-secondary" title="Prepare a reviewable card distribution plan">
+                    <i class="fas fa-wand-magic-sparkles" style="color:#2563eb;"></i> Distribution Assistant
                 </button>
                 <button type="button" id="resetFilterBtn" class="btn btn-light"><i class="fas fa-undo"></i> Reset</button>
             </div>
@@ -1237,18 +1239,16 @@ foreach ($cards as $i => $c) {
     </div>
     <?php endif; ?>
     
-    <!-- AI Inventory Insights Panel -->
-    <div class="ai-panel" id="aiInventoryPanel">
+    <!-- RFID Distribution Assistant -->
+    <div class="ai-panel" id="rfidDistributionPanel">
         <div class="ai-panel-header">
-            <div class="ai-icon"><i class="fas fa-brain"></i></div>
-            <div>
-                <h3>AI Inventory Insights</h3>
-                <p>Smart analysis of your RFID card inventory</p>
-            </div>
-            <button class="btn btn-light" style="margin-left:auto;" onclick="refreshAiPanel()"><i class="fas fa-sync-alt"></i> Refresh</button>
+            <div class="ai-icon"><i class="fas fa-wand-magic-sparkles"></i></div>
+            <div><h3>RFID Distribution Assistant</h3><p>Prepare a reviewable plan for available cards and students without an RFID card.</p></div>
+            <button class="btn btn-light" style="margin-left:auto;" onclick="openRfidDistribution()"><i class="fas fa-list-check"></i> Prepare distribution</button>
         </div>
-        <div class="ai-insights" id="aiInsightsGrid">
-            <div class="ai-insight-card"><div class="label">Loading...</div><div class="value">-</div></div>
+        <div class="ai-insight-card" style="border-left:4px solid #2563eb;">
+            <strong style="font-size:13px;color:#1e40af;">How it works</strong>
+            <div class="sub" style="margin-top:4px;line-height:1.6;">The assistant pairs available cards with eligible students, then waits for your confirmation. It never assigns cards automatically.</div>
         </div>
     </div>
 </main>
@@ -1785,31 +1785,28 @@ foreach ($cards as $i => $c) {
     </div>
 </div>
 
-<!-- AI Chat FAB + Window -->
-<button class="ai-chat-fab" id="aiChatFab" onclick="toggleAiChat()" title="AI RFID Assistant">
-    <i class="fas fa-robot"></i>
-</button>
-<div class="ai-chat-window" id="aiChatWindow">
-    <div class="ai-chat-head">
-        <div class="ai-avatar"><i class="fas fa-robot"></i></div>
-        <div>
-            <h4>RFID AI Assistant</h4>
-            <p>Ask about card inventory, assignments, trends...</p>
-        </div>
-        <button onclick="toggleAiChat()"><i class="fas fa-times"></i></button>
-    </div>
-    <div class="ai-chat-messages" id="aiChatMessages">
-        <div class="ai-chat-msg bot">Hello! I'm your RFID card inventory assistant. Ask me anything about card status, inventory stats, or best practices.</div>
-    </div>
-    <div class="ai-chat-input">
-        <input type="text" id="aiChatInput" placeholder="Ask about RFID cards..." onkeydown="if(event.key==='Enter')sendAiChat()" />
-        <button onclick="sendAiChat()" id="aiChatSendBtn"><i class="fas fa-paper-plane"></i></button>
-    </div>
-</div>
 
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
+<!-- RFID Distribution Assistant Modal -->
+<div class="logout-modal-overlay" id="rfidDistributionModal">
+    <div class="logout-modal rfid-modal" style="max-width:980px;width:min(980px,94vw)">
+        <div class="rfid-modal-header">
+            <div class="header-icon assign"><i class="fas fa-wand-magic-sparkles"></i></div>
+            <div><h3>Prepare RFID distribution</h3><p>Review proposed card-to-student assignments before applying.</p></div>
+        </div>
+        <div class="rfid-modal-body-wrapper" id="rfidDistributionBody">
+            <div class="ai-insight-card" style="text-align:center;color:#64748b;"><i class="fas fa-spinner fa-spin"></i> Loading available cards and students…</div>
+        </div>
+        <div class="rfid-modal-actions">
+            <button type="button" class="btn btn-light" onclick="closeRfidDistribution()">Cancel</button>
+            <button type="button" class="btn btn-primary" id="applyRfidDistributionBtn" onclick="applyRfidDistribution()" disabled><i class="fas fa-check"></i> Apply selected</button>
+        </div>
+    </div>
+</div>
+
+<script src="<?= $APP_ROOT ?>js/rfid-distribution.js?v=<?= is_file(__DIR__ . '/../js/rfid-distribution.js') ? filemtime(__DIR__ . '/../js/rfid-distribution.js') : time() ?>"></script>
 <script>
 // =================================================================
 // RFID CARDS &mdash; INLINE JS
@@ -1882,56 +1879,7 @@ if (resetFilterBtn) resetFilterBtn.addEventListener('click', () => {
     rfidSearchInput && rfidSearchInput.focus();
 });
 
-// â”€â”€ Assign modal: students from <select> â”€â”€
-// AI card search (api/rfid-ai-search.php)
-const aiRfidBtn = document.getElementById('aiRfidSearchBtn');
-const aiRfidInfo = document.getElementById('aiRfidInterpretation');
-const aiRfidText = document.getElementById('aiRfidExplanation');
-
-async function runAiCardSearch() {
-    const query = (rfidSearchInput?.value || '').trim();
-    if (query.length < 3) { showToast('Type at least 3 characters for AI search.', 'info'); return; }
-    aiRfidBtn.disabled = true;
-    aiRfidBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> AI';
-    if (aiRfidInfo) aiRfidInfo.style.display = 'none';
-    try {
-        const res = await fetch('../api/rfid-ai-search.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query })
-        });
-        const data = await res.json();
-        if (!data.success) throw new Error(data.message || 'AI search failed.');
-        const uids = new Set((data.results || []).map(r => String(r.card_uid)));
-        let visible = 0;
-        if (rfidTableBody) {
-            rfidTableBody.querySelectorAll('tr[data-card]').forEach(row => {
-                const raw = (row.getAttribute('data-card') || '');
-                let match = false;
-                uids.forEach(uid => { if (raw.indexOf('"' + uid + '"') !== -1) match = true; });
-                row.style.display = match ? '' : 'none';
-                if (match) visible++;
-            });
-        }
-        if (showingCount) showingCount.textContent = visible;
-        if (statusFilter) statusFilter.value = '';
-        if (aiRfidInfo) {
-            aiRfidText.textContent = (data.ai_interpretation || 'Results') + ' - ' + visible + ' card(s) shown.';
-            aiRfidInfo.style.display = 'block';
-        }
-    } catch (err) {
-        console.error(err);
-        if (aiRfidInfo) {
-            aiRfidText.textContent = 'AI search failed. Check the AI server, or use the filters below.';
-            aiRfidInfo.style.display = 'block';
-        }
-    } finally {
-        aiRfidBtn.disabled = false;
-        aiRfidBtn.innerHTML = '<i class="fas fa-wand-magic-sparkles" style="color:#7c3aed;"></i> AI';
-    }
-}
-if (aiRfidBtn) aiRfidBtn.addEventListener('click', runAiCardSearch);
-
+// ─── Assign modal: students from <select> ────────────────────────
 const allStudents = [];
 const studentSelectEl = document.getElementById('studentSelect');
 if (studentSelectEl) {
@@ -2668,62 +2616,6 @@ document.getElementById('archiveConfirm')?.addEventListener('click', async () =>
     if (el) el.addEventListener('click', e => { if (e.target === e.currentTarget) { el.classList.remove('active'); document.body.style.overflow = ''; } });
 });
 
-// ── AI Inventory Panel ────────────────────────────────────────────
-async function refreshAiPanel() {
-    const grid = document.getElementById('aiInsightsGrid');
-    if (!grid) return;
-    grid.innerHTML = '<div class="ai-insight-card" style="grid-column:1/-1;text-align:center;padding:20px;color:#94a3b8;"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
-    try {
-        const res = await fetch('../api/rfid.php?action=inventory-stats');
-        const json = await res.json();
-        if (!json.success) throw new Error(json.message);
-        const d = json.data;
-        const runwayText = d.runway_weeks >= 999 ? 'No churn' : (d.runway_weeks > 0 ? d.runway_weeks + ' weeks' : 'Overstocked');
-        grid.innerHTML =
-            '<div class="ai-insight-card"><div class="label">Pool Runway</div><div class="value">' + runwayText + '</div><div class="sub">' + d.weekly_rate + ' cards/week</div></div>' +
-            '<div class="ai-insight-card"><div class="label">Utilization</div><div class="value">' + (d.total > 0 ? Math.round(d.active / d.total * 100) : 0) + '%</div><div class="sub">' + d.active + ' of ' + d.total + '</div></div>' +
-            '<div class="ai-insight-card"><div class="label">Expiring Soon</div><div class="value" style="color:' + (d.expiring_soon > 5 ? '#dc2626' : '#0f172a') + ';">' + d.expiring_soon + '</div><div class="sub">within 60 days</div></div>' +
-            '<div class="ai-insight-card"><div class="label">Recent Batches</div><div class="value">' + (d.batches ? d.batches.length : 0) + '</div><div class="sub">' + (d.batches && d.batches.length ? d.batches[0].cnt + ' latest' : 'None') + '</div></div>';
-    } catch(e) { grid.innerHTML = '<div class="ai-insight-card" style="grid-column:1/-1;color:#dc2626;">Failed to load insights.</div>'; }
-}
-setTimeout(refreshAiPanel, 500);
-
-// ── AI Chat Widget ────────────────────────────────────────────────
-let aiChatHistory = [];
-function toggleAiChat() {
-    const w = document.getElementById('aiChatWindow');
-    const fab = document.getElementById('aiChatFab');
-    if (w.classList.contains('open')) { w.classList.remove('open'); fab.style.display = ''; }
-    else { w.classList.add('open'); fab.style.display = 'none'; document.getElementById('aiChatInput').focus(); }
-}
-async function sendAiChat() {
-    const input = document.getElementById('aiChatInput');
-    const msg = input.value.trim();
-    if (!msg) return;
-    input.value = '';
-    const msgsDiv = document.getElementById('aiChatMessages');
-    msgsDiv.innerHTML += '<div class="ai-chat-msg user">' + msg.replace(/</g, '&lt;') + '</div>';
-    aiChatHistory.push({ role: 'user', content: msg });
-    const typingDiv = document.createElement('div');
-    typingDiv.className = 'ai-chat-msg bot typing';
-    typingDiv.textContent = 'Thinking...';
-    msgsDiv.appendChild(typingDiv);
-    msgsDiv.scrollTop = msgsDiv.scrollHeight;
-    document.getElementById('aiChatSendBtn').disabled = true;
-    try {
-        const res = await fetch('../api/rfid-ai-chat.php', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ message: msg, history: aiChatHistory.slice(-20) })
-        });
-        const data = await res.json();
-        typingDiv.remove();
-        const reply = data.success ? data.reply : (data.message || 'Could not process.');
-        msgsDiv.innerHTML += '<div class="ai-chat-msg bot">' + reply.replace(/</g, '&lt;').replace(/\*\*/g, '').replace(/\n/g, '<br>') + '</div>';
-        aiChatHistory.push({ role: 'assistant', content: reply });
-    } catch(e) { typingDiv.remove(); msgsDiv.innerHTML += '<div class="ai-chat-msg bot">Network error.</div>'; }
-    msgsDiv.scrollTop = msgsDiv.scrollHeight;
-    document.getElementById('aiChatSendBtn').disabled = false;
-}
 </script>
 
 <?php include '../includes/footer.php'; ?>

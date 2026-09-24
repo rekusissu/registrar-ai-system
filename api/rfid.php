@@ -9,6 +9,7 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../shared/config.php';
 corsSameOrigin();
 require_once __DIR__ . '/../shared/database.php';
+require_once __DIR__ . '/../shared/ai_client.php';
 require_once __DIR__ . '/../shared/session_config.php';
 require_once __DIR__ . '/../shared/csrf_guard.php';
 
@@ -179,6 +180,82 @@ try {
         ]);
         exit;
     }
+
+    // DISTRIBUTION ASSISTANT: PREVIEW
+    if ($method === 'GET' && $action === 'distribution-preview') {
+        $available = $db->fetchAll("SELECT id, card_uid, registered_at FROM rfid_cards WHERE status = 'available' AND student_id IS NULL ORDER BY registered_at ASC, card_uid ASC LIMIT 1000");
+        $studentsWithoutCards = $db->fetchAll("SELECT s.id, s.student_number, s.first_name, s.middle_name, s.last_name, s.course, s.year_level, s.status FROM students s WHERE COALESCE(s.status, '') != 'archived' AND NOT EXISTS (SELECT 1 FROM rfid_cards r WHERE r.student_id = s.id AND r.status IN ('active','enrolled','probation','at-risk','loa')) ORDER BY CASE COALESCE(s.status, 'active') WHEN 'active' THEN 1 WHEN 'enrolled' THEN 2 WHEN 'probation' THEN 3 WHEN 'at-risk' THEN 4 WHEN 'loa' THEN 5 ELSE 6 END, s.last_name, s.first_name, s.id LIMIT 1000");
+        $priority = ['active' => 1, 'enrolled' => 2, 'probation' => 3, 'at-risk' => 4, 'loa' => 5];
+        usort($studentsWithoutCards, static function (array $a, array $b) use ($priority): int { return ($priority[$a['status'] ?? 'active'] ?? 6) <=> ($priority[$b['status'] ?? 'active'] ?? 6) ?: strcasecmp((string)$a['last_name'], (string)$b['last_name']) ?: (int)$a['id'] <=> (int)$b['id']; });
+        $assignments = [];
+        foreach (array_slice($studentsWithoutCards, 0, count($available)) as $index => $student) {
+            $card = $available[$index];
+            $fullName = trim(($student['first_name'] ?? '') . ' ' . ($student['last_name'] ?? ''));
+            $assignments[] = ['card_id' => (int)$card['id'], 'card_uid' => (string)$card['card_uid'], 'student_id' => (int)$student['id'], 'student_name' => $fullName, 'student_number' => (string)($student['student_number'] ?? ''), 'course' => (string)($student['course'] ?? ''), 'year_level' => $student['year_level'], 'status' => (string)($student['status'] ?? 'active'), 'eligible' => $fullName !== '', 'reason' => $fullName === '' ? 'Needs review: student has no usable name.' : 'Eligible student with no active RFID card.'];
+        }
+        $skipped = array_values(array_filter($assignments, static fn(array $row): bool => !$row['eligible']));
+        $assignments = array_values(array_filter($assignments, static fn(array $row): bool => $row['eligible']));
+        $aiSummary = aiGenerate('You are a registrar RFID distribution reviewer. Summarize the proposed plan in two concise sentences. Do not invent students or cards, do not make changes, and remind the registrar to review every proposed pair.', json_encode(['available_cards' => count($available), 'eligible_students' => count($studentsWithoutCards), 'proposed' => count($assignments), 'needs_review' => count($skipped)]), ['max_tokens' => 180, 'temperature' => 0.1]);
+        $fallbackSummary = sprintf('%d available card(s) can be reviewed for %d student(s) without an active card.', count($available), count($studentsWithoutCards));
+        echo json_encode(['success' => true, 'data' => ['summary' => $fallbackSummary, 'ai_summary' => $aiSummary !== '' ? $aiSummary : $fallbackSummary, 'available_cards' => count($available), 'eligible_students' => count($studentsWithoutCards), 'proposed' => count($assignments), 'needs_review' => count($skipped), 'unpaired_cards' => max(0, count($available) - count($assignments)), 'assignments' => $assignments, 'skipped' => $skipped]]);
+        exit;
+    }
+
+    // DISTRIBUTION ASSISTANT: APPLY CONFIRMED PAIRS
+    if ($method === 'POST' && $action === 'distribution-apply') {
+        $input = json_decode(file_get_contents('php://input'), true) ?: [];
+        $pairs = $input['assignments'] ?? [];
+        $issuedDate = trim((string)($input['issued_date'] ?? date('Y-m-d')));
+        $expiryDate = trim((string)($input['expiry_date'] ?? date('Y-m-d', strtotime('+1 year'))));
+        $notes = trim((string)($input['notes'] ?? 'Bulk RFID distribution'));
+        if (!is_array($pairs) || empty($pairs) || count($pairs) > 1000) {
+            echo json_encode(['success' => false, 'message' => 'Select at least one valid assignment (maximum 1000).']);
+            exit;
+        }
+        require_once __DIR__ . '/../shared/qr_generator.php';
+        $conn = $db->getConnection();
+        $conn->beginTransaction();
+        $applied = [];
+        try {
+            foreach ($pairs as $pair) {
+                $cardId = (int)($pair['card_id'] ?? 0);
+                $studentId = (int)($pair['student_id'] ?? 0);
+                $expectedCardUid = trim((string)($pair['expected_card_uid'] ?? ''));
+                $expectedStudentNumber = trim((string)($pair['expected_student_number'] ?? ''));
+                if (!$cardId || !$studentId) throw new RuntimeException('Each assignment needs a card and student.');
+                $card = $db->fetchOne("SELECT id, card_uid, status, student_id FROM rfid_cards WHERE id = ? FOR UPDATE", [$cardId]);
+                $student = $db->fetchOne("SELECT id, student_number, status FROM students WHERE id = ? FOR UPDATE", [$studentId]);
+                if ($expectedCardUid !== '' && (!$card || $card['card_uid'] !== $expectedCardUid)) throw new RuntimeException('One selected card changed after the preview.');
+                if ($expectedStudentNumber !== '' && (!$student || (string)($student['student_number'] ?? '') !== $expectedStudentNumber)) throw new RuntimeException('One selected student changed after the preview.');
+                if (!$card || $card['status'] !== 'available' || $card['student_id'] !== null) throw new RuntimeException('One selected card is no longer available.');
+                if (!$student || ($student['status'] ?? '') === 'archived') throw new RuntimeException('One selected student is no longer eligible.');
+                $existing = $db->fetchOne("SELECT id FROM rfid_cards WHERE student_id = ? AND status IN ('active','enrolled','probation','at-risk','loa') LIMIT 1", [$studentId]);
+                if ($existing) throw new RuntimeException('One selected student already has an active RFID card.');
+                $db->update('rfid_cards', ['student_id' => $studentId, 'status' => 'active', 'issued_date' => $issuedDate, 'expiry_date' => $expiryDate, 'assigned_at' => date('Y-m-d H:i:s'), 'notes' => $notes], 'id = ?', [$cardId]);
+                $qrPath = generateStudentQrFile($studentId);
+                $existingSid = $db->fetchOne("SELECT id, id_number, qr_code_path FROM student_ids WHERE student_id = ? AND id_type = 'school_id' AND status = 'active'", [$studentId]);
+                if ($existingSid) {
+                    $sidUpdates = [];
+                    if (empty($existingSid['qr_code_path']) && $qrPath) $sidUpdates['qr_code_path'] = $qrPath;
+                    if ($sidUpdates) $db->update('student_ids', $sidUpdates, 'id = ?', [$existingSid['id']]);
+                } else {
+                    $sidData = ['student_id' => $studentId, 'id_type' => 'school_id', 'id_number' => '', 'issue_date' => $issuedDate, 'expiry_date' => $expiryDate, 'status' => 'active', 'rfid_card_id' => $cardId];
+                    if ($qrPath) $sidData['qr_code_path'] = $qrPath;
+                    $db->insert('student_ids', $sidData);
+                }
+                $db->insert('audit_logs', ['user_id' => (int)($_SESSION['user_id'] ?? 0), 'action' => 'rfid_bulk_assignment', 'table_name' => 'rfid_cards', 'record_id' => $cardId, 'old_values' => json_encode(['status' => 'available', 'student_id' => null]), 'new_values' => json_encode(['status' => 'active', 'student_id' => $studentId, 'card_uid' => $card['card_uid']]), 'created_at' => date('Y-m-d H:i:s')]);
+                $applied[] = ['card_id' => $cardId, 'card_uid' => $card['card_uid'], 'student_id' => $studentId];
+            }
+            $conn->commit();
+        } catch (Throwable $e) {
+            if ($conn->inTransaction()) $conn->rollBack();
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            exit;
+        }
+        echo json_encode(['success' => true, 'message' => count($applied) . ' RFID card(s) assigned successfully.', 'data' => ['applied' => $applied]]);
+        exit;
+    }
+
 
     // QUICK ASSIGN
     if ($method === 'POST' && $action === 'quick-assign') {
