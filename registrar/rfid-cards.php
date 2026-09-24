@@ -28,6 +28,13 @@ $cards = $db->fetchAll("
         s.course,
         s.year_level,
         s.photo AS student_photo,
+        (SELECT d.file_path
+         FROM documents d
+         WHERE d.student_id = s.id
+           AND d.doc_type = 'photo'
+           AND LOWER(d.file_type) IN ('jpg', 'jpeg', 'png', 'webp', 'gif')
+         ORDER BY d.created_at DESC, d.id DESC
+         LIMIT 1) AS id_photo,
         s.address AS student_address,
         si.id_number AS student_id_number,
         si.qr_code_path,
@@ -1089,7 +1096,7 @@ foreach ($cards as $i => $c) {
                             data-id="<?= (int)$card['id'] ?>"
                             data-student-id="<?= (int)($card['student_id'] ?? 0) ?>"
                             data-name="<?= htmlspecialchars($card['student_name'] ?? '', ENT_QUOTES) ?>"
-                            data-photo="<?= htmlspecialchars($card['student_photo'] ?? '', ENT_QUOTES) ?>"
+                            data-photo="<?= htmlspecialchars($card['id_photo'] ?? '', ENT_QUOTES) ?>"
                             data-course="<?= htmlspecialchars($card['course'] ?? '', ENT_QUOTES) ?>"
                             data-year="<?= htmlspecialchars($card['year_level'] ?? '', ENT_QUOTES) ?>"
                             data-idnumber="<?= htmlspecialchars($card['student_id_number'] ?? '', ENT_QUOTES) ?>"

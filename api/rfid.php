@@ -282,7 +282,7 @@ try {
     // GET ALL RFID CARDS
     if ($method === 'GET' && !$id && !$action) {
         $studentId = isset($_GET['student_id']) ? intval($_GET['student_id']) : null;
-        $sel = "rf.*, CONCAT(s.first_name, ' ', s.last_name) AS student_name, s.student_number, s.course, s.year_level, s.photo AS student_photo, si.id_number AS student_id_number, si.qr_code_path, si.id_type AS id_type, si.issue_date AS id_issue_date, si.expiry_date AS id_expiry_date, si.status AS id_status";
+        $sel = "rf.*, CONCAT(s.first_name, ' ', s.last_name) AS student_name, s.student_number, s.course, s.year_level, s.photo AS student_photo, (SELECT d.file_path FROM documents d WHERE d.student_id = s.id AND d.doc_type = 'photo' AND LOWER(d.file_type) IN ('jpg', 'jpeg', 'png', 'webp', 'gif') ORDER BY d.created_at DESC, d.id DESC LIMIT 1) AS id_photo, si.id_number AS student_id_number, si.qr_code_path, si.id_type AS id_type, si.issue_date AS id_issue_date, si.expiry_date AS id_expiry_date, si.status AS id_status";
         $from = "FROM rfid_cards rf LEFT JOIN students s ON rf.student_id = s.id LEFT JOIN student_ids si ON si.rfid_card_id = rf.id AND si.id_type = 'school_id'";
         if ($studentId) {
             $cards = $db->fetchAll("SELECT $sel $from WHERE rf.student_id = ? ORDER BY rf.id DESC", [$studentId]);
@@ -296,7 +296,7 @@ try {
     // GET SINGLE RFID CARD
     if ($method === 'GET' && $id) {
         $card = $db->fetchOne(
-            "SELECT rf.*, CONCAT(s.first_name, ' ', s.last_name) AS student_name, s.student_number, s.course, s.year_level, si.id_number AS student_id_number FROM rfid_cards rf LEFT JOIN students s ON rf.student_id = s.id LEFT JOIN student_ids si ON si.rfid_card_id = rf.id AND si.id_type = 'school_id' WHERE rf.id = ?",
+            "SELECT rf.*, CONCAT(s.first_name, ' ', s.last_name) AS student_name, s.student_number, s.course, s.year_level, s.photo AS student_photo, (SELECT d.file_path FROM documents d WHERE d.student_id = s.id AND d.doc_type = 'photo' AND LOWER(d.file_type) IN ('jpg', 'jpeg', 'png', 'webp', 'gif') ORDER BY d.created_at DESC, d.id DESC LIMIT 1) AS id_photo, si.id_number AS student_id_number FROM rfid_cards rf LEFT JOIN students s ON rf.student_id = s.id LEFT JOIN student_ids si ON si.rfid_card_id = rf.id AND si.id_type = 'school_id' WHERE rf.id = ?",
             [$id]
         );
         if ($card) {
