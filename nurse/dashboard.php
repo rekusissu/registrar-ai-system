@@ -51,6 +51,11 @@ include '../includes/header.php';
 include '../includes/sidebar.php';
 ?>
 <style>
+
+/* ================================================================
+   NURSE DASHBOARD — Warm Clinical Design
+   ================================================================ */
+
 /* ── Hero (student-portal match) ────────────────────────── */
 .clinic-hero{display:flex;align-items:center;gap:24px;color:#fff;border-radius:20px;padding:42px 48px;box-shadow:0 20px 60px rgba(0,0,0,.25);position:relative;overflow:hidden;min-height:130px;background-size:cover;background-position:center}
 .clinic-hero::after{content:'';position:absolute;right:-80px;top:-80px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.12) 0%,transparent 70%)}
@@ -66,7 +71,7 @@ include '../includes/sidebar.php';
 /* ── Status Strip ────────────────────────────────────────── */
 .status-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:18px}
 @media(max-width:860px){.status-strip{grid-template-columns:repeat(2,1fr)}}
-.s-item{background:#fff;border:1px solid #f1f5f9;border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:14px;box-shadow:0 4px 16px rgba(15,23,42,.04);transition:box-shadow .15s}
+.s-item{background:#fff;border:1px solid #ebe8e3;border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:14px;box-shadow:0 4px 16px rgba(15,23,42,.04);transition:box-shadow .15s}
 .s-item:hover{box-shadow:0 6px 22px rgba(15,23,42,.07)}
 .s-icon{width:42px;height:42px;min-width:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:16px}
 .s-icon.green{background:#dcfce7;color:#16a34a}.s-icon.blue{background:#dbeafe;color:#2563eb}
@@ -74,73 +79,175 @@ include '../includes/sidebar.php';
 .s-value{font-size:18px;font-weight:800;color:#0f172a;line-height:1}
 .s-label{font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.4px;margin-top:2px}
 
-/* ── Tap Card ────────────────────────────────────────────── */
-.clinic-grid{display:grid;grid-template-columns:380px 1fr;gap:20px;align-items:start}
+/* Clinic Grid */
+.clinic-grid{display:grid;grid-template-columns:360px 1fr;gap:22px;align-items:start;transition:grid-template-columns .35s cubic-bezier(.4,0,.2,1)}
+.clinic-grid.assessment-active{grid-template-columns:1fr}
+.clinic-grid.assessment-active .tap-card{display:none}
 @media(max-width:1000px){.clinic-grid{grid-template-columns:1fr}}
-.tap-card{background:#fff;border:1px solid #ccfbf1;border-radius:18px;padding:24px;box-shadow:0 8px 28px rgba(13,148,136,.08);position:relative;overflow:visible}
-.tap-card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#0d9488,#14b8a6,#5eead4)}
-.tap-icon{width:64px;height:64px;margin:0 auto 12px;border-radius:20px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#99f6e4,#5eead4);color:#0f766e;box-shadow:0 6px 20px rgba(13,148,136,.15)}
-.tap-icon i{font-size:28px}.tap-title{text-align:center;font-weight:800;font-size:17px;color:#0f172a}
-.tap-sub{text-align:center;font-size:12px;color:#94a3b8;margin-top:4px}
-.tap-status{margin-top:14px;padding:12px 14px;border-radius:12px;background:#f0fdfa;border:1px dashed #5eead4;text-align:center;font-weight:700;font-size:13px;color:#134e4a}
-.tap-status.awaiting{animation:tapPulse 2s ease-in-out infinite}
-.tap-status.awaiting i{animation:tapIconPulse 1.8s ease-in-out infinite}
-@keyframes tapPulse{0%,100%{background:#f0fdfa;border-color:#5eead4}50%{background:#ccfbf1;border-color:#0d9488}}
-@keyframes tapIconPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.85)}}
-#tapInput{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
-.divider{display:flex;align-items:center;gap:10px;margin:18px 0 14px;color:#94a3b8;font-size:11px;text-transform:uppercase;letter-spacing:.6px;font-weight:700}
-.divider::before,.divider::after{content:'';flex:1;height:1px;background:#e2e8f0}
+/* Tap-In Card */
+.tap-card{background:#fff;border:1px solid #ebe8e3;border-radius:20px;padding:32px 28px;text-align:center;position:relative;box-shadow:0 2px 8px rgba(0,0,0,.03)}
+.tap-card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#0d9488,#2dd4bf,#5eead4);border-radius:20px 20px 0 0}
+.tap-icon{width:88px;height:88px;margin:0 auto 18px;border-radius:50%;background:linear-gradient(135deg,#ccfbf1,#99f6e4);display:flex;align-items:center;justify-content:center;color:#0f766e;position:relative;box-shadow:0 8px 30px rgba(13,148,136,.12)}
+.tap-icon::before{content:"";position:absolute;inset:-8px;border-radius:50%;border:2px dashed rgba(13,148,136,.18);animation:tapRing 20s linear infinite}
+.tap-icon::after{content:"";position:absolute;inset:-16px;border-radius:50%;border:1.5px solid rgba(13,148,136,.06)}
+@keyframes tapRing{to{transform:rotate(360deg)}}
+.tap-icon i{font-size:32px}
+.tap-title{font-weight:800;font-size:17px;color:#0f172a;margin-bottom:4px}
+.tap-sub{font-size:13px;color:#718096;margin-bottom:18px}
+.tap-status{margin-top:0;padding:11px 16px;border-radius:12px;background:#f0fdfa;border:1px dashed #5eead4;text-align:center;font-weight:600;font-size:13px;color:#115e59;display:flex;align-items:center;justify-content:center;gap:8px}
+.tap-status.awaiting{animation:tapGlow 2.5s ease-in-out infinite}
+@keyframes tapGlow{0%,100%{background:#f0fdfa;border-color:#5eead4}50%{background:#ccfbf1;border-color:#0d9488}}
+#tapInput{display:block;width:100%;margin-top:14px;padding:13px 16px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:15px;font-family:"JetBrains Mono",monospace;text-align:center;letter-spacing:2px;font-weight:600;color:#0f172a;background:#fafaf8;transition:border-color .2s,box-shadow .2s;box-sizing:border-box}
+#tapInput:focus{outline:none;border-color:#0d9488;box-shadow:0 0 0 4px rgba(13,148,136,.1);background:#fff}
+#tapInput::placeholder{color:#a0aec0;letter-spacing:0;font-weight:400;font-family:inherit}
+.divider{display:flex;align-items:center;gap:14px;margin:20px 0 14px;font-size:12px;font-weight:500;color:#a0aec0}
+.divider::before,.divider::after{content:"";flex:1;height:1px;background:#ebe8e3}
 
-/* ── Student Search ──────────────────────────────────────── */
-.student-search-wrap{position:relative;overflow:visible}
-.student-search-wrap i{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:14px;pointer-events:none;z-index:2}
-.student-search-input{width:100%;padding:12px 14px 12px 40px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:14px;font-weight:500;color:#0f172a;background:#f8fafc;transition:border-color .15s,box-shadow .15s;outline:none;box-sizing:border-box}
-.student-search-input::placeholder{color:#94a3b8;font-weight:400}
-.student-search-input:focus{border-color:#0d9488;box-shadow:0 0 0 3px rgba(13,148,136,.12);background:#fff}
-.search-dropdown{position:absolute;top:calc(100% + 6px);left:0;right:0;background:#fff;border:1px solid #e2e8f0;border-radius:14px;box-shadow:0 12px 40px rgba(15,23,42,.16);max-height:340px;overflow-y:auto;z-index:50;display:none}
+/* Search */
+.section-label{font-size:12px;font-weight:600;color:#718096;margin-bottom:8px}
+.student-search-wrap{position:relative}
+.student-search-wrap i{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#a0aec0;font-size:13px;pointer-events:none}
+.student-search-input{width:100%;padding:11px 14px 11px 38px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:13px;font-family:inherit;color:#0f172a;background:#fafaf8;transition:border-color .2s,box-shadow .2s;box-sizing:border-box}
+.student-search-input:focus{outline:none;border-color:#0d9488;box-shadow:0 0 0 4px rgba(13,148,136,.1);background:#fff}
+.student-search-input::placeholder{color:#a0aec0}
+.search-dropdown{display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,.1);z-index:100;max-height:240px;overflow-y:auto}
 .search-dropdown.open{display:block}
-.search-item{padding:12px 16px;cursor:pointer;display:flex;align-items:center;gap:12px;border-bottom:1px solid #f1f5f9;transition:background .1s}
-.search-item:last-child{border-bottom:none}
+.search-item{padding:11px 16px;cursor:pointer;font-size:13px;color:#334155;display:flex;align-items:center;gap:10px;transition:background .1s}
 .search-item:hover,.search-item.active{background:#f0fdfa}
-.search-item .si-avatar{width:40px;height:40px;min-width:40px;border-radius:12px;background:linear-gradient(135deg,#0d9488,#14b8a6);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700}
-.search-item .si-info{flex:1;min-width:0}
-.search-item .si-name{font-size:14px;font-weight:700;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.search-item .si-meta{font-size:12px;color:#64748b;margin-top:2px}
-.search-empty{padding:14px;text-align:center;color:#94a3b8;font-size:13px;font-weight:500}
+.search-item .si-name{font-weight:600;color:#0f172a}
+.search-item .si-sub{font-size:11px;color:#94a3b8}
 
-/* ── Workspace Panel ─────────────────────────────────────── */
-.ws-panel{background:#fff;border:1px solid #f1f5f9;border-radius:18px;padding:22px;box-shadow:0 8px 24px rgba(15,23,42,.05);min-height:300px}
-.student-chip-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-.avatar{width:56px;height:56px;min-width:56px;border-radius:16px;font-weight:800;font-size:20px;display:flex;align-items:center;justify-content:center;background:#0d9488;color:#fff;overflow:hidden;position:relative}
-.avatar img{width:100%;height:100%;object-fit:cover;border-radius:16px}
-.info-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:16px}
-.info-cell{background:#f0fdfa;border-radius:12px;padding:10px 14px}
-.info-cell .k{font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#0f766e;font-weight:700}
-.info-cell .v{font-size:14px;font-weight:600;color:#134e4a;margin-top:2px}
-.pill{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;background:#f1f5f9;color:#475569}
-.pill.active{background:#d1fae5;color:#065f46}
+/* Workspace Panel */
+.ws-panel{background:#fff;border:1px solid #ebe8e3;border-radius:20px;padding:28px;box-shadow:0 2px 8px rgba(0,0,0,.03);min-height:300px}
+.student-chip-row{display:flex;align-items:center;gap:16px;margin-bottom:18px}
+.avatar{width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,#ccfbf1,#99f6e4);color:#0f766e;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;flex-shrink:0;overflow:hidden}
+.info-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.info-cell{padding:11px 14px;background:#fafaf8;border-radius:11px;border:1px solid #f0ede9}
+.info-cell .k{font-size:11px;font-weight:600;color:#a0aec0;text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px}
+.info-cell .v{font-size:14px;font-weight:700;color:#0f172a}
+/* Stepper */
+.eval-stepper{display:none;align-items:center;justify-content:center;padding:26px 0 14px;gap:0}
+.eval-stepper.visible{display:flex}
+.eval-step{display:flex;align-items:center;gap:8px}
+.eval-step-num{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:2px solid #e2e8f0;color:#a0aec0;background:#fff;transition:all .3s;flex-shrink:0}
+.eval-step.active .eval-step-num{background:#0d9488;border-color:#0d9488;color:#fff;box-shadow:0 0 0 5px rgba(13,148,136,.12)}
+.eval-step.done .eval-step-num{background:#059669;border-color:#059669;color:#fff}
+.eval-step-label{font-size:13px;font-weight:600;color:#a0aec0;white-space:nowrap;transition:color .3s}
+.eval-step.active .eval-step-label{color:#0f766e;font-weight:700}
+.eval-step.done .eval-step-label{color:#059669}
+.eval-step-line{width:44px;height:2.5px;background:#ebe8e3;margin:0 4px;transition:background .3s;flex-shrink:0;border-radius:2px}
+.eval-step-line.done{background:#059669}
+@media(max-width:640px){.eval-step-label{display:none}.eval-step-line{width:24px}}
 
-/* ── Buttons / Form ──────────────────────────────────────── */
-.btn{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:12px;font-family:inherit;font-size:14px;font-weight:600;border:none;cursor:pointer;text-decoration:none;transition:all .15s}
-.btn-primary{background:#0d9488;color:#fff}.btn-primary:hover{background:#0f766e}
-.btn-light{background:#f1f5f9;color:#334155}.btn-light:hover{background:#e2e8f0}
-.btn-outline{background:#fff;border:1px solid #99f6e4;color:#0f766e}.btn-outline:hover{background:#f0fdfa}
-.btn:disabled{opacity:.55;cursor:not-allowed}
-.section-title{display:flex;align-items:center;gap:8px;font-weight:700;font-size:15px;color:#0f172a;margin-top:24px;padding-bottom:8px;border-bottom:2px solid #f1f5f9}
-.section-label{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:#64748b;font-weight:700;margin:16px 0 8px}
-.form-control{width:100%;padding:10px 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:14px;font-weight:500;outline:none}
-.form-control:focus{border-color:#0d9488;box-shadow:0 0 0 3px rgba(13,148,136,.1)}
-textarea.form-control{resize:vertical;min-height:60px}
-.form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px}
-.other-input{display:none;margin-top:8px}.other-input.show{display:block}
-.visit-list .visit-item{border:1px solid #f1f5f9;border-radius:12px;padding:10px 14px;margin-bottom:8px;background:#fafcfd}
-#formMsg div{padding:12px 16px;border-radius:12px;font-weight:600;font-size:13px;margin-top:8px}
+/* Eval Panes */
+.eval-pane{display:none}.eval-pane.active{display:block;animation:paneIn .25s ease}
+@keyframes paneIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.eval-pane-head{display:flex;align-items:center;gap:12px;margin-bottom:22px;padding-bottom:14px;border-bottom:2px solid #f0ede9}
+.eval-pane-head h3{font-size:17px;font-weight:800;color:#0f172a;margin:0;letter-spacing:-.2px}
+.pane-icon{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.eval-nav{display:flex;justify-content:space-between;align-items:center;margin-top:24px;padding-top:18px;border-top:1px solid #f0ede9}
+.btn-step-back{background:none;border:1.5px solid #e2e8f0;color:#4a5568;padding:10px 20px;border-radius:11px;font-family:inherit;font-weight:600;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:all .15s}
+.btn-step-back:hover{background:#fafaf8;border-color:#cbd5e1}
+.btn-step-next{background:linear-gradient(135deg,#0d9488,#0f766e);color:#fff;border:none;padding:11px 24px;border-radius:11px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:all .15s;box-shadow:0 4px 16px rgba(13,148,136,.25)}
+.btn-step-next:hover{transform:translateY(-1px);box-shadow:0 6px 22px rgba(13,148,136,.35)}
 
-/* ── Profile Modal ───────────────────────────────────────── */
-.profile-modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;align-items:center;justify-content:center;z-index:1000;padding:20px}
+/* Medical History Card */
+.eval-history-card{background:#fafaf8;border:1px solid #f0ede9;border-radius:14px;padding:16px 18px;margin-top:18px}
+.eval-history-card h4{font-size:12px;font-weight:700;color:#0f766e;text-transform:uppercase;letter-spacing:.4px;margin:0 0 10px;display:flex;align-items:center;gap:7px}
+.eval-history-card .eh-row{font-size:13px;color:#4a5568;padding:3px 0;line-height:1.6}
+.eval-history-card .eh-row strong{color:#0f172a}
+.eval-history-card .eh-empty{font-size:13px;color:#a0aec0;font-style:italic}
+
+/* AI Panel */
+.ai-panel{background:#fff;border:1.5px solid #ebe8e3;border-radius:16px;overflow:hidden;margin-top:20px;transition:border-color .2s}
+.ai-panel.collapsed .ai-panel-body{display:none}
+.ai-panel-header{display:flex;align-items:center;gap:10px;padding:14px 20px;background:linear-gradient(135deg,rgba(13,148,136,.04),rgba(13,148,136,.08));border-bottom:1px solid #f0ede9}
+.ai-title{font-size:13px;font-weight:700;color:#0f172a;flex:1;display:flex;align-items:center;gap:8px}
+.ai-title i{color:#0d9488}
+.ai-panel-body{padding:20px}
+.ai-btn{display:inline-flex;align-items:center;gap:8px;padding:10px 22px;border:none;border-radius:11px;background:linear-gradient(135deg,#0d9488,#0f766e);color:#fff;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;transition:all .15s;box-shadow:0 4px 16px rgba(13,148,136,.25)}
+.ai-btn:hover{transform:translateY(-1px);box-shadow:0 6px 22px rgba(13,148,136,.35)}
+.ai-loading{display:none;text-align:center;padding:28px 0}
+.ai-loading.active{display:block}
+.spinner{width:32px;height:32px;border:3px solid #e2e8f0;border-top-color:#0d9488;border-radius:50%;animation:ndSpin .7s linear infinite;margin:0 auto 12px}
+@keyframes ndSpin{to{transform:rotate(360deg)}}
+.ai-loading-text{font-size:13px;color:#718096}
+.ai-result{display:none}
+.ai-result.active{display:block}
+.ai-urgency{display:inline-flex;align-items:center;gap:6px;padding:5px 14px;border-radius:9999px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+.ai-urgency.low{background:#ecfdf5;color:#059669}
+.ai-urgency.medium{background:#fffbeb;color:#d97706}
+.ai-urgency.high{background:#fef2f2;color:#e11d48}
+.ai-summary{font-size:13px;color:#718096;margin:12px 0;font-style:italic;line-height:1.6}
+.ai-recommendation{font-size:14px;color:#1e293b;line-height:1.7;background:#fafaf8;border:1px solid #f0ede9;border-radius:12px;padding:14px 16px;margin:12px 0}
+.ai-warnings{margin:10px 0;padding:0;list-style:none}
+.ai-warnings li{font-size:13px;color:#92400e;padding:5px 0 5px 22px;position:relative;line-height:1.5}
+.ai-warnings li::before{content:"";position:absolute;left:0;top:12px;width:10px;height:10px;border-radius:50%;background:#fbbf24}
+.ai-referral{display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border-radius:11px;background:#fef2f2;color:#991b1b;font-size:13px;font-weight:700;margin-top:8px}
+.ai-confidence{font-size:11px;color:#a0aec0;text-transform:uppercase;letter-spacing:.4px;font-weight:600}
+/* Other Toggle */
+.other-input{display:none;margin-top:8px}
+.other-input.show{display:block}
+.other-input input{width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:11px;font-size:14px;font-family:inherit;color:#0f172a;background:#fafaf8;transition:border-color .2s,box-shadow .2s;box-sizing:border-box}
+.other-input input:focus{outline:none;border-color:#0d9488;box-shadow:0 0 0 4px rgba(13,148,136,.1);background:#fff}
+
+/* Section Titles */
+.section-title{font-size:13px;font-weight:700;color:#0f172a;margin:20px 0 10px;display:flex;align-items:center;gap:8px}
+
+/* Messages */
+.ok,.err{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:11px;font-size:13px;font-weight:500;margin-top:14px}
+.ok{background:#ecfdf5;color:#065f46}
+.err{background:#fef2f2;color:#991b1b}
+
+/* Visit History */
+.visit-list{display:flex;flex-direction:column;gap:10px}
+.visit-item{padding:14px 16px;background:#fafaf8;border:1px solid #f0ede9;border-radius:12px;border-left:3px solid #0d9488}
+
+/* Pill */
+.pill{display:inline-flex;align-items:center;padding:3px 10px;border-radius:9999px;font-size:11px;font-weight:600}
+.pill.recorded,.pill.active{background:#ecfdf5;color:#059669}
+.pill.pending{background:#fffbeb;color:#d97706}
+.pill.cancelled{background:#fef2f2;color:#e11d48}
+
+/* Table */
+.table{width:100%;border-collapse:separate;border-spacing:0}
+.table th{text-align:left;padding:11px 14px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#718096;background:#fafaf8;border-bottom:1px solid #ebe8e3}
+.table th:first-child{border-radius:11px 0 0 0}.table th:last-child{border-radius:0 11px 0 0}
+.table td{padding:12px 14px;font-size:13px;color:#4a5568;border-bottom:1px solid #f0ede9;vertical-align:middle}
+.table tbody tr:hover{background:#fafaf8}
+.table tbody tr:last-child td{border-bottom:none}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 20px;border-radius:11px;font-size:14px;font-weight:600;font-family:inherit;border:1.5px solid transparent;cursor:pointer;transition:all .2s;text-decoration:none;white-space:nowrap;line-height:1.2}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+.btn-primary{background:linear-gradient(135deg,#0d9488,#0f766e);color:#fff;border-color:#0f766e;box-shadow:0 2px 8px rgba(13,148,136,.18)}
+.btn-primary:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 18px rgba(13,148,136,.3)}
+.btn-light{background:#f1f5f9;color:#4a5568;border-color:transparent}
+.btn-light:hover:not(:disabled){background:#e2e8f0;color:#1e293b}
+.btn-outline{background:transparent;color:#0d9488;border-color:#0d9488}
+.btn-outline:hover:not(:disabled){background:#f0fdfa}
+.btn i{font-size:13px}
+
+/* Forms */
+.form-row{display:grid;grid-template-columns:repeat(2,1fr);gap:14px 16px}
+.form-group{margin-bottom:0;min-width:0}
+.form-group label{display:block;font-size:12px;font-weight:600;color:#718096;margin-bottom:5px}
+.form-control{width:100%;padding:10px 14px;border:1.5px solid #d1d5db;border-radius:11px;font-size:14px;font-family:inherit;color:#0f172a;background:#fafaf8;transition:border-color .2s,box-shadow .2s;box-sizing:border-box}
+.form-control:focus{outline:none;border-color:#0d9488;box-shadow:0 0 0 4px rgba(13,148,136,.1);background:#fff}
+.form-control::placeholder{color:#a0aec0}
+select.form-control{appearance:none;-webkit-appearance:none;padding-right:38px;cursor:pointer}
+
+/* Profile Modal */
+.profile-modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.4);backdrop-filter:blur(4px);z-index:9000;align-items:center;justify-content:center;padding:24px}
 .profile-modal-overlay.active{display:flex}
-.profile-modal{background:#fff;border-radius:18px;width:100%;max-width:560px;max-height:88vh;overflow-y:auto;padding:22px 24px}
+.profile-modal{background:#fff;border-radius:20px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;padding:28px 30px;box-shadow:0 24px 64px rgba(0,0,0,.2);animation:modalIn .25s ease}
+@keyframes modalIn{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:none}}
+
+/* Responsive */
+@media(max-width:640px){.ws-panel{padding:20px 16px}.tap-card{padding:24px 20px}.info-grid{grid-template-columns:1fr}.form-row{grid-template-columns:1fr}.btn{padding:10px 16px;font-size:13px}}
 </style>
+
+
 <main class="dashboard-main">
 <div class="dashboard-container">
 
@@ -151,7 +258,7 @@ textarea.form-control{resize:vertical;min-height:60px}
     </div>
     <div class="hero-body">
         <div class="hero-greet"><?= $timeGreeting ?></div>
-        <div class="hero-title"><?= h($nurseName) ?> 👋</div>
+        <div class="hero-title"><?= h($nurseName) ?> &#x1f44b;</div>
         <div class="hero-meta">
             <span class="hero-chip"><i class="fa-solid fa-hospital"></i> Clinic Portal</span>
             <span class="hero-chip"><i class="fa-solid fa-clock"></i> <?= date('F d, Y') ?></span>
@@ -180,12 +287,12 @@ textarea.form-control{resize:vertical;min-height:60px}
 </div>
 
 <div class="clinic-grid" style="margin-top:20px;">
-    <!-- ─── TAP-IN ─── -->
+    <!-- TAP-IN -->
     <div class="tap-card">
         <div class="tap-icon"><i class="fas fa-credit-card"></i></div>
         <div class="tap-title">Student Tap-In</div>
         <div class="tap-sub">Tap the RFID student ID card on the reader</div>
-        <div class="tap-status awaiting" id="tapStatus"><i class="fas fa-circle-dot" style="color:#0d9488;margin-right:6px;"></i>Awaiting card tap…</div>
+        <div class="tap-status awaiting" id="tapStatus"><i class="fas fa-circle-dot" style="color:#0d9488;margin-right:6px;"></i>Awaiting card tap&hellip;</div>
         <input id="tapInput" type="text" maxlength="10" autocomplete="off" aria-label="Card UID" />
 
         <div class="divider">or</div>
@@ -193,7 +300,7 @@ textarea.form-control{resize:vertical;min-height:60px}
         <label class="section-label" style="margin-top:0;">Search student by name or ID</label>
         <div class="student-search-wrap">
             <i class="fas fa-magnifying-glass"></i>
-            <input id="studentSearch" type="text" class="student-search-input" placeholder="Type name or student number…" autocomplete="off" />
+            <input id="studentSearch" type="text" class="student-search-input" placeholder="Type name or student number&hellip;" autocomplete="off" />
             <div id="searchDropdown" class="search-dropdown"></div>
         </div>
     </div>
@@ -227,51 +334,75 @@ textarea.form-control{resize:vertical;min-height:60px}
         </div>
 
         <div id="wsForm" style="display:none;">
-            <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
-                <div style="font-weight:800;font-size:16px;color:#0f172a;"><i class="fas fa-clipboard-check" style="color:#2563eb;"></i> Clinic Visit — <span id="formStudentName"></span></div>
-                <button type="button" class="btn btn-light" style="padding:8px 14px;font-size:12px;" onclick="openProfile()"><i class="fas fa-id-card-clip"></i> Medical Profile</button>
+            <div class="eval-stepper visible" id="evalStepper">
+                <div class="eval-step active" data-step="1"><div class="eval-step-num">1</div><div class="eval-step-label">Patient Info</div></div>
+                <div class="eval-step-line"></div>
+                <div class="eval-step" data-step="2"><div class="eval-step-num">2</div><div class="eval-step-label">Assessment</div></div>
+                <div class="eval-step-line"></div>
+                <div class="eval-step" data-step="3"><div class="eval-step-num">3</div><div class="eval-step-label">Notes &amp; Save</div></div>
             </div>
-
-            <div class="section-title"><i class="fas fa-heart-pulse" style="color:#dc2626;"></i> Vitals</div>
-            <div class="form-row">
-                <div class="form-group"><label>Temperature (°C)</label><input type="number" step="0.1" id="temperature" class="form-control" placeholder="e.g., 36.8"></div>
-                <div class="form-group"><label>Blood Pressure</label><input type="text" id="bloodPressure" class="form-control" placeholder="e.g., 120/80"></div>
+            <div class="eval-pane active" data-pane="1">
+                <div class="eval-pane-head"><div class="pane-icon" style="background:#f0fdfa;color:#0d9488;"><i class="fas fa-user-check"></i></div><div><h3>Patient Information</h3><div style="font-size:12px;color:#94a3b8;margin-top:2px;">Verify student and record visit reason</div></div></div>
+                <div class="section-title"><i class="fas fa-clipboard-list" style="color:#2563eb;"></i> This Visit &mdash; <span id="formStudentName"></span></div>
+                <div class="section-label">Reason for Visit <span style="color:#dc2626;">*</span></div>
+                <select id="reasonSelect" class="form-control" style="width:100%;"><option value="">— Select a reason —</option><?php foreach (['Headache','Fever','Stomachache','Menstrual Cramps','Dizziness','Minor Injury','Other'] as $r): ?><option value="<?= h($r) ?>"><?= h($r) ?></option><?php endforeach; ?></select>
+                <div class="other-input" id="reasonOther"><input type="text" id="reasonOtherInput" class="form-control" placeholder="Enter the reason for visit…"></div>
+                <div style="display:flex;justify-content:flex-end;margin-top:20px;"><button type="button" class="btn-step-next" onclick="goPane(2)">Next: Assessment <i class="fas fa-arrow-right"></i></button></div>
             </div>
-
-            <div class="section-title"><i class="fas fa-clipboard-list" style="color:#2563eb;"></i> This Visit</div>
-
-            <div class="section-label">Reason for Visit <span style="color:#dc2626;">*</span></div>
-            <select id="reasonSelect" class="form-control" style="width:100%;">
-                <option value="">— Select a reason —</option>
-                <?php foreach (['Headache','Fever','Stomachache','Menstrual Cramps','Dizziness','Minor Injury','Other'] as $r): ?>
-                    <option value="<?= h($r) ?>"><?= h($r) ?></option><?php endforeach; ?>
-            </select>
-            <div class="other-input" id="reasonOther"><input type="text" id="reasonOtherInput" class="form-control" placeholder="Enter the reason for visit…"></div>
-
-            <div class="section-label">Nurse's Assessment / Initial Diagnosis</div>
-            <select id="assessSelect" class="form-control" style="width:100%;">
-                <option value="">— Select assessment —</option>
-                <?php foreach (['Headache','Fever','Dysmenorrhea','Possible Dehydration','Minor Abrasion','Other'] as $a): ?>
-                    <option value="<?= h($a) ?>"><?= h($a) ?></option><?php endforeach; ?>
-            </select>
-            <div class="other-input" id="assessOther"><input type="text" id="assessOtherInput" class="form-control" placeholder="Enter the assessment / diagnosis…"></div>
-
-            <div class="section-label">Action Taken <span style="color:#dc2626;">*</span></div>
-            <select id="actionSelect" class="form-control" style="width:100%;">
-                <option value="">— Select action —</option>
-                <?php foreach (['Rest','Hydration','First Aid','Medication Administered','Referred to Physician','Sent Home','Other'] as $a): ?>
-                    <option value="<?= h($a) ?>"><?= h($a) ?></option><?php endforeach; ?>
-            </select>
-            <div class="other-input" id="actionOther"><input type="text" id="actionOtherInput" class="form-control" placeholder="Enter the action performed…"></div>
-
-            <div class="section-label">Nurse's Notes</div>
-            <textarea id="nurseNotes" class="form-control" rows="3" style="width:100%;" placeholder="Any additional observations or notes…"></textarea>
-
-            <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:20px;">
-                <button type="button" class="btn btn-primary" id="saveBtn" onclick="saveVisit()" style="padding:12px 26px;"><i class="fas fa-save"></i> Save Health Record</button>
-                <button type="button" class="btn btn-light" onclick="resetVisitFields()" style="padding:12px 20px;">Clear Visit Fields</button>
+            <div class="eval-pane" data-pane="2">
+                <div class="eval-pane-head"><div class="pane-icon" style="background:#eff6ff;color:#2563eb;"><i class="fas fa-stethoscope"></i></div><div><h3>Clinical Assessment</h3><div style="font-size:12px;color:#94a3b8;margin-top:2px;">Record vitals, diagnosis, and action taken</div></div></div>
+                <div class="section-title"><i class="fas fa-heart-pulse" style="color:#dc2626;"></i> Vitals</div>
+                <div class="form-row">
+                    <div class="form-group"><label>Temperature (°C)</label><input type="number" step="0.1" id="temperature" class="form-control" placeholder="e.g., 36.8"></div>
+                    <div class="form-group"><label>Blood Pressure</label><input type="text" id="bloodPressure" class="form-control" placeholder="e.g., 120/80"></div>
+                </div>
+                <div class="section-title"><i class="fas fa-stethoscope" style="color:#2563eb;"></i> Diagnosis &amp; Action</div>
+                <div class="section-label">Nurse's Assessment / Initial Diagnosis</div>
+                <select id="assessSelect" class="form-control" style="width:100%;"><option value="">— Select assessment —</option><?php foreach (['Headache','Fever','Dysmenorrhea','Possible Dehydration','Minor Abrasion','Other'] as $a): ?><option value="<?= h($a) ?>"><?= h($a) ?></option><?php endforeach; ?></select>
+                <div class="other-input" id="assessOther"><input type="text" id="assessOtherInput" class="form-control" placeholder="Enter the assessment / diagnosis…"></div>
+                <div class="section-label">Action Taken <span style="color:#dc2626;">*</span></div>
+                <select id="actionSelect" class="form-control" style="width:100%;"><option value="">— Select action —</option><?php foreach (['Rest','Hydration','First Aid','Medication Administered','Referred to Physician','Sent Home','Other'] as $a): ?><option value="<?= h($a) ?>"><?= h($a) ?></option><?php endforeach; ?></select>
+                <div class="other-input" id="actionOther"><input type="text" id="actionOtherInput" class="form-control" placeholder="Enter the action performed…"></div>
+                <div class="eval-nav">
+                    <button type="button" class="btn-step-back" onclick="goPane(1)"><i class="fas fa-arrow-left"></i> Back</button>
+                    <button type="button" class="btn-step-next" onclick="goPane(3)">Next: Notes <i class="fas fa-arrow-right"></i></button>
+                </div>
             </div>
-            <div id="formMsg"></div>
+            <div class="eval-pane" data-pane="3">
+                <div class="eval-pane-head"><div class="pane-icon" style="background:#fef3c7;color:#d97706;"><i class="fas fa-pen-to-square"></i></div><div><h3>Notes &amp; AI Review</h3><div style="font-size:12px;color:#94a3b8;margin-top:2px;">Add final notes, review AI recommendations, and save</div></div></div>
+                <div class="section-label" style="margin-top:0;">Nurse's Notes</div>
+                <textarea id="nurseNotes" class="form-control" rows="3" style="width:100%;" placeholder="Any additional observations or notes…"></textarea>
+                <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:20px;">
+                    <button type="button" class="btn btn-primary" id="saveBtn" onclick="saveVisit()" style="padding:12px 26px;"><i class="fas fa-save"></i> Save Health Record</button>
+                    <button type="button" class="btn btn-light" onclick="resetVisitFields()" style="padding:12px 20px;">Clear Fields</button>
+                </div>
+                <div id="formMsg"></div>
+                <div class="eval-nav">
+                    <button type="button" class="btn-step-back" onclick="goPane(2)"><i class="fas fa-arrow-left"></i> Back</button>
+                    <div></div>
+                </div>
+            </div>
+            <div class="ai-panel collapsed" id="aiPanel">
+                <div class="ai-panel-header">
+                    <div class="ai-title"><i class="fas fa-robot"></i> AI Clinical Assistant</div>
+                    <button type="button" class="btn btn-light" style="padding:5px 12px;font-size:11px;" onclick="getAiRecommendation()"><i class="fas fa-bolt"></i> Analyze</button>
+                </div>
+                <div class="ai-panel-body">
+                    <div id="aiPrompt" style="text-align:center;color:#94a3b8;font-size:13px;padding:20px 0;">
+                        <i class="fas fa-wand-magic-sparkles" style="font-size:22px;display:block;margin-bottom:8px;color:#cbd5e1;"></i>
+                        Fill in the visit fields, then click <strong>Analyze</strong> for AI clinical recommendations.
+                    </div>
+                    <div class="ai-loading" id="aiLoading"><div class="spinner"></div><div class="ai-loading-text">Analyzing clinical data…</div></div>
+                    <div class="ai-result" id="aiResult">
+                        <div class="ai-urgency" id="aiUrgency"></div>
+                        <div class="ai-summary" id="aiSummary"></div>
+                        <div class="ai-recommendation" id="aiRecommendation"></div>
+                        <ul class="ai-warnings" id="aiWarnings"></ul>
+                        <div class="ai-referral" id="aiReferral"></div>
+                        <div class="ai-confidence" id="aiConfidence"></div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -514,6 +645,7 @@ textarea.form-control{resize:vertical;min-height:60px}
         if(!current) return;
         el('wsStudent').style.display = 'none';
         el('wsForm').style.display = 'block';
+        goPane(1);
         el('wsForm').scrollIntoView({behavior:'smooth', block:'start'});
     };
 
@@ -523,11 +655,113 @@ textarea.form-control{resize:vertical;min-height:60px}
         el('wsForm').style.display = 'none';
         el('wsEmpty').style.display = 'block';
         el('historyPanel').style.display = 'none';
+        goPane(1);
         resetVisitFields(true);
         if(searchInput) searchInput.value = '';
         if(searchDD) searchDD.classList.remove('open');
         setTapStatus('Awaiting card tap…', false);
         if(tap) tap.focus();
+    };
+
+    // ── Stepper / Pane navigation ──
+    window.goPane = function(n){
+        var panes = document.querySelectorAll('#wsForm .eval-pane');
+        var steps = document.querySelectorAll('#wsForm .eval-step');
+        var lines = document.querySelectorAll('#wsForm .eval-step-line');
+        panes.forEach(function(p){ p.classList.toggle('active', parseInt(p.dataset.pane) === n); });
+        steps.forEach(function(s){
+            var sn = parseInt(s.dataset.step);
+            s.classList.remove('active','done');
+            if(sn === n) s.classList.add('active');
+            else if(sn < n) s.classList.add('done');
+        });
+        lines.forEach(function(l, i){ l.classList.toggle('done', i < n - 1); });
+        // Show AI panel only on pane 3
+        var ai = el('aiPanel');
+        if(ai) ai.classList.toggle('collapsed', n !== 3);
+    };
+
+    // ── AI Aid Recommendation ──
+    function showAiPanel(){
+        var p = el('aiPanel');
+        if(p) p.classList.remove('collapsed');
+    }
+    window.getAiRecommendation = function(){
+        showAiPanel();
+        var prompt = el('aiPrompt'), loading = el('aiLoading'), result = el('aiResult');
+        if(prompt) prompt.style.display = 'none';
+        if(loading) loading.classList.add('active');
+        if(result) result.classList.remove('active');
+
+        var payload = {
+            reason_for_visit:       resolveValue('reasonSelect','reasonOtherInput'),
+            assessment:             resolveValue('assessSelect','assessOtherInput'),
+            temperature:            el('temperature') ? el('temperature').value : '',
+            blood_pressure:         el('bloodPressure') ? el('bloodPressure').value : '',
+            allergies:              el('allergies') ? el('allergies').value : '',
+            pre_existing_conditions:el('conditions') ? el('conditions').value : '',
+            immunization_records:   el('immunizations') ? el('immunizations').value : '',
+            height:                 el('height') ? el('height').value : '',
+            weight:                 el('weight') ? el('weight').value : '',
+            nurse_notes:            el('nurseNotes') ? el('nurseNotes').value : ''
+        };
+
+        fetch('../api/clinic-ai-recommend.php', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json','X-CSRF-Token':CSRF},
+            body: JSON.stringify(payload)
+        })
+        .then(function(r){ return r.json().then(function(d){ return {status:r.status, data:d}; }); })
+        .then(function(res){
+            if(loading) loading.classList.remove('active');
+            if(res.data && res.data.success){
+                var d = res.data.data;
+                var urgEl = el('aiUrgency');
+                if(urgEl){
+                    urgEl.className = 'ai-urgency ' + esc(d.urgency);
+                    urgEl.innerHTML = '<i class="fas fa-circle"></i> ' + esc(d.urgency.toUpperCase());
+                }
+                var confEl = el('aiConfidence');
+                if(confEl) confEl.textContent = 'Confidence: ' + esc(d.confidence);
+                var sumEl = el('aiSummary');
+                if(sumEl) sumEl.textContent = d.summary || '';
+                var recEl = el('aiRecommendation');
+                if(recEl) recEl.textContent = d.recommendation || '';
+                var warnEl = el('aiWarnings');
+                if(warnEl){
+                    if(d.key_warnings && d.key_warnings.length > 0){
+                        warnEl.innerHTML = d.key_warnings.map(function(w){ return '<li>' + esc(w) + '</li>'; }).join('');
+                    } else { warnEl.innerHTML = ''; }
+                }
+                var refEl = el('aiReferral');
+                if(refEl){
+                    refEl.innerHTML = d.referral_needed
+                        ? '<div class="ai-referral"><i class="fas fa-triangle-exclamation"></i> Physician referral recommended</div>'
+                        : '';
+                }
+                if(result) result.classList.add('active');
+            } else {
+                if(prompt) prompt.style.display = 'block';
+                var errMsg = (res.data && res.data.message) ? res.data.message : 'AI recommendation failed.';
+                alert(errMsg);
+            }
+        })
+        .catch(function(){
+            if(loading) loading.classList.remove('active');
+            if(prompt) prompt.style.display = 'block';
+            alert('Network error while fetching AI recommendation.');
+        });
+    };
+
+    // Reset AI panel when workspace resets
+    var origReset = window.resetWorkspace;
+    window.resetWorkspace = function(){
+        if(origReset) origReset();
+        var p = el('aiPanel'), prompt = el('aiPrompt'), loading = el('aiLoading'), result = el('aiResult');
+        if(p) p.classList.add('collapsed');
+        if(prompt) prompt.style.display = '';
+        if(loading) loading.classList.remove('active');
+        if(result) result.classList.remove('active');
     };
 
     // ── Medical Profile modal ──

@@ -205,14 +205,14 @@ define('KIOSK_ACCESS_TOKEN', secretFromEnvOrLocal('KIOSK_ACCESS_TOKEN', 'kiosk-t
 // Environment variables:
 //   OPENROUTER_API_KEY or AI_API_KEY - your OpenRouter API key
 //     (or paste the key into the git-ignored shared/ai_key.local file)
-//   AI_MODEL - model to use (default: inclusionai/ling-3.0-flash-vl:free; NO "openrouter/" prefix)
+//   AI_MODEL - model to use (default: qwen/qwen3.8-27b:free; NO "openrouter/" prefix)
 //   AI_API_URL - override URL if needed (default: https://openrouter.ai/api/v1/chat/completions)
 
 $aiProvider    = env('AI_PROVIDER') ?: 'openrouter';
 $aiApiUrl      = env('AI_API_URL') ?: 'https://openrouter.ai/api/v1/chat/completions';
 $aiApiKey      = '';
 $aiGeminiModel = env('GEMINI_MODEL') ?: env('AI_GEMINI_MODEL') ?: 'gemini-2.0-flash';
-$aiModel       = env('AI_MODEL') ?: ($aiProvider === 'gemini' ? $aiGeminiModel : 'inclusionai/ling-3.0-flash-vl:free');
+$aiModel       = env('AI_MODEL') ?: ($aiProvider === 'gemini' ? $aiGeminiModel : 'qwen/qwen3.8-27b:free');
 $aiCacheTtl    = (int) (env('AI_CACHE_TTL') ?: 3600);   // seconds
 
 // Optional OpenRouter (or gateway) failover chain, comma-separated:
@@ -228,7 +228,15 @@ if ($aiModelsEnv !== '') {
     }
 }
 if (empty($aiModels)) {
-    $aiModels = [$aiModel];
+    // ponytail: env AI_MODELS overrides this list entirely.
+    $aiModels = [
+        $aiModel,
+        'nvidia/nemotron-3-ultra-550b-a55b:free',
+        'z-ai/glm-5.2:free',
+        'google/gemma-4-31b-it:free',
+        'inclusionai/ling-3.0-flash-sante:free',
+        'nvidia/nemotron-3-super-120b-a12b:free',
+    ];
 }
 if (!in_array($aiModel, $aiModels, true)) {
     array_unshift($aiModels, $aiModel);
