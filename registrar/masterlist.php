@@ -524,12 +524,12 @@ document.getElementById('btnAutoAssign')?.addEventListener('click', async functi
             body: JSON.stringify({ action: 'assign_sections', max_per_section: MAX_PER_SECTION })
         });
         const data = await response.json();
-        if (!data.success) { alert(data.message || 'Failed to assign sections.'); return; }
+        if (!data.success) { showToast(data.message || 'Failed to assign sections.', 'error'); return; }
         const params = new URLSearchParams(window.location.search);
         params.set('assigned', '1');
         window.location.href = 'masterlist.php?' + params.toString();
     } catch (err) {
-        alert('Network error. Please try again.');
+        showToast('Network error. Please try again.', 'error');
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-wand-magic-sparkles"></i> Auto-assign';
@@ -636,9 +636,9 @@ function bulkArchive() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids, status: 'archived' })
     }).then(r => r.json()).then(d => {
-        if (d.success) { alert(d.message); window.location.reload(); }
-        else alert(d.message);
-    }).catch(() => alert('Error.'));
+        if (d.success) { showToast(d.message || 'Archived.', 'success'); window.location.reload(); }
+        else showToast(d.message || 'Archive failed.', 'error');
+    }).catch(() => showToast('Network error.', 'error'));
 }
 
 // ─── EXPORT CSV ──────────────────────────────────────────────
@@ -756,7 +756,7 @@ function viewStudent(id) {
         loadRfid(s.id);
         document.getElementById('viewModal').classList.add('active');
         document.body.style.overflow = 'hidden';
-    }).catch(() => alert('Failed to load.'));
+    }).catch(() => showToast('Failed to load.', 'error'));
 }
 function switchVTab(btn, tab) {
     document.querySelectorAll('#viewModal .vtab').forEach(t => { t.style.borderBottomColor = 'transparent'; t.style.color = '#64748b'; });
@@ -931,7 +931,7 @@ async function saveEditSection() {
         });
         const d = await r.json();
         if (d.success) {
-            alert(d.message);
+            showToast(d.message || 'Section updated.', 'success');
             window.location.reload();
         } else {
             errEl.textContent = d.message || 'Failed to update section.';
@@ -939,7 +939,7 @@ async function saveEditSection() {
             btn.disabled = false;
         }
     } catch (e) {
-        alert('Network error.');
+        showToast('Network error.', 'error');
         btn.disabled = false;
     }
 }
@@ -1001,8 +1001,8 @@ document.getElementById('wsIncludeOthers').addEventListener('change', renderAssi
 
 async function assignSelectedToSection() {
     const ids = Array.from(document.querySelectorAll('.ws-assign-cb:checked')).map(cb => cb.value);
-    if (!ids.length) { alert('Select at least one student.'); return; }
-    if (!wsContext || !wsContext.section) { alert('No target section. Open this from a section card.'); return; }
+    if (!ids.length) { showToast('Select at least one student.', 'warning'); return; }
+    if (!wsContext || !wsContext.section) { showToast('No target section. Open this from a section card.', 'warning'); return; }
     const section = wsContext.section;
     const ctx = {
         course: wsContext.course || '',
@@ -1020,10 +1020,10 @@ async function assignSelectedToSection() {
             body: JSON.stringify({ action: 'bulk_assign_section', ids, section, course: ctx.course, year_level: ctx.year_level, semester: ctx.semester, school_year: ctx.school_year, adviser_id: ctx.adviser_id })
         });
         const d = await r.json();
-        alert(d.message || 'Assigned.');
+        showToast(d.message || 'Assigned.', d.success ? 'success' : 'error');
         if (d.success) window.location.reload();
     } catch (e) {
-        alert('Error.');
+        showToast('Error.', 'error');
     } finally {
         btn.disabled = false;
     }
@@ -1043,7 +1043,7 @@ function urlParamSafe(val) {
 async function runAiSearch() {
     const query = searchInput.value.trim();
     if (query.length < 3) {
-        alert('Type at least 3 characters for the AI search.');
+        showToast('Type at least 3 characters for the AI search.', 'warning');
         return;
     }
     aiSearchBtn.disabled = true;
@@ -1120,16 +1120,14 @@ function handoffApi(payload) {
 function sendList() {
     if (!confirm('Send the masterlist to the Academic Strand / Course Assignment module (CMS)?')) return;
     handoffApi({ program: '' }).then(d => {
-        if (typeof showToast === 'function') showToast(d.success ? 'Sent' : 'Error', d.message || 'Failed.', d.success ? 'success' : 'error');
-        else alert(d.message || 'Failed.');
-    }).catch(() => { if (typeof showToast === 'function') showToast('Error', 'Network error.', 'error'); else alert('Network error.'); });
+        showToast(d.message || (d.success ? 'Sent.' : 'Failed.'), d.success ? 'success' : 'error');
+    }).catch(() => { showToast('Network error.', 'error'); });
 }
 function handoffGroup(label) {
     if (!confirm('Hand off this section to the CMS?\n\n' + label)) return;
     handoffApi({ program: label }).then(d => {
-        if (typeof showToast === 'function') showToast(d.success ? 'Handed off' : 'Error', d.message || 'Failed.', d.success ? 'success' : 'error');
-        else alert(d.message || 'Failed.');
-    }).catch(() => { if (typeof showToast === 'function') showToast('Error', 'Network error.', 'error'); else alert('Network error.'); });
+        showToast(d.message || (d.success ? 'Handed off.' : 'Failed.'), d.success ? 'success' : 'error');
+    }).catch(() => { showToast('Network error.', 'error'); });
 }</script>
 
 <style>

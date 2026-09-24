@@ -155,6 +155,21 @@ if ($USER_ROLE === 'student') {
             <span class="sidebar-text">Student Lookup</span>
         </a>
 
+        <a href="<?= $APP_ROOT ?>nurse/statistics.php" class="sidebar-item <?= $ACTIVE_NAV === 'nurse_stats' ? 'active' : '' ?>">
+            <i class="fa-solid fa-chart-simple"></i>
+            <span class="sidebar-text">Visit Statistics</span>
+        </a>
+
+        <a href="<?= $APP_ROOT ?>nurse/supplies.php" class="sidebar-item <?= $ACTIVE_NAV === 'nurse_supplies' ? 'active' : '' ?>">
+            <i class="fa-solid fa-boxes-stacked"></i>
+            <span class="sidebar-text">Supplies</span>
+        </a>
+
+        <a href="<?= $APP_ROOT ?>nurse/incidents.php" class="sidebar-item <?= $ACTIVE_NAV === 'nurse_incidents' ? 'active' : '' ?>">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span class="sidebar-text">Incidents</span>
+        </a>
+
         <div class="sidebar-divider"></div>
 
         <div class="sidebar-brand">

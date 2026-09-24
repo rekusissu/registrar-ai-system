@@ -791,7 +791,7 @@ function addEmailRow() {
 
 // ─── AUTO-FILL FROM ENROLLMENT ──────────────────────────────
 async function pullEnrollment() {
-    if (!currentStudentId) { alert('Select a student first.'); return; }
+    if (!currentStudentId) { showToast('Select a student first.', 'warning'); return; }
     const d = await fetch('../api/contacts.php', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'pull_enrollment', student_id: currentStudentId }) }).then(r => r.json());
     showToast(d.message, d.success ? 'success' : 'error');
     if (!d.success) return;
@@ -828,7 +828,7 @@ function ph11(v) {
 }
 
 async function saveAll() {
-    if (!currentStudentId) { alert('Select a student first.'); return; }
+    if (!currentStudentId) { showToast('Select a student first.', 'warning'); return; }
     const btn = document.querySelector('#manageModal .modal-footer .btn-primary');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
 
@@ -913,7 +913,7 @@ async function saveAll() {
         showToast('Contacts updated.', 'success');
         setTimeout(() => window.location.reload(), 700);
     } catch (err) {
-        alert(err.message || 'Error saving contacts.');
+        showToast(err.message || 'Error saving contacts.', 'error');
         // Reconcile to server truth: any earlier saves in this run may
         // have partially applied. A reload rebuilds the lists from the
         // authoritative data, so a removed row that wasn't deleted won't

@@ -277,14 +277,17 @@ include '../includes/sidebar.php';
         }).catch(function(){toast('Network error.',false);});
     };
 
-    /* ── Toast ───────────────────────────────── */
+    /* ── Toast (consistent with global CSS) ─────── */
     function toast(msg,ok){
+        var c=document.querySelector('.toast-container');
+        if(!c){c=document.createElement('div');c.className='toast-container';document.body.appendChild(c);}
         var t=document.createElement('div');
-        t.className='sp-toast '+(ok?'ok':'err');t.textContent=msg;
-        document.body.appendChild(t);
-        setTimeout(function(){t.style.opacity='0';},2600);
-        setTimeout(function(){t.remove();},3000);
+        t.className='toast '+(ok?'success':'error');
+        t.innerHTML='<i class="fas '+(ok?'fa-circle-check':'fa-circle-xmark')+' toast-icon"></i><div class="toast-content"><div class="toast-message">'+esc(msg)+'</div></div><button class="toast-close" onclick="this.closest(\'.toast\').remove()"><i class="fas fa-times"></i></button>';
+        c.appendChild(t);
+        setTimeout(function(){t.classList.add('hiding');setTimeout(function(){t.remove();},300);},4000);
     }
+    function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;');}
 
     /* ── Events ──────────────────────────────── */
     $('spQ').addEventListener('keyup',function(e){if(e.key==='Enter')loadSupplies();});

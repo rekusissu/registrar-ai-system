@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 // ============================================================
 //  REGISTRAR/RFID-CARDS.PHP
 //  RFID cards management &mdash; fully inline (CSS + JS)
@@ -1809,38 +1809,6 @@ foreach ($cards as $i => $c) {
 // =================================================================
 let deleteTarget = null;
 
-// â”€â”€ Toast helper (colored, from components.css) â”€â”€
-function showToast(title, message, type) {
-    const container = document.getElementById('toastContainer') || (() => {
-        const c = document.createElement('div');
-        c.className = 'toast-container';
-        document.body.appendChild(c);
-        return c;
-    })();
-    type = type || 'info';
-    const icons = { success: 'fa-circle-check', error: 'fa-circle-xmark', info: 'fa-circle-info', warning: 'fa-triangle-exclamation' };
-    const toast = document.createElement('div');
-    toast.className = 'toast ' + type;
-    toast.innerHTML =
-        '<i class="fas ' + (icons[type] || icons.info) + ' toast-icon"></i>' +
-        '<div class="toast-content">' +
-            '<div class="toast-title"></div>' +
-            '<div class="toast-message"></div>' +
-        '</div>' +
-        '<button class="toast-close" aria-label="Close"><i class="fas fa-times"></i></button>';
-    toast.querySelector('.toast-title').textContent = title;
-    toast.querySelector('.toast-message').textContent = message;
-    toast.querySelector('.toast-close').addEventListener('click', () => {
-        toast.classList.add('hiding');
-        setTimeout(() => toast.remove(), 300);
-    });
-    container.appendChild(toast);
-    setTimeout(() => {
-        toast.classList.add('hiding');
-        setTimeout(() => toast.remove(), 300);
-    }, 4000);
-}
-
 // â”€â”€ Delete modal â”€â”€
 function confirmDelete(id, uid) {
     deleteTarget = id;
@@ -1915,7 +1883,7 @@ const aiRfidText = document.getElementById('aiRfidExplanation');
 
 async function runAiCardSearch() {
     const query = (rfidSearchInput?.value || '').trim();
-    if (query.length < 3) { alert('Type at least 3 characters for AI search.'); return; }
+    if (query.length < 3) { showToast('Type at least 3 characters for AI search.', 'info'); return; }
     aiRfidBtn.disabled = true;
     aiRfidBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> AI';
     if (aiRfidInfo) aiRfidInfo.style.display = 'none';
@@ -1979,7 +1947,7 @@ function selectStudent(id, name) {
         studentSearchInput.style.background = '#f0fdf4';
     }
     if (studentSearchResults) studentSearchResults.classList.remove('show');
-    showToast('Student Selected', name, 'success');
+    showToast(name + ' selected.', 'success');
     validateAssignForm();
 }
 
@@ -2047,7 +2015,7 @@ if (cardUidInput) {
                             this.style.background = '#fee2e2';
                             const badge2 = document.getElementById('uidLengthBadge');
                             if (badge2) { badge2.style.color = '#dc2626'; badge2.style.background = '#fee2e2'; }
-                            showToast('Duplicate UID', 'Card ' + uid + ' already assigned to ' + d.student, 'warning');
+                            showToast('Card ' + uid + ' already assigned to ' + d.student, 'warning');
                         }
                     })
                     .catch(() => {});
@@ -2103,7 +2071,7 @@ document.getElementById('assignCardForm')?.addEventListener('submit', async func
     e.preventDefault();
     const studentId = document.getElementById('selectedStudentId').value;
     const mode = document.getElementById('assignMode').value;
-    if (!studentId) { showToast('Error', 'Please select a student.', 'error'); return; }
+    if (!studentId) { showToast('Please select a student.', 'error'); return; }
 
     clearTimeout(uidCheckTimeout);
     uidSubmitting = true;
@@ -2116,21 +2084,21 @@ document.getElementById('assignCardForm')?.addEventListener('submit', async func
         let url, body;
         if (mode === 'pool') {
             const cardId = document.getElementById('selectedPoolCardId').value;
-            if (!cardId) { showToast('Error', 'Select a card from the pool.', 'error'); submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fas fa-save"></i> Assign Card'; return; }
+            if (!cardId) { showToast('Select a card from the pool.', 'error'); submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fas fa-save"></i> Assign Card'; return; }
             url = '../api/rfid.php?action=quick-assign';
             body = { card_id: parseInt(cardId), student_id: parseInt(studentId), issued_date: document.getElementById('issuedDate').value, expiry_date: document.getElementById('expiryDate').value, notes: document.getElementById('cardNotes').value };
         } else {
             const cardUid = document.getElementById('cardUid').value.trim();
-            if (!cardUid || cardUid.length !== 10) { showToast('Error', 'UID must be exactly 10 digits.', 'error'); submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fas fa-save"></i> Assign Card'; return; }
+            if (!cardUid || cardUid.length !== 10) { showToast('UID must be exactly 10 digits.', 'error'); submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fas fa-save"></i> Assign Card'; return; }
             url = '../api/rfid.php';
             body = { student_id: studentId, card_uid: cardUid, issued_date: document.getElementById('issuedDate').value, expiry_date: document.getElementById('expiryDate').value, notes: document.getElementById('cardNotes').value };
         }
         const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         const data = await res.json();
-        if (data.success) { showToast('Success', data.message, 'success'); setTimeout(() => window.location.reload(), 1000); }
-        else { showToast('Error', data.message, 'error'); submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fas fa-save"></i> Assign Card'; }
+        if (data.success) { showToast(data.message, 'success'); setTimeout(() => window.location.reload(), 1000); }
+        else { showToast(data.message, 'error'); submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fas fa-save"></i> Assign Card'; }
     } catch (err) {
-        showToast('Error', 'Network error. Please try again.', 'error');
+        showToast('Network error. Please try again.', 'error');
         submitBtn.disabled = false;
         submitBtn.innerHTML = '<i class="fas fa-save"></i> Assign Card';
     }
@@ -2143,7 +2111,7 @@ async function openEditModal(id) {
         const res = await fetch('../api/rfid.php?id=' + id);
         const json = await res.json();
         if (!json.success || !json.data) {
-            showToast('Error', json.message || 'Card not found.', 'error');
+            showToast(json.message || 'Card not found.', 'error');
             return;
         }
         const c = json.data;
@@ -2160,7 +2128,7 @@ async function openEditModal(id) {
         m.classList.add('active');
         document.body.style.overflow = 'hidden';
     } catch (e) {
-        showToast('Error', 'Failed to load card details.', 'error');
+        showToast('Failed to load card details.', 'error');
     }
 }
 
@@ -2184,15 +2152,15 @@ document.getElementById('editCardForm')?.addEventListener('submit', async functi
         });
         const data = await res.json();
         if (data.success) {
-            showToast('Card updated', data.message || 'Saved.', 'success');
+            showToast(data.message || 'Saved.', 'success');
             setTimeout(() => window.location.reload(), 800);
         } else {
-            showToast('Error', data.message || 'Update failed.', 'error');
+            showToast(data.message || 'Update failed.', 'error');
             submitBtn.disabled = false;
             submitBtn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
         }
     } catch (err) {
-        showToast('Error', 'Network error. Please try again.', 'error');
+        showToast('Network error. Please try again.', 'error');
         submitBtn.disabled = false;
         submitBtn.innerHTML = '<i class="fas fa-save"></i> Save Changes';
     }
@@ -2216,7 +2184,7 @@ async function openViewDrawer(id) {
     try {
         const res = await fetch('../api/rfid.php?id=' + id);
         const json = await res.json();
-        if (!json.success || !json.data) { showToast('Error', json.message || 'Card not found.', 'error'); closeViewModal(); return; }
+        if (!json.success || !json.data) { showToast(json.message || 'Card not found.', 'error'); closeViewModal(); return; }
         const c = json.data;
         setText('#viewUid', c.card_uid);
         setText('#viewStudent', c.student_name || 'Unassigned');
@@ -2294,7 +2262,7 @@ async function openViewDrawer(id) {
             }
         }
     } catch (err) {
-        showToast('Error', 'Failed to load card details.', 'error');
+        showToast('Failed to load card details.', 'error');
         closeViewModal();
     }
 }
@@ -2374,7 +2342,7 @@ document.querySelectorAll('img.qr-auto[data-qr-student-id]').forEach(function(im
 function viewIdCard(btn) {
     const tr = btn.closest('tr');
     const d = tr.dataset;
-    if (!d.studentId || d.studentId === '0') { showToast('No Student', 'This card has no student assigned.', 'warning'); return; }
+    if (!d.studentId || d.studentId === '0') { showToast('This card has no student assigned.', 'warning'); return; }
     idCardData = {
         name: d.name, studentId: d.studentId, photo: d.photo, course: d.course,
         year: d.year, idnumber: d.idnumber, qr: d.qr, idtype: d.idtype,
@@ -2433,10 +2401,10 @@ function fillIdCardBack(studentId) {
 function printIdCard() {
     var area = document.getElementById('printArea');
     var flip = document.getElementById('cardFlip');
-    if (!flip || !area) { showToast('Error','Card elements not found.','error'); return; }
+    if (!flip || !area) { showToast('Card elements not found.','error'); return; }
     var frontEl = flip.querySelector('.idcard');
     var backEl = flip.querySelector('.idcard-back');
-    if (!frontEl || !backEl) { showToast('Error','Card faces not found.','error'); return; }
+    if (!frontEl || !backEl) { showToast('Card faces not found.','error'); return; }
 
     /*
      * Standard RFID/credit card (CR80): 85mm wide × 55mm tall
@@ -2544,7 +2512,7 @@ function viewInPool() {
     closeRegisterModal();
     var pool = document.getElementById('poolSection');
     if (pool) pool.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    else showToast('Info', 'No available cards in pool.', 'info');
+    else showToast('No available cards in pool.', 'info');
 }
 function regGoStep(step) {
     [1,2,3].forEach(function(s){ document.getElementById('regPanel'+s).classList.toggle('active', s===step); });
@@ -2564,9 +2532,9 @@ function regGoStep(step) {
 }
 async function previewBulkRegister() {
     var raw = document.getElementById('registerUids').value.trim();
-    if (!raw) { showToast('Error', 'Paste at least one UID.', 'error'); return; }
+    if (!raw) { showToast('Paste at least one UID.', 'error'); return; }
     var uids = raw.split(/\s*[\n\r,;]+\s*/).filter(function(u){ return u.trim(); });
-    if (uids.length === 0) { showToast('Error', 'Paste at least one UID.', 'error'); return; }
+    if (uids.length === 0) { showToast('Paste at least one UID.', 'error'); return; }
     var btn = document.getElementById('registerPreviewBtn');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validating...';
     try {
@@ -2576,7 +2544,7 @@ async function previewBulkRegister() {
         });
         var data = await res.json();
         btn.disabled = false; btn.innerHTML = '<i class="fas fa-magnifying-glass-chart"></i> Validate &amp; Preview';
-        if (!data.success) { showToast('Error', data.message, 'error'); return; }
+        if (!data.success) { showToast(data.message, 'error'); return; }
         regPreviewData = data;
         var s = data.summary;
         document.getElementById('regSummaryGrid').innerHTML =
@@ -2612,7 +2580,7 @@ async function previewBulkRegister() {
         }
         regGoStep(2);
     } catch(e) {
-        showToast('Error', 'Network error.', 'error');
+        showToast('Network error.', 'error');
         btn.disabled = false; btn.innerHTML = '<i class="fas fa-magnifying-glass-chart"></i> Validate &amp; Preview';
     }
 }
@@ -2658,7 +2626,7 @@ async function submitBulkRegister() {
                 '<h3>Registration Failed</h3><p>' + (data.message || 'Unknown error') + '</p></div>';
         }
         regGoStep(3);
-    } catch(e) { showToast('Error', 'Network error.', 'error'); }
+    } catch(e) { showToast('Network error.', 'error'); }
     btn.disabled = false;
 }
 // ── Archive Modal ─────────────────────────────────────────────────
@@ -2682,9 +2650,9 @@ document.getElementById('archiveConfirm')?.addEventListener('click', async () =>
             body: JSON.stringify({ card_id: archiveCardId, reason: document.getElementById('archiveReason').value })
         });
         const data = await res.json();
-        if (data.success) { showToast('Archived', data.message, 'success'); setTimeout(() => window.location.reload(), 800); }
-        else showToast('Error', data.message, 'error');
-    } catch(e) { showToast('Error', 'Network error.', 'error'); }
+        if (data.success) { showToast(data.message, 'success'); setTimeout(() => window.location.reload(), 800); }
+        else showToast(data.message, 'error');
+    } catch(e) { showToast('Network error.', 'error'); }
     document.getElementById('archiveModal').classList.remove('active');
     document.body.style.overflow = ''; archiveCardId = null;
 });

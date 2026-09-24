@@ -387,7 +387,7 @@ function openAdd() {
 
 function submitIssue() {
     const studentId = document.getElementById('issueStudent').value;
-    if (!studentId) { alert('Select a student.'); return; }
+    if (!studentId) { showToast('Select a student.', 'warning'); return; }
     const btn = document.getElementById('issueSubmit');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Issuing...';
     fetch('../api/student-ids.php', {
@@ -404,9 +404,9 @@ function submitIssue() {
     .then(r => r.json())
     .then(d => {
         if (d.success) window.location.reload();
-        else alert(d.message || 'Error issuing ID.');
+        else showToast(d.message || 'Error issuing ID.', 'error');
     })
-    .catch(() => alert('Network error.'))
+    .catch(() => showToast('Network error.', 'error'))
     .finally(() => { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Issue ID'; });
 }
 
@@ -622,7 +622,7 @@ function printCard() {
     const blob = new Blob([doc], {type:'text/html'});
     const blobUrl = URL.createObjectURL(blob);
     const w = window.open(blobUrl, '_blank', 'width=700,height=900');
-    if (!w) { showToast('Error','Pop-up blocked.','error'); return; }
+    if (!w) { showToast('Pop-up blocked.','error'); return; }
     w.onload = function(){ setTimeout(function(){ w.print(); URL.revokeObjectURL(blobUrl); }, 500); };
 }
 
@@ -642,8 +642,8 @@ function submitEdit() {
         })
     })
     .then(r => r.json())
-    .then(d => { if (d.success) window.location.reload(); else alert(d.message || 'Error updating.'); })
-    .catch(() => alert('Network error.'));
+    .then(d => { if (d.success) window.location.reload(); else showToast(d.message || 'Error updating.', 'error'); })
+    .catch(() => showToast('Network error.', 'error'));
 }
 
 function deleteId(btn) {
@@ -655,8 +655,8 @@ function deleteId(btn) {
         body: JSON.stringify({ id: d.id })
     })
     .then(r => r.json())
-    .then(d => { if (d.success) window.location.reload(); else alert(d.message || 'Error deleting.'); })
-    .catch(() => alert('Network error.'));
+    .then(d => { if (d.success) window.location.reload(); else showToast(d.message || 'Error deleting.', 'error'); })
+    .catch(() => showToast('Network error.', 'error'));
 }
 
 // ── QR Modal ──────────────────────────────────────────────────────

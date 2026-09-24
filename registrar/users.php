@@ -199,7 +199,7 @@ function toggleUser(id, name, action) {
     fetch('../api/users.php?id=' + id + (action === 'enable' ? '&action=enable' : ''), {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action })
-    }).then(r => r.json()).then(d => { if (d.success) window.location.reload(); else alert(d.message); }).catch(() => alert('Error.'));
+    }).then(r => r.json()).then(d => { if (d.success) window.location.reload(); else showToast(d.message || 'Failed.', 'error'); }).catch(() => showToast('Network error.', 'error'));
 }
 
 async function submitJson(url, method, body) {
@@ -218,9 +218,9 @@ document.getElementById('addForm').addEventListener('submit', async function(e) 
             role: document.getElementById('addRole').value,
             password: document.getElementById('addPassword').value
         });
-        if (d.success) { alert('User created.'); window.location.reload(); }
-        else { alert(d.message); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Create'; }
-    } catch(e) { alert('Network error.'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Create'; }
+        if (d.success) { showToast('User created successfully.', 'success'); window.location.reload(); }
+        else { showToast(d.message || 'Failed to create user.', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Create'; }
+    } catch(e) { showToast('Network error.', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Create'; }
 });
 
 document.getElementById('editForm').addEventListener('submit', async function(e) {
@@ -233,9 +233,9 @@ document.getElementById('editForm').addEventListener('submit', async function(e)
             full_name: document.getElementById('editFullName').value,
             role: document.getElementById('editRole').value
         });
-        if (d.success) { alert('User updated.'); window.location.reload(); }
-        else { alert(d.message); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save'; }
-    } catch(e) { alert('Network error.'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save'; }
+        if (d.success) { showToast('User updated.', 'success'); window.location.reload(); }
+        else { showToast(d.message || 'Failed to update.', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save'; }
+    } catch(e) { showToast('Network error.', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save'; }
 });
 
 document.getElementById('passwordForm').addEventListener('submit', async function(e) {
@@ -248,9 +248,9 @@ document.getElementById('passwordForm').addEventListener('submit', async functio
             action: 'password',
             password: document.getElementById('passwordValue').value
         });
-        if (d.success) { alert('Password updated.'); window.location.reload(); }
-        else { alert(d.message); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Set Password'; }
-    } catch(e) { alert('Network error.'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Set Password'; }
+        if (d.success) { showToast('Password updated.', 'success'); window.location.reload(); }
+        else { showToast(d.message || 'Failed to update password.', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Set Password'; }
+    } catch(e) { showToast('Network error.', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Set Password'; }
 });
 </script>
 
