@@ -51,9 +51,18 @@ chown www-data:www-data "$WWW/logs/$DENY_PHP" 2>/dev/null || true
 # Dev-only: install Composer deps when the source is bind-mounted and the
 # host's vendor/ (which is gitignored) isn't present yet.
 if [ "${RUN_COMPOSER_ON_BOOT:-0}" = "1" ] && [ ! -f "$WWW/vendor/autoload.php" ]; then
-  echo "[entrypoint] vendor/ missing — running composer install…"
-  ( cd "$WWW" && composer install --no-interaction --no-progress --prefer-dist ) \
-    || echo "[entrypoint] warning: composer install failed, continuing anyway."
+  # Composer is not baked into the production image (~10 MB saved).
+  # Download it on-the-fly for dev mode only.
+  if ! command -v composer >/dev/null 2>&1; then
+    echo "[entrypoint] installing composer…"
+    curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer 2>/dev/null \
+      || echo "[entrypoint] warning: composer install failed, continuing anyway."
+  fi
+  if command -v composer >/dev/null 2>&1; then
+    echo "[entrypoint] vendor/ missing — running composer install…"
+    ( cd "$WWW" && composer install --no-interaction --no-progress --prefer-dist ) \
+      || echo "[entrypoint] warning: composer install failed, continuing anyway."
+  fi
 fi
 
 # ── PaaS port support ──────────────────────────────────────────────────────

@@ -73,8 +73,8 @@ COPY docker/deny-all.htaccess /usr/local/share/registrar-templates/deny-all.htac
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# Composer (only exercised when RUN_COMPOSER_ON_BOOT=1 in dev bind-mount mode).
-COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
+# Composer: NOT baked into the production image (~10 MB saved).
+# Dev mode (RUN_COMPOSER_ON_BOOT=1) installs it on-the-fly in entrypoint.sh.
 
 # Application source + ready-to-run vendor.
 COPY --from=vendor /build/vendor /var/www/html/vendor

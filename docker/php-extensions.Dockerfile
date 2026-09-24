@@ -11,9 +11,10 @@
 #  This image is the base for the registrar-app image (see ../Dockerfile).
 #
 #  Only the extensions the app actually uses are compiled (see composer.json:
-#  ext-pdo, ext-mbstring, ext-curl; gd for PDF/QRCodes; fileinfo/opcache cheap):
-#    pdo_mysql mysqli mbstring gd curl opcache fileinfo
-#  intl / exif / zip are intentionally NOT built (unused → faster + smaller).
+#  ext-pdo, ext-mbstring, ext-curl; gd for PDF/QRCodes; zip for runtime
+#  composer operations; fileinfo/opcache cheap):
+#    pdo_mysql mysqli mbstring gd curl zip fileinfo opcache
+#  intl / exif are intentionally NOT built (unused → faster + smaller).
 #
 #  Build (CI does this):  docker build -f docker/php-extensions.Dockerfile -t ghcr.io/rekusissu/php-8.2-apache-ext:php-8.2 .
 # =============================================================================
@@ -21,6 +22,9 @@
 FROM php:8.2-apache
 
 # System libraries + PHP extensions for the app (compiled here, cached in CI).
+# Build deps (-dev packages) are installed, used, then purged to keep the
+# image lean.  Runtime libs (libfreetype6, libjpeg62-turbo, libpng16-16,
+# libzip4, libonig5, libcurl4) are kept as auto-installed dependencies.
 RUN set -e \
     && apt-get update -o Acquire::Retries=5 -o Acquire::http::Timeout=30 \
     && apt-get install -y --no-install-recommends \
@@ -41,7 +45,17 @@ RUN set -e \
         fileinfo \
     && docker-php-ext-enable opcache \
     && a2enmod rewrite headers remoteip \
-    && rm -rf /var/lib/apt/lists/*
+    # Remove build-time headers only.  Runtime .so libs (libfreetype6,
+    # libjpeg62-turbo, libpng16-16, libzip4, libonig5, libcurl4) must stay —
+    # apt cannot see that the compiled php extensions link to them.
+    && apt-get purge -y \
+        libfreetype6-dev \
+        libjpeg62-turbo-dev \
+        libpng-dev \
+        libzip-dev \
+        libonig-dev \
+        libcurl4-openssl-dev \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Production defaults.
 ENV APP_ENV=production
