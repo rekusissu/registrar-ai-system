@@ -1,4 +1,5 @@
 let rfidDistributionPlan = null;
+let rfidDistributionConfirming = false;
 
 function rfidEscape(value) {
     return String(value == null ? '' : value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -48,11 +49,23 @@ function updateRfidApplyButton() {
 
 function applyRfidDistribution() {
     if (!rfidDistributionPlan) return;
+    const button = document.getElementById('applyRfidDistributionBtn');
     const selectedIds = [...document.querySelectorAll('[data-rfid-distribution-card]:checked')].map(input => Number(input.dataset.rfidDistributionCard));
     const assignments = (rfidDistributionPlan.assignments || []).filter(row => selectedIds.includes(Number(row.card_id))).map(row => ({ card_id: row.card_id, student_id: row.student_id, expected_card_uid: row.card_uid, expected_student_number: row.student_number }));
     if (!assignments.length) { showToast('Select at least one assignment.', 'warning'); return; }
-    if (!window.confirm(`Assign ${assignments.length} RFID card(s) to the selected student(s)?`)) return;
-    const button = document.getElementById('applyRfidDistributionBtn');
+    if (!rfidDistributionConfirming) {
+        rfidDistributionConfirming = true;
+        if (button) button.innerHTML = '<i class="fas fa-check"></i> Confirm apply';
+        showToast(`Click “Confirm apply” to assign ${assignments.length} RFID card(s).`, 'info');
+        window.setTimeout(() => {
+            if (rfidDistributionConfirming) {
+                rfidDistributionConfirming = false;
+                if (button) button.innerHTML = '<i class="fas fa-check"></i> Apply selected';
+            }
+        }, 5000);
+        return;
+    }
+    rfidDistributionConfirming = false;
     if (button) { button.disabled = true; button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Applying…'; }
     const csrfMeta = document.querySelector('meta[name=csrf-token]');
     fetch('../api/rfid.php?action=distribution-apply', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfMeta ? csrfMeta.getAttribute('content') : '' }, body: JSON.stringify({ assignments }) })
