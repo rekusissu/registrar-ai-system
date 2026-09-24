@@ -294,7 +294,7 @@ if ($method === 'GET' && $action === 'log') {
     }
 
     $sql = "SELECT
-                hv.id, hv.date_time, hv.visit_date, hv.reason_for_visit,
+                hv.id, hv.student_id, hv.date_time, hv.visit_date, hv.reason_for_visit,
                 hv.assessment, hv.action_taken, hv.nurse_notes,
                 hv.record_status, hv.recorded_by,
                 hv.temperature, hv.blood_pressure, hv.blood_type,

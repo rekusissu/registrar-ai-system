@@ -107,6 +107,30 @@ include '../includes/sidebar.php';
         return 'inactive';
     }
 
+    function healthAttention(r){
+        if(r.record_status !== 'Recorded') return 'Clinic review';
+        if(!r.action_taken || !r.assessment) return 'Incomplete';
+        return '';
+    }
+
+    window.runHealthRecordReview = function(){
+        if(!currentHr || !currentHr.student_id) return;
+        var box = el('hrAiReview');
+        var button = el('hrAiReviewBtn');
+        box.innerHTML = '<div style="color:#64748b;font-size:12px"><i class="fas fa-spinner fa-spin"></i> Reviewing existing clinic records…</div>';
+        if(button) button.disabled = true;
+        var csrf = document.querySelector('meta[name=csrf-token]');
+        fetch('../api/clinic-ai-review.php', {method:'POST', headers:{'Content-Type':'application/json','X-CSRF-Token':csrf ? csrf.content : ''}, body:JSON.stringify({student_id:currentHr.student_id})})
+            .then(function(res){ return res.json(); })
+            .then(function(d){
+                if(!d.success) throw new Error(d.message || 'Review unavailable.');
+                var flags = (d.data.information_flags || []).map(function(flag){ return '<li>' + esc(flag) + '</li>'; }).join('');
+                box.innerHTML = '<div style="font-size:12px;line-height:1.55;color:#334155">' + esc(d.data.summary) + '</div>' + (flags ? '<ul style="font-size:11px;color:#64748b;margin:8px 0 0;padding-left:18px">' + flags + '</ul>' : '') + '<div style="font-size:10px;color:#94a3b8;margin-top:8px">' + esc(d.data.disclaimer) + '</div>';
+            })
+            .catch(function(err){ box.innerHTML = '<div style="font-size:12px;color:#b45309">' + esc(err.message || 'Review unavailable.') + ' Confirm details with the Clinic Portal.</div>'; })
+            .finally(function(){ if(button) button.disabled = false; });
+    };
+
     // Detail modal
     var currentHr = null;
     window.closeHrView = function(){
@@ -139,7 +163,7 @@ include '../includes/sidebar.php';
         if(r.recorded_by_name) rows.push(['Recorded By', r.recorded_by_name]);
         rows.push(['Status', '<span class="pill ' + tpe + '">' + esc(r.record_status) + '</span>']);
 
-        el('hrViewBody').innerHTML = rows.map(function(pair){
+        el('hrViewBody').innerHTML = '<div id="hrAiReviewPanel" style="padding:12px 14px;margin-bottom:12px;background:#f5f8ff;border:1px solid #c7d7fe;border-left:4px solid #2563eb;border-radius:9px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><strong style="font-size:12px;color:#1e40af"><i class="fas fa-sparkles"></i> AI record review</strong><button type="button" class="btn btn-light" id="hrAiReviewBtn" style="padding:4px 9px;font-size:11px" onclick="runHealthRecordReview()">Review</button></div><div id="hrAiReview" style="font-size:12px;line-height:1.5;color:#64748b;margin-top:8px">Summarizes existing clinic records only. It does not diagnose or edit records.</div></div>' + rows.map(function(pair){
             return '<div style="display:flex;justify-content:space-between;gap:16px;padding:9px 0;border-bottom:1px solid #f1f5f9;">'
                 + '<span style="color:#64748b;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;">' + pair[0] + '</span>'
                 + '<span style="font-weight:600;text-align:right;word-break:break-word;">' + pair[1] + '</span></div>';
