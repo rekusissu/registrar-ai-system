@@ -70,7 +70,10 @@ try {
             exit;
         }
 
-        $amount = round((float) ($input['amount'] ?? 0), 2);
+        // Request-backed payments must use the amount stored with the request.
+        // Never trust a client-supplied amount: otherwise a student can pay
+        // PHP 0.01 and still advance the request to Processing.
+        $amount = 0.0;
 
         if ($requestId) {
             $req = $db->fetchOne(
@@ -100,20 +103,16 @@ try {
                 echo json_encode(['success' => false, 'message' => 'This request is not awaiting payment.']);
                 exit;
             }
-            // Derive the amount from the stored record when the client didn't
-            // supply one. fee_amount is authoritative (base_fee × qty already
-            // applied at submit); the student also pays the courier delivery
-            // fee, so it is included here.
-            if ($amount <= 0) {
-                $amount = round((float) ($req['fee_amount'] ?? 0), 2);
+            // fee_amount is authoritative (base_fee × qty already applied at
+            // submit); the student also pays the courier delivery fee.
+            $amount = round((float) ($req['fee_amount'] ?? 0), 2);
+            if (isset($req['delivery_fee']) && (float) $req['delivery_fee'] > 0) {
+                $amount += round((float) $req['delivery_fee'], 2);
+            }
+            if ($amount <= 0 && isset($req['base_fee'])) {
+                $amount = round((float) $req['base_fee'] * max(1, (int) $req['quantity']), 2);
                 if (isset($req['delivery_fee']) && (float) $req['delivery_fee'] > 0) {
                     $amount += round((float) $req['delivery_fee'], 2);
-                }
-                if ($amount <= 0 && isset($req['base_fee'])) {
-                    $amount = round((float) $req['base_fee'] * max(1, (int) $req['quantity']), 2);
-                    if (isset($req['delivery_fee']) && (float) $req['delivery_fee'] > 0) {
-                        $amount += round((float) $req['delivery_fee'], 2);
-                    }
                 }
             }
         }
