@@ -633,14 +633,14 @@ function updateBulkBar() {
 }
 function applyBulkAction() {
     const action = document.getElementById('bulkActionSelect').value;
-    if (!action) { alert('Select an action first.'); return; }
+    if (!action) { showToast('Select an action first.', 'warning'); return; }
     const ids = Array.from(document.querySelectorAll('.student-cb:checked')).map(cb => cb.value);
     if (!ids.length) return;
     if (!confirm('Change status of ' + ids.length + ' student(s) to "' + action + '"?')) return;
     fetch('../api/students.php?action=bulk-status', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids, status: action })
-    }).then(r => r.json()).then(d => { if (d.success) window.location.reload(); else alert(d.message); }).catch(() => alert('Error.'));
+    }).then(r => r.json()).then(d => { if (d.success) window.location.reload(); else showToast(d.message || 'Failed.', 'error'); }).catch(() => showToast('Network error.', 'error'));
 }
 
 // ─── VIEW MODAL (full profile) ──────────────────────────────
@@ -736,7 +736,7 @@ function viewStudent(id) {
         document.querySelectorAll('.vtab-content').forEach(t=>t.style.display='none');
         document.getElementById('tabProfile').style.display = '';
         viewModal.classList.add('active'); document.body.style.overflow = 'hidden';
-    }).catch(() => alert('Failed to load.'));
+    }).catch(() => showToast('Failed to load.', 'error'));
 }
 
 function switchVTab(btn, tab) {
@@ -775,8 +775,8 @@ function uploadPhoto() {
     fd.append('photo', input.files[0]);
     fd.append('student_id', currentViewId);
     fetch('../api/students.php?action=upload-photo', { method:'POST', body:fd })
-    .then(r=>r.json()).then(d=>{ if(d.success) window.location.reload(); else alert(d.message); })
-    .catch(()=>alert('Upload failed.'));
+    .then(r=>r.json()).then(d=>{ if(d.success) window.location.reload(); else showToast(d.message || 'Upload failed.', 'error'); })
+    .catch(()=>showToast('Upload failed.', 'error'));
 }
 async function resendWelcomeEmail() {
     if (!currentViewId) return;
@@ -786,9 +786,9 @@ async function resendWelcomeEmail() {
     try {
         const res = await fetch('../api/students.php?action=resend_welcome_email', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ student_id: currentViewId }) });
         const d = await res.json();
-        if (d.success) showToast('Sent', d.message || 'Welcome email sent.', 'success');
-        else alert(d.message || 'Could not send the email.');
-    } catch (e) { alert('Network error.'); }
+        if (d.success) showToast(d.message || 'Welcome email sent.', 'success');
+        else showToast(d.message || 'Could not send the email.', 'error');
+    } catch (e) { showToast('Network error.', 'error'); }
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-envelope"></i> Resend Welcome Email'; }
 }
 
@@ -843,7 +843,7 @@ function editStudent(id) {
         }).catch(()=>{});
         document.getElementById('editModal').classList.add('active');
         document.body.style.overflow = 'hidden';
-    }).catch(() => alert('Failed to load.'));
+    }).catch(() => showToast('Failed to load.', 'error'));
 }
 function closeEditModal() { document.getElementById('editModal').classList.remove('active'); document.body.style.overflow = ''; }
 document.getElementById('editModal').addEventListener('click', function(e) { if (e.target === this) closeEditModal(); });
@@ -851,11 +851,11 @@ document.getElementById('editModal').addEventListener('click', function(e) { if 
 document.getElementById('editForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     const ec = document.getElementById('editContact').value;
-    if (!ph11(ec)) { alert('Student contact number is required and must be an 11-digit mobile number (e.g. 09171234567).'); return; }
+    if (!ph11(ec)) { showToast('Student contact number is required and must be an 11-digit mobile number (e.g. 09171234567).', 'warning'); return; }
     const egn = document.getElementById('editGuardianName').value.trim();
-    if (egn !== '' && !ph11(document.getElementById('editGuardianContact').value)) { alert('Guardian contact number is required and must be an 11-digit mobile number (e.g. 09171234567).'); return; }
+    if (egn !== '' && !ph11(document.getElementById('editGuardianContact').value)) { showToast('Guardian contact number is required and must be an 11-digit mobile number (e.g. 09171234567).', 'warning'); return; }
     const ee = document.getElementById('editEmail').value.trim();
-    if (!ee || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ee)) { alert('Email is required and must be a valid address.'); return; }
+    if (!ee || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ee)) { showToast('Email is required and must be a valid address.', 'warning'); return; }
     const id = document.getElementById('editId').value;
     const btn = this.querySelector('button[type="submit"]');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
@@ -893,9 +893,9 @@ document.getElementById('editForm').addEventListener('submit', async function(e)
             })
         });
         const d = await res.json();
-        if (d.success) { showToast('Updated', 'Student record updated.', 'success'); setTimeout(() => window.location.reload(), 800); }
-        else { alert(d.message); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save Changes'; }
-    } catch(e) { alert('Network error.'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save Changes'; }
+        if (d.success) { showToast('Student record updated.', 'success'); setTimeout(() => window.location.reload(), 800); }
+        else { showToast(d.message || 'Failed to update.', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save Changes'; }
+    } catch(e) { showToast('Network error.', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save Changes'; }
 });
 
 // ─── COURSE & MAJOR DROPDOWN (native select) ─────────────────
@@ -1001,11 +1001,11 @@ function ph11(v) {
 document.getElementById('addForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     const ac = document.getElementById('addContact').value;
-    if (!ph11(ac)) { alert('Student contact number is required and must be an 11-digit mobile number (e.g. 09171234567).'); return; }
+    if (!ph11(ac)) { showToast('Student contact number is required and must be an 11-digit mobile number (e.g. 09171234567).', 'warning'); return; }
     const agn = document.getElementById('addGuardianName').value.trim();
-    if (agn !== '' && !ph11(document.getElementById('addGuardianContact').value)) { alert('Guardian contact number is required and must be an 11-digit mobile number (e.g. 09171234567).'); return; }
+    if (agn !== '' && !ph11(document.getElementById('addGuardianContact').value)) { showToast('Guardian contact number is required and must be an 11-digit mobile number (e.g. 09171234567).', 'warning'); return; }
     const ae = document.getElementById('addEmail').value.trim();
-    if (!ae || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ae)) { alert('Email is required and must be a valid address.'); return; }
+    if (!ae || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ae)) { showToast('Email is required and must be a valid address.', 'warning'); return; }
     const btn = this.querySelector('button[type="submit"]');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
     try {
@@ -1053,12 +1053,12 @@ document.getElementById('addForm').addEventListener('submit', async function(e) 
                 document.getElementById('acctModal').classList.add('active');
                 document.getElementById('addModal').classList.remove('active');
             } else {
-                showToast('Added', 'Student created successfully.', 'success');
+                showToast('Student created successfully.', 'success');
                 setTimeout(() => window.location.reload(), 800);
             }
         }
-        else { alert(d.message); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Add Student'; }
-    } catch(e) { alert('Network error.'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Add Student'; }
+        else { showToast(d.message || 'Failed to add student.', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Add Student'; }
+    } catch(e) { showToast('Network error.', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Add Student'; }
 });
 
 // ─── AUTO PORTAL ACCOUNT MODAL ───────────────────────────────
@@ -1135,7 +1135,7 @@ async function extractPaste() {
     const fileEl = document.getElementById('pasteFile');
     const text = document.getElementById('pasteText').value.trim();
     const hasFile = fileEl.files && fileEl.files.length > 0;
-    if (!hasFile && !text) { alert('Upload a file or paste some text first.'); return; }
+    if (!hasFile && !text) { showToast('Upload a file or paste some text first.', 'warning'); return; }
     const btn = document.getElementById('pasteExtractBtn');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Extracting...';
     try {
@@ -1150,7 +1150,7 @@ async function extractPaste() {
         } else {
             d = await aiPost('paste_fill', { text });
         }
-        if (!d.success) { alert(d.message || 'Extraction failed.'); return; }
+        if (!d.success) { showToast(d.message || 'Extraction failed.', 'error'); return; }
         pasteData = d.data || {};
         const keys = ['first_name','middle_name','last_name','gender','birth_date','place_of_birth','nationality','religion','email','contact_number','address','course','year_level','guardian_name','guardian_relationship'];
         let html = '<div style="font-size:12px;font-weight:700;color:#1e40af;margin-bottom:8px;">Extracted — review before applying</div>';
@@ -1163,7 +1163,7 @@ async function extractPaste() {
         document.getElementById('pastePreview').innerHTML = html;
         document.getElementById('pastePreview').style.display = 'block';
         document.getElementById('pasteApplyBtn').style.display = '';
-    } catch(e) { alert('Extraction error: ' + e.message); }
+    } catch(e) { showToast('Extraction error: ' + e.message, 'error'); }
     finally { btn.disabled = false; btn.innerHTML = '<i class="fas fa-magic"></i> Extract'; }
 }
 
@@ -1184,7 +1184,7 @@ function applyPaste() {
     }
     refreshMajorOptions('add');
     closePasteModal();
-    showToast('Applied', 'Form pre-filled from extracted data.', 'success');
+    showToast('Form pre-filled from extracted data.', 'success');
 }
 
 // Duplicate check on name blur (deterministic, no LLM)
@@ -1321,15 +1321,15 @@ function applyStd(from, to) {
         const match = changes.filter(c => c.from === from).map(c => c.id);
         const chain = match.map(id => aiToolsPost('apply_std', { id, to }));
         return Promise.all(chain);
-    }).then(() => { showToast('Updated', 'Course standardized.', 'success'); openQualityPanel(true); }).catch(() => alert('Error applying.'));
+    }).then(() => { showToast('Course standardized.', 'success'); openQualityPanel(true); }).catch(() => showToast('Error applying.', 'error'));
 }
 function applyStdById(id, to, btn) {
     if (!confirm('Apply course change?')) return;
     btn.disabled = true;
     aiToolsPost('apply_std', { id, to }).then(d => {
-        if (d.success) { showToast('Updated', 'Course updated.', 'success'); btn.parentElement.remove(); }
-        else { alert(d.message || 'Failed.'); btn.disabled = false; }
-    }).catch(() => { alert('Error.'); btn.disabled = false; });
+        if (d.success) { showToast('Course updated.', 'success'); btn.parentElement.remove(); }
+        else { showToast(d.message || 'Failed.', 'error'); btn.disabled = false; }
+    }).catch(() => { showToast('Error.', 'error'); btn.disabled = false; });
 }
 
 // ─── MERGE DUPLICATES ───────────────────────────────────────
@@ -1340,9 +1340,9 @@ function mergeDupes(idA, idB, btn) {
     if (!confirm('Keep record ' + keeperId + ' and delete record ' + removeId + '? This moves all related records (documents, guardians, RFID, etc.) to the keeper. This cannot be undone.')) return;
     btn.disabled = true;
     aiToolsPost('merge', { keeper_id: keeperId, remove_id: removeId }).then(d => {
-        if (d.success) { showToast('Merged', 'Records merged.', 'success'); setTimeout(() => window.location.reload(), 800); }
-        else { alert(d.message || 'Merge failed.'); btn.disabled = false; }
-    }).catch(() => { alert('Merge error.'); btn.disabled = false; });
+        if (d.success) { showToast('Records merged.', 'success'); setTimeout(() => window.location.reload(), 800); }
+        else { showToast(d.message || 'Merge failed.', 'error'); btn.disabled = false; }
+    }).catch(() => { showToast('Merge error.', 'error'); btn.disabled = false; });
 }
 
 // ─── SECTION SUGGESTION ─────────────────────────────────────
@@ -1350,17 +1350,17 @@ function suggestSection() {
     const course = document.getElementById('addCourse').value;
     const year = document.getElementById('addYearLevel').value;
     const sem = document.getElementById('addSemester').value;
-    if (!course || !year) { alert('Choose a course and year level first.'); return; }
+    if (!course || !year) { showToast('Choose a course and year level first.', 'warning'); return; }
     const btn = event.target.closest('button');
     if (btn) btn.disabled = true;
     aiPost('suggest_section', { course, year_level: year, semester: sem }).then(d => {
         if (d.success && d.data && d.data.suggestion) {
             document.getElementById('addSection').value = d.data.suggestion;
-            showToast('Suggested', 'Section ' + d.data.suggestion, 'success');
+            showToast('Section ' + d.data.suggestion, 'success');
         } else {
-            alert(d.message || 'Could not suggest a section.');
+            showToast(d.message || 'Could not suggest a section.', 'error');
         }
-    }).catch(() => alert('Error suggesting section.'))
+    }).catch(() => showToast('Error suggesting section.', 'error'))
       .finally(() => { if (btn) btn.disabled = false; });
 }
 
@@ -1380,14 +1380,14 @@ document.addEventListener('click', e => { if (!e.target.closest('.quick-status-w
 
 function quickStatus(id, status) {
     fetch('../api/students.php?id=' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) })
-    .then(r => r.json()).then(d => { if (d.success) window.location.reload(); else alert(d.message); }).catch(() => alert('Error.'));
+    .then(r => r.json()).then(d => { if (d.success) window.location.reload(); else showToast(d.message || 'Failed.', 'error'); }).catch(() => showToast('Error.', 'error'));
 }
 
 // ─── RESTORE ─────────────────────────────────────────────────
 function restoreStudent(id, name) {
     if (!confirm('Restore ' + name + '?')) return;
     fetch('../api/students.php?id=' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'active' }) })
-    .then(r => r.json()).then(d => { if (d.success) window.location.reload(); else alert(d.message); }).catch(() => alert('Error.'));
+    .then(r => r.json()).then(d => { if (d.success) window.location.reload(); else showToast(d.message || 'Failed.', 'error'); }).catch(() => showToast('Error.', 'error'));
 }
 
 // ─── EXPORT ─────────────────────────────────────────────────
@@ -1414,15 +1414,6 @@ function exportStudents(list) {
     URL.revokeObjectURL(a.href);
 }
 
-// ─── TOAST ───────────────────────────────────────────────────
-function ensureToastContainer() { let c = document.querySelector('.toast-container'); if (!c) { c = document.createElement('div'); c.className = 'toast-container'; document.body.appendChild(c); } return c; }
-function showToast(title, message, type) {
-    const c = ensureToastContainer(); const t = document.createElement('div'); t.className = 'toast ' + (type||'info');
-    t.innerHTML = '<i class="fas ' + (type==='success'?'fa-circle-check':type==='error'?'fa-circle-xmark':'fa-circle-info') + ' toast-icon"></i><div class="toast-content"><div class="toast-title"></div><div class="toast-message"></div></div><button class="toast-close" aria-label="Close"><i class="fas fa-times"></i></button>';
-    t.querySelector('.toast-title').textContent = title; t.querySelector('.toast-message').textContent = message;
-    t.querySelector('.toast-close').addEventListener('click', () => { t.classList.add('hiding'); setTimeout(() => t.remove(), 300); });
-    c.appendChild(t); setTimeout(() => { t.classList.add('hiding'); setTimeout(() => t.remove(), 300); }, 4000);
-}
 function ucfirst(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]); }
 function fmtDate(v) {
@@ -1509,26 +1500,26 @@ async function checkDuplicate(id) {
     try {
         const d = await enrollApi('duplicate-check', { enrollment_id: id });
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-clone"></i> Duplicate Check'; }
-        if (!d.success) { showToast('Error', d.message || 'Duplicate check failed.', 'error'); return; }
+        if (!d.success) { showToast(d.message || 'Duplicate check failed.', 'error'); return; }
         dupState[id] = d;
         const reBtn = document.getElementById('reEnrollBtn_' + id);
         const viewBtn = document.getElementById('viewDupBtn_' + id);
         // Reveal the accept path when no duplicate exists
         const acceptBtn = Array.from(document.querySelectorAll('#receiveModal button')).find(b => b.getAttribute('onclick') === 'acceptEnrollment(' + id + ')');
         if (d.exists) {
-            showToast('Duplicate', 'Student already exists.', 'info');
+            showToast('Student already exists.', 'info');
             if (reBtn) reBtn.style.display = 'inline-flex';
             if (viewBtn) viewBtn.style.display = 'inline-flex';
             if (acceptBtn) acceptBtn.style.display = 'none';
         } else {
-            showToast('No Record', 'No existing record.', 'success');
+            showToast('No existing record.', 'success');
             if (reBtn) reBtn.style.display = 'none';
             if (viewBtn) viewBtn.style.display = 'none';
             if (acceptBtn) acceptBtn.style.display = 'inline-flex';
         }
     } catch (err) {
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-clone"></i> Duplicate Check'; }
-        showToast('Error', 'Duplicate check failed.', 'error');
+        showToast('Duplicate check failed.', 'error');
     }
 }
 
@@ -1536,27 +1527,27 @@ async function acceptEnrollment(id) {
     if (!confirm('Accept this student into the registrar records?')) return;
     try {
         const d = await enrollApi('accept', { enrollment_id: id });
-        if (!d.success) { showToast('Cannot Accept', d.message || 'Failed.', 'error'); return; }
+        if (!d.success) { showToast(d.message || 'Failed.', 'error'); return; }
         const num = d.data && (d.data.student_number || '');
-        showToast('Accepted', 'Student accepted' + (num ? ' — ' + num : '') + '.', 'success');
+        showToast('Student accepted' + (num ? ' — ' + num : '') + '.', 'success');
         loadEnrollments();
     } catch (err) {
-        showToast('Error', 'Failed to accept student.', 'error');
+        showToast('Failed to accept student.', 'error');
     }
 }
 
 async function reenrollEnrollment(id) {
     const st = dupState[id] && dupState[id].student;
     const studentId = st && st.id;
-    if (!studentId) { showToast('Error', 'No existing record selected. Run Duplicate Check first.', 'error'); return; }
+    if (!studentId) { showToast('No existing record selected. Run Duplicate Check first.', 'error'); return; }
     if (!confirm('Re-enroll this student with their existing student number?')) return;
     try {
         const d = await enrollApi('re-enroll', { enrollment_id: id, student_id: studentId });
-        if (!d.success) { showToast('Cannot Re-enroll', d.message || 'Failed.', 'error'); return; }
-        showToast('Re-enrolled', 'Student re-enrolled successfully.', 'success');
+        if (!d.success) { showToast(d.message || 'Failed.', 'error'); return; }
+        showToast('Student re-enrolled successfully.', 'success');
         loadEnrollments();
     } catch (err) {
-        showToast('Error', 'Failed to re-enroll student.', 'error');
+        showToast('Failed to re-enroll student.', 'error');
     }
 }
 
@@ -1572,7 +1563,7 @@ performSearch();
     const success = params.get('success');
     if (!success) return;
     const msgs = { added: ['Student Added','Created successfully.'], updated: ['Student Updated','Record updated.'], archived: ['Student Deleted','Record archived.'] };
-    if (msgs[success]) showToast(msgs[success][0], msgs[success][1], 'success');
+    if (msgs[success]) showToast(msgs[success][1], 'success');
     const url = new URL(window.location.href); url.searchParams.delete('success'); window.history.replaceState({}, '', url.toString());
 })();
 </script>

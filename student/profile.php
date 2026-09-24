@@ -313,16 +313,15 @@ foreach (['enrolled','probation','at-risk','graduated','loa','transferred','drop
     if (!avatarContainer || !photoInput) return;
 
     function showToast(message, type = 'success') {
-        const bgColor = type === 'success' ? '#10b981' : '#ef4444';
-        const toast = document.createElement('div');
-        toast.style.cssText = `position:fixed;bottom:24px;right:24px;background:${bgColor};color:#fff;padding:16px 20px;border-radius:10px;box-shadow:0 8px 24px rgba(15, 23, 42, 0.15);z-index:9999;font-weight:600;font-size:14px;letter-spacing:-0.2px;transition:opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1);`;
-        toast.textContent = message;
-        document.body.appendChild(toast);
-
-        setTimeout(() => {
-            toast.style.opacity = '0';
-            setTimeout(() => toast.remove(), 300);
-        }, 3000);
+        var c = document.querySelector('.toast-container');
+        if (!c) { c = document.createElement('div'); c.className = 'toast-container'; document.body.appendChild(c); }
+        var t = document.createElement('div');
+        t.className = 'toast ' + (type || 'success');
+        t.innerHTML = '<i class="fas ' + (type === 'success' ? 'fa-circle-check' : 'fa-circle-xmark') + ' toast-icon"></i>' +
+            '<div class="toast-content"><div class="toast-message">' + message + '</div></div>' +
+            '<button class="toast-close" onclick="this.closest(\'.toast\').remove()"><i class="fas fa-times"></i></button>';
+        c.appendChild(t);
+        setTimeout(() => { t.classList.add('hiding'); setTimeout(() => t.remove(), 300); }, 4000);
     }
 
     // Open file picker on avatar click

@@ -439,8 +439,8 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
     var btn = document.getElementById('upSubmit');
     var studentId = document.getElementById('upStudent').value;
     var file = document.getElementById('upFile').files[0];
-    if (!studentId) { alert('Select a student.'); return; }
-    if (!file) { alert('Select a file.'); return; }
+    if (!studentId) { showToast('Select a student.', 'warning'); return; }
+    if (!file) { showToast('Select a file.', 'warning'); return; }
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Uploading…';
     var fd = new FormData();
@@ -453,12 +453,12 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
         var res = await fetch('../api/documents.php?section=files', { method: 'POST', body: fd });
         var d = await res.json();
         if (d.success) {
-            showToast('Uploaded', 'Document stored. Validating…', 'success');
+            showToast('Document stored. Validating…', 'success');
             // Auto-validate the uploaded document via AI
             if (d.data && d.data.id) {
                 validateDocument(d.data.id, function(vr) {
                     if (vr && vr.valid === false) {
-                        showToast('⚠ Flagged', 'AI flagged this document: ' + (vr.reasoning || 'Does not match declared type.'), 'error');
+                        showToast('AI flagged this document: ' + (vr.reasoning || 'Does not match declared type.'), 'error');
                     }
                     setTimeout(function() { window.location.reload(); }, vr && vr.valid === false ? 1500 : 700);
                 });
@@ -466,9 +466,9 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
                 setTimeout(function() { window.location.reload(); }, 700);
             }
         } else {
-            alert(d.message || 'Upload failed.');
+            showToast(d.message || 'Upload failed.', 'error');
         }
-    } catch(err) { alert('Network error.'); }
+    } catch(err) { showToast('Network error.', 'error'); }
     btn.disabled = false;
     btn.innerHTML = '<i class="fas fa-upload"></i> Upload';
 });
@@ -582,9 +582,9 @@ function deleteFile(el) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: el.dataset.id })
     }).then(function(r) { return r.json(); }).then(function(res) {
-        if (res.success) { showToast('Deleted', 'File removed.', 'success'); setTimeout(function() { window.location.reload(); }, 500); }
-        else alert(res.message || 'Delete failed.');
-    }).catch(function() { alert('Network error.'); });
+        if (res.success) { showToast('File removed.', 'success'); setTimeout(function() { window.location.reload(); }, 500); }
+        else showToast(res.message || 'Delete failed.', 'error');
+    }).catch(function() { showToast('Network error.', 'error'); });
 }
 
 // ─── NOTIFY MISSING ─────────────────────────────────────
@@ -598,12 +598,12 @@ function notifyMissing() {
         body: JSON.stringify({})
     }).then(function(r) { return r.json(); }).then(function(res) {
         if (res.success) {
-            showToast('Notifications Sent', res.message || 'Students with missing documents notified.', 'success');
+            showToast(res.message || 'Students with missing documents notified.', 'success');
         } else {
-            showToast('Error', res.message || 'Failed to send notifications.', 'error');
+            showToast(res.message || 'Failed to send notifications.', 'error');
         }
     }).catch(function() {
-        showToast('Error', 'Network error.', 'error');
+        showToast('Network error.', 'error');
     }).finally(function() {
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-bell"></i> Notify Students';
@@ -648,22 +648,6 @@ function aiValidate(el) {
         }
         // Remove validate button, show result
     });
-}
-
-// ─── TOAST ──────────────────────────────────────────────
-function showToast(title, message, type) {
-    var c = document.querySelector('.toast-container');
-    if (!c) { c = document.createElement('div'); c.className = 'toast-container'; document.body.appendChild(c); }
-    var t = document.createElement('div');
-    t.className = 'toast ' + (type || 'info');
-    t.innerHTML = '<i class="fas ' + (type === 'success' ? 'fa-circle-check' : type === 'error' ? 'fa-circle-xmark' : 'fa-circle-info') + ' toast-icon"></i>' +
-        '<div class="toast-content"><div class="toast-title"></div><div class="toast-message"></div></div>' +
-        '<button class="toast-close" aria-label="Close"><i class="fas fa-times"></i></button>';
-    t.querySelector('.toast-title').textContent = title;
-    t.querySelector('.toast-message').textContent = message;
-    t.querySelector('.toast-close').addEventListener('click', function() { t.classList.add('hiding'); setTimeout(function() { t.remove(); }, 300); });
-    c.appendChild(t);
-    setTimeout(function() { t.classList.add('hiding'); setTimeout(function() { t.remove(); }, 300); }, 4000);
 }
 </script>
 

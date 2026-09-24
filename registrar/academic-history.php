@@ -270,12 +270,11 @@ async function importRecords(studentId, btn) {
         });
         const d = await res.json();
         if (!d.success) throw new Error(d.message || 'Import failed.');
-        showToast('Imported', d.message, 'success');
+        showToast(d.message || 'Imported.', 'success');
         setTimeout(() => window.location.reload(), 800);
     } catch (err) {
         btn.disabled = false; btn.innerHTML = orig;
-        if (typeof showToast === 'function') showToast('Error', err.message || 'Import failed.', 'error');
-        else alert(err.message || 'Import failed.');
+        showToast(err.message || 'Import failed.', 'error');
     }
 }
 

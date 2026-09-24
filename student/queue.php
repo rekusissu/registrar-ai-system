@@ -137,10 +137,10 @@ function cancelTicket() {
     fetch('../api/student-queue.php?action=cancel', { method: 'POST' })
         .then(r => r.json())
         .then(d => {
-            if (d.success) { refreshQueue(); }
-            else { alert(d.message || 'Unable to cancel your ticket.'); }
+            if (d.success) { refreshQueue(); showToast('Ticket cancelled.', 'success'); }
+            else { showToast(d.message || 'Unable to cancel your ticket.', 'error'); }
         })
-        .catch(() => alert('Unable to cancel your ticket. Please try again.'));
+        .catch(() => showToast('Unable to cancel your ticket. Please try again.', 'error'));
 }
 
 function refreshQueue() {

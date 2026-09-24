@@ -743,13 +743,13 @@ select.form-control{appearance:none;-webkit-appearance:none;padding-right:38px;c
             } else {
                 if(prompt) prompt.style.display = 'block';
                 var errMsg = (res.data && res.data.message) ? res.data.message : 'AI recommendation failed.';
-                alert(errMsg);
+                showToast(errMsg, 'error');
             }
         })
         .catch(function(){
             if(loading) loading.classList.remove('active');
             if(prompt) prompt.style.display = 'block';
-            alert('Network error while fetching AI recommendation.');
+            showToast('Network error while fetching AI recommendation.', 'error');
         });
     };
 

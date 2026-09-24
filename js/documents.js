@@ -150,7 +150,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // ─── 2. DAILY QUEUE VOLUME — Express vs Regular (grouped bar) ─
     const volumeEl = document.getElementById('volumeChart');
     if (volumeEl) {
-        const days = getData(volumeEl, 'days');
+        const days = getData(volumeEl, 'labels');
         const express = getData(volumeEl, 'express');
         const regular = getData(volumeEl, 'regular');
         const has = hasData(express) || hasData(regular);

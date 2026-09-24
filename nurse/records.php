@@ -217,7 +217,6 @@ include '../includes/sidebar.php';
     </div>
 </div>
 
-<div class="toast" id="toast"></div>
 <script>
 (function(){
     'use strict';
@@ -228,10 +227,6 @@ include '../includes/sidebar.php';
     function statusClass(s){ var v=String(s||'').toLowerCase(); return v==='recorded'?'active':(v==='pending'?'warning':'inactive'); }
     var CSRF=(document.querySelector('meta[name=csrf-token]')||{}).getAttribute?document.querySelector('meta[name=csrf-token]').getAttribute('content'):'';
     var _rows=[];
-    function showToast(msg,type){
-        var t=el('toast');t.textContent=msg;t.className='toast '+(type||'success')+' show';
-        setTimeout(function(){t.className='toast';},3000);
-    }
     window.loadHealthLog=function(){
         var params={q:el('hlogQ').value.trim(),date_from:el('hlogFrom').value,date_to:el('hlogTo').value,status:el('hlogStatus').value};
         var parts=[];
