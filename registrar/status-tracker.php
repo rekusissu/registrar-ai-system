@@ -1,7 +1,7 @@
 <?php
 // ============================================================
 //  REGISTRAR/STATUS-TRACKER.PHP
-//  Student Status Tracker — AI-powered decision console.
+//  Student Status Tracker â€” AI-powered decision console.
 // ============================================================
 
 require_once __DIR__ . '/../shared/security_headers.php';
@@ -57,7 +57,7 @@ if ($search !== '') { $where[] = "(s.student_number LIKE ? OR s.first_name LIKE 
 if (!empty($where)) { $sql .= " WHERE " . implode(' AND ', $where); }
 $sql .= " GROUP BY s.id ORDER BY last_change DESC, s.id DESC";
 $students = $db->fetchAll($sql, $params);
-$studentIds = array_map(fn($s) => (int) $s['id'], $students);
+
 
 $page_title = 'Status Tracker';
 $APP_ROOT   = '../';
@@ -65,128 +65,26 @@ $ACTIVE_NAV = 'tracker';
 include '../includes/header.php';
 include '../includes/sidebar.php';
 ?>
-<style>
-.st-wrap{padding:24px;max-width:1400px;margin:0 auto}
-.st-grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
-.st-kpi{background:#fff;border-radius:12px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.08);display:flex;align-items:flex-start;gap:14px}
-.st-kpi-icon{width:44px;height:44px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
-.st-kpi-num{font-size:28px;font-weight:700;line-height:1.1}
-.st-kpi-label{font-size:13px;color:#64748b;margin-top:2px}
-.st-kpi-sub{font-size:12px;color:#94a3b8;margin-top:4px}
-.st-delta{font-size:12px;font-weight:600;padding:2px 6px;border-radius:4px;display:inline-block;margin-left:6px}
-.st-delta.up{color:#16a34a;background:#f0fdf4}
-.st-delta.down{color:#dc2626;background:#fef2f2}
-.st-ai-panel{background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.08);margin-bottom:24px;overflow:hidden}
-.st-ai-hdr{padding:16px 20px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;border-bottom:1px solid #f1f5f9}
-.st-ai-hdr h3{font-size:15px;font-weight:600;margin:0;display:flex;align-items:center;gap:8px}
-.st-ai-badge{background:#3b82f6;color:#fff;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600}
-.st-ai-body{padding:16px 20px}
-.st-ai-load{text-align:center;padding:24px;color:#94a3b8}
-.st-rec-list{display:flex;flex-direction:column;gap:10px}
-.st-rec{border:1px solid #e2e8f0;border-radius:8px;padding:14px;display:flex;gap:12px;align-items:flex-start;transition:opacity .3s}
-.st-rec.sv-high{border-left:3px solid #dc2626}
-.st-rec.sv-med{border-left:3px solid #f59e0b}
-.st-rec.sv-low{border-left:3px solid #22c55e}
-.st-rec-info{flex:1}
-.st-rec-title{font-size:13px;color:#64748b;margin-bottom:2px}
-.st-rec-name{font-size:14px;font-weight:600;color:#1e293b}
-.st-rec-reason{font-size:12px;color:#64748b;margin-top:4px;line-height:1.4}
-.st-rec-acts{display:flex;gap:8px;margin-top:8px}
-.st-btn-apply{background:#3b82f6;color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:500}
-.st-btn-apply:hover{background:#2563eb}
-.st-btn-apply.applying{opacity:.5;pointer-events:none}
-.st-btn-apply.applied{background:#16a34a;pointer-events:none}
-.st-btn-dismiss{background:transparent;color:#94a3b8;border:1px solid #e2e8f0;padding:5px 12px;border-radius:6px;font-size:12px;cursor:pointer}
-.st-btn-dismiss:hover{color:#64748b;border-color:#cbd5e1}
-.st-btn-dismiss.dismissed{opacity:.3;pointer-events:none}
-.st-ai-src{font-size:11px;color:#94a3b8;margin-left:auto}
-.st-apply-all{background:#1e293b;color:#fff;border:none;padding:6px 14px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:500;margin-left:auto}
-.st-apply-all:hover{background:#334155}
-.st-anom{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px 16px;margin-bottom:24px;display:none}
-.st-anom-bar{display:flex;align-items:center;gap:8px;font-size:13px;color:#991b1b}
-.st-dist{background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.08);padding:20px;margin-bottom:24px}
-.st-dist-title{font-size:14px;font-weight:600;margin-bottom:12px}
-.st-dist-bar{display:flex;height:12px;border-radius:6px;overflow:hidden;background:#f1f5f9}
-.st-dist-seg{height:100%;transition:width .5s}
-.st-dist-legend{display:flex;flex-wrap:wrap;gap:12px;margin-top:12px}
-.st-dist-item{display:flex;align-items:center;gap:5px;font-size:12px;color:#64748b}
-.st-dist-dot{width:8px;height:8px;border-radius:50%}
-.st-filters{display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap}
-.st-pill{padding:6px 14px;border-radius:20px;font-size:13px;font-weight:500;border:1px solid #e2e8f0;background:#fff;color:#64748b;cursor:pointer;text-decoration:none;transition:all .2s}
-.st-pill:hover,.st-pill.active{background:#2563eb;color:#fff;border-color:#2563eb}
-.st-search{margin-left:auto;position:relative}
-.st-search input{padding:7px 12px 7px 32px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;width:220px;outline:none}
-.st-search input:focus{border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.1)}
-.st-search i{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:13px}
-.st-panels{display:grid;grid-template-columns:1fr 340px;gap:24px}
-.st-table-wrap{background:#fff;border-radius:14px;border:1px solid #e2e8f0;overflow:hidden;box-shadow:0 1px 3px rgba(15,23,42,0.04)}
-.st-table-wrap table{width:100%;border-collapse:collapse}
-.st-table-wrap th{text-align:left;padding:10px 14px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:#64748b;background:#fafcfd;border-bottom:2px solid #e8edf4;white-space:nowrap}
-.st-table-wrap td{padding:10px 14px;font-size:13px;color:#1e293b;border-bottom:1px solid #f1f5f9;vertical-align:middle}
-.st-table-wrap tbody tr{transition:background .15s ease}
-.st-table-wrap tbody tr:hover{background:#f8fafc}
-.st-table-wrap tbody tr:last-child td{border-bottom:none}
-.st-table-wrap .st-t-info{display:flex;align-items:center;gap:10px}
-.st-table-wrap .st-t-av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:11px;flex-shrink:0}
-.st-table-wrap .st-t-name{font-weight:600;color:#0f172a;font-size:13px}
-.st-table-wrap .st-t-num{font-size:11px;color:#94a3b8}
-.st-badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;gap:4px;white-space:nowrap;border:none}
-.st-rdot{width:8px;height:8px;border-radius:50%;margin-left:6px;display:inline-block;flex-shrink:0}
-.st-rdot.loading{background:#e2e8f0;animation:pulse 1s infinite}
-.st-rdot.low{background:#22c55e}
-.st-rdot.med{background:#f59e0b}
-.st-rdot.high{background:#ef4444}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-.st-tl{background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.08);padding:20px;max-height:calc(100vh - 220px);overflow-y:auto;position:sticky;top:80px}
-.st-tl-h{font-size:14px;font-weight:600;margin-bottom:16px}
-.st-tl-b{position:relative;padding-left:20px}
-.st-tl-i{position:relative;padding-bottom:16px}
-.st-tl-i:last-child{padding-bottom:0}
-.st-tl-dot{position:absolute;left:-20px;top:4px;width:10px;height:10px;border-radius:50%;border:2px solid #fff}
-.st-tl-nm{font-size:13px;font-weight:600;color:#1e293b}
-.st-tl-chg{font-size:12px;color:#64748b;margin-top:2px}
-.st-tl-time{font-size:11px;color:#94a3b8;margin-top:2px}
-.st-tl-rsn{font-size:11px;color:#64748b;background:#f8fafc;padding:4px 8px;border-radius:4px;margin-top:4px;border:1px solid #f1f5f9}
-.st-empty{text-align:center;padding:48px;color:#94a3b8}
-.st-empty i{font-size:32px;margin-bottom:12px;display:block}
-.st-modal-o{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,.5);backdrop-filter:blur(4px);z-index:1000;display:none;align-items:center;justify-content:center}
-.st-modal-o.show{display:flex}
-.st-modal{background:#fff;border-radius:16px;width:560px;max-height:80vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2)}
-.st-modal-h{padding:20px 24px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between}
-.st-modal-x{background:none;border:none;font-size:20px;color:#94a3b8;cursor:pointer;padding:4px}
-.st-modal-ai{background:#f8fafc;border-radius:8px;padding:14px;margin:16px 24px;border:1px solid #e2e8f0}
-.st-modal-ai-lbl{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:#3b82f6;font-weight:600;margin-bottom:6px}
-.st-modal-ai-txt{font-size:13px;color:#475569;line-height:1.5}
-.st-modal-ai-rec{font-size:12px;color:#16a34a;margin-top:6px;font-weight:500}
-.st-modal-tl{padding:0 24px 24px}
-.st-modal-empty{padding:24px;text-align:center;color:#94a3b8}
-.st-toast{position:fixed;bottom:24px;right:24px;background:#1e293b;color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;z-index:9999;transform:translateY(80px);opacity:0;transition:all .3s;display:flex;align-items:center;gap:8px}
-.st-toast.show{transform:translateY(0);opacity:1}
-.st-toast.success{background:#16a34a}
-.st-toast.error{background:#dc2626}
-@media(max-width:1024px){.st-grid4{grid-template-columns:repeat(2,1fr)}.st-panels{grid-template-columns:1fr}.st-tl{position:static;max-height:none}}
-@media(max-width:640px){.st-grid4{grid-template-columns:1fr}.st-filters{flex-direction:column;align-items:stretch}.st-search{margin-left:0}}
-</style>
+<link rel="stylesheet" href="../css/status-tracker.css">
 <main class="dashboard-main">
 <header class="header">
   <div class="title">
-    <h1><i class="fas fa-chart-line" style="color:#2563eb;margin-right:8px"></i>Status Tracker</h1>
+    <h1><i class="fas fa-chart-line" style="color:var(--brand-500);margin-right:8px"></i>Status Tracker</h1>
     <p>AI-powered status monitoring, recommendations, and student risk assessment</p>
   </div>
 </header>
 <div class="st-wrap">
 <!-- KPI Cards -->
-<div class="st-grid4">
+<div class="st-kpi-strip">
   <div class="st-kpi">
-    <div class="st-kpi-icon" style="background:#eff6ff;color:#2563eb"><i class="fas fa-users"></i></div>
+    <div class="st-kpi-icon" style="background:var(--brand-50);color:var(--brand-500)"><i class="fas fa-users"></i></div>
     <div>
       <div class="st-kpi-num"><?= number_format($totalStudents) ?></div>
       <div class="st-kpi-label">Total Students</div>
-      <div class="st-kpi-sub">All registered students</div>
     </div>
   </div>
   <div class="st-kpi">
-    <div class="st-kpi-icon" style="background:#f0fdf4;color:#16a34a"><i class="fas fa-arrow-right-arrow-left"></i></div>
+    <div class="st-kpi-icon" style="background:var(--success-100);color:var(--success-600)"><i class="fas fa-arrow-right-arrow-left"></i></div>
     <div>
       <div class="st-kpi-num"><?= number_format($changesThisMonth) ?>
         <?php $delta = $changesThisMonth - $changesPrevMonth; if ($delta !== 0): ?>
@@ -194,45 +92,43 @@ include '../includes/sidebar.php';
         <?php endif; ?>
       </div>
       <div class="st-kpi-label">Changes This Month</div>
-      <div class="st-kpi-sub">vs last month (<?= number_format($changesPrevMonth) ?>)</div>
     </div>
   </div>
   <div class="st-kpi">
-    <div class="st-kpi-icon" style="background:#fef2f2;color:#dc2626"><i class="fas fa-triangle-exclamation"></i></div>
+    <div class="st-kpi-icon" style="background:var(--danger-100);color:var(--danger-600)"><i class="fas fa-triangle-exclamation"></i></div>
     <div>
       <div class="st-kpi-num"><?= number_format($attentionNeeded) ?></div>
       <div class="st-kpi-label">Attention Needed</div>
-      <div class="st-kpi-sub">At-risk + Probation students</div>
     </div>
   </div>
   <div class="st-kpi">
-    <div class="st-kpi-icon" style="background:#f5f3ff;color:#7c3aed"><i class="fas fa-calendar-week"></i></div>
+    <div class="st-kpi-icon" style="background:#eef2ff;color:var(--purple-500)"><i class="fas fa-calendar-week"></i></div>
     <div>
       <div class="st-kpi-num"><?= number_format($changesLast7d) ?></div>
       <div class="st-kpi-label">Last 7 Days</div>
-      <div class="st-kpi-sub">Recent status changes</div>
     </div>
   </div>
 </div>
 
-<!-- AI Recommendations Panel -->
-<div class="st-ai-panel" id="aiPanel">
-  <div class="st-ai-hdr" onclick="toggleAI()">
-    <h3><i class="fas fa-robot" style="color:#3b82f6"></i> AI Recommendations <span class="st-ai-badge" id="aiCount">0</span></h3>
-    <div style="display:flex;align-items:center;gap:8px">
-      <button class="st-apply-all" id="btnApplyAll" onclick="event.stopPropagation();applyAll()" style="display:none">Apply All</button>
-      <i class="fas fa-chevron-down" id="aiChevron" style="color:#94a3b8;transition:transform .3s"></i>
-    </div>
-  </div>
-  <div class="st-ai-body" id="aiBody">
-    <div class="st-ai-load" id="aiLoad"><i class="fas fa-spinner fa-spin"></i> Loading AI recommendations...</div>
-    <div class="st-rec-list" id="aiRecs" style="display:none"></div>
-  </div>
+
+<!-- AI Command Bar -->
+<div class="st-ai-bar">
+  <div class="st-ai-bar-label"><i class="fas fa-robot"></i> AI Tools</div>
+  <button class="st-ai-btn" onclick="runAI('report')" id="btnAIReport"><i class="fas fa-file-lines"></i> AI Report</button>
+  <button class="st-ai-btn" onclick="runAI('anomalies')" id="btnAIAnomalies"><i class="fas fa-magnifying-glass-chart"></i> Scan Anomalies</button>
+  <button class="st-ai-btn" onclick="runAI('risks')" id="btnAIRisks"><i class="fas fa-shield-halved"></i> Risk Assessment</button>
+  <button class="st-ai-btn" onclick="runAI('recommendations')" id="btnAIRecs"><i class="fas fa-lightbulb"></i> Recommendations</button>
+  <div class="st-ai-sep"></div>
+  <button class="st-ai-btn st-ai-run-all" onclick="runAI('all')" id="btnAIAll"><i class="fas fa-bolt"></i> Run All</button>
 </div>
 
-<!-- Anomaly Alerts -->
-<div class="st-anom" id="anomalyAlert">
-  <div class="st-anom-bar"><i class="fas fa-bell"></i> <span id="anomalyText"></span></div>
+<!-- AI Output Panel -->
+<div class="st-ai-output" id="aiOutput">
+  <div class="st-ai-output-hdr">
+    <div class="st-ai-output-title" id="aiOutputTitle"><i class="fas fa-robot"></i> <span id="aiOutputLabel">Output</span> <span class="st-ai-output-badge" id="aiOutputCount" style="display:none">0</span></div>
+    <button class="st-ai-output-close" onclick="closeAIOutput()"><i class="fas fa-xmark"></i></button>
+  </div>
+  <div class="st-ai-output-body" id="aiOutputBody"></div>
 </div>
 
 <!-- Status Distribution -->
@@ -246,7 +142,7 @@ include '../includes/sidebar.php';
 <div class="st-filters">
   <a href="?" class="st-pill <?= $filterStatus === '' ? 'active' : '' ?>">All</a>
   <?php foreach ($DB_STATUSES as $s): ?>
-    <a href="?status=<?= $s ?>" class="st-pill <?= $filterStatus === $s ? 'active' : '' ?>"><?= ucfirst($s) ?> <span style="opacity:.6;font-size:11px"><?= $counts[$s] ?></span></a>
+    <a href="?status=<?= $s ?>" class="st-pill <?= $filterStatus === $s ? 'active' : '' ?>"><?= ucfirst($s) ?> <span class="st-pill-count"><?= $counts[$s] ?></span></a>
   <?php endforeach; ?>
   <div class="st-search">
     <i class="fas fa-search"></i>
@@ -273,7 +169,7 @@ include '../includes/sidebar.php';
       </thead>
       <tbody>
         <?php if (empty($students)): ?>
-          <tr><td colspan="8" class="st-empty" style="text-align:center;padding:48px;color:#94a3b8"><i class="fas fa-users-slash" style="font-size:32px;display:block;margin-bottom:12px"></i>No students found</td></tr>
+          <tr><td colspan="8" class="st-empty" style="text-align:center;padding:48px;color:var(--text-subtle)"><i class="fas fa-users-slash" style="font-size:32px;display:block;margin-bottom:12px"></i>No students found</td></tr>
         <?php else: ?>
           <?php $rowNum = 0; foreach ($students as $s):
             $rowNum++;
@@ -281,7 +177,7 @@ include '../includes/sidebar.php';
             $sm = $STATUS_META[$s['status']] ?? $STATUS_META['inactive'];
           ?>
           <tr style="cursor:pointer" onclick="openStudentModal(<?= $s['id'] ?>,'<?= htmlspecialchars(addslashes($s['first_name'].' '.$s['last_name'])) ?>','<?= htmlspecialchars($s['student_number']) ?>')">
-            <td style="font-weight:600;font-size:12px;color:#64748b"><?= $rowNum ?></td>
+            <td style="font-weight:600;font-size:12px;color:var(--text-faint)"><?= $rowNum ?></td>
             <td>
               <div class="st-t-info">
                 <div class="st-t-av" style="background:<?= $sm['bg'] ?>;color:<?= $sm['color'] ?>"><?= $initials ?></div>
@@ -298,18 +194,18 @@ include '../includes/sidebar.php';
             <td style="white-space:nowrap"><?= htmlspecialchars($s['year_level'] ?? 'N/A') ?></td>
             <td>
               <div class="st-badge" style="background:<?= $sm['bg'] ?>;color:<?= $sm['color'] ?>">
-                <span style="width:6px;height:6px;border-radius:50%;display:inline-block;background:<?= $sm['color'] ?>"></span>
+                <span class="st-badge-dot" style="background:<?= $sm['color'] ?>"></span>
                 <?= ucfirst($s['status']) ?>
               </div>
             </td>
             <td style="text-align:center">
               <span class="st-rdot loading" data-student-id="<?= $s['id'] ?>"></span>
             </td>
-            <td style="font-size:12px;color:#64748b;white-space:nowrap">
+            <td style="font-size:12px;color:var(--text-faint);white-space:nowrap">
               <?php if (!empty($s['last_change'])): ?>
                 <?= date('M d, Y', strtotime($s['last_change'])) ?>
               <?php else: ?>
-                <span style="color:#cbd5e1">—</span>
+                <span style="color:var(--text-subtle)">â€”</span>
               <?php endif; ?>
             </td>
           </tr>
@@ -334,7 +230,7 @@ include '../includes/sidebar.php';
         <div class="st-tl-nm"><?= htmlspecialchars($af['first_name'].' '.$af['last_name']) ?></div>
         <div class="st-tl-chg">
           <span class="st-badge" style="background:<?= ($STATUS_META[$af['previous_status']]??$STATUS_META['inactive'])['bg'] ?>;color:<?= ($STATUS_META[$af['previous_status']]??$STATUS_META['inactive'])['color'] ?>;padding:2px 6px;font-size:10px"><?= ucfirst($af['previous_status']) ?></span>
-          <i class="fas fa-arrow-right" style="color:#94a3b8;font-size:10px;margin:0 4px"></i>
+          <i class="fas fa-arrow-right" style="color:var(--text-subtle);font-size:10px;margin:0 4px"></i>
           <span class="st-badge" style="background:<?= $meta['bg'] ?>;color:<?= $meta['color'] ?>;padding:2px 6px;font-size:10px"><?= ucfirst($af['current_status']) ?></span>
         </div>
         <?php if (!empty($af['reason'])): ?>
@@ -351,22 +247,28 @@ include '../includes/sidebar.php';
 </main><!-- /dashboard-main -->
 
 <!-- History Modal -->
-<div class="st-modal-o" id="studentModal">
+<div class="st-modal-overlay" id="studentModal">
   <div class="st-modal">
-    <div class="st-modal-h">
-      <div>
-        <div id="modalName" style="font-size:16px;font-weight:600"></div>
-        <div id="modalNumber" style="font-size:12px;color:#64748b;margin-top:2px"></div>
+    <div class="st-modal-header">
+      <div class="st-modal-header-info">
+        <div id="modalAvatar" class="st-modal-header-avatar" style="background:var(--brand-500)"></div>
+        <div>
+          <div class="st-modal-header-name" id="modalName"></div>
+          <div class="st-modal-header-num" id="modalNumber"></div>
+        </div>
       </div>
-      <button class="st-modal-x" onclick="closeModal()"><i class="fas fa-xmark"></i></button>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="st-btn-sm st-btn-apply" id="btnModalAIProfile" onclick="runModalAIProfile()"><i class="fas fa-robot"></i> Run Full AI Profile</button>
+        <button class="st-modal-close" onclick="closeModal()"><i class="fas fa-xmark"></i></button>
+      </div>
     </div>
     <div class="st-modal-ai" id="modalAI">
       <div class="st-modal-ai-lbl"><i class="fas fa-robot"></i> AI Brief</div>
       <div class="st-modal-ai-txt" id="modalAIText">Loading...</div>
       <div class="st-modal-ai-rec" id="modalAIRec"></div>
     </div>
-    <div class="st-modal-tl">
-      <div style="font-size:14px;font-weight:600;margin-bottom:12px"><i class="fas fa-clock-rotate-left"></i> Status History</div>
+    <div class="st-modal-timeline">
+      <div class="st-modal-timeline-h"><i class="fas fa-clock-rotate-left"></i> Status History</div>
       <div id="modalTimeline">
         <div class="st-modal-empty"><i class="fas fa-spinner fa-spin"></i> Loading history...</div>
       </div>
@@ -378,11 +280,11 @@ include '../includes/sidebar.php';
 <div class="st-toast" id="toast"></div>
 
 <script>
+'use strict';
 (function(){
 const STATUS_META=<?= json_encode($STATUS_META) ?>;
 const ALL_STATUSES=<?= json_encode($ALL_STATUSES) ?>;
 const DB_STATUSES=<?= json_encode($DB_STATUSES) ?>;
-const STUDENT_IDS=<?= json_encode($studentIds) ?>;
 const SEARCH_DELAY=400;
 let searchTimer=null;
 
@@ -408,129 +310,171 @@ legend.appendChild(item);
 });
 })();
 
-/* --- AI Recommendations --- */
-async function loadRecommendations(){
-try{
-const r=await fetch('../api/ai-tools.php?action=status_recommendations');
-if(!r.ok)throw new Error('API error');
-const data=await r.json();
-renderRecs(data.data?.recommendations||data.recommendations||[]);
-}catch(e){
-document.getElementById('aiLoad').innerHTML='<span style="color:#94a3b8"><i class="fas fa-exclamation-circle"></i> Unable to load recommendations</span>';
-}}
-
-function renderRecs(recs){
-const container=document.getElementById('aiRecs');
-const load=document.getElementById('aiLoad');
-const badge=document.getElementById('aiCount');
-const btnAll=document.getElementById('btnApplyAll');
-load.style.display='none';
-container.style.display='flex';
-container.innerHTML='';
-badge.textContent=recs.length;
-btnAll.style.display=recs.length>1?'inline-block':'none';
-if(recs.length===0){
-container.innerHTML='<div style="text-align:center;padding:16px;color:#94a3b8;font-size:13px"><i class="fas fa-check-circle" style="color:#16a34a"></i> No recommendations at this time</div>';
-return;
+/* --- Helpers --- */
+function escapeHTML(str){const d=document.createElement('div');d.textContent=str;return d.innerHTML;}
+function toast(msg,type){
+const el=document.getElementById('toast');
+if(!el)return;
+el.textContent=msg;
+el.className='st-toast '+(type||'')+' show';
+setTimeout(()=>el.classList.remove('show'),3000);
 }
-recs.forEach((rec,i)=>{
+window.toast=toast;
+
+/* --- AI Command Bar --- */
+let activeAITab=null;
+
+function setActiveTab(tab){
+document.querySelectorAll('.st-ai-btn').forEach(b=>b.classList.remove('active'));
+if(tab==='all'){document.getElementById('btnAIAll')?.classList.add('active');return;}
+const btnMap={report:'btnAIReport',anomalies:'btnAIAnomalies',risks:'btnAIRisks',recommendations:'btnAIRecs'};
+const btn=document.getElementById(btnMap[tab]);
+if(btn)btn.classList.add('active');
+}
+
+function showAILoading(label){
+const out=document.getElementById('aiOutput');
+const title=document.getElementById('aiOutputLabel');
+const body=document.getElementById('aiOutputBody');
+const badge=document.getElementById('aiOutputCount');
+if(!out)return;
+out.classList.add('show');
+title.textContent=label||'Output';
+badge.style.display='none';
+body.innerHTML='<div class="st-ai-output-loading"><i class="fas fa-spinner fa-spin"></i> Running AI analysis...</div>';
+}
+
+function closeAIOutput(){
+const o=document.getElementById('aiOutput');
+if(o)o.classList.remove('show');
+document.querySelectorAll('.st-ai-btn').forEach(b=>b.classList.remove('active'));
+activeAITab=null;
+}
+window.closeAIOutput=closeAIOutput;
+
+function renderRecCards(recs){
+if(!recs||!recs.length)return'<div style="text-align:center;padding:16px;color:var(--text-subtle);font-size:13px"><i class="fas fa-check-circle" style="color:#16a34a"></i> No recommendations</div>';
+let h='';recs.forEach((rec,i)=>{
 const sv=rec.severity||'low';
-const svClass=sv==='high'?'sv-high':sv==='med'?'sv-med':'sv-low';
-const card=document.createElement('div');
-card.className='st-rec '+svClass;
-card.id='rec-'+i;
-card.innerHTML='<div class="st-rec-info"><div class="st-rec-title">'+(rec.type||'Status Recommendation')+'</div><div class="st-rec-name">'+rec.student_name+' <span class="st-ai-src">'+(rec.student_number||'')+'</span></div><div class="st-rec-reason">'+rec.reason+'</div><div class="st-rec-acts"><button class="st-btn-apply" onclick="window._stApplyRec('+i+',\''+rec.student_id+'\',\''+rec.recommended_status+'\')">Apply</button><button class="st-btn-dismiss" onclick="window._stDismissRec('+i+')">Dismiss</button></div></div>';
-container.appendChild(card);
-});
-window._stRecs=recs;
+const cls=sv==='high'?'sv-high':sv==='med'?'sv-med':'sv-low';
+h+='<div class="st-rec '+cls+'" id="rec-'+i+'"><div class="st-rec-info"><div class="st-rec-title">'+escapeHTML(rec.type||'Status Recommendation')+'</div>';
+h+='<div class="st-rec-name">'+escapeHTML(rec.student_name)+' <span class="st-ai-src">'+escapeHTML(rec.student_number||'')+'</span></div>';
+h+='<div class="st-rec-reason">'+escapeHTML(rec.reason)+'</div>';
+h+='<div class="st-rec-acts"><button class="st-btn-apply" onclick="applyRec('+i+','+rec.student_id+',\''+escapeHTML(rec.recommended_status)+'\')">Apply</button>';
+h+='<button class="st-btn-dismiss" onclick="dismissRec('+i+')">Dismiss</button></div></div></div>';
+});return h;
 }
 
-window._stApplyRec=async function(idx,studentId,status){
-const btn=document.querySelector('#rec-'+idx+' .st-btn-apply');
-btn.textContent='Applying...';
-btn.classList.add('applying');
-try{
-const r=await fetch('../api/students.php?action=bulk-status',{
-method:'POST',headers:{'Content-Type':'application/json'},
-body:JSON.stringify({ids:[parseInt(studentId)],status:status})
-});
-if(r.ok){
-btn.textContent='Applied';
-btn.classList.remove('applying');
-btn.classList.add('applied');
-toast('Status updated to '+status,'success');
-setTimeout(()=>location.reload(),1500);
-}else{throw new Error();}
-}catch(e){
-btn.textContent='Apply';
-btn.classList.remove('applying');
-toast('Failed to update status','error');
-}};
+function renderAnomCards(anoms){
+if(!anoms||!anoms.length)return'<div style="text-align:center;padding:16px;color:var(--text-subtle);font-size:13px"><i class="fas fa-check-circle" style="color:#16a34a"></i> No anomalies</div>';
+let h='';anoms.forEach((a,i)=>{
+const msg=a.label||a.message||JSON.stringify(a);
+h+='<div class="st-rec sv-med" id="anom-'+i+'"><div class="st-rec-info"><div class="st-rec-title"><i class="fas fa-magnifying-glass-chart"></i> Anomaly</div>';
+h+='<div class="st-rec-reason">'+escapeHTML(msg)+'</div></div></div>';
+});return h;
+}
 
-window._stDismissRec=function(idx){
+function renderRiskCards(risks){
+if(!risks||typeof risks!=='object'||!Object.keys(risks).length)return'<div style="text-align:center;padding:16px;color:var(--text-subtle);font-size:13px"><i class="fas fa-check-circle" style="color:#16a34a"></i> No risk data</div>';
+let h='';Object.keys(risks).forEach(id=>{
+const risk=risks[id];const level=risk.risk||'low';
+const cls=level==='high'?'sv-high':level==='medium'?'sv-med':'sv-low';
+h+='<div class="st-rec '+cls+'" id="risk-'+id+'"><div class="st-rec-info"><div class="st-rec-title"><i class="fas fa-shield-halved"></i> Student #'+escapeHTML(id)+'</div>';
+h+='<div class="st-rec-name">'+escapeHTML(risk.name||'Student #'+id)+' <span class="st-ai-src">Risk: '+escapeHTML(level)+'</span></div>';
+h+='<div class="st-rec-reason">'+escapeHTML(risk.reason||'No reason')+'</div></div></div>';
+});return h;
+}
+
+async function fetchAIEndpoint(action,body){
+let url='../api/ai-tools.php?action='+action;
+const opts={method:'GET'};
+if(body){opts.method='POST';opts.headers={'Content-Type':'application/json'};opts.body=JSON.stringify(body);}
+const r=await fetch(url,opts);
+if(!r.ok)throw new Error('API error');
+return await r.json();
+}
+
+async function runAI(tab){
+activeAITab=tab;setActiveTab(tab);
+const label=tab==='all'?'All AI Tools':tab.charAt(0).toUpperCase()+tab.slice(1);
+showAILoading(label);
+const badge=document.getElementById('aiOutputCount');
+const body=document.getElementById('aiOutputBody');
+try{
+if(tab==='all'){
+const results=await Promise.allSettled([
+fetchAIEndpoint('report'),
+fetchAIEndpoint('status_recommendations'),
+fetchAIEndpoint('status_anomalies'),
+fetchAIEndpoint('status_risks',{student_ids:[]})
+]);
+let html='',count=0;
+const labels=['Report','Recommendations','Anomalies','Risks'];
+results.forEach((res,i)=>{
+let content='';let cnt=0;
+if(res.status==='fulfilled'){
+const d=res.value;
+if(i===0){const t=d.data?.report||d.report||'';content='<div class="st-ai-out-text">'+escapeHTML(t)+'</div>';cnt=t?1:0;}
+else if(i===1){const r=d.data?.recommendations||d.recommendations||[];content=renderRecCards(r);cnt=r.length;}
+else if(i===2){const a=d.data?.anomalies||d.anomalies||[];content=renderAnomCards(a);cnt=a.length;}
+else if(i===3){const r=d.data?.risks||d.risks||{};content=renderRiskCards(r);cnt=Object.keys(r).length;}
+}
+html+='<div class="st-ai-section"><div class="st-ai-section-hdr">'+labels[i]+' ('+cnt+')</div>'+content+'</div>';
+count+=cnt;
+});
+body.innerHTML=html;badge.textContent=count;badge.style.display=count>0?'inline-block':'none';
+}else{
+const epMap={report:'report',anomalies:'status_anomalies',risks:'status_risks',recommendations:'status_recommendations'};
+const postBody=tab==='risks'?{student_ids:[]}:undefined;
+const data=await fetchAIEndpoint(epMap[tab]||'status_recommendations',postBody);
+let html='',count=0;
+if(tab==='report'){const t=data.data?.report||data.report||'';html='<div class="st-ai-out-text">'+escapeHTML(t)+'</div>';count=t?1:0;}
+else if(tab==='recommendations'){const r=data.data?.recommendations||data.recommendations||[];html=renderRecCards(r);count=r.length;}
+else if(tab==='anomalies'){const a=data.data?.anomalies||data.anomalies||[];html=renderAnomCards(a);count=a.length;}
+else if(tab==='risks'){const r=data.data?.risks||data.risks||{};html=renderRiskCards(r);count=Object.keys(r).length;}
+body.innerHTML=html;badge.textContent=count;badge.style.display=count>0?'inline-block':'none';
+}
+}catch(e){
+body.innerHTML='<div style="text-align:center;padding:24px;color:var(--text-subtle)"><i class="fas fa-exclamation-circle"></i> Unable to load AI data.</div>';
+}
+}
+window.runAI=runAI;
+
+function applyRec(idx,studentId,status){
+const btn=document.querySelector('#rec-'+idx+' .st-btn-apply');
+if(!btn)return;btn.textContent='Applying...';btn.classList.add('applying');
+fetch('../api/students.php?action=bulk-status',{method:'POST',headers:{'Content-Type':'application/json'},
+body:JSON.stringify({ids:[parseInt(studentId)],status:status})
+}).then(r=>{if(r.ok){btn.textContent='Applied';btn.classList.remove('applying');btn.classList.add('applied');
+toast('Status updated to '+status,'success');setTimeout(()=>location.reload(),1500);}else throw new Error();
+}).catch(()=>{btn.textContent='Apply';btn.classList.remove('applying');toast('Failed to update status','error');});
+}
+window.applyRec=applyRec;
+
+function dismissRec(idx){
 const card=document.getElementById('rec-'+idx);
 if(card){card.style.opacity='0';setTimeout(()=>card.remove(),300);}
-const badge=document.getElementById('aiCount');
-const remaining=document.querySelectorAll('.st-rec').length-1;
-badge.textContent=Math.max(0,remaining);
-if(remaining<=0)document.getElementById('btnApplyAll').style.display='none';
-};
-
-window.applyAll=async function(){
-const btn=document.getElementById('btnApplyAll');
-btn.textContent='Applying...';
-btn.disabled=true;
-const cards=document.querySelectorAll('.st-rec .st-btn-apply:not(.applied):not(.applying)');
-for(const btnApply of cards){btnApply.click();await new Promise(r=>setTimeout(r,300));}
-setTimeout(()=>location.reload(),2000);
-};
-
-/* --- Toggle AI Panel --- */
-window.toggleAI=function(){
-const body=document.getElementById('aiBody');
-const chevron=document.getElementById('aiChevron');
-const isHidden=body.style.display==='none';
-body.style.display=isHidden?'block':'none';
-chevron.style.transform=isHidden?'rotate(180deg)':'rotate(0)';
-};
-
-/* --- Anomaly Alerts --- */
-async function loadAnomalies(){
-try{
-const r=await fetch('../api/ai-tools.php?action=status_anomalies');
-if(!r.ok)return;
-const data=await r.json();
-const anom=data.data?.anomalies||data.anomalies||[];
-if(anom.length>0){
-const el=document.getElementById('anomalyAlert');
-const txt=document.getElementById('anomalyText');
-txt.textContent=anom.length+' anomal'+(anom.length>1?'ies':'y')+' detected: '+anom.map(a=>a.label||a.message||a).join('; ');
-el.style.display='block';
-}}catch(e){}
 }
+window.dismissRec=dismissRec;
 
-/* --- Student Risk Dots --- */
+/* --- Risk Dots Loader --- */
 async function loadRisks(){
-if(!STUDENT_IDS.length)return;
+const dots=document.querySelectorAll('.st-rdot.loading');
+if(!dots.length)return;
 try{
-const r=await fetch('../api/ai-tools.php?action=student_risks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student_ids:STUDENT_IDS.slice(0,20)})});
-if(!r.ok)return;
+const r=await fetch('../api/ai-tools.php?action=status_risks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({student_ids:[]})});
+if(!r.ok)throw new Error();
 const data=await r.json();
 const risks=data.data?.risks||data.risks||{};
-if(typeof risks==='object'){
-Object.keys(risks).forEach(id=>{
-const risk=risks[id];
-const dot=document.querySelector('.st-rdot[data-student-id="'+id+'"]');
-if(dot){
-const level=risk.risk||'low';
+dots.forEach(dot=>{
+const id=dot.dataset.studentId;
+if(risks[id]){const level=risks[id].risk||'low';
 dot.className='st-rdot '+(level==='high'?'high':level==='medium'?'med':'low');
-dot.title=risk.reason||level;
-}});
-
-document.querySelectorAll('.st-rdot.loading').forEach(dot=>{dot.classList.remove('loading');dot.classList.add('unk');});
-}catch(e){
-document.querySelectorAll('.st-rdot.loading').forEach(dot=>{dot.classList.remove('loading');dot.classList.add('unk');});
-}}
+dot.title=risks[id].reason||level;
+}else{dot.classList.remove('loading');dot.classList.add('unk');}
+});
+}catch(e){dots.forEach(dot=>{dot.classList.remove('loading');dot.classList.add('unk');});}
+}
 
 /* --- Search Debounce --- */
 const searchInput=document.getElementById('searchInput');
@@ -550,10 +494,11 @@ window.location=url.toString();
 /* --- Student Modal --- */
 window.openStudentModal=async function(id,name,number){
 const modal=document.getElementById('studentModal');
+window._currentModalStudentId=id;
 document.getElementById('modalName').textContent=name;
 document.getElementById('modalNumber').textContent=number;
-document.getElementById('modalAIText').textContent='Loading...';
-document.getElementById('modalAIRec').textContent='';
+const av=document.getElementById('modalAvatar');
+if(av){const parts=name.split(' ');const initials=(parts[0]?parts[0][0]:'')+(parts[1]?parts[1][0]:'');av.textContent=initials.toUpperCase();}
 document.getElementById('modalTimeline').innerHTML='<div class="st-modal-empty"><i class="fas fa-spinner fa-spin"></i> Loading history...</div>';
 modal.classList.add('show');
 document.body.style.overflow='hidden';
@@ -566,13 +511,32 @@ try{
 const r=await fetch('../api/ai-tools.php?action=profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});
 if(!r.ok)throw new Error();
 const d=await r.json();
-const brief=d.data?.summary||d.ai_brief||d.aiBrief||'No AI brief available for this student.';
-document.getElementById('modalAIText').textContent=brief;
+const brief=d.data?.summary||d.ai_brief||d.aiBrief||'No AI brief available.';
+const aiEl=document.getElementById('modalAI');
+if(aiEl){aiEl.querySelector('.st-modal-ai-txt').textContent=brief;
 const rec=d.ai_recommendation||d.aiRecommendation||'';
-document.getElementById('modalAIRec').textContent=rec?'Recommendation: '+rec:'';
-}catch(e){
-document.getElementById('modalAIText').textContent='Unable to load AI brief.';
-}}
+aiEl.querySelector('.st-modal-ai-rec').textContent=rec?'Recommendation: '+rec:'';}
+}catch(e){const aiEl=document.getElementById('modalAI');
+if(aiEl)aiEl.querySelector('.st-modal-ai-txt').textContent='Unable to load AI brief.';}
+}
+
+async function runModalAIProfile(){
+const btn=document.getElementById('btnModalAIProfile');
+if(btn){btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Running...';btn.disabled=true;}
+try{
+const r=await fetch('../api/ai-tools.php?action=profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:window._currentModalStudentId||0})});
+if(!r.ok)throw new Error();
+const d=await r.json();
+const brief=d.data?.summary||d.ai_brief||d.aiBrief||'No AI brief.';
+const rec=d.ai_recommendation||d.aiRecommendation||'';
+const aiEl=document.getElementById('modalAI');
+if(aiEl){aiEl.querySelector('.st-modal-ai-txt').textContent=brief;
+aiEl.querySelector('.st-modal-ai-rec').textContent=rec?'Recommendation: '+rec:'';}
+toast('AI Profile generated','success');
+}catch(e){toast('Failed to generate AI profile','error');}
+if(btn){btn.innerHTML='<i class="fas fa-robot"></i> Run Full AI Profile';btn.disabled=false;}
+}
+window.runModalAIProfile=runModalAIProfile;
 
 async function fetchStudentHistory(id){
 try{
@@ -581,49 +545,32 @@ if(!r.ok)throw new Error();
 const d=await r.json();
 const history=d.data||d.history||[];
 const container=document.getElementById('modalTimeline');
-if(history.length===0){
-container.innerHTML='<div class="st-modal-empty"><i class="fas fa-inbox"></i> No status history</div>';
-return;
-}
+if(history.length===0){container.innerHTML='<div class="st-modal-empty"><i class="fas fa-inbox"></i> No status history</div>';return;}
 let html='';
 history.forEach(h=>{
 const meta=STATUS_META[h.current_status]||STATUS_META['inactive'];
 const prevMeta=STATUS_META[h.previous_status]||STATUS_META['inactive'];
 html+='<div class="st-tl-i"><div class="st-tl-dot" style="background:'+meta.color+'"></div><div class="st-tl-chg">';
 html+='<span class="st-badge" style="background:'+prevMeta.bg+';color:'+prevMeta.color+';padding:2px 6px;font-size:10px">'+(h.previous_status||'N/A')+'</span>';
-html+=' <i class="fas fa-arrow-right" style="color:#94a3b8;font-size:10px"></i> ';
+html+=' <i class="fas fa-arrow-right" style="color:var(--text-subtle);font-size:10px"></i> ';
 html+='<span class="st-badge" style="background:'+meta.bg+';color:'+meta.color+';padding:2px 6px;font-size:10px">'+h.current_status+'</span>';
 html+='</div>';
-if(h.reason)html+='<div class="st-tl-rsn">'+h.reason+'</div>';
-html+='<div class="st-tl-time">'+(h.changed_by_name||'System')+' &middot; '+new Date(h.created_at).toLocaleString()+'</div></div>';
+if(h.reason)html+='<div class="st-tl-rsn">'+escapeHTML(h.reason)+'</div>';
+html+='<div class="st-tl-time">'+escapeHTML(h.changed_by_name||'System')+' \u00b7 '+new Date(h.created_at).toLocaleString()+'</div></div>';
 });
 container.innerHTML=html;
-}catch(e){
-document.getElementById('modalTimeline').innerHTML='<div class="st-modal-empty"><i class="fas fa-exclamation-circle"></i> Failed to load history</div>';
-}}
+}catch(e){document.getElementById('modalTimeline').innerHTML='<div class="st-modal-empty"><i class="fas fa-exclamation-circle"></i> Failed to load history</div>';}
+}
 
 window.closeModal=function(){
-const modal=document.getElementById('studentModal');
-modal.classList.remove('show');
+document.getElementById('studentModal').classList.remove('show');
 document.body.style.overflow='';
 };
-
-document.getElementById('studentModal').addEventListener('click',function(e){
-if(e.target===this)closeModal();
-});
-
-/* --- Toast --- */
-window.toast=function(msg,type){
-const el=document.getElementById('toast');
-el.textContent=msg;
-el.className='st-toast '+(type||'')+' show';
-setTimeout(()=>el.classList.remove('show'),3000);
-};
+document.getElementById('studentModal').addEventListener('click',function(e){if(e.target===this)closeModal();});
 
 /* --- Init --- */
-loadRecommendations();
-loadAnomalies();
 loadRisks();
 
 })();
 </script>
+

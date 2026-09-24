@@ -1,0 +1,193 @@
+/* ============================================================
+   STATUS-TRACKER.CSS
+   AI-powered Status Tracker — command console aesthetic.
+   ============================================================ */
+
+/* ── Page Wrap ────────────────────────────────────── */
+.st-wrap { padding:24px; max-width:1400px; margin:0 auto }
+
+/* ── KPI Strip ────────────────────────────────────── */
+.st-kpi-strip { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:20px }
+.st-kpi { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:18px 20px; display:flex; align-items:flex-start; gap:14px; transition:border-color .2s }
+.st-kpi:hover { border-color:var(--border-strong) }
+.st-kpi-icon { width:42px; height:42px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0 }
+.st-kpi-num { font-size:26px; font-weight:800; line-height:1.1; color:var(--text-strong); letter-spacing:-0.5px }
+.st-kpi-label { font-size:13px; color:var(--text-muted); margin-top:2px; font-weight:500 }
+.st-delta { font-size:11px; font-weight:700; padding:2px 7px; border-radius:4px; display:inline-block; margin-left:6px; vertical-align:middle }
+.st-delta.up { color:var(--success-600); background:var(--success-100) }
+.st-delta.down { color:var(--danger-600); background:var(--danger-100) }
+
+/* ── AI Command Bar ───────────────────────────────── */
+.st-ai-bar { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:14px 18px; margin-bottom:20px; display:flex; align-items:center; gap:10px; flex-wrap:wrap }
+.st-ai-bar-label { font-size:13px; font-weight:600; color:var(--text-strong); display:flex; align-items:center; gap:7px; margin-right:4px }
+.st-ai-bar-label i { color:var(--brand-500) }
+.st-ai-btn { display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border-radius:8px; font-size:12px; font-weight:600; border:1px solid var(--border); background:var(--surface-subtle); color:var(--text-body); cursor:pointer; transition:all .15s; white-space:nowrap }
+.st-ai-btn:hover { background:var(--brand-50); border-color:var(--brand-400); color:var(--brand-600) }
+.st-ai-btn:active { transform:scale(0.97) }
+.st-ai-btn.active { background:var(--brand-500); border-color:var(--brand-500); color:#fff; box-shadow:0 2px 8px rgba(37,99,235,.25) }
+.st-ai-btn.loading { opacity:.6; pointer-events:none }
+.st-ai-btn i { font-size:12px }
+.st-ai-sep { width:1px; height:22px; background:var(--border); flex-shrink:0 }
+.st-ai-run-all { background:var(--text-strong); color:#fff; border-color:var(--text-strong) }
+.st-ai-run-all:hover { background:#334155; border-color:#334155 }
+
+/* ── AI Output Panel ──────────────────────────────── */
+.st-ai-output { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); margin-bottom:20px; overflow:hidden; display:none }
+.st-ai-output.show { display:block }
+.st-ai-output-hdr { padding:12px 18px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border-subtle); background:var(--surface-subtle) }
+.st-ai-output-title { font-size:13px; font-weight:600; color:var(--text-strong); display:flex; align-items:center; gap:7px }
+.st-ai-output-title i { color:var(--brand-500) }
+.st-ai-output-badge { font-size:10px; font-weight:700; background:var(--brand-500); color:#fff; padding:2px 7px; border-radius:8px; margin-left:6px }
+.st-ai-output-close { background:none; border:none; color:var(--text-subtle); cursor:pointer; padding:4px; font-size:14px; transition:color .15s }
+.st-ai-output-close:hover { color:var(--text-strong) }
+.st-ai-output-body { padding:16px 18px; max-height:400px; overflow-y:auto }
+.st-ai-output-loading { text-align:center; padding:32px; color:var(--text-subtle); font-size:13px }
+.st-ai-output-loading i { display:block; font-size:20px; margin-bottom:8px; color:var(--brand-400) }
+
+/* Recommendation cards */
+.st-rec { border:1px solid var(--border); border-radius:8px; padding:14px 16px; display:flex; gap:12px; align-items:flex-start; margin-bottom:8px; transition:border-color .15s }
+.st-rec:last-child { margin-bottom:0 }
+.st-rec:hover { border-color:var(--border-strong) }
+.st-rec.sv-high { border-left:3px solid var(--danger-500) }
+.st-rec.sv-med { border-left:3px solid #f59e0b }
+.st-rec.sv-low { border-left:3px solid var(--success-500) }
+.st-rec-info { flex:1; min-width:0 }
+.st-rec-title { font-size:11px; color:var(--text-faint); font-weight:500; text-transform:uppercase; letter-spacing:.3px; margin-bottom:3px }
+.st-rec-name { font-size:14px; font-weight:600; color:var(--text-strong) }
+.st-rec-name .st-rec-id { font-size:11px; color:var(--text-subtle); font-weight:400; margin-left:6px }
+.st-rec-reason { font-size:12px; color:var(--text-muted); margin-top:4px; line-height:1.5 }
+.st-rec-acts { display:flex; gap:6px; margin-top:8px }
+.st-btn-sm { display:inline-flex; align-items:center; gap:4px; padding:5px 12px; border-radius:6px; font-size:11px; font-weight:600; border:none; cursor:pointer; transition:all .15s }
+.st-btn-apply { background:var(--brand-500); color:#fff }
+.st-btn-apply:hover { background:var(--brand-600) }
+.st-btn-apply.applying { opacity:.5; pointer-events:none }
+.st-btn-apply.applied { background:var(--success-500); pointer-events:none }
+.st-btn-dismiss { background:transparent; color:var(--text-subtle); border:1px solid var(--border) }
+.st-btn-dismiss:hover { color:var(--text-muted); border-color:var(--border-strong) }
+.st-btn-dismiss.dismissed { opacity:.3; pointer-events:none }
+
+/* Anomaly cards */
+.st-anom-card { border:1px solid var(--border); border-radius:8px; padding:14px 16px; margin-bottom:8px; display:flex; align-items:flex-start; gap:12px }
+.st-anom-card:last-child { margin-bottom:0 }
+.st-anom-icon { width:32px; height:32px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:13px; flex-shrink:0 }
+.st-anom-info { flex:1 }
+.st-anom-label { font-size:13px; font-weight:600; color:var(--text-strong) }
+.st-anom-students { font-size:12px; color:var(--text-muted); margin-top:4px; line-height:1.5 }
+.st-anom-students a { color:var(--brand-500); text-decoration:none; font-weight:500 }
+.st-anom-students a:hover { text-decoration:underline }
+
+/* Report text */
+.st-report-text, .st-ai-out-text { font-size:13px; color:var(--text-body); line-height:1.7; white-space:pre-wrap }
+.st-ai-src { font-size:11px; color:var(--text-subtle); margin-left:4px }
+.st-ai-section { margin-bottom:16px }
+.st-ai-section:last-child { margin-bottom:0 }
+.st-ai-section-hdr { font-size:12px; font-weight:700; color:var(--text-strong); text-transform:uppercase; letter-spacing:.3px; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid var(--border-subtle) }
+
+/* Empty / status states */
+.st-ai-empty { text-align:center; padding:28px; color:var(--text-subtle); font-size:13px }
+.st-ai-empty i { display:block; font-size:24px; margin-bottom:8px; color:var(--success-500) }
+
+/* ── Distribution Bar ─────────────────────────────── */
+.st-dist { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:16px 18px; margin-bottom:20px }
+.st-dist-title { font-size:12px; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:.4px; margin-bottom:10px }
+.st-dist-bar { display:flex; height:8px; border-radius:4px; overflow:hidden; background:var(--surface-muted) }
+.st-dist-seg { height:100%; transition:width .5s }
+.st-dist-legend { display:flex; flex-wrap:wrap; gap:14px; margin-top:10px }
+.st-dist-item { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-muted); font-weight:500 }
+.st-dist-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0 }
+
+/* ── Filters ──────────────────────────────────────── */
+.st-filters { display:flex; align-items:center; gap:8px; margin-bottom:20px; flex-wrap:wrap }
+.st-pill { padding:6px 14px; border-radius:20px; font-size:12px; font-weight:600; border:1px solid var(--border); background:var(--surface); color:var(--text-muted); cursor:pointer; text-decoration:none; transition:all .15s }
+.st-pill:hover { background:var(--brand-50); border-color:var(--brand-400); color:var(--brand-600) }
+.st-pill.active { background:var(--brand-500); color:#fff; border-color:var(--brand-500) }
+.st-pill .st-pill-count { opacity:.6; font-size:11px; margin-left:2px }
+.st-search { margin-left:auto; position:relative }
+.st-search input { padding:7px 12px 7px 32px; border:1px solid var(--border); border-radius:8px; font-size:12px; font-weight:500; width:200px; outline:none; transition:all .15s; font-family:inherit }
+.st-search input:focus { border-color:var(--brand-400); box-shadow:var(--focus-ring); width:240px }
+.st-search i { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text-subtle); font-size:12px }
+
+/* ── Two-Panel Layout ─────────────────────────────── */
+.st-panels { display:grid; grid-template-columns:1fr 320px; gap:20px }
+
+/* ── Student Table ────────────────────────────────── */
+.st-table-wrap { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); overflow:hidden }
+.st-table-wrap table { width:100%; border-collapse:collapse }
+.st-table-wrap th { text-align:left; padding:10px 14px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--text-faint); background:var(--surface-subtle); border-bottom:2px solid var(--border); white-space:nowrap }
+.st-table-wrap td { padding:10px 14px; font-size:13px; color:var(--text-body); border-bottom:1px solid var(--border-subtle); vertical-align:middle }
+.st-table-wrap tbody tr { cursor:pointer; transition:background .1s }
+.st-table-wrap tbody tr:hover { background:var(--surface-subtle) }
+.st-table-wrap tbody tr:last-child td { border-bottom:none }
+.st-t-info { display:flex; align-items:center; gap:10px }
+.st-t-av { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:11px; flex-shrink:0 }
+.st-t-name { font-weight:600; color:var(--text-strong); font-size:13px }
+.st-t-sub { font-size:11px; color:var(--text-subtle) }
+
+/* ── Status Badge ─────────────────────────────────── */
+.st-badge { display:inline-flex; align-items:center; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600; gap:5px; white-space:nowrap; border:none }
+.st-badge-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0 }
+
+/* ── Risk Dot ─────────────────────────────────────── */
+.st-rdot { width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0 }
+.st-rdot.loading { background:var(--border); animation:st-pulse 1s infinite }
+.st-rdot.low { background:var(--success-500) }
+.st-rdot.med { background:#f59e0b }
+.st-rdot.high { background:var(--danger-500) }
+@keyframes st-pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+
+/* ── Activity Timeline ────────────────────────────── */
+.st-tl { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md); padding:18px; max-height:calc(100vh - 220px); overflow-y:auto; position:sticky; top:24px }
+.st-tl-h { font-size:13px; font-weight:600; color:var(--text-strong); margin-bottom:16px; display:flex; align-items:center; gap:7px }
+.st-tl-h i { color:var(--brand-400) }
+.st-tl-b { position:relative; padding-left:20px }
+.st-tl-i { position:relative; padding-bottom:16px }
+.st-tl-i:last-child { padding-bottom:0 }
+.st-tl-dot { position:absolute; left:-20px; top:4px; width:10px; height:10px; border-radius:50%; border:2px solid var(--surface) }
+.st-tl-nm { font-size:13px; font-weight:600; color:var(--text-strong) }
+.st-tl-chg { font-size:12px; color:var(--text-muted); margin-top:2px; display:flex; align-items:center; gap:4px; flex-wrap:wrap }
+.st-tl-rsn { font-size:11px; color:var(--text-muted); background:var(--surface-subtle); padding:4px 8px; border-radius:4px; margin-top:4px; border:1px solid var(--border-subtle); line-height:1.4 }
+.st-tl-time { font-size:11px; color:var(--text-subtle); margin-top:3px }
+.st-tl-time i { font-size:9px }
+.st-empty { text-align:center; padding:36px; color:var(--text-subtle) }
+.st-empty i { font-size:28px; margin-bottom:10px; display:block }
+
+/* ── Student Modal ────────────────────────────────── */
+.st-modal-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(15,23,42,.5); backdrop-filter:blur(4px); z-index:1000; display:none; align-items:center; justify-content:center }
+.st-modal-overlay.show { display:flex }
+.st-modal { background:var(--surface); border-radius:var(--radius-lg); width:560px; max-width:92vw; max-height:80vh; overflow-y:auto; box-shadow:var(--shadow-lg) }
+.st-modal-header { padding:18px 24px; border-bottom:1px solid var(--border-subtle); display:flex; align-items:center; justify-content:space-between }
+.st-modal-header-info { display:flex; align-items:center; gap:12px }
+.st-modal-header-avatar { width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:700; font-size:14px; flex-shrink:0 }
+.st-modal-header-name { font-size:16px; font-weight:700; color:var(--text-strong) }
+.st-modal-header-num { font-size:12px; color:var(--text-subtle); margin-top:1px }
+.st-modal-close { background:none; border:none; font-size:18px; color:var(--text-subtle); cursor:pointer; padding:4px; border-radius:6px; transition:all .15s }
+.st-modal-close:hover { background:var(--surface-muted); color:var(--text-strong) }
+.st-modal-ai { background:var(--surface-subtle); border-radius:8px; padding:14px 16px; margin:14px 20px; border:1px solid var(--border) }
+.st-modal-ai-lbl { font-size:10px; text-transform:uppercase; letter-spacing:.5px; color:var(--brand-500); font-weight:700; margin-bottom:6px; display:flex; align-items:center; gap:5px }
+.st-modal-ai-txt { font-size:13px; color:var(--text-muted); line-height:1.6 }
+.st-modal-ai-rec { font-size:12px; color:var(--success-600); margin-top:6px; font-weight:600 }
+.st-modal-timeline { padding:0 20px 20px }
+.st-modal-timeline-h { font-size:13px; font-weight:600; color:var(--text-strong); margin-bottom:12px; display:flex; align-items:center; gap:6px }
+.st-modal-empty { padding:24px; text-align:center; color:var(--text-subtle); font-size:13px }
+
+/* ── Toast ────────────────────────────────────────── */
+.st-toast { position:fixed; bottom:24px; right:24px; background:var(--text-strong); color:#fff; padding:12px 20px; border-radius:10px; font-size:13px; font-weight:600; z-index:9999; transform:translateY(80px); opacity:0; transition:all .3s; display:flex; align-items:center; gap:8px; box-shadow:var(--shadow-md) }
+.st-toast.show { transform:translateY(0); opacity:1 }
+.st-toast.success { background:var(--success-600) }
+.st-toast.error { background:var(--danger-600) }
+
+/* ── Responsive ───────────────────────────────────── */
+@media(max-width:1024px) {
+    .st-kpi-strip { grid-template-columns:repeat(2,1fr) }
+    .st-panels { grid-template-columns:1fr }
+    .st-tl { position:static; max-height:none }
+}
+@media(max-width:640px) {
+    .st-kpi-strip { grid-template-columns:1fr }
+    .st-filters { flex-direction:column; align-items:stretch }
+    .st-search { margin-left:0 }
+    .st-search input,.st-search input:focus { width:100% }
+    .st-ai-bar { flex-direction:column; align-items:stretch }
+    .st-ai-sep { width:100%; height:1px }
+    .st-ai-btn { justify-content:center }
+}

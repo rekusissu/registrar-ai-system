@@ -19,7 +19,8 @@ Subsystem 8 (Phase 1) — journal of student status changes.
 
 ## Pages
 
-- `registrar/status-tracker.php` — status history UI
+- `registrar/status-tracker.php` — AI command console with Command Bar, collapsible output panel, status distribution, student table + timeline
+- `css/status-tracker.css` — extracted styles (193 lines)
 
 ## Related
 

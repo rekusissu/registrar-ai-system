@@ -16,28 +16,22 @@
 ARG PHP_EXT_TAG=php-8.2
 FROM ghcr.io/rekusissu/php-8.2-apache-ext:${PHP_EXT_TAG} AS vendor
 
-# Safety net: guarantee the extensions the app needs exist even if the
-# prebuilt base image is stale or was rebuilt without them. These installs
-# are no-ops when the extension is already present.
-RUN set -e \
-    && apt-get update -o Acquire::Retries=5 -o Acquire::http::Timeout=30 \
-    && apt-get install -y --no-install-recommends \
-        unzip \
-        libzip-dev \
-        libmariadb-dev \
-    && docker-php-ext-install -j"$(nproc)" mysqli pdo_mysql \
-    && rm -rf /var/lib/apt/lists/*
-
-# Composer needs ext-zip OR the unzip binary to download dist archives.
-# unzip is installed here so the app build is self-sufficient even if the
-# pulled extension layer predates the zip addition.
+# Composer needs the unzip binary to download dist archives.
+# We only install the minimal tool — all PHP extensions (pdo_mysql, mysqli,
+# mbstring, gd, curl, zip, opcache) are already compiled in the base image.
+# Cache mounts keep apt lists and Composer downloads across rebuilds.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update -o Acquire::Retries=5 -o Acquire::http::Timeout=30 \
+    && apt-get install -y --no-install-recommends unzip
 
 # Composer production dependencies. The vendor stage uses the SAME prebuilt
 # runtime so Composer's platform checks match exactly.
 COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 WORKDIR /build
 COPY composer.json composer.lock ./
-RUN composer install \
+RUN --mount=type=cache,target=/root/.composer/cache \
+    composer install \
         --no-dev \
         --no-interaction \
         --no-progress \
@@ -47,13 +41,8 @@ RUN composer install \
 # ── Runtime (final image) ──────────────────────────────────────────────────
 FROM ghcr.io/rekusissu/php-8.2-apache-ext:${PHP_EXT_TAG}
 
-# Safety net: same guarantee as the vendor stage — ensure critical
-# extensions exist even if the prebuilt base image is missing them.
-RUN set -e \
-    && apt-get update -o Acquire::Retries=5 -o Acquire::http::Timeout=30 \
-    && apt-get install -y --no-install-recommends libzip-dev libmariadb-dev \
-    && docker-php-ext-install -j"$(nproc)" mysqli pdo_mysql \
-    && rm -rf /var/lib/apt/lists/*
+# Extensions are pre-compiled in the base image — no apt-get or
+# docker-php-ext-install needed here. This keeps the build to COPY-only.
 
 ENV APP_ENV=production
 

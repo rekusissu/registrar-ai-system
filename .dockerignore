@@ -21,6 +21,10 @@ uploads/*
 assets/uploads/students/*
 brain
 
+# Deployment scripts / config — not needed in the app image
+deploy
+backups
+
 # Agent/skill tooling
 .cline
 
@@ -29,3 +33,4 @@ brain
 Thumbs.db
 *.backup
 *.log
+*.bak
