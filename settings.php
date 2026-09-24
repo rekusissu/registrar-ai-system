@@ -2,7 +2,7 @@
 // ============================================================
 //  SETTINGS.PHP  (Root)
 //  Account settings for every logged-in role:
-//    - Staff roles: update profile + change password
+//    - Staff roles: view profile info + change password
 //    - Students:    change password only (their record lives in
 //                   student/profile.php)
 //  Wired to api/settings.php (authenticated, role-agnostic).
@@ -14,7 +14,7 @@ requireLogin();
 
 require_once __DIR__ . '/shared/database.php';
 $db = Database::getInstance();
-$me = $db->fetchOne("SELECT id, email, full_name, role, created_at, updated_at FROM users WHERE id = ?", [$_SESSION['user_id']]);
+$me = $db->fetchOne("SELECT id, email, full_name, role, username, created_at, updated_at FROM users WHERE id = ?", [$_SESSION['user_id']]);
 
 $currentRole = $me['role'] ?? $_SESSION['role'] ?? '';
 $isStudent   = ($currentRole === 'student');
@@ -29,7 +29,6 @@ include 'includes/header.php';
 include 'includes/sidebar.php';
 
 $userName  = $me['full_name'] ?? $_SESSION['full_name'] ?? 'User';
-$userEmail = $me['email'] ?? '';
 $userRole  = $currentRole !== '' ? $currentRole : 'Staff';
 ?>
 <main class="dashboard-main">
@@ -73,27 +72,25 @@ $userRole  = $currentRole !== '' ? $currentRole : 'Staff';
     <div class="settings-grid">
 
         <?php if (!$isStudent): ?>
-        <!-- Profile Settings -->
+        <!-- Profile Settings (display-only) -->
         <div class="panel accent-blue" style="padding:24px;">
             <div class="settings-card-header">
                 <div class="settings-card-icon blue"><i class="fas fa-user"></i></div>
                 <div>
                     <h3 class="card-title" style="margin:0;font-size:15px;">Profile Settings</h3>
-                    <p class="card-subtitle" style="margin:2px 0 0;font-size:12.5px;color:#64748b;">Your display name across the system</p>
+                    <p class="card-subtitle" style="margin:2px 0 0;font-size:12.5px;color:#64748b;">Your account information</p>
                 </div>
             </div>
-            <form id="profileForm" style="margin-top:18px;">
+            <div style="margin-top:18px;">
                 <div class="form-group">
                     <label>Full Name</label>
-                    <input type="text" id="profileName" class="form-control" value="<?= htmlspecialchars($userName) ?>" required />
+                    <input type="text" class="form-control" value="<?= htmlspecialchars($userName) ?>" disabled />
                 </div>
                 <div class="form-group">
-                    <label>Email Address</label>
-                    <input type="email" id="profileEmail" class="form-control" value="<?= htmlspecialchars($userEmail) ?>" disabled />
-                    <small style="color:#94a3b8;font-size:12px;">Email cannot be changed here.</small>
+                    <label>Staff ID Number</label>
+                    <input type="text" class="form-control" value="<?= htmlspecialchars($me['username'] ?? 'N/A') ?>" disabled />
                 </div>
-                <button type="submit" class="btn btn-primary" id="profileBtn" style="margin-top:4px;"><i class="fas fa-save"></i> Update Profile</button>
-            </form>
+            </div>
         </div>
         <?php endif; ?>
 
@@ -201,20 +198,6 @@ function validateMatch() {
     return ok;
 }
 confirmInput.addEventListener('input', validateMatch);
-
-const profileForm = document.getElementById('profileForm');
-if (profileForm) {
-    profileForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-        const btn = document.getElementById('profileBtn');
-        btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
-        try {
-            const d = await submitJson('api/settings.php', 'PUT', { section: 'profile', full_name: document.getElementById('profileName').value.trim() });
-            showToast(d.success ? 'Profile updated.' : (d.message || 'Failed to update.'), d.success ? 'success' : 'error');
-        } catch(err) { showToast('Network error.', 'error'); }
-        btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Update Profile';
-    });
-}
 
 document.getElementById('passwordForm').addEventListener('submit', async function(e) {
     e.preventDefault();

@@ -46,6 +46,11 @@ function studentTemplateSections(): array {
             ['key' => 'semester',     'label' => 'Semester (1st/2nd/summer)'],
             ['key' => 'status',       'label' => 'Status'],
         ],
+        'Previous School' => [
+            ['key' => 'previous_school', 'label' => 'Name of Previous School'],
+            ['key' => 'school_year_graduated', 'label' => 'School Year Graduated'],
+            ['key' => 'last_year_level_completed', 'label' => 'Last Year Level Completed'],
+        ],
         'Guardian / Parent' => [
             ['key' => 'guardian_name', 'label' => 'Guardian Full Name'],
             ['key' => 'guardian_relationship', 'label' => 'Relationship'],
