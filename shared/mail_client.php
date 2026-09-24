@@ -34,8 +34,8 @@ function emailConfigured(): bool {
 }
 
 /**
- * Low-level SMTP send via PHPMailer. HTML body, UTF-8. One optional
- * attachment: ['data' => string, 'name' => string, 'mime' => string|null].
+ * Low-level email send — prefers Brevo API, then Gmail API, then SMTP.
+ * HTML body, UTF-8. One optional attachment: ['data' => string, 'name' => string, 'mime' => string|null].
  * Returns true on successful send; failure is error_logged.
  */
 function sendEmail(array $to, string $subject, string $htmlBody, ?array $attachment = null): bool {
@@ -43,6 +43,22 @@ function sendEmail(array $to, string $subject, string $htmlBody, ?array $attachm
         error_log('mail: EMAIL_CONFIGURED is false — refusing to send to ' . ($to['email'] ?? ''));
         return false;
     }
+
+    // ── Brevo API path (preferred — reliable, no bounce issues) ──
+    if (BREVO_CONFIGURED) {
+        $result = sendViaBrevo($to, $subject, $htmlBody, $attachment);
+        if ($result !== null) return $result;
+        error_log('mail: Brevo API failed, trying next transport');
+    }
+
+    // ── Gmail API path ──
+    if (GMAIL_API_CONFIGURED) {
+        $result = sendViaGmailApi($to, $subject, $htmlBody, $attachment);
+        if ($result !== null) return $result;
+        error_log('mail: Gmail API failed, falling back to SMTP');
+    }
+
+    // ── SMTP fallback (PHPMailer) ──
     $mail = new PHPMailer(true);
     try {
         $mail->isSMTP();
@@ -80,6 +96,156 @@ function sendEmail(array $to, string $subject, string $htmlBody, ?array $attachm
         return false;
     }
 }
+
+/**
+ * Send via Brevo (Sendinblue) transactional API. Returns true/false or
+ * null when config missing (caller tries next transport).
+ */
+function sendViaBrevo(array $to, string $subject, string $htmlBody, ?array $attachment = null): ?bool {
+    if (!BREVO_CONFIGURED) return null;
+
+    $payload = [
+        'sender'      => ['email' => MAIL_FROM ?: SMTP_USER, 'name' => MAIL_FROM_NAME ?: 'BCP Registrar System'],
+        'to'          => [['email' => $to['email'], 'name' => $to['name'] ?? '']],
+        'subject'     => $subject,
+        'htmlContent' => $htmlBody,
+    ];
+
+    if (is_array($attachment) && isset($attachment['data'])) {
+        $payload['attachment'] = [[
+            'name'    => $attachment['name'] ?? 'attachment.pdf',
+            'content' => base64_encode($attachment['data']),
+        ]];
+    }
+
+    $ch = curl_init('https://api.brevo.com/v3/smtp/email');
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_HTTPHEADER     => [
+            'api-key: ' . BREVO_API_KEY,
+            'accept: application/json',
+            'content-type: application/json',
+        ],
+        CURLOPT_POSTFIELDS     => json_encode($payload),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 30,
+        CURLOPT_SSL_VERIFYPEER => true,
+    ]);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErr  = curl_error($ch);
+    curl_close($ch);
+
+    if ($curlErr) { error_log('mail: Brevo API curl → ' . $curlErr); return false; }
+    if ($httpCode >= 400) {
+        $detail = json_decode($response, true);
+        error_log("mail: Brevo API HTTP {$httpCode} → " . ($detail['message'] ?? $response));
+        return false;
+    }
+    return true;
+}
+
+/**
+ * Send via Gmail API (OAuth2). Returns true/false or null on config-missing
+ * (caller falls back to SMTP).
+ */
+function sendViaGmailApi(array $to, string $subject, string $htmlBody, ?array $attachment = null): ?bool {
+    if (!GMAIL_API_CONFIGURED) return null;
+
+    $accessToken = gmailGetAccessToken();
+    if ($accessToken === null) return null;
+
+    // Build raw MIME
+    $fromEmail = GMAIL_SENDER_EMAIL !== '' ? GMAIL_SENDER_EMAIL : SMTP_USER;
+    $fromName  = MAIL_FROM_NAME !== '' ? MAIL_FROM_NAME : 'BCP Registrar System';
+    $boundary  = 'boundary_' . bin2hex(random_bytes(16));
+
+    $headers  = "From: =?UTF-8?B?" . base64_encode($fromName) . "?= <{$fromEmail}>\r\n";
+    $headers .= "To: " . (($to['name'] ?? '') !== '' ? "=?UTF-8?B?" . base64_encode($to['name'] ?? '') . "?= " : '') . "<{$to['email']}>\r\n";
+    $headers .= "Subject: =?UTF-8?B?" . base64_encode($subject) . "?=\r\n";
+    $headers .= "MIME-Version: 1.0\r\n";
+    $headers .= "Content-Type: multipart/mixed; boundary=\"{$boundary}\"\r\n";
+    $headers .= "Date: " . date('r') . "\r\n\r\n";
+
+    $body  = "--{$boundary}\r\n";
+    $body .= "Content-Type: text/html; charset=UTF-8\r\n";
+    $body .= "Content-Transfer-Encoding: base64\r\n\r\n";
+    $body .= chunk_split(base64_encode($htmlBody), 76, "\r\n");
+
+    if (is_array($attachment) && isset($attachment['data'])) {
+        $attName = $attachment['name'] ?? 'attachment.pdf';
+        $attMime = $attachment['mime'] ?? 'application/pdf';
+        $body .= "--{$boundary}\r\n";
+        $body .= "Content-Type: {$attMime}; name=\"{$attName}\"\r\n";
+        $body .= "Content-Disposition: attachment; filename=\"{$attName}\"\r\n";
+        $body .= "Content-Transfer-Encoding: base64\r\n\r\n";
+        $body .= chunk_split(base64_encode($attachment['data']), 76, "\r\n");
+    }
+    $body .= "--{$boundary}--\r\n";
+
+    $rawEncoded = rtrim(strtr(base64_encode($headers . $body), '+/', '-_'), '=');
+
+    $ch = curl_init('https://gmail.googleapis.com/gmail/v1/users/me/messages/send');
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_HTTPHEADER     => ['Authorization: Bearer ' . $accessToken, 'Content-Type: application/json'],
+        CURLOPT_POSTFIELDS     => json_encode(['raw' => $rawEncoded]),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 30,
+        CURLOPT_SSL_VERIFYPEER => true,
+    ]);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErr  = curl_error($ch);
+    curl_close($ch);
+
+    if ($curlErr) { error_log('mail: Gmail API curl → ' . $curlErr); return false; }
+    if ($httpCode !== 200) {
+        $detail = json_decode($response, true);
+        error_log("mail: Gmail API HTTP {$httpCode} → " . ($detail['error']['message'] ?? $response));
+        return false;
+    }
+    return true;
+}
+
+/**
+ * Refresh access token from Google OAuth2. Cached ~50 min.
+ */
+function gmailGetAccessToken(): ?string {
+    static $cached = null;
+    if ($cached !== null && $cached['expires'] > time()) return $cached['token'];
+
+    $ch = curl_init('https://oauth2.googleapis.com/token');
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_HTTPHEADER     => ['Content-Type: application/x-www-form-urlencoded'],
+        CURLOPT_POSTFIELDS     => http_build_query([
+            'client_id'     => GMAIL_API_CLIENT_ID,
+            'client_secret' => GMAIL_API_CLIENT_SECRET,
+            'refresh_token' => GMAIL_REFRESH_TOKEN,
+            'grant_type'    => 'refresh_token',
+        ]),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 15,
+        CURLOPT_SSL_VERIFYPEER => true,
+    ]);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlErr  = curl_error($ch);
+    curl_close($ch);
+
+    if ($curlErr || $httpCode !== 200) {
+        error_log('mail: Gmail token refresh failed → HTTP ' . $httpCode . ($curlErr ? " ({$curlErr})" : '') . ' ' . ($response ?: ''));
+        return null;
+    }
+    $data  = json_decode($response, true);
+    $token = $data['access_token'] ?? null;
+    if ($token === null) { error_log('mail: Gmail token missing access_token'); return null; }
+
+    $cached = ['token' => $token, 'expires' => time() + ((int)($data['expires_in'] ?? 3600)) - 300];
+    return $token;
+}
+
 
 /**
  * Write a communication_log row. $fields: student_id, contact_id,

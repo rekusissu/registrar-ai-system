@@ -162,6 +162,9 @@ include '../includes/sidebar.php';
                         <tr><td style="color:#64748b;">MAIL_FROM_NAME</td><td><?= htmlspecialchars(defined('MAIL_FROM_NAME') ? MAIL_FROM_NAME : '') ?></td></tr>
                         <tr><td style="color:#64748b;">PHPMailer (vendor)</td><td><?= $hasPhpMailer ? 'Installed' : 'Missing' ?></td></tr>
                         <tr><td style="color:#64748b;">OpenSSL extension</td><td><?= $hasOpenssl ? 'Enabled' : 'Disabled (STARTTLS needs it)' ?></td></tr>
+                        <tr><td style="color:#64748b;">Brevo API</td><td><?= defined('BREVO_CONFIGURED') && BREVO_CONFIGURED ? '<span style="color:#16a34a;font-weight:600;">Active — emails sent via Brevo</span>' : '<span style="color:#94a3b8;">Not configured</span>' ?></td></tr>
+                        <tr><td style="color:#64748b;">Gmail API (OAuth2)</td><td><?= defined('GMAIL_API_CONFIGURED') && GMAIL_API_CONFIGURED ? '<span style="color:#16a34a;font-weight:600;">Active — emails sent via Gmail API</span>' : '<span style="color:#94a3b8;">Not configured</span>' ?></td></tr>
+                        <tr><td style="color:#64748b;">Gmail API Client ID</td><td><?= defined('GMAIL_API_CLIENT_ID') && GMAIL_API_CLIENT_ID !== '' ? 'Set' : 'Not set' ?></td></tr>
                     </tbody>
                 </table>
             </div>

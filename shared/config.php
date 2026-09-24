@@ -347,7 +347,26 @@ define('SMTP_USER',     env('SMTP_USER') ?: emailSecretFromLocal('SMTP_USER'));
 define('SMTP_PASS',     env('SMTP_PASS') ?: emailSecretFromLocal('SMTP_PASS'));
 define('MAIL_FROM',     env('MAIL_FROM') ?: emailSecretFromLocal('MAIL_FROM'));
 define('MAIL_FROM_NAME',env('MAIL_FROM_NAME') ?: emailSecretFromLocal('MAIL_FROM_NAME'));
-define('EMAIL_CONFIGURED', SMTP_HOST !== '' && SMTP_USER !== '' && SMTP_PASS !== '');
+
+// ── Gmail API (OAuth2) — preferred over SMTP for free Gmail accounts ─
+// When GMAIL_API_CLIENT_ID + GMAIL_API_CLIENT_SECRET + GMAIL_REFRESH_TOKEN
+// are all set, emails are sent via Gmail API (no SMTP bounce issues).
+// Get these from Google Cloud Console → APIs & Services → Credentials.
+define('GMAIL_API_CLIENT_ID',     env('GMAIL_API_CLIENT_ID') ?: emailSecretFromLocal('GMAIL_API_CLIENT_ID'));
+define('GMAIL_API_CLIENT_SECRET', env('GMAIL_API_CLIENT_SECRET') ?: emailSecretFromLocal('GMAIL_API_CLIENT_SECRET'));
+define('GMAIL_REFRESH_TOKEN',     env('GMAIL_REFRESH_TOKEN') ?: emailSecretFromLocal('GMAIL_REFRESH_TOKEN'));
+define('GMAIL_SENDER_EMAIL',      env('GMAIL_SENDER_EMAIL') ?: emailSecretFromLocal('GMAIL_SENDER_EMAIL') ?: MAIL_FROM);
+
+define('GMAIL_API_CONFIGURED', GMAIL_API_CLIENT_ID !== '' && GMAIL_API_CLIENT_SECRET !== '' && GMAIL_REFRESH_TOKEN !== '');
+
+// ── Brevo (Sendinblue) transactional API — preferred for reliability ─
+// Sign up at https://app.brevo.com → SMTP & API → API Keys → Generate.
+// Verify your sender email in Brevo (one-click link, no DNS needed).
+define('BREVO_API_KEY', env('BREVO_API_KEY') ?: emailSecretFromLocal('BREVO_API_KEY'));
+define('BREVO_CONFIGURED', BREVO_API_KEY !== '');
+
+// EMAIL_CONFIGURED = true when ANY transport is set up (Brevo > Gmail API > SMTP)
+define('EMAIL_CONFIGURED', BREVO_CONFIGURED || GMAIL_API_CONFIGURED || (SMTP_HOST !== '' && SMTP_USER !== '' && SMTP_PASS !== ''));
 
 // Timezone
 date_default_timezone_set('Asia/Manila');
