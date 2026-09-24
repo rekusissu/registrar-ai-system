@@ -1364,10 +1364,10 @@ function restoreStudent(id, name) {
 
 // ─── TOAST ───────────────────────────────────────────────────
 function ensureToastContainer() { let c = document.querySelector('.toast-container'); if (!c) { c = document.createElement('div'); c.className = 'toast-container'; document.body.appendChild(c); } return c; }
-function showToast(title, message, type) {
+function showToast(message, type) {
     const c = ensureToastContainer(); const t = document.createElement('div'); t.className = 'toast ' + (type||'info');
-    t.innerHTML = '<i class="fas ' + (type==='success'?'fa-circle-check':type==='error'?'fa-circle-xmark':'fa-circle-info') + ' toast-icon"></i><div class="toast-content"><div class="toast-title"></div><div class="toast-message"></div></div><button class="toast-close" aria-label="Close"><i class="fas fa-times"></i></button>';
-    t.querySelector('.toast-title').textContent = title; t.querySelector('.toast-message').textContent = message;
+    t.innerHTML = '<i class="fas ' + (type==='success'?'fa-circle-check':type==='error'?'fa-circle-xmark':type==='warning'?'fa-triangle-exclamation':'fa-circle-info') + ' toast-icon"></i><div class="toast-content"><div class="toast-message"></div></div><button class="toast-close" aria-label="Close"><i class="fas fa-times"></i></button>';
+    t.querySelector('.toast-message').textContent = message;
     t.querySelector('.toast-close').addEventListener('click', () => { t.classList.add('hiding'); setTimeout(() => t.remove(), 300); });
     c.appendChild(t); setTimeout(() => { t.classList.add('hiding'); setTimeout(() => t.remove(), 300); }, 4000);
 }

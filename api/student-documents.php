@@ -26,6 +26,7 @@ require_once __DIR__ . '/../shared/config.php';
 corsSameOrigin();
 require_once __DIR__ . '/../shared/database.php';
 require_once __DIR__ . '/../shared/session_config.php';
+require_once __DIR__ . '/../shared/csrf_guard.php';
 require_once __DIR__ . '/../shared/functions.php';
 
 if (!isLoggedIn()) {
