@@ -75,13 +75,17 @@ function renderQualityDetail() {
     const report = ((qualityData && qualityData.students) || []).find(item => Number(item.student_id) === Number(qualitySelectedId));
     if (!report) {
         detail.innerHTML = '<div class="quality-detail-empty"><div><i class="fas fa-user-check"></i><p>Select a student to review their record.</p></div></div>';
+        const openButton = document.getElementById('qualityOpenStudentBtn');
+        const applyButton = document.getElementById('qualityApplyBtn');
+        if (openButton) openButton.disabled = true;
+        if (applyButton) applyButton.disabled = true;
         return;
     }
     const s = report.student || {};
     const repairs = report.safe_repairs || [];
     const issues = (report.issues || []).map(issue => {
         const values = `<div class="quality-value-grid"><div class="quality-value"><label>Current value</label><span>${esc(issue.current_value || 'Not provided')}</span></div>${issue.suggested_value ? `<div class="quality-value suggested"><label>Suggested value</label><span>${esc(issue.suggested_value)}</span></div>` : ''}</div>`;
-        return `<article class="quality-issue ${esc(issue.severity || 'medium')}"><div class="quality-issue-top"><strong>${esc(issue.label || issue.field)}</strong><span>${esc(issue.category || '')}</span></div><p>${esc(issue.message || 'Needs review.')}</p>${values}</article>`;
+        return `<article class="quality-issue ${esc(issue.severity || 'medium')} ${esc(issue.category || 'general')}"><div class="quality-issue-top"><strong>${esc(issue.label || issue.field)}</strong><span>${esc(issue.category || 'Review')}</span></div><p>${esc(issue.message || 'Needs review.')}</p>${values}</article>`;
     }).join('');
     const duplicates = (report.duplicates || []).map(item => `<div class="quality-duplicate"><strong>Possible duplicate:</strong> ${esc(item.name)} · ${esc(item.student_number || 'No student #')} · match ${Math.round(Number(item.score || 0) * 100)}%<br><span>Review both records before making a decision. This panel never merges students.</span></div>`).join('');
     const repairCards = repairs.map(repair => `<label class="quality-issue low" style="display:block;cursor:pointer"><div class="quality-issue-top"><strong>Apply safe correction</strong><span>${esc(repair.field)}</span></div><p>${esc(repair.reason || 'Verified formatting correction.')}</p><div class="quality-value-grid"><div class="quality-value"><label>Current</label><span>${esc(repair.current_value)}</span></div><div class="quality-value suggested"><label>Correction</label><span>${esc(repair.suggested_value)}</span></div></div><input type="checkbox" data-quality-repair="${esc(repair.field)}" style="margin-top:10px"></label>`).join('');
@@ -91,9 +95,13 @@ function renderQualityDetail() {
         <div class="quality-section-title">Detected issues · ${(report.issues || []).length}</div>${issues || '<div class="quality-empty">No issues detected.</div>'}
         ${duplicates ? `<div class="quality-section-title">Duplicate review</div>${duplicates}` : ''}
         ${repairCards ? `<div class="quality-section-title">Verified safe corrections</div>${repairCards}` : ''}
-        </div><div class="quality-actions"><button class="btn btn-secondary" onclick="closeQualityPanel()">Close</button><button class="btn btn-secondary" onclick="openQualityStudent(${Number(s.id)})"><i class="fas fa-user"></i> Open student</button><button class="btn btn-primary" id="qualityApplyBtn" onclick="applySelectedQualityRepairs()" ${repairs.length ? '' : 'disabled'}><i class="fas fa-check"></i> Apply selected</button></div>`;
+        </div>`;
     const text = document.getElementById('qualityAiText');
     if (text) text.textContent = report.summary || 'Select “Explain this record” for an AI-assisted overview.';
+    const openButton = document.getElementById('qualityOpenStudentBtn');
+    const applyButton = document.getElementById('qualityApplyBtn');
+    if (openButton) openButton.disabled = !s.id;
+    if (applyButton) applyButton.disabled = !repairs.length;
 }
 
 async function runQualityAiSummary() {
@@ -138,9 +146,10 @@ async function applySelectedQualityRepairs() {
     }
 }
 
-function openQualityStudent(id) {
+function openQualityStudent() {
+    if (!qualitySelectedId) return;
     closeQualityPanel();
-    window.setTimeout(() => viewStudent(id), 180);
+    window.setTimeout(() => viewStudent(qualitySelectedId), 180);
 }
 
 function initStudentDataQuality() {
