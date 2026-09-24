@@ -39,6 +39,14 @@ $immunizations = trim((string) ($input['immunization_records'] ?? ''));
 $height        = trim((string) ($input['height'] ?? ''));
 $weight        = trim((string) ($input['weight'] ?? ''));
 $nurseNotes    = trim((string) ($input['nurse_notes'] ?? ''));
+$pulse         = trim((string) ($input['pulse'] ?? ''));
+$respiratory   = trim((string) ($input['respiratory_rate'] ?? ''));
+$oxygen        = trim((string) ($input['oxygen_saturation'] ?? ''));
+$symptoms      = trim((string) ($input['symptoms'] ?? ''));
+$disposition   = trim((string) ($input['disposition'] ?? ''));
+$precautions   = trim((string) ($input['return_precautions'] ?? ''));
+$followUp      = trim((string) ($input['follow_up_plan'] ?? ''));
+$redFlags      = is_array($input['red_flags'] ?? null) ? implode(', ', $input['red_flags']) : trim((string) ($input['red_flags'] ?? ''));
 
 if ($reason === '' && $assessment === '' && $temperature === '' && $bloodPressure === '') {
     echo json_encode(['success' => false, 'message' => 'At least one visit field is required for a recommendation.']);
@@ -56,6 +64,14 @@ if ($immunizations !== '')   $parts[] = "Immunization records: {$immunizations}"
 if ($height !== '')          $parts[] = "Height: {$height} cm";
 if ($weight !== '')          $parts[] = "Weight: {$weight} kg";
 if ($nurseNotes !== '')      $parts[] = "Nurse notes: {$nurseNotes}";
+if ($symptoms !== '')        $parts[] = "Symptoms and observations: {$symptoms}";
+if ($pulse !== '')           $parts[] = "Pulse: {$pulse} bpm";
+if ($respiratory !== '')     $parts[] = "Respiratory rate: {$respiratory}/min";
+if ($oxygen !== '')          $parts[] = "Oxygen saturation: {$oxygen}%";
+if ($redFlags !== '')        $parts[] = "Safety flags recorded: {$redFlags}";
+if ($disposition !== '')     $parts[] = "Disposition: {$disposition}";
+if ($precautions !== '')     $parts[] = "Return precautions: {$precautions}";
+if ($followUp !== '')        $parts[] = "Follow-up plan: {$followUp}";
 
 if ($height !== '' && $weight !== '') {
     $h = (float) $height / 100;
@@ -66,15 +82,14 @@ if ($height !== '' && $weight !== '') {
 $userPrompt = "Student visit data:\n" . implode("\n", $parts);
 
 $systemPrompt = <<<'EOT'
-You are a clinical aid assistant in a school clinic portal.
-Given student visit data, provide a basic first-aid recommendation.
+You are a non-diagnostic clinical aid in a school clinic portal. Summarize entered facts, identify missing documentation, and suggest escalation prompts. Do not diagnose, prescribe, clear, or restrict students.
 
 Rules:
-- You are NOT diagnosing. Suggest first-aid steps a school nurse can take on-site.
-- Flag abnormal vitals: temp > 37.5°C = fever, > 38.5°C = high fever; BP systolic > 140 or < 90 is concerning, diastolic > 90 or < 60 is concerning.
-- Consider known allergies and pre-existing conditions when recommending medication.
-- If symptoms suggest something beyond first aid (chest pain, difficulty breathing, severe allergic reaction, suspected fracture, loss of consciousness), flag for physician referral.
-- Keep recommendations concise, actionable, appropriate for a school clinic.
+- Base every statement only on supplied visit data.
+- Identify missing pulse, respiratory rate, disposition, precautions, guardian contact, or follow-up fields.
+- Flag entered symptoms such as chest pain, difficulty breathing, severe allergic reaction, suspected fracture, loss of consciousness, uncontrolled bleeding, confusion, or concerning vitals for nurse review and clinic protocol.
+- Do not recommend a specific medication or treatment.
+- Keep the output concise and appropriate for a school clinic.
 
 Respond with ONLY a single valid JSON object:
 {"recommendation":"concise first-aid action (1-3 sentences)","urgency":"low|medium|high","key_warnings":["warning1"],"referral_needed":true|false,"confidence":"high|medium|low","summary":"one-line clinical summary"}

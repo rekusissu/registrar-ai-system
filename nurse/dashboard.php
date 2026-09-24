@@ -347,6 +347,22 @@ select.form-control{appearance:none;-webkit-appearance:none;padding-right:38px;c
                 <div class="section-label">Reason for Visit <span style="color:#dc2626;">*</span></div>
                 <select id="reasonSelect" class="form-control" style="width:100%;"><option value="">— Select a reason —</option><?php foreach (['Headache','Fever','Stomachache','Menstrual Cramps','Dizziness','Minor Injury','Other'] as $r): ?><option value="<?= h($r) ?>"><?= h($r) ?></option><?php endforeach; ?></select>
                 <div class="other-input" id="reasonOther"><input type="text" id="reasonOtherInput" class="form-control" placeholder="Enter the reason for visit…"></div>
+                <div class="form-row" style="margin-top:14px">
+                    <div class="form-group"><label>Visit type</label><select id="visitType" class="form-control"><option>First aid</option><option>Illness</option><option>Injury</option><option>Medication</option><option>Follow-up</option><option>Other</option></select></div>
+                    <div class="form-group"><label>Onset / incident time</label><input type="datetime-local" id="onsetAt" class="form-control"></div>
+                </div>
+                <div class="form-group"><label>Affected area / incident details</label><textarea id="incidentDetails" class="form-control" rows="2" placeholder="Where did it happen? What body area is affected?"></textarea></div>
+                <div class="form-group"><label>Symptoms and observations</label><textarea id="symptoms" class="form-control" rows="2" placeholder="Primary complaint, other symptoms, appearance, breathing, bleeding, mobility…"></textarea></div>
+                <div class="form-group"><label>Pain scale (0–10)</label><input type="number" min="0" max="10" id="painScore" class="form-control" style="max-width:120px" placeholder="0"></div>
+                <div class="section-title"><i class="fas fa-triangle-exclamation" style="color:#b45309;"></i> Safety check</div>
+                <div class="form-row">
+                    <div class="form-group"><label><input type="checkbox" id="flagBreathing"> Difficulty breathing</label></div>
+                    <div class="form-group"><label><input type="checkbox" id="flagChestPain"> Chest pain</label></div>
+                    <div class="form-group"><label><input type="checkbox" id="flagUnconscious"> Loss of consciousness</label></div>
+                    <div class="form-group"><label><input type="checkbox" id="flagAllergy"> Severe allergic reaction</label></div>
+                    <div class="form-group"><label><input type="checkbox" id="flagBleeding"> Uncontrolled bleeding</label></div>
+                    <div class="form-group"><label><input type="checkbox" id="flagConfusion"> Confusion / altered awareness</label></div>
+                </div>
                 <div style="display:flex;justify-content:flex-end;margin-top:20px;"><button type="button" class="btn-step-next" onclick="goPane(2)">Next: Assessment <i class="fas fa-arrow-right"></i></button></div>
             </div>
             <div class="eval-pane" data-pane="2">
@@ -355,7 +371,15 @@ select.form-control{appearance:none;-webkit-appearance:none;padding-right:38px;c
                 <div class="form-row">
                     <div class="form-group"><label>Temperature (°C)</label><input type="number" step="0.1" id="temperature" class="form-control" placeholder="e.g., 36.8"></div>
                     <div class="form-group"><label>Blood Pressure</label><input type="text" id="bloodPressure" class="form-control" placeholder="e.g., 120/80"></div>
+                    <div class="form-group"><label>Pulse (bpm)</label><input type="number" id="pulse" class="form-control" placeholder="e.g., 80"></div>
+                    <div class="form-group"><label>Respiratory rate</label><input type="number" id="respiratoryRate" class="form-control" placeholder="e.g., 18"></div>
+                    <div class="form-group"><label>Oxygen saturation (%)</label><input type="number" min="0" max="100" id="oxygenSaturation" class="form-control" placeholder="e.g., 98"></div>
                 </div>
+                <div class="form-group"><label>Current medications / treatment given today</label><textarea id="currentMedications" class="form-control" rows="2" placeholder="Medication name, dose, time, response…"></textarea></div>
+                <div class="section-title"><i class="fas fa-clipboard-check" style="color:#0d9488;"></i> Disposition &amp; follow-up</div>
+                <div class="form-group"><label>Disposition <span style="color:#dc2626;">*</span></label><select id="disposition" class="form-control"><option value="">— Select outcome —</option><option>Returned to class</option><option>Observed / rest</option><option>Sent home</option><option>Sent to physician</option><option>Emergency referral</option><option>Transferred to external facility</option><option>Parent / guardian notified</option><option>No follow-up required</option></select></div>
+                <div class="form-group"><label>Return precautions / education given</label><textarea id="returnPrecautions" class="form-control" rows="2" placeholder="Instructions given to student and guardian, warning signs to watch for…"></textarea></div>
+                <div class="form-group"><label>Follow-up plan</label><textarea id="followUpPlan" class="form-control" rows="2" placeholder="When and why should the student return or be rechecked?"></textarea></div>
                 <div class="section-title"><i class="fas fa-stethoscope" style="color:#2563eb;"></i> Diagnosis &amp; Action</div>
                 <div class="section-label">Nurse's Assessment / Initial Diagnosis</div>
                 <select id="assessSelect" class="form-control" style="width:100%;"><option value="">— Select assessment —</option><?php foreach (['Headache','Fever','Dysmenorrhea','Possible Dehydration','Minor Abrasion','Other'] as $a): ?><option value="<?= h($a) ?>"><?= h($a) ?></option><?php endforeach; ?></select>
@@ -373,7 +397,9 @@ select.form-control{appearance:none;-webkit-appearance:none;padding-right:38px;c
                 <div class="section-label" style="margin-top:0;">Nurse's Notes</div>
                 <textarea id="nurseNotes" class="form-control" rows="3" style="width:100%;" placeholder="Any additional observations or notes…"></textarea>
                 <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:20px;">
-                    <button type="button" class="btn btn-primary" id="saveBtn" onclick="saveVisit()" style="padding:12px 26px;"><i class="fas fa-save"></i> Save Health Record</button>
+                    <button type="button" class="btn btn-primary" id="saveBtn" onclick="saveVisit(false)" style="padding:12px 26px;"><i class="fas fa-save"></i> Save complete visit</button>
+                     <button type="button" class="btn btn-outline" onclick="saveVisit(true)" style="padding:12px 20px;"><i class="fas fa-file-pen"></i> Save draft</button>
+
                     <button type="button" class="btn btn-light" onclick="resetVisitFields()" style="padding:12px 20px;">Clear Fields</button>
                 </div>
                 <div id="formMsg"></div>
@@ -705,6 +731,7 @@ select.form-control{appearance:none;-webkit-appearance:none;padding-right:38px;c
             weight:                 el('weight') ? el('weight').value : '',
             nurse_notes:            el('nurseNotes') ? el('nurseNotes').value : ''
         };
+        Object.assign(payload, expandedPayload());
 
         fetch('../api/clinic-ai-recommend.php', {
             method: 'POST',
@@ -807,19 +834,44 @@ select.form-control{appearance:none;-webkit-appearance:none;padding-right:38px;c
         ['reasonSelect','assessSelect','actionSelect'].forEach(function(id){ var s2 = el(id); if(s2) s2.value=''; });
         ['reasonOtherInput','assessOtherInput','actionOtherInput'].forEach(function(id){ var i2 = el(id); if(i2) i2.value=''; });
         ['reasonOther','assessOther','actionOther'].forEach(function(id){ var o2 = el(id); if(o2) o2.classList.remove('show'); });
-        ['nurseNotes','temperature','bloodPressure'].forEach(function(id){ var f = el(id); if(f) f.value=''; });
+        ['nurseNotes','temperature','bloodPressure','pulse','respiratoryRate','oxygenSaturation','visitType','onsetAt','incidentDetails','symptoms','painScore','currentMedications','disposition','returnPrecautions','followUpPlan'].forEach(function(id){ var f = el(id); if(f) f.value=''; });
+        ['flagBreathing','flagChestPain','flagUnconscious','flagAllergy','flagBleeding','flagConfusion'].forEach(function(id){ var f = el(id); if(f) f.checked=false; });
         var box = el('formMsg'); if(box) box.innerHTML='';
         if(!silent) msg('Visit fields cleared.', true);
     };
 
+    function flagPayload(){
+        return ['flagBreathing','flagChestPain','flagUnconscious','flagAllergy','flagBleeding','flagConfusion']
+            .map(function(id){ return el(id) && el(id).checked ? id.replace('flag','') : ''; }).filter(Boolean);
+    }
+    function expandedPayload(){
+        return {
+            visit_type: el('visitType') ? el('visitType').value : '',
+            onset_at: el('onsetAt') ? el('onsetAt').value : '',
+            incident_details: el('incidentDetails') ? el('incidentDetails').value.trim() : '',
+            symptoms: el('symptoms') ? el('symptoms').value.trim() : '',
+            pain_score: el('painScore') ? el('painScore').value : '',
+            red_flags: flagPayload(),
+            pulse: el('pulse') ? el('pulse').value : '',
+            respiratory_rate: el('respiratoryRate') ? el('respiratoryRate').value : '',
+            oxygen_saturation: el('oxygenSaturation') ? el('oxygenSaturation').value : '',
+            current_medications: el('currentMedications') ? el('currentMedications').value.trim() : '',
+            disposition: el('disposition') ? el('disposition').value : '',
+            return_precautions: el('returnPrecautions') ? el('returnPrecautions').value.trim() : '',
+            follow_up_plan: el('followUpPlan') ? el('followUpPlan').value.trim() : ''
+        };
+    }
+
     // ── SAVE HEALTH RECORD ──
-    window.saveVisit = function(){
+    window.saveVisit = function(draft){
         if(!current){ msg('No student selected. Tap a card or select a student first.', false); return; }
         var reason = resolveValue('reasonSelect','reasonOtherInput');
         var assessment = resolveValue('assessSelect','assessOtherInput');
         var action = resolveValue('actionSelect','actionOtherInput');
-        if(!reason){ msg('Please select/enter a reason for visit.', false); return; }
-        if(!action){ msg('Please select/enter an action taken.', false); return; }
+        var disposition = el('disposition') ? el('disposition').value : '';
+        if(!draft && !reason){ msg('Please select/enter a reason for visit.', false); return; }
+        if(!draft && !action){ msg('Please select/enter an action taken.', false); return; }
+        if(!draft && !disposition){ msg('Please select the visit disposition.', false); return; }
 
         var btn = el('saveBtn');
         if(btn){ btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…'; }
@@ -827,11 +879,11 @@ select.form-control{appearance:none;-webkit-appearance:none;padding-right:38px;c
         fetch('../api/clinic.php?action=save-visit', {
             method: 'POST',
             headers: { 'Content-Type':'application/json', 'X-CSRF-Token':CSRF },
-            body: JSON.stringify({
+            body: JSON.stringify(Object.assign({
                 student_id: current.id,
-                reason_for_visit: reason,
+                reason_for_visit: reason || (draft ? 'Draft intake' : ''),
                 assessment: assessment,
-                action_taken: action,
+                action_taken: action || (draft ? 'Draft pending completion' : ''),
                 nurse_notes: el('nurseNotes') ? el('nurseNotes').value.trim() : '',
                 temperature: el('temperature') ? el('temperature').value : '',
                 blood_pressure: el('bloodPressure') ? el('bloodPressure').value.trim() : '',
@@ -840,16 +892,17 @@ select.form-control{appearance:none;-webkit-appearance:none;padding-right:38px;c
                 weight: el('weight') ? el('weight').value : '',
                 allergies: el('allergies') ? el('allergies').value.trim() : '',
                 pre_existing_conditions: el('conditions') ? el('conditions').value.trim() : '',
-                immunization_records: el('immunizations') ? el('immunizations').value.trim() : ''
-            })
+                immunization_records: el('immunizations') ? el('immunizations').value.trim() : '',
+                save_mode: draft ? 'draft' : 'complete'
+            }, expandedPayload()))
         }).then(function(r){
             return r.json().then(function(d){ return {status:r.status, data:d}; });
         })
         .then(function(res){
             if(res.data && res.data.success){
-                msg('Health record saved and synced to the registrar portal.', true);
-                resetVisitFields(true);
-                loadHistory();
+                showToast(res.data.message || (draft ? 'Draft saved.' : 'Visit saved.'), 'success');
+                msg(res.data.message || (draft ? 'Draft saved.' : 'Health record saved and synced to the registrar portal.'), true);
+                if(!draft){ resetVisitFields(true); loadHistory(); }
             } else {
                 var m = (res.data && res.data.message) ? res.data.message : 'Save failed.';
                 if(res.status === 419) m = 'Session/CSRF token expired — please reload the page.';

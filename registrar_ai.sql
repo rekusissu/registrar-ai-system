@@ -960,6 +960,24 @@ CREATE TABLE `health_visits` (
   KEY `idx_recorded_by` (`recorded_by`),
   CONSTRAINT `fk_visit_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+-- Run this migration on existing installations after backing up the database.
+-- It adds the structured Nurse Clinic intake fields without changing existing visit data.
+ALTER TABLE `health_visits`
+  ADD COLUMN `visit_type` varchar(32) DEFAULT NULL,
+  ADD COLUMN `onset_at` datetime DEFAULT NULL,
+  ADD COLUMN `incident_details` text DEFAULT NULL,
+  ADD COLUMN `symptoms` text DEFAULT NULL,
+  ADD COLUMN `pain_score` tinyint(3) DEFAULT NULL,
+  ADD COLUMN `red_flags` text DEFAULT NULL,
+  ADD COLUMN `pulse` smallint(6) DEFAULT NULL,
+  ADD COLUMN `respiratory_rate` smallint(6) DEFAULT NULL,
+  ADD COLUMN `oxygen_saturation` decimal(5,2) DEFAULT NULL,
+  ADD COLUMN `current_medications` text DEFAULT NULL,
+  ADD COLUMN `disposition` varchar(64) DEFAULT NULL,
+  ADD COLUMN `return_precautions` text DEFAULT NULL,
+  ADD COLUMN `follow_up_plan` text DEFAULT NULL,
+  MODIFY COLUMN `record_status` enum('Recorded','Draft','Pending','Cancelled') NOT NULL DEFAULT 'Recorded';
+
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --

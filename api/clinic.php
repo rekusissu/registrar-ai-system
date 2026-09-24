@@ -203,7 +203,25 @@ if ($method === 'POST' && $action === 'save-visit') {
     $allergies = trim((string)($input['allergies'] ?? ''));
     $conditions = trim((string)($input['pre_existing_conditions'] ?? ''));
     $immunizations = trim((string)($input['immunization_records'] ?? ''));
-
+    $expanded = [
+        'visit_type' => trim((string)($input['visit_type'] ?? '')),
+        'onset_at' => trim((string)($input['onset_at'] ?? '')),
+        'incident_details' => trim((string)($input['incident_details'] ?? '')),
+        'symptoms' => trim((string)($input['symptoms'] ?? '')),
+        'pain_score' => ($input['pain_score'] ?? '') !== '' ? (float)$input['pain_score'] : null,
+        'red_flags' => is_array($input['red_flags'] ?? null) ? implode(',', array_slice(array_map('strval', $input['red_flags']), 0, 20)) : '',
+        'pulse' => ($input['pulse'] ?? '') !== '' ? (float)$input['pulse'] : null,
+        'respiratory_rate' => ($input['respiratory_rate'] ?? '') !== '' ? (float)$input['respiratory_rate'] : null,
+        'oxygen_saturation' => ($input['oxygen_saturation'] ?? '') !== '' ? (float)$input['oxygen_saturation'] : null,
+        'current_medications' => trim((string)($input['current_medications'] ?? '')),
+        'disposition' => trim((string)($input['disposition'] ?? '')),
+        'return_precautions' => trim((string)($input['return_precautions'] ?? '')),
+        'follow_up_plan' => trim((string)($input['follow_up_plan'] ?? '')),
+    ];
+    $saveMode = ($input['save_mode'] ?? 'complete') === 'draft' ? 'Draft' : 'Recorded';
+    if ($saveMode === 'Recorded' && empty($expanded['disposition'])) {
+        echo json_encode(['success' => false, 'message' => 'Disposition is required for a complete visit.']); exit;
+    }
     if ($reason === '') {
         echo json_encode(['success' => false, 'message' => 'Reason for visit is required.']);
         exit;
@@ -221,7 +239,8 @@ if ($method === 'POST' && $action === 'save-visit') {
         }
 
         $dateTime = date('Y-m-d H:i:s');
-        $id = $db->insert('health_visits', [
+        $id = $db->insert('health_visits', array_merge([
+
             'student_id'             => $studentId,
             'date_time'              => $dateTime,
             'visit_date'             => date('Y-m-d'),
@@ -241,10 +260,10 @@ if ($method === 'POST' && $action === 'save-visit') {
             'weight'                 => $weight,
             'pre_existing_conditions'=> $conditions !== '' ? $conditions : null,
             'immunization_records'   => $immunizations !== '' ? $immunizations : null,
-            'record_status'          => 'Recorded',
+            'record_status'          => $saveMode,
             'recorded_by'            => getCurrentUserId(),
             'created_at'             => $dateTime,
-        ]);
+        ], $expanded));
 
         logActivity(getCurrentUserId(), 'clinic_visit_logged',
             json_encode(['student_id' => $studentId, 'reason' => $reason]));
