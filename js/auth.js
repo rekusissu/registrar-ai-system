@@ -104,8 +104,8 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    // Login successful - redirect to dashboard
-                    window.location.href = '../dashboard/dashboard.php';
+                    // Login successful - use server-returned redirect URL
+                    window.location.href = data.data?.redirect || '../dashboard/dashboard.php';
                 } else {
                     showError('authError', data.message || 'Invalid username or password.');
                     btn.disabled = false;
@@ -173,7 +173,7 @@
             fd.set('email', email);
             fd.set('username', username);
             fd.set('password', password);
-            fd.set('role', 'registrar'); // Default role
+            fd.set('role', 'student'); // Default role
 
             try {
                 const response = await fetch('../shared/auth_actions.php', {

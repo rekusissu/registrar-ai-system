@@ -1070,6 +1070,15 @@ function createStudentFromInput(array $input, $db): array
     if (isset($input['father_name']) && trim($input['father_name']) !== '' && in_array('father_name', $studentColNames, true)) {
         $data['father_name'] = normalizeNameCase(trim($input['father_name']));
     }
+    if (isset($input['previous_school']) && trim($input['previous_school']) !== '' && in_array('previous_school', $studentColNames, true)) {
+        $data['previous_school'] = normalizeNameCase(trim($input['previous_school']));
+    }
+    if (isset($input['school_year_graduated']) && trim($input['school_year_graduated']) !== '' && in_array('school_year_graduated', $studentColNames, true)) {
+        $data['school_year_graduated'] = trim($input['school_year_graduated']);
+    }
+    if (isset($input['last_year_level_completed']) && trim($input['last_year_level_completed']) !== '' && in_array('last_year_level_completed', $studentColNames, true)) {
+        $data['last_year_level_completed'] = trim($input['last_year_level_completed']);
+    }
 
     $newId = $db->insert('students', $data);
 

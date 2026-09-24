@@ -1,8 +1,7 @@
 <?php
 // ============================================================
 //  API/SETTINGS.PHP
-//  Settings API (authenticated) — update own profile + password.
-//  PUT profile   { full_name }
+//  Settings API (authenticated) — change own password.
 //  PUT password  { current_password, new_password }
 // ============================================================
 
@@ -31,23 +30,6 @@ if ($method !== 'PUT') {
 }
 
 $section = $input['section'] ?? null;
-
-// ─── UPDATE PROFILE ────────────────────────────────────────────
-if ($section === 'profile') {
-    $fullName = trim($input['full_name'] ?? '');
-    if ($fullName === '') {
-        echo json_encode(['success' => false, 'message' => 'Full name is required.']);
-        exit;
-    }
-    $db->update('users', [
-        'full_name'  => $fullName,
-        'updated_at' => date('Y-m-d H:i:s'),
-    ], 'id = ?', [$userId]);
-    $_SESSION['full_name'] = $fullName;
-    logActivity($userId, 'settings_profile_update', null, 'users', $userId);
-    echo json_encode(['success' => true, 'message' => 'Profile updated.']);
-    exit;
-}
 
 // ─── CHANGE PASSWORD ───────────────────────────────────────────
 if ($section === 'password') {

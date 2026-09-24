@@ -608,12 +608,12 @@ try {
                               'birth_country', 'lrn', 'name_suffix', 'mother_name', 'father_name',
                               'nationality', 'religion', 'address', 'contact_number', 'email',
                               'course', 'major', 'year_level', 'school_year', 'semester', 'section', 'adviser_id', 'status',
-                              'student_number'];
+                              'student_number', 'previous_school', 'school_year_graduated', 'last_year_level_completed'];
 
             foreach ($allowedFields as $field) {
                 if (array_key_exists($field, $input)) {
                     $value = $input[$field];
-                    if ($value === '' && in_array($field, ['birth_date', 'middle_name', 'place_of_birth', 'birth_country', 'nationality', 'religion', 'contact_number', 'email', 'course', 'major', 'year_level', 'school_year', 'semester', 'section', 'adviser_id', 'lrn', 'name_suffix', 'mother_name', 'father_name'], true)) {
+                    if ($value === '' && in_array($field, ['birth_date', 'middle_name', 'place_of_birth', 'birth_country', 'nationality', 'religion', 'contact_number', 'email', 'course', 'major', 'year_level', 'school_year', 'semester', 'section', 'adviser_id', 'lrn', 'name_suffix', 'mother_name', 'father_name', 'previous_school', 'school_year_graduated', 'last_year_level_completed'], true)) {
                         $value = null;
                     }
                     if ($field === 'birth_date' && $value === '0000-00-00') {
@@ -632,7 +632,7 @@ try {
                     }
                     // B3: normalize text fields before saving.
                     if ($value !== null && $value !== '') {
-                        if (in_array($field, ['first_name', 'middle_name', 'last_name', 'place_of_birth', 'religion', 'mother_name', 'father_name'], true)) {
+                        if (in_array($field, ['first_name', 'middle_name', 'last_name', 'place_of_birth', 'religion', 'mother_name', 'father_name', 'previous_school'], true)) {
                             $value = normalizeNameCase((string) $value);
                         } elseif ($field === 'contact_number') {
                             $value = normalizePhone((string) $value);

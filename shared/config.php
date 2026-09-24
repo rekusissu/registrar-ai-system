@@ -158,6 +158,12 @@ ini_set('error_log', APP_ROOT . 'logs/php_errors.log');
 /** Maximum enrollees per section when auto-generating masterlists (e.g. BSIT 11001 = 50). Section codes are [year][semester][number], e.g. 11001 = yr 1 sem 1 section 1. */
 define('MAX_STUDENTS_PER_SECTION', 50);
 
+// Logs directory — used by shared/functions.php logError() / logApiRequest()
+define('LOGS_PATH', APP_ROOT . 'logs/');
+
+// Allowed file extensions for uploads — used by shared/functions.php isAllowedFile()
+define('ALLOWED_FILE_EXTENSIONS', ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx']);
+
 // Security
 // Secrets must come from the environment (or a git-ignored local file).
 // In production we FAIL CLOSED: a missing secret aborts startup loudly
