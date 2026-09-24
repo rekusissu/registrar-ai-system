@@ -87,6 +87,12 @@ include '../includes/sidebar.php';
 .search-bar .search-actions{display:flex;gap:8px;flex-wrap:nowrap;flex-shrink:0;align-items:center;height:40px}
 .search-bar .search-actions .btn{height:40px;padding:0 16px;font-size:13px;display:inline-flex;align-items:center;justify-content:center}
 
+/* Bulk bar */
+.bulk-bar{display:none;padding:10px 20px;background:#eef4ff;border-bottom:1px solid #bfdbfe;align-items:center;gap:12px;flex-wrap:wrap}
+.bulk-bar.show{display:flex}
+.bulk-bar .count{font-size:13px;font-weight:600;color:#1d4ed8}
+.bulk-bar .bulk-actions{display:flex;gap:8px;margin-left:auto}
+
 /* Table */
 .table-responsive{overflow-x:auto}
 .table-responsive table{width:100%;border-collapse:collapse}
@@ -96,6 +102,10 @@ include '../includes/sidebar.php';
 .table-responsive tbody tr:hover{background:#f8fafc}
 .table-responsive tbody tr:last-child td{border-bottom:none}
 .table-responsive tbody tr.archived{opacity:.5;background:#f8fafc}
+
+/* Checkbox */
+.cb-wrap{display:flex;align-items:center;justify-content:center}
+.cb-wrap input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:#2563eb}
 
 /* Student info */
 .student-info{display:flex;align-items:center;gap:10px}
@@ -127,6 +137,14 @@ include '../includes/sidebar.php';
 .status-dot.dropped{background:#dc2626} .status-dot.archived{background:#94a3b8}
 
 .status-card .status-archived{background:#f1f5f9;color:#64748b}
+
+/* Quick status dropdown */
+.quick-status-wrap{position:relative;display:inline-block}
+.quick-status-menu{display:none;position:absolute;top:100%;left:0;z-index:50;background:white;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.1);min-width:150px;padding:4px;margin-top:4px}
+.quick-status-menu.show{display:block}
+.quick-status-menu button{display:block;width:100%;padding:8px 12px;border:none;background:none;font-size:12px;font-weight:600;text-align:left;cursor:pointer;border-radius:6px;font-family:inherit}
+.quick-status-menu button:hover{background:#f1f5f9}
+.quick-status-menu button.active{background:#eef4ff;color:#2563eb}
 
 /* Action buttons */
 .action-group{display:flex;gap:3px;justify-content:center}
@@ -240,8 +258,18 @@ select.form-control{cursor:pointer;appearance:auto;-webkit-appearance:auto;}
 .course-select-list .cs-option.active{ background:#eef4ff; color:#2563eb; font-weight:600; }
 .modal-overlay select.form-control,
 .modal-overlay select { cursor:pointer !important; appearance:auto !important; -webkit-appearance:auto !important; }
+/* bulk bar select inside page (not modal) — force native */
+.bulk-bar select.form-control { appearance:auto !important; -webkit-appearance:auto !important; cursor:pointer !important; }
+
 /* Delete icon */
 .delete-icon{width:60px;height:60px;border-radius:50%;background:#fee2e2;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:26px;color:#dc2626}
+
+/* Export dropdown */
+.export-wrap{position:relative}
+.export-menu{display:none;position:absolute;top:100%;right:0;z-index:50;background:white;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.1);min-width:160px;padding:4px;margin-top:4px}
+.export-menu.show{display:block}
+.export-menu a{display:block;padding:8px 12px;font-size:12px;font-weight:600;color:#1e293b;text-decoration:none;border-radius:6px}
+.export-menu a:hover{background:#f1f5f9}
 
 /* Responsive */
 @media(max-width:992px){.dashboard-main{padding:20px}.dashboard-stats{grid-template-columns:repeat(2,1fr)}}
@@ -279,17 +307,26 @@ select.form-control{cursor:pointer;appearance:auto;-webkit-appearance:auto;}
 <header class="header">
 <div class="title"><h1>Students</h1><p>Manage all student records</p></div>
 <div class="header-actions">
+<div class="export-wrap">
+<button class="btn btn-secondary" id="exportBtn"><i class="fas fa-download"></i> Export</button>
+<div class="export-menu" id="exportMenu">
+<a href="#" onclick="exportCSV()"><i class="fas fa-file-csv"></i> Export CSV</a>
+<a href="#" onclick="exportFiltered()"><i class="fas fa-filter-circle-dollar"></i> Export Filtered</a>
+</div>
+</div>
+<button class="btn btn-secondary" onclick="openQualityPanel()"><i class="fas fa-shield-halved"></i> Data Quality</button>
 <button class="btn btn-primary" onclick="openReceiveModal()"><i class="fas fa-inbox"></i> Receive Student</button>
+<button class="btn btn-secondary" title="Manually add a student record" onclick="openAddModal()"><i class="fas fa-user-plus"></i></button>
 </div>
 </header>
 
 <!-- Stats -->
 <div class="dashboard-stats">
 <div class="stat-card"><div class="stat-top"><div class="stat-icon blue"><i class="fas fa-users"></i></div></div><div class="stat-number"><?= $totalStudents ?></div><div class="stat-label">Total Students</div></div>
-<div class="stat-card"><div class="stat-top"><div class="stat-icon green"><i class="fas fa-seedling"></i></div></div><div class="stat-number"><?= $yearLevelCounts[1] ?></div><div class="stat-label">Freshmen</div></div>
-<div class="stat-card"><div class="stat-top"><div class="stat-icon yellow"><i class="fas fa-book"></i></div></div><div class="stat-number"><?= $yearLevelCounts[2] ?></div><div class="stat-label">Sophomore</div></div>
-<div class="stat-card"><div class="stat-top"><div class="stat-icon purple"><i class="fas fa-user-graduate"></i></div></div><div class="stat-number"><?= $yearLevelCounts[3] ?></div><div class="stat-label">Junior</div></div>
-<div class="stat-card"><div class="stat-top"><div class="stat-icon teal"><i class="fas fa-award"></i></div></div><div class="stat-number"><?= $yearLevelCounts[4] ?></div><div class="stat-label">Senior</div></div>
+<div class="stat-card"><div class="stat-top"><div class="stat-icon green"><i class="fas fa-1"></i></div></div><div class="stat-number"><?= $yearLevelCounts[1] ?></div><div class="stat-label">Year 1</div></div>
+<div class="stat-card"><div class="stat-top"><div class="stat-icon yellow"><i class="fas fa-2"></i></div></div><div class="stat-number"><?= $yearLevelCounts[2] ?></div><div class="stat-label">Year 2</div></div>
+<div class="stat-card"><div class="stat-top"><div class="stat-icon purple"><i class="fas fa-3"></i></div></div><div class="stat-number"><?= $yearLevelCounts[3] ?></div><div class="stat-label">Year 3</div></div>
+<div class="stat-card"><div class="stat-top"><div class="stat-icon teal"><i class="fas fa-4"></i></div></div><div class="stat-number"><?= $yearLevelCounts[4] ?></div><div class="stat-label">Year 4</div></div>
 </div>
 
 <!-- Search + Table -->
@@ -297,18 +334,30 @@ select.form-control{cursor:pointer;appearance:auto;-webkit-appearance:auto;}
 <div class="search-bar">
 <div class="search-wrapper">
 <i class="fas fa-search"></i>
-<input type="text" id="studentSearch" placeholder="Search by name, ID, program..." />
+<input type="text" id="studentSearch" placeholder="Search by name, ID, course..." />
 <button class="search-clear" id="searchClear"><i class="fas fa-times"></i></button>
 </div>
 <div class="search-actions">
+<button class="btn btn-secondary" onclick="printTable()"><i class="fas fa-print"></i> Print</button>
 <button class="btn btn-secondary" id="filterToggle"><i class="fas fa-sliders"></i> Filter</button>
 </div>
+</div>
+
+<!-- Bulk bar -->
+<div class="bulk-bar" id="bulkBar">
+<span class="count" id="bulkCount">0 selected</span>
+<select class="form-control" style="width:auto;display:inline-block;padding:6px 10px;font-size:12px;" id="bulkActionSelect"><option value="">Bulk action...</option><option value="active">Set Active</option><option value="at-risk">Set At Risk</option><option value="probation">Set Probation</option><option value="graduated">Set Graduated</option><option value="loa">Set LOA</option><option value="transferred">Set Transferred</option><option value="dropped">Set Dropped</option></select>
+<button class="btn btn-secondary" style="height:32px;padding:0 12px;font-size:12px;" onclick="applyBulkAction()"><i class="fas fa-check"></i> Apply</button>
 </div>
 
 <div class="table-responsive" id="studentTableWrap">
 <table id="studentTable">
 <thead>
-<tr><th>Student ID</th><th>Name</th><th>Program</th><th>Year</th><th>Section</th><th>RFID</th><th>Status</th><th style="text-align:center;">Actions</th></tr>
+<tr><th style="width:30px;"><div class="cb-wrap"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></div></th><th>#</th><th>Student ID</th><th>Name</th><th>Course</th><th>Year</th><th>Section</th><th>Gender</th><th>RFID</th><th>Status</th><th style="text-align:center;">Quality <span class="quality-legend" title=""><i class="fas fa-circle-info" style="cursor:help;"></i><span class="quality-legend-box">Quality score = % of required student fields filled.
+<span style="color:#22c55e;">●</span> 85–100% &nbsp; Complete
+<span style="color:#f59e0b;">●</span> 60–84% &nbsp; Some fields missing
+<span style="color:#ef4444;">●</span> &lt;60% &nbsp; Many fields missing
+<span style="color:#f59e0b;">⚠</span> Anomaly worth checking (hover the row)</span></span></th><th style="text-align:center;">Actions</th></tr>
 </thead>
 <tbody id="studentTableBody">
 <?php if (!empty($students)): ?>
@@ -319,16 +368,40 @@ $initials = strtoupper(substr($s['first_name'],0,1).substr($s['last_name'],0,1))
 $ac = $avatarColors[$i % count($avatarColors)];
 $hasRfid = isset($rfidMap[$s['id']]);
 $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' : ($hasRfid ? 'inactive' : 'none');
+// Data quality score + anomaly flags (deterministic)
+$qScore = studentQualityScore($s);
+$qAnoms = studentAnomalies($s);
+$qDotClass = $qScore >= 85 ? 'good' : ($qScore >= 60 ? 'warn' : 'bad');
 ?>
 <tr data-student='<?= htmlspecialchars(json_encode($s),ENT_QUOTES,'UTF-8') ?>' class="<?= $s['status']==='archived'?'archived':'' ?>">
+<td><div class="cb-wrap"><input type="checkbox" class="student-cb" value="<?= (int)$s['id'] ?>" onchange="updateBulkBar()"></div></td>
+<td class="student-id" style="font-weight:600;font-size:12px;color:#64748b;"><?= (int)$s['id'] ?></td>
 <td class="student-id" style="font-weight:600;font-size:12px;"><?= htmlspecialchars($s['student_number'] ?: '—') ?></td>
 <td><div class="student-info"><div class="student-avatar <?= $ac ?>"><?= $initials ?: '?' ?></div><div><div class="student-name"><?= htmlspecialchars($s['first_name']." ".$s['last_name']) ?></div><div class="student-email"><?= htmlspecialchars($s['email'] ?? '') ?></div></div></div></td>
 <td><?= htmlspecialchars($s['course'] ?? 'N/A') ?></td>
 <td><?= htmlspecialchars($s['year_level'] ?? 'N/A') ?></td>
 <td><?= htmlspecialchars($s['section'] ?? '—') ?></td>
+<td><?= htmlspecialchars(($s['gender'] ?? '') ?: '—') ?></td>
 <td><a href="../registrar/rfid-cards.php?search=<?= urlencode($s['student_number']) ?>" class="rfid-chip <?= $rfidStatus ?>"><i class="fas fa-<?= $rfidStatus==='active'?'check-circle':'credit-card' ?>"></i> <?= $rfidStatus==='active'?($rfidMap[$s['id']]['card_uid']):($rfidStatus==='none'?'—':$rfidMap[$s['id']]['status']) ?></a></td>
-<td><span class="status-badge <?= $s['status']??'active' ?>"><span class="status-dot <?= $s['status']??'active' ?>"></span><?= ucfirst($s['status']??'Active') ?></span></td>
-<td><div class="action-group"><button class="action-btn view" onclick="viewStudent(<?= (int)$s['id'] ?>)" title="View"><i class="fas fa-eye"></i></button><button class="action-btn edit" onclick="editStudent(<?= (int)$s['id'] ?>)" title="Edit"><i class="fas fa-pen"></i></button></div></td>
+<td><div class="quick-status-wrap"><button class="status-badge <?= $s['status']??'active' ?>" onclick="toggleQuickMenu(<?= (int)$s['id'] ?>)"><span class="status-dot <?= $s['status']??'active' ?>"></span><?= ucfirst($s['status']??'Active') ?></button><div class="quick-status-menu" id="qsm_<?= (int)$s['id'] ?>"><?php $statuses=['active','probation','at-risk','graduated','loa','transferred','dropped']; if($s['status']==='archived')$statuses[]='archived'; foreach($statuses as $st): ?><button onclick="quickStatus(<?= (int)$s['id'] ?>,'<?= $st ?>')" class="<?= ($s['status']??'active')===$st?'active':'' ?>"><?= ucfirst($st) ?></button><?php endforeach; ?></div></div></td>
+<td style="text-align:center;">
+<?php
+$qAnomLabels = array_map(function ($k) {
+    return [
+        'age_mismatch' => 'Age doesn\'t match year level',
+        'future_birthdate' => 'Birth date is in the future',
+        'no_address' => 'Missing address',
+        'no_contact' => 'Missing contact number',
+        'no_gender' => 'Missing gender',
+        'course_nonstandard' => 'Course name not standardized',
+    ][$k] ?? $k;
+}, $qAnoms);
+$qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; ', $qAnomLabels) : ' — all key fields filled');
+?>
+<span class="q-dot q-<?= $qDotClass ?>" title="<?= htmlspecialchars($qTitle) ?>" style="display:inline-block;width:10px;height:10px;border-radius:50%;<?= $qScore>=85?'background:#22c55e':($qScore>=60?'background:#f59e0b':'background:#ef4444') ?>;"></span>
+<?php if (!empty($qAnoms)): ?><i class="fas fa-exclamation-triangle" style="color:#f59e0b;margin-left:4px;font-size:11px;" title="<?= htmlspecialchars(implode('; ', $qAnomLabels)) ?>"></i><?php endif; ?>
+</td>
+<td><div class="action-group"><button class="action-btn view" onclick="viewStudent(<?= (int)$s['id'] ?>)" title="View"><i class="fas fa-eye"></i></button><button class="action-btn edit" onclick="editStudent(<?= (int)$s['id'] ?>)" title="Edit"><i class="fas fa-pen"></i></button><?php if ($s['status']==='archived'): ?><button class="action-btn restore" onclick="restoreStudent(<?= (int)$s['id'] ?>,'<?= htmlspecialchars($s['first_name']." ".$s['last_name'],ENT_QUOTES) ?>')" title="Restore"><i class="fas fa-undo"></i></button><?php endif; ?></div></td>
 </tr>
 <?php endforeach; endif; ?>
 </tbody>
@@ -354,7 +427,7 @@ $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' :
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
 <div class="form-group"><label>Status</label><select id="filterStatus" class="form-control"><option value="">All Status</option><option value="enrolled">Enrolled</option><option value="active">Active</option><option value="probation">Probation</option><option value="at-risk">At Risk</option><option value="graduated">Graduated</option><option value="loa">LOA</option><option value="transferred">Transferred</option><option value="dropped">Dropped</option><option value="archived">Archived</option></select></div>
 <div class="form-group"><label>Year Level</label><select id="filterYear" class="form-control"><option value="">All Year</option><option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option><option value="4">4th</option></select></div>
-<div class="form-group"><label>Program</label><select id="filterCourse" class="form-control"><option value="">All Programs</option><?php foreach($courses as $c): ?><option value="<?= htmlspecialchars($c['course']) ?>"><?= htmlspecialchars($c['course']) ?></option><?php endforeach; ?></select></div>
+<div class="form-group"><label>Course</label><select id="filterCourse" class="form-control"><option value="">All Courses</option><?php foreach($courses as $c): ?><option value="<?= htmlspecialchars($c['course']) ?>"><?= htmlspecialchars($c['course']) ?></option><?php endforeach; ?></select></div>
 <div class="form-group"><label>Section</label><input type="text" id="filterSection" class="form-control" placeholder="Enter section..." /></div>
 </div>
 </div>
@@ -384,46 +457,25 @@ $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' :
 <div id="vAiSummary" style="display:none;margin-top:12px;background:linear-gradient(135deg,#eef4ff,#f5f3ff);border:1px solid #dbeafe;border-radius:10px;padding:12px 14px;font-size:13px;color:#1e40af;"></div>
 </div>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid #f1f5f9">
-<div class="view-item"><div class="lbl">Date of Birth</div><div class="val" id="vBirthDate">—</div></div>
-<div class="view-item"><div class="lbl">Sex</div><div class="val" id="vGender">—</div></div>
+<div class="view-item"><div class="lbl">Status</div><div class="val" id="vStatus">—</div></div>
+<div class="view-item"><div class="lbl">LRN</div><div class="val" id="vLrn">—</div></div>
+<div class="view-item"><div class="lbl">Gender</div><div class="val" id="vGender">—</div></div>
 <div class="view-item"><div class="lbl">Civil Status</div><div class="val" id="vCivilStatus">—</div></div>
+<div class="view-item"><div class="lbl">Birth Date</div><div class="val" id="vBirthDate">—</div></div>
+<div class="view-item"><div class="lbl">Place of Birth</div><div class="val" id="vBirthPlace">—</div></div>
 <div class="view-item"><div class="lbl">Nationality</div><div class="val" id="vNationality">—</div></div>
 <div class="view-item"><div class="lbl">Religion</div><div class="val" id="vReligion">—</div></div>
-<div class="view-item"><div class="lbl">Place of Birth</div><div class="val" id="vBirthPlace">—</div></div>
-<div class="view-item"><div class="lbl">Email Address</div><div class="val" id="vEmail">—</div></div>
-<div class="view-item"><div class="lbl">Mobile Number</div><div class="val" id="vContact">—</div></div>
-<div class="view-item" style="grid-column:span 2;"><div class="lbl">Home Address</div><div class="val" id="vAddress">—</div></div>
+<div class="view-item"><div class="lbl">Course</div><div class="val" id="vCourse">—</div></div>
+<div class="view-item"><div class="lbl">Year / Section</div><div class="val" id="vYearSection">—</div></div>
+<div class="view-item"><div class="lbl">School Year / Sem</div><div class="val" id="vSchoolYearSem">—</div></div>
+<div class="view-item"><div class="lbl">Adviser</div><div class="val" id="vAdviser">—</div></div>
+<div class="view-item"><div class="lbl">Email</div><div class="val" id="vEmail">—</div></div>
+<div class="view-item"><div class="lbl">Contact</div><div class="val" id="vContact">—</div></div>
+<div class="view-item"><div class="lbl">Father</div><div class="val" id="vFather">—</div></div>
+<div class="view-item"><div class="lbl">Mother</div><div class="val" id="vMother">—</div></div>
+<div class="view-item" style="grid-column:span 2;"><div class="lbl">Address</div><div class="val" id="vAddress">—</div></div>
 </div>
-<hr style="border:none;border-top:1px solid #f1f5f9;margin:14px 0;">
-<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-school"></i> Previous School</div>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-<div class="view-item" style="grid-column:span 2;"><div class="lbl">Name of Previous School</div><div class="val" id="vPrevSchool">—</div></div>
-<div class="view-item"><div class="lbl">School Year Graduated</div><div class="val" id="vSYGraduated">—</div></div>
-<div class="view-item"><div class="lbl">Last Year Level Completed</div><div class="val" id="vLastYearCompleted">—</div></div>
-</div>
-<hr style="border:none;border-top:1px solid #f1f5f9;margin:14px 0;">
-<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-users"></i> Family Information</div>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-<div class="view-item"><div class="lbl">Father's Name</div><div class="val" id="vFather">—</div></div>
-<div class="view-item"><div class="lbl">Mother's Name</div><div class="val" id="vMother">—</div></div>
-</div>
-<hr style="border:none;border-top:1px solid #f1f5f9;margin:14px 0;">
-<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-user-shield"></i> Guardian Information</div>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-<div class="view-item"><div class="lbl">Guardian Name</div><div class="val" id="vGuardianName">—</div></div>
-<div class="view-item"><div class="lbl">Relationship</div><div class="val" id="vGuardianRel">—</div></div>
-<div class="view-item"><div class="lbl">Address</div><div class="val" id="vGuardianAddress">—</div></div>
-<div class="view-item"><div class="lbl">Contact Number</div><div class="val" id="vGuardianContact">—</div></div>
-<div class="view-item"><div class="lbl">Email Address</div><div class="val" id="vGuardianEmail">—</div></div>
-</div>
-<hr style="border:none;border-top:1px solid #f1f5f9;margin:14px 0;">
-<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-phone-flip"></i> Emergency Contact</div>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-<div class="view-item"><div class="lbl">Emergency Contact Person</div><div class="val" id="vEmergencyName">—</div></div>
-<div class="view-item"><div class="lbl">Relationship</div><div class="val" id="vEmergencyRel">—</div></div>
-<div class="view-item"><div class="lbl">Address</div><div class="val" id="vEmergencyAddress">—</div></div>
-<div class="view-item"><div class="lbl">Contact Number</div><div class="val" id="vEmergencyContact">—</div></div>
-</div>
+<div id="vGuardianSection" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid #f1f5f9;"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:6px;">Guardian</div><div id="vGuardianInfo" style="font-size:13px;color:#475569;"></div></div>
 <div id="vRfidSection" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid #f1f5f9;text-align:center;display:flex;gap:8px;justify-content:center;"><a id="vRfidLink" href="#" class="btn btn-secondary" style="padding:6px 14px;font-size:12px;"><i class="fas fa-credit-card"></i> RFID Card</a> <a id="vScanLink" href="#" class="btn btn-secondary" style="padding:6px 14px;font-size:12px;"><i class="fas fa-clock-rotate-left"></i> Scan Logs</a></div>
 </div>
 <!-- Tab: Documents -->
@@ -484,10 +536,6 @@ $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' :
 <div class="form-row"><div class="form-group" style="flex:1 1 220px;min-width:150px;"><label>Course <span style="color:#dc2626;">*</span></label><div class="course-select-wrap"><select id="addCourse" class="form-control" required><option value="">Select course</option><?php foreach ($offeredCourses as $cname => $majors): ?><option value="<?= htmlspecialchars($cname) ?>"><?= htmlspecialchars($cname) ?></option><?php endforeach; ?></select><div class="course-select-list" style="display:none;"></div></div></div><div class="form-group" style="flex:0 0 150px;"><label>Year Level</label><select id="addYearLevel" class="form-control"><option value="">Select</option><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option></select></div><div class="form-group" id="addMajorGroup" style="display:none;flex:1 1 200px;"><label>Major</label><select id="addMajor" class="form-control"><option value="">Select major</option></select></div></div>
 <div class="form-row"><div class="form-group"><label>School Year</label><input type="text" id="addSchoolYear" class="form-control" placeholder="2026-2027" value="2026-2027"></div><div class="form-group"><label>Semester</label><select id="addSemester" class="form-control"><option value="">—</option><option value="1st">1st Semester</option><option value="2nd">2nd Semester</option><option value="summer">Summer</option></select></div><div class="form-group"><label>Section <button type="button" style="background:none;border:none;color:#2563eb;cursor:pointer;font-size:11px;padding:0;" onclick="suggestSection()"><i class="fas fa-magic"></i> Suggest</button></label><input type="text" id="addSection" class="form-control" placeholder="e.g. 11001"></div></div>
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
-<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-school"></i> Previous School</div>
-<div class="form-row"><div class="form-group"><label>Name of Previous School</label><input type="text" id="addPrevSchool" class="form-control" placeholder="Enter previous school name"></div></div>
-<div class="form-row"><div class="form-group"><label>School Year Graduated</label><input type="text" id="addSYGraduated" class="form-control" placeholder="e.g. 2025-2026"></div><div class="form-group"><label>Last Year Level Completed</label><input type="text" id="addLastYearCompleted" class="form-control" placeholder="e.g. Grade 12"></div></div>
-<hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-users"></i> Guardian / Parent</div>
 <div class="form-row"><div class="form-group"><label>Full Name <span style="color:#dc2626;">*</span></label><input type="text" id="addGuardianName" class="form-control" required></div><div class="form-group"><label>Relationship</label><select id="addGuardianRel" class="form-control"><option value="father">Father</option><option value="mother">Mother</option><option value="guardian">Guardian</option></select></div></div>
 <div class="form-row"><div class="form-group"><label>Contact No. <span style="color:#dc2626;">*</span></label><input type="text" id="addGuardianContact" class="form-control" placeholder="09XXXXXXXXX" pattern="09[0-9]{9}" title="11-digit mobile number (e.g. 09171234567)"></div><div class="form-group"><label>Email (optional)</label><input type="email" id="addGuardianEmail" class="form-control"></div></div>
@@ -535,10 +583,6 @@ $rfidStatus = $hasRfid && $rfidMap[$s['id']]['status'] === 'active' ? 'active' :
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-book"></i> Enrollment Details</div>
 <div class="form-row"><div class="form-group" style="flex:1 1 220px;min-width:150px;"><label>Course</label><div class="course-select-wrap"><select id="editCourse" class="form-control"><option value="">Select course</option><?php foreach ($offeredCourses as $cname => $majors): ?><option value="<?= htmlspecialchars($cname) ?>"><?= htmlspecialchars($cname) ?></option><?php endforeach; ?></select><div class="course-select-list" style="display:none;"></div></div></div><div class="form-group" style="flex:0 0 150px;"><label>Year Level</label><select id="editYearLevel" class="form-control"><option value="">Select</option><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option></select></div><div class="form-group" id="editMajorGroup" style="display:none;flex:1 1 200px;"><label>Major</label><select id="editMajor" class="form-control"><option value="">Select major</option></select></div></div>
 <div class="form-row"><div class="form-group"><label>School Year</label><input type="text" id="editSchoolYear" class="form-control" placeholder="2026-2027"></div><div class="form-group"><label>Semester</label><select id="editSemester" class="form-control"><option value="">—</option><option value="1st">1st Semester</option><option value="2nd">2nd Semester</option><option value="summer">Summer</option></select></div></div>
-<hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
-<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-school"></i> Previous School</div>
-<div class="form-row"><div class="form-group"><label>Name of Previous School</label><input type="text" id="editPrevSchool" class="form-control" placeholder="Enter previous school name"></div></div>
-<div class="form-row"><div class="form-group"><label>School Year Graduated</label><input type="text" id="editSYGraduated" class="form-control" placeholder="e.g. 2025-2026"></div><div class="form-group"><label>Last Year Level Completed</label><input type="text" id="editLastYearCompleted" class="form-control" placeholder="e.g. Grade 12"></div></div>
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-users"></i> Guardian</div>
 <div class="form-row"><div class="form-group"><label>Full Name</label><input type="text" id="editGuardianName" class="form-control"></div><div class="form-group"><label>Relationship</label><select id="editGuardianRel" class="form-control"><option value="">Select</option><option value="father">Father</option><option value="mother">Mother</option><option value="guardian">Guardian</option></select></div></div>
@@ -595,6 +639,7 @@ function updateTable(students) {
         if (tblWrap) tblWrap.querySelector('table').style.display = '';
         if (emptyState) emptyState.style.display = 'none';
     }
+    updateBulkBar();
 }
 
 function performSearch() {
@@ -668,41 +713,27 @@ function viewStudent(id) {
         document.getElementById('vName').textContent = name;
         document.getElementById('vStudentId').textContent = s.student_number || 'ID not yet assigned';
         document.getElementById('vDbId').textContent = 'Record #' + s.id;
+        document.getElementById('vStatus').innerHTML = '<span class="status-badge '+(s.status||'active')+'"><span class="status-dot '+(s.status||'active')+'"></span>'+ucfirst(s.status||'Active')+'</span>';
+        document.getElementById('vLrn').textContent = s.lrn || '—';
         document.getElementById('vGender').textContent = s.gender || '—';
         document.getElementById('vCivilStatus').textContent = s.civil_status||'—';
         document.getElementById('vBirthDate').textContent = s.birth_date?new Date(s.birth_date).toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}):'—';
         document.getElementById('vBirthPlace').textContent = s.place_of_birth||'—';
         document.getElementById('vNationality').textContent = s.nationality||'—';
         document.getElementById('vReligion').textContent = s.religion||'—';
+        document.getElementById('vCourse').textContent = s.course||'—';
+        document.getElementById('vYearSection').textContent = (s.year_level?s.year_level+' Year':'')+(s.section?' — '+s.section:'');
+        document.getElementById('vSchoolYearSem').textContent = (s.school_year?s.school_year:'—')+(s.semester?' — '+s.semester:'');
+        document.getElementById('vAdviser').textContent = (s.adviser_id && ADVISER_MAP[s.adviser_id]) ? ADVISER_MAP[s.adviser_id] : '—';
         document.getElementById('vEmail').textContent = s.email||'—';
         document.getElementById('vContact').textContent = s.contact_number||'—';
-        document.getElementById('vAddress').textContent = s.address||'—';
-        // Previous school info
-        document.getElementById('vPrevSchool').textContent = s.previous_school||'—';
-        document.getElementById('vSYGraduated').textContent = s.school_year_graduated||'—';
-        document.getElementById('vLastYearCompleted').textContent = s.last_year_level_completed||'—';
-        // Family
         document.getElementById('vFather').textContent = s.father_name || '—';
         document.getElementById('vMother').textContent = s.mother_name || '—';
-        // Guardian + Emergency Contact
-        fetch('../api/students.php?action=guardians&student_id='+s.id).then(r=>r.json()).then(gd=>{
-            if(gd.success&&gd.data){
-                const primary = gd.data.find(g=>g.is_primary)||gd.data[0];
-                const emergency = gd.data.find(g=>g.is_emergency);
-                if(primary){
-                    document.getElementById('vGuardianName').textContent = primary.full_name||'—';
-                    document.getElementById('vGuardianRel').textContent = primary.relationship||'—';
-                    document.getElementById('vGuardianAddress').textContent = primary.address||'—';
-                    document.getElementById('vGuardianContact').textContent = primary.contact_number||'—';
-                    document.getElementById('vGuardianEmail').textContent = primary.email||'—';
-                }
-                if(emergency){
-                    document.getElementById('vEmergencyName').textContent = emergency.full_name||'—';
-                    document.getElementById('vEmergencyRel').textContent = emergency.relationship||'—';
-                    document.getElementById('vEmergencyAddress').textContent = emergency.address||'—';
-                    document.getElementById('vEmergencyContact').textContent = emergency.contact_number||'—';
-                }
-            }
+        document.getElementById('vAddress').textContent = s.address||'—';
+        // Guardian
+        fetch('../api/students.php?action=guardian&student_id='+s.id).then(r=>r.json()).then(gd=>{
+            const gs=document.getElementById('vGuardianSection'),gi=document.getElementById('vGuardianInfo');
+            if(gd.success&&gd.data){gs.style.display='block';gi.innerHTML=(gd.data.full_name||'')+(gd.data.relationship?' <span style=\"color:#94a3b8\">('+gd.data.relationship+')</span>':'')+'<br>'+(gd.data.contact_number?'<i class=\"fas fa-phone\" style=\"color:#94a3b8\"></i> '+gd.data.contact_number:'')+(gd.data.email?' <i class=\"fas fa-envelope\" style=\"color:#94a3b8\"></i> '+gd.data.email:'');}
         }).catch(()=>{});
         // Last scan
         fetch('../api/students.php?action=lastscan&student_id='+s.id).then(r=>r.json()).then(sd=>{
@@ -813,6 +844,14 @@ async function resendWelcomeEmail() {
 function closeViewModal() { viewModal.classList.remove('active'); document.body.style.overflow = ''; }
 viewModal.addEventListener('click', function(e) { if (e.target === this) closeViewModal(); });
 
+function printTable() {
+    const w = window.open(); w.document.write('<html><head><style>table{width:100%;border-collapse:collapse}th,td{padding:8px;border:1px solid #ddd;text-align:left;font-size:12px}th{background:#f4f4f4}</style></head><body><h2>Student List</h2><table><tr><th>ID</th><th>Name</th><th>Course</th><th>Year</th><th>Status</th></tr>');
+    allStudents.filter(s=>s.element&&s.element.style.display!=='none').forEach(s=>{
+        w.document.write('<tr><td>'+(s.student_number||'')+'</td><td>'+(s.first_name||'')+' '+(s.last_name||'')+'</td><td>'+(s.course||'')+'</td><td>'+(s.year_level||'')+'</td><td>'+(s.status||'')+'</td></tr>');
+    });
+    w.document.write('</table></body></html>'); w.document.close(); w.print();
+}
+
 // ─── EDIT MODAL (full fields) ───────────────────────────────
 function editStudent(id) {
     fetch('../api/students.php?id=' + id).then(r => r.json()).then(d => {
@@ -843,9 +882,6 @@ function editStudent(id) {
         document.getElementById('editEmail').value = s.email || '';
         document.getElementById('editContact').value = s.contact_number || '';
         document.getElementById('editAddress').value = s.address || '';
-        document.getElementById('editPrevSchool').value = s.previous_school || '';
-        document.getElementById('editSYGraduated').value = s.school_year_graduated || '';
-        document.getElementById('editLastYearCompleted').value = s.last_year_level_completed || '';
         // Load guardian
         document.getElementById('editGuardianName').value = '';
         document.getElementById('editGuardianRel').value = '';
@@ -898,9 +934,6 @@ document.getElementById('editForm').addEventListener('submit', async function(e)
                 email: document.getElementById('editEmail').value,
                 contact_number: document.getElementById('editContact').value,
                 address: document.getElementById('editAddress').value,
-                previous_school: document.getElementById('editPrevSchool').value,
-                school_year_graduated: document.getElementById('editSYGraduated').value,
-                last_year_level_completed: document.getElementById('editLastYearCompleted').value,
                 guardian_name: document.getElementById('editGuardianName').value,
                 guardian_relationship: document.getElementById('editGuardianRel').value,
                 guardian_contact: document.getElementById('editGuardianContact').value,
@@ -1051,9 +1084,6 @@ document.getElementById('addForm').addEventListener('submit', async function(e) 
                 email: document.getElementById('addEmail').value,
                 contact_number: document.getElementById('addContact').value,
                 address: document.getElementById('addAddress').value,
-                previous_school: document.getElementById('addPrevSchool').value,
-                school_year_graduated: document.getElementById('addSYGraduated').value,
-                last_year_level_completed: document.getElementById('addLastYearCompleted').value,
                 guardian_name: document.getElementById('addGuardianName').value,
                 guardian_relationship: document.getElementById('addGuardianRel').value,
                 guardian_contact: document.getElementById('addGuardianContact').value,
@@ -1173,7 +1203,7 @@ async function extractPaste() {
         }
         if (!d.success) { showToast(d.message || 'Extraction failed.', 'error'); return; }
         pasteData = d.data || {};
-        const keys = ['first_name','middle_name','last_name','gender','birth_date','place_of_birth','nationality','religion','email','contact_number','address','course','year_level','guardian_name','guardian_relationship','previous_school','school_year_graduated','last_year_level_completed'];
+        const keys = ['first_name','middle_name','last_name','gender','birth_date','place_of_birth','nationality','religion','email','contact_number','address','course','year_level','guardian_name','guardian_relationship'];
         let html = '<div style="font-size:12px;font-weight:700;color:#1e40af;margin-bottom:8px;">Extracted — review before applying</div>';
         let found = 0;
         keys.forEach(k => {
@@ -1195,8 +1225,7 @@ function applyPaste() {
         gender: 'addGender', birth_date: 'addBirthDate', place_of_birth: 'addBirthPlace',
         nationality: 'addNationality', religion: 'addReligion', email: 'addEmail',
         contact_number: 'addContact', address: 'addAddress', course: 'addCourse',
-        year_level: 'addYearLevel', guardian_name: 'addGuardianName', guardian_relationship: 'addGuardianRel',
-        previous_school: 'addPrevSchool', school_year_graduated: 'addSYGraduated', last_year_level_completed: 'addLastYearCompleted'
+        year_level: 'addYearLevel', guardian_name: 'addGuardianName', guardian_relationship: 'addGuardianRel'
     };
     for (const k in map) {
         const el = document.getElementById(map[k]);
@@ -1289,22 +1318,11 @@ function quickStatus(id, status) {
     .then(r => r.json()).then(d => { if (d.success) window.location.reload(); else showToast(d.message || 'Failed.', 'error'); }).catch(() => showToast('Error.', 'error'));
 }
 
-
 // ─── RESTORE ─────────────────────────────────────────────────
 function restoreStudent(id, name) {
     if (!confirm('Restore ' + name + '?')) return;
     fetch('../api/students.php?id=' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'active' }) })
     .then(r => r.json()).then(d => { if (d.success) window.location.reload(); else showToast(d.message || 'Failed.', 'error'); }).catch(() => showToast('Error.', 'error'));
-}
-
-// ─── TOAST ───────────────────────────────────────────────────
-function ensureToastContainer() { let c = document.querySelector('.toast-container'); if (!c) { c = document.createElement('div'); c.className = 'toast-container'; document.body.appendChild(c); } return c; }
-function showToast(message, type) {
-    const c = ensureToastContainer(); const t = document.createElement('div'); t.className = 'toast ' + (type||'info');
-    t.innerHTML = '<i class="fas ' + (type==='success'?'fa-circle-check':type==='error'?'fa-circle-xmark':type==='warning'?'fa-triangle-exclamation':'fa-circle-info') + ' toast-icon"></i><div class="toast-content"><div class="toast-message"></div></div><button class="toast-close" aria-label="Close"><i class="fas fa-times"></i></button>';
-    t.querySelector('.toast-message').textContent = message;
-    t.querySelector('.toast-close').addEventListener('click', () => { t.classList.add('hiding'); setTimeout(() => t.remove(), 300); });
-    c.appendChild(t); setTimeout(() => { t.classList.add('hiding'); setTimeout(() => t.remove(), 300); }, 4000);
 }
 
 // ─── EXPORT ─────────────────────────────────────────────────
@@ -1396,10 +1414,9 @@ async function loadEnrollments() {
             html += '<td style="text-align:center;"><div class="action-group" style="justify-content:center;flex-wrap:wrap;gap:4px;">';
             html += '<button class="btn btn-secondary" style="height:30px;padding:0 12px;font-size:11px;" onclick="checkDuplicate(' + e.id + ')"><i class="fas fa-clone"></i> Duplicate Check</button>';
             if (e.status === 'pending') {
-                html += '<button class="btn btn-primary" style="height:30px;padding:0 14px;font-size:11px;display:none;" id="acceptBtn_' + e.id + '" onclick="acceptEnrollment(' + e.id + ')"><i class="fas fa-check"></i> Accept</button>';
+                html += '<button class="btn btn-primary" style="height:30px;padding:0 14px;font-size:11px;" onclick="acceptEnrollment(' + e.id + ')"><i class="fas fa-check"></i> Accept</button>';
                 html += '<button class="btn btn-secondary" style="height:30px;padding:0 12px;font-size:11px;display:none;" id="reEnrollBtn_' + e.id + '" onclick="reenrollEnrollment(' + e.id + ')"><i class="fas fa-rotate"></i> Re-enroll</button>';
                 html += '<button class="btn btn-secondary" style="height:30px;padding:0 12px;font-size:11px;display:none;" id="viewDupBtn_' + e.id + '" onclick="viewDuplicate(' + e.id + ')"><i class="fas fa-eye"></i> View Existing</button>';
-                html += '<div id="dupStatus_' + e.id + '" style="width:100%;margin-top:4px;font-size:11px;color:#94a3b8;"><i class="fas fa-circle-info"></i> Not checked yet</div>';
             }
             html += '</div></td></tr>';
         });
@@ -1422,20 +1439,18 @@ async function checkDuplicate(id) {
         dupState[id] = d;
         const reBtn = document.getElementById('reEnrollBtn_' + id);
         const viewBtn = document.getElementById('viewDupBtn_' + id);
-        const acceptBtn = document.getElementById('acceptBtn_' + id);
-        const statusEl = document.getElementById('dupStatus_' + id);
+        // Reveal the accept path when no duplicate exists
+        const acceptBtn = Array.from(document.querySelectorAll('#receiveModal button')).find(b => b.getAttribute('onclick') === 'acceptEnrollment(' + id + ')');
         if (d.exists) {
             showToast('Student already exists.', 'info');
             if (reBtn) reBtn.style.display = 'inline-flex';
             if (viewBtn) viewBtn.style.display = 'inline-flex';
             if (acceptBtn) acceptBtn.style.display = 'none';
-            if (statusEl) statusEl.innerHTML = '<i class="fas fa-exclamation-triangle" style="color:#f59e0b;"></i> <span style="color:#f59e0b;font-weight:600;">Duplicate found</span> — returning student';
         } else {
             showToast('No existing record.', 'success');
             if (reBtn) reBtn.style.display = 'none';
             if (viewBtn) viewBtn.style.display = 'none';
             if (acceptBtn) acceptBtn.style.display = 'inline-flex';
-            if (statusEl) statusEl.innerHTML = '<i class="fas fa-check-circle" style="color:#10b981;"></i> <span style="color:#10b981;font-weight:600;">No duplicate</span> — new student';
         }
     } catch (err) {
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-clone"></i> Duplicate Check'; }

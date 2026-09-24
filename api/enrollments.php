@@ -240,9 +240,9 @@ try {
             'school_year'     => $enc['school_year'] ?? '',
             'semester'        => $enc['semester'] ?? '',
             'section'         => $enc['section'] ?? '',
-            'previous_school'           => $enc['prev_school_name'] ?? '',
-            'last_year_level_completed' => $enc['prev_school_last_year'] ?? '',
-            'school_year_graduated'     => $enc['prev_school_graduated_sy'] ?? '',
+            'prev_school_name'          => $enc['prev_school_name'] ?? '',
+            'prev_school_last_year'     => $enc['prev_school_last_year'] ?? '',
+            'prev_school_graduated_sy'  => $enc['prev_school_graduated_sy'] ?? '',
             'emergency_name'            => $enc['emergency_name'] ?? '',
             'emergency_relationship'    => $enc['emergency_relationship'] ?? '',
             'emergency_contact'         => $enc['emergency_contact'] ?? '',
@@ -251,7 +251,7 @@ try {
 
         // Data-quality pass: trim text, fix enum-bound fields and reject
         // impossible dates so bad source data can't fail the insert silently.
-        foreach (['first_name', 'middle_name', 'last_name', 'name_suffix', 'place_of_birth', 'nationality', 'religion', 'father_name', 'mother_name', 'email', 'address', 'contact_number', 'course', 'major', 'school_year', 'semester', 'section', 'previous_school', 'last_year_level_completed', 'school_year_graduated', 'emergency_name', 'emergency_relationship', 'emergency_contact'] as $f) {
+        foreach (['first_name', 'middle_name', 'last_name', 'name_suffix', 'place_of_birth', 'nationality', 'religion', 'father_name', 'mother_name', 'email', 'address', 'contact_number', 'course', 'major', 'school_year', 'semester', 'section', 'prev_school_name', 'prev_school_last_year', 'prev_school_graduated_sy', 'emergency_name', 'emergency_relationship', 'emergency_contact'] as $f) {
             $payload[$f] = trim((string) $payload[$f]);
         }
         $payload['emergency_contact'] = normalizePhone((string) $payload['emergency_contact']);
