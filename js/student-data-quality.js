@@ -91,7 +91,7 @@ function renderQualityDetail() {
     const repairCards = repairs.map(repair => `<label class="quality-issue low" style="display:block;cursor:pointer"><div class="quality-issue-top"><strong>Apply safe correction</strong><span>${esc(repair.field)}</span></div><p>${esc(repair.reason || 'Verified formatting correction.')}</p><div class="quality-value-grid"><div class="quality-value"><label>Current</label><span>${esc(repair.current_value)}</span></div><div class="quality-value suggested"><label>Correction</label><span>${esc(repair.suggested_value)}</span></div></div><input type="checkbox" data-quality-repair="${esc(repair.field)}" style="margin-top:10px"></label>`).join('');
     detail.innerHTML = `<div class="quality-detail-inner">
         <div class="quality-person"><div><h2>${esc(s.name || 'Unnamed student')}</h2><p><span class="mono">${esc(s.student_number || 'No student #')}</span> · ${esc(s.course || 'No course')} · ${s.year_level ? `Year ${esc(s.year_level)}` : 'Year not set'}</p></div><div class="quality-score"><strong>${Number(report.score || 0)}</strong><span>Quality score</span></div></div>
-        <div class="quality-ai"><div class="quality-ai-head"><strong><i class="fas fa-wand-magic-sparkles"></i> AI quality explanation</strong><span id="qualityAiSource">Loading…</span></div><p id="qualityAiText">Analyzing the detected record issues…</p><div class="quality-ai-actions"><button class="btn btn-secondary" style="padding:6px 10px;font-size:11px" onclick="runQualityAiSummary()"><i class="fas fa-sparkles"></i> Explain this record</button></div></div>
+        <div class="quality-ai"><div class="quality-ai-head"><strong><i class="fas fa-wand-magic-sparkles"></i> AI quality explanation</strong><span id="qualityAiSource">Not generated</span></div><p id="qualityAiText">Select “Explain this record” for an AI-assisted overview.</p><div class="quality-ai-actions"><button class="btn btn-secondary" id="qualityAiBtn" style="padding:6px 10px;font-size:11px" onclick="runQualityAiSummary()"><i class="fas fa-sparkles"></i> Explain this record</button></div></div>
         <div class="quality-section-title">Detected issues · ${(report.issues || []).length}</div>${issues || '<div class="quality-empty">No issues detected.</div>'}
         ${duplicates ? `<div class="quality-section-title">Duplicate review</div>${duplicates}` : ''}
         ${repairCards ? `<div class="quality-section-title">Verified safe corrections</div>${repairCards}` : ''}
@@ -108,8 +108,10 @@ async function runQualityAiSummary() {
     if (!qualitySelectedId) return;
     const text = document.getElementById('qualityAiText');
     const source = document.getElementById('qualityAiSource');
-    if (text) text.textContent = 'Analyzing the detected record issues…';
+    const button = document.getElementById('qualityAiBtn');
+    if (text) text.textContent = 'Generating a concise explanation of the detected issues…';
     if (source) source.textContent = 'Loading…';
+    if (button) { button.disabled = true; button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Explaining…'; }
     try {
         const response = await aiToolsPost('quality_summary', { student_id: Number(qualitySelectedId) });
         if (!response.success) throw new Error(response.message || 'AI summary unavailable.');
@@ -119,6 +121,8 @@ async function runQualityAiSummary() {
         const report = ((qualityData && qualityData.students) || []).find(item => Number(item.student_id) === Number(qualitySelectedId));
         if (text) text.textContent = report?.summary || 'AI summary is unavailable. Review the detected issues below.';
         if (source) source.textContent = 'Rule-based fallback';
+    } finally {
+        if (button) { button.disabled = false; button.innerHTML = '<i class="fas fa-sparkles"></i> Explain this record'; }
     }
 }
 
