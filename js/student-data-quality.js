@@ -94,14 +94,18 @@ function renderQualityDetail() {
         <div class="quality-ai"><div class="quality-ai-head"><strong><i class="fas fa-wand-magic-sparkles"></i> AI quality explanation</strong><span id="qualityAiSource">Not generated</span></div><p id="qualityAiText">Select “Explain this record” for an AI-assisted overview.</p><div class="quality-ai-actions"><button class="btn btn-secondary" id="qualityAiBtn" style="padding:6px 10px;font-size:11px" onclick="runQualityAiSummary()"><i class="fas fa-sparkles"></i> Explain this record</button></div></div>
         <div class="quality-section-title">Detected issues · ${(report.issues || []).length}</div>${issues || '<div class="quality-empty">No issues detected.</div>'}
         ${duplicates ? `<div class="quality-section-title">Duplicate review</div>${duplicates}` : ''}
-        ${repairCards ? `<div class="quality-section-title">Verified safe corrections</div>${repairCards}` : ''}
+        ${repairCards ? `<div class="quality-section-title">Verified safe corrections</div>${repairCards}<p id="qualityRepairHint" style="font-size:11px;color:#64748b;margin:8px 0 0"><i class="fas fa-circle-info"></i> Select one or more corrections to enable Apply selected.</p>` : ''}
         </div>`;
     const text = document.getElementById('qualityAiText');
     if (text) text.textContent = report.summary || 'Select “Explain this record” for an AI-assisted overview.';
     const openButton = document.getElementById('qualityOpenStudentBtn');
     const applyButton = document.getElementById('qualityApplyBtn');
     if (openButton) openButton.disabled = !s.id;
-    if (applyButton) applyButton.disabled = !repairs.length;
+    if (applyButton) {
+        applyButton.disabled = true;
+        applyButton.innerHTML = '<i class="fas fa-check"></i> Apply selected';
+    }
+    updateQualityApplyButton();
 }
 
 async function runQualityAiSummary() {
@@ -123,6 +127,23 @@ async function runQualityAiSummary() {
         if (source) source.textContent = 'Rule-based fallback';
     } finally {
         if (button) { button.disabled = false; button.innerHTML = '<i class="fas fa-sparkles"></i> Explain this record'; }
+    }
+}
+
+function updateQualityApplyButton() {
+    const button = document.getElementById('qualityApplyBtn');
+    const selected = document.querySelectorAll('[data-quality-repair]:checked').length;
+    const hint = document.getElementById('qualityRepairHint');
+    if (button) {
+        button.disabled = selected === 0;
+        button.innerHTML = selected > 0
+            ? `<i class="fas fa-check"></i> Apply ${selected} selected`
+            : '<i class="fas fa-check"></i> Apply selected';
+    }
+    if (hint) {
+        hint.innerHTML = selected > 0
+            ? `<i class="fas fa-check-circle" style="color:#15803d"></i> ${selected} correction${selected === 1 ? '' : 's'} selected.`
+            : '<i class="fas fa-circle-info"></i> Select one or more corrections to enable Apply selected.';
     }
 }
 
@@ -168,6 +189,9 @@ function initStudentDataQuality() {
         qualitySelectedId = Number(row.dataset.qualityId);
         renderQualityQueue();
         renderQualityDetail();
+    });
+    document.getElementById('qualityDetail')?.addEventListener('change', event => {
+        if (event.target.matches('[data-quality-repair]')) updateQualityApplyButton();
     });
     document.getElementById('qualityFilters')?.addEventListener('click', event => {
         const button = event.target.closest('[data-filter]');
