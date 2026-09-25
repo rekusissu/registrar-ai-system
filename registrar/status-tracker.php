@@ -115,15 +115,17 @@ include '../includes/sidebar.php';
 
 
 <!-- AI Command Bar -->
-<div class="st-ai-bar">
-  <div class="st-ai-bar-label"><i class="fas fa-robot"></i> AI Tools</div>
+<section class="st-ai-section" aria-labelledby="stAiToolsTitle">
+  <div class="st-ai-bar">
+    <div class="st-ai-bar-label"><span class="st-ai-mark"><i class="fas fa-robot"></i></span><span><strong id="stAiToolsTitle">AI workspace</strong><small>Run a focused status review</small></span></div>
   <button class="st-ai-btn" onclick="runAI('report')" id="btnAIReport"><i class="fas fa-file-lines"></i> AI Report</button>
   <button class="st-ai-btn" onclick="runAI('anomalies')" id="btnAIAnomalies"><i class="fas fa-magnifying-glass-chart"></i> Scan Anomalies</button>
   <button class="st-ai-btn" onclick="runAI('risks')" id="btnAIRisks"><i class="fas fa-shield-halved"></i> Risk Assessment</button>
   <button class="st-ai-btn" onclick="runAI('recommendations')" id="btnAIRecs"><i class="fas fa-lightbulb"></i> Recommendations</button>
   <div class="st-ai-sep"></div>
-  <button class="st-ai-btn st-ai-run-all" onclick="runAI('all')" id="btnAIAll"><i class="fas fa-bolt"></i> Run All</button>
-</div>
+  <button class="st-ai-btn st-ai-run-all" onclick="runAI('all')" id="btnAIAll"><i class="fas fa-bolt"></i> Run all</button>
+  </div>
+</section>
 
 <!-- AI Output Panel -->
 <div class="st-ai-output" id="aiOutput">
@@ -135,11 +137,11 @@ include '../includes/sidebar.php';
 </div>
 
 <!-- Status Distribution -->
-<div class="st-dist">
-  <div class="st-dist-title">Status Distribution</div>
+<section class="st-dist" aria-labelledby="statusDistributionTitle">
+  <div class="st-panel-heading"><div><h2 id="statusDistributionTitle">Status distribution</h2><p>Current student status mix</p></div><span class="st-panel-chip"><i class="fas fa-chart-pie"></i> Live</span></div>
   <div class="st-dist-bar" id="distBar"></div>
   <div class="st-dist-legend" id="distLegend"></div>
-</div>
+</section>
 
 <!-- Filters -->
 <div class="st-filters">
@@ -156,6 +158,7 @@ include '../includes/sidebar.php';
 <!-- Two Panel Layout -->
 <div class="st-panels">
   <!-- Student Table -->
+  <div class="st-panel-heading"><div><h2>Student directory</h2><p>Select a student to review status history</p></div><span class="st-panel-chip"><i class="fas fa-users"></i> <?= number_format(count($students)) ?> shown</span></div>
   <div class="st-table-wrap">
     <table>
       <thead>
@@ -220,7 +223,7 @@ include '../includes/sidebar.php';
 
   <!-- Activity Timeline -->
   <div class="st-tl">
-    <div class="st-tl-h"><i class="fas fa-clock-rotate-left"></i> Recent Activity</div>
+    <div class="st-panel-heading"><div><h2>Recent activity</h2><p>Latest status changes across students</p></div><span class="st-panel-chip"><i class="fas fa-clock-rotate-left"></i> Timeline</span></div>
     <?php if (empty($activityFeed)): ?>
       <div class="st-empty"><i class="fas fa-inbox"></i>No activity yet</div>
     <?php else: ?>
