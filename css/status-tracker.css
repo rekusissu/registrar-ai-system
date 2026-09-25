@@ -189,7 +189,7 @@
     .st-search input,.st-search input:focus { width:100% }
     .st-ai-bar { flex-direction:column; align-items:stretch }
     .st-ai-sep { width:100%; height:1px }
-    .st-ai-btn { justify-content:center }
+    .st-ai-btn { justify-content:center } }
 
 /* Registrar blue clinical layout layer */
 body[data-page="status-tracker"]{background:#f5f7fb;color:#0f172a}
