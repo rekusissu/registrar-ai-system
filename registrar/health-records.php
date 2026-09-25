@@ -126,8 +126,15 @@ include '../includes/sidebar.php';
             .then(function(res){ return res.json(); })
             .then(function(d){
                 if(!d.success) throw new Error(d.message || 'Review unavailable.');
+                var latest = d.data.latest_visit || {};
                 var flags = (d.data.information_flags || []).map(function(flag){ return '<li>' + esc(flag) + '</li>'; }).join('');
-                box.innerHTML = '<div style="font-size:12px;line-height:1.55;color:#334155">' + esc(d.data.summary) + '</div>' + (flags ? '<ul style="font-size:11px;color:#64748b;margin:8px 0 0;padding-left:18px">' + flags + '</ul>' : '') + '<div style="font-size:10px;color:#94a3b8;margin-top:8px">' + esc(d.data.disclaimer) + '</div>';
+                var latestReason = esc(latest.reason_for_visit || 'Not recorded');
+                var latestAssessment = esc(latest.assessment || 'Not recorded');
+                var latestAction = esc(latest.action_taken || 'Not recorded');
+                box.innerHTML = '<div class="hr-review-summary"><span>Record overview</span><strong>' + esc(d.data.summary) + '</strong></div>'
+                    + '<div class="hr-review-latest"><div class="hr-review-section-head"><i class="fas fa-clock-rotate-left"></i><strong>Latest visit</strong><small>' + esc(fmt(latest.date_time || latest.visit_date)) + '</small></div><div class="hr-review-facts"><div><span>Reason</span><strong>' + latestReason + '</strong></div><div><span>Assessment</span><strong>' + latestAssessment + '</strong></div><div><span>Action</span><strong>' + latestAction + '</strong></div></div></div>'
+                    + (flags ? '<div class="hr-review-notes"><div class="hr-review-section-head"><i class="fas fa-circle-info"></i><strong>Documentation notes</strong></div><ul>' + flags + '</ul></div>' : '')
+                    + '<div class="hr-review-disclaimer"><i class="fas fa-shield-halved"></i><span>' + esc(d.data.disclaimer) + '</span></div>';
             })
             .catch(function(err){ box.innerHTML = '<div style="font-size:12px;color:#b45309">' + esc(err.message || 'Review unavailable.') + ' Confirm details with the Clinic Portal.</div>'; })
             .finally(function(){ if(button) button.disabled = false; });
