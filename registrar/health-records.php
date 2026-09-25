@@ -83,12 +83,12 @@ include '../includes/sidebar.php';
 
 <!-- Record View Modal -->
 <div class="modal-overlay health-record-modal" id="hrViewModal"><div class="modal-content health-record-modal-content">
-    <div class="modal-header">
-        <h3><i class="fas fa-file-medical health-modal-icon"></i> Health record</h3>
-        <button class="modal-close" onclick="closeHrView()"><i class="fas fa-times"></i></button>
+    <div class="modal-header health-record-modal-header">
+        <div><div class="health-modal-kicker"><i class="fas fa-file-medical"></i> Clinic record</div><h3>Health record</h3></div>
+        <button class="modal-close" onclick="closeHrView()" aria-label="Close health record"><i class="fas fa-times"></i></button>
     </div>
     <div class="modal-body">
-        <div id="hrViewBody" style="font-size:13px;color:#1e293b;"></div>
+        <div id="hrViewBody"></div>
     </div>
     <div class="modal-footer">
         <button class="btn btn-secondary" onclick="closeHrView()">Close</button>
@@ -165,11 +165,21 @@ include '../includes/sidebar.php';
         if(r.recorded_by_name) rows.push(['Recorded By', r.recorded_by_name]);
         rows.push(['Status', '<span class="pill ' + tpe + '">' + esc(r.record_status) + '</span>']);
 
-        el('hrViewBody').innerHTML = '<div id="hrAiReviewPanel" style="padding:12px 14px;margin-bottom:12px;background:#f5f8ff;border:1px solid #c7d7fe;border-left:4px solid #2563eb;border-radius:9px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><strong style="font-size:12px;color:#1e40af"><i class="fas fa-sparkles"></i> AI record review</strong><button type="button" class="btn btn-light" id="hrAiReviewBtn" style="padding:4px 9px;font-size:11px" onclick="runHealthRecordReview()">Review</button></div><div id="hrAiReview" style="font-size:12px;line-height:1.5;color:#64748b;margin-top:8px">Summarizes existing clinic records only. It does not diagnose or edit records.</div></div>' + rows.map(function(pair){
-            return '<div style="display:flex;justify-content:space-between;gap:16px;padding:9px 0;border-bottom:1px solid #f1f5f9;">'
-                + '<span style="color:#64748b;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;">' + pair[0] + '</span>'
-                + '<span style="font-weight:600;text-align:right;word-break:break-word;">' + pair[1] + '</span></div>';
-        }).join('');
+        var attention = healthAttention(r);
+        var studentName = esc(r.student_name || 'Unknown student');
+        var studentId = esc(r.student_number || 'Not available');
+        var program = esc(r.course || 'Not recorded');
+        var section = esc(r.section || 'Not recorded');
+        var visitDate = fmt(r.date_time);
+        var reason = esc(r.reason_for_visit || 'Not recorded');
+        var assessment = esc(r.assessment || 'Not recorded');
+        var action = esc(r.action_taken || 'Not recorded');
+        var recordedBy = esc(r.recorded_by_name || 'Not recorded');
+        var status = esc(r.record_status || 'Pending');
+        el('hrViewBody').innerHTML = '<div class="hr-summary"><div class="hr-summary-avatar"><i class="fas fa-user-graduate"></i></div><div class="hr-summary-copy"><span>Student record</span><strong>' + studentName + '</strong><small>' + studentId + ' · ' + program + ' · ' + section + '</small></div><div class="hr-summary-status"><span class="pill ' + tpe + '">' + status + '</span><small>' + visitDate + '</small></div></div>'
+            + '<div class="hr-ai-panel" id="hrAiReviewPanel"><div class="hr-ai-heading"><div><span class="hr-ai-icon"><i class="fas fa-sparkles"></i></span><strong>AI record review</strong></div><button type="button" class="btn btn-light" id="hrAiReviewBtn" onclick="runHealthRecordReview()">Review</button></div><div id="hrAiReview" class="hr-ai-copy">Summarizes existing clinic records only. It does not diagnose or edit records.</div></div>'
+            + '<div class="hr-detail-grid"><div class="hr-detail"><span>Reason for visit</span><strong>' + reason + '</strong></div><div class="hr-detail"><span>Assessment</span><strong>' + assessment + '</strong></div><div class="hr-detail"><span>Action taken</span><strong>' + action + '</strong></div><div class="hr-detail"><span>Vitals</span><strong>' + (vitals.length ? vitals.join(' / ') : 'Not recorded') + '</strong></div></div>'
+            + '<div class="hr-record-meta"><div><span>Recorded by</span><strong>' + recordedBy + '</strong></div><div><span>Review status</span><strong>' + (attention || 'Complete record') + '</strong></div></div>';
         el('hrViewModal').classList.add('active');
         document.body.style.overflow = 'hidden';
     };
