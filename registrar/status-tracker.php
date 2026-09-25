@@ -144,16 +144,28 @@ include '../includes/sidebar.php';
 </section>
 
 <!-- Filters -->
-<div class="st-filters">
-  <a href="?" class="st-pill <?= $filterStatus === '' ? 'active' : '' ?>">All</a>
-  <?php foreach ($DB_STATUSES as $s): ?>
-    <a href="?status=<?= $s ?>" class="st-pill <?= $filterStatus === $s ? 'active' : '' ?>"><?= ucfirst($s) ?> <span class="st-pill-count"><?= $counts[$s] ?></span></a>
-  <?php endforeach; ?>
-  <div class="st-search">
-    <i class="fas fa-search"></i>
-    <input type="text" id="searchInput" placeholder="Search students..." value="<?= htmlspecialchars($search) ?>">
+<section class="st-filter-panel" aria-labelledby="statusFiltersTitle">
+  <div class="st-filter-heading">
+    <div><div class="st-filter-kicker"><i class="fas fa-filter"></i> Directory controls</div><h2 id="statusFiltersTitle">Status categories</h2><p>Filter the student directory by current status.</p></div>
+    <div class="st-filter-count"><span><?= number_format(array_sum($counts)) ?></span><small>Total students</small></div>
   </div>
-</div>
+  <div class="st-category-layout">
+    <div class="st-category-group" aria-label="Status filters">
+      <div class="st-category-label">All statuses</div>
+      <div class="st-pill-grid">
+        <a href="?" class="st-pill st-pill-all <?= $filterStatus === '' ? 'active' : '' ?>"><span class="st-pill-icon"><i class="fas fa-layer-group"></i></span><span>All</span><strong><?= number_format($totalStudents) ?></strong></a>
+        <?php foreach ($DB_STATUSES as $s): $meta = $STATUS_META[$s] ?? $STATUS_META['inactive']; ?>
+          <a href="?status=<?= $s ?>" class="st-pill <?= $filterStatus === $s ? 'active' : '' ?>" style="--pill-color:<?= $meta['color'] ?>;--pill-bg:<?= $meta['bg'] ?>"><span class="st-pill-icon"><i class="<?= $meta['icon'] ?>"></i></span><span><?= ucfirst(str_replace('-', ' ', $s)) ?></span><strong><?= number_format($counts[$s]) ?></strong></a>
+        <?php endforeach; ?>
+      </div>
+    </div>
+    <div class="st-search-group">
+      <label class="st-category-label" for="searchInput">Search directory</label>
+      <div class="st-search"><i class="fas fa-search"></i><input type="text" id="searchInput" placeholder="Search name or student ID" value="<?= htmlspecialchars($search) ?>"></div>
+      <small>Search updates the directory results.</small>
+    </div>
+  </div>
+</section>
 
 <!-- Two Panel Layout -->
 <div class="st-panels">
@@ -173,7 +185,7 @@ include '../includes/sidebar.php';
           <th>Last Changed</th>
         </tr>
       </thead>
-      <tbody>
+      <tbody id="stStudentBody">
         <?php if (empty($students)): ?>
           <tr><td colspan="8" class="st-empty" style="text-align:center;padding:48px;color:var(--text-subtle)"><i class="fas fa-users-slash" style="font-size:32px;display:block;margin-bottom:12px"></i>No students found</td></tr>
         <?php else: ?>
@@ -182,7 +194,7 @@ include '../includes/sidebar.php';
             $initials = strtoupper(substr($s['first_name'],0,1) . substr($s['last_name'],0,1));
             $sm = $STATUS_META[$s['status']] ?? $STATUS_META['inactive'];
           ?>
-          <tr style="cursor:pointer" onclick="openStudentModal(<?= $s['id'] ?>,'<?= htmlspecialchars(addslashes($s['first_name'].' '.$s['last_name'])) ?>','<?= htmlspecialchars($s['student_number']) ?>')">
+          <tr data-student-row style="cursor:pointer" onclick="openStudentModal(<?= $s['id'] ?>,'<?= htmlspecialchars(addslashes($s['first_name'].' '.$s['last_name'])) ?>','<?= htmlspecialchars($s['student_number']) ?>')">
             <td style="font-weight:600;font-size:12px;color:var(--text-faint)"><?= $rowNum ?></td>
             <td>
               <div class="st-t-info">
@@ -211,7 +223,7 @@ include '../includes/sidebar.php';
               <?php if (!empty($s['last_change'])): ?>
                 <?= date('M d, Y', strtotime($s['last_change'])) ?>
               <?php else: ?>
-                <span style="color:var(--text-subtle)">â€”</span>
+                <span class="st-no-change">Not recorded</span>
               <?php endif; ?>
             </td>
           </tr>
@@ -258,19 +270,16 @@ include '../includes/sidebar.php';
     <div class="st-modal-header">
       <div class="st-modal-header-info">
         <div id="modalAvatar" class="st-modal-header-avatar" style="background:var(--brand-500)"></div>
-        <div>
-          <div class="st-modal-header-name" id="modalName"></div>
-          <div class="st-modal-header-num" id="modalNumber"></div>
-        </div>
+        <div><div class="st-modal-header-name" id="modalName"></div><div class="st-modal-header-num" id="modalNumber"></div></div>
       </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <button class="st-btn-sm st-btn-apply" id="btnModalAIProfile" onclick="runModalAIProfile()"><i class="fas fa-robot"></i> Run Full AI Profile</button>
-        <button class="st-modal-close" onclick="closeModal()"><i class="fas fa-xmark"></i></button>
+      <div class="st-modal-header-actions">
+        <button class="st-btn-sm st-btn-apply" id="btnModalAIProfile" onclick="runModalAIProfile()"><i class="fas fa-robot"></i> Generate AI profile</button>
+        <button class="st-modal-close" onclick="closeModal()" aria-label="Close student status history"><i class="fas fa-xmark"></i></button>
       </div>
     </div>
     <div class="st-modal-ai" id="modalAI">
-      <div class="st-modal-ai-lbl"><i class="fas fa-robot"></i> AI Brief</div>
-      <div class="st-modal-ai-txt" id="modalAIText">Loading...</div>
+      <div class="st-modal-ai-lbl"><i class="fas fa-robot"></i> AI status brief</div>
+      <div class="st-modal-ai-txt" id="modalAIText">Loading student profile…</div>
       <div class="st-modal-ai-rec" id="modalAIRec"></div>
     </div>
     <div class="st-modal-timeline">
@@ -291,7 +300,7 @@ include '../includes/sidebar.php';
 const STATUS_META=<?= json_encode($STATUS_META) ?>;
 const ALL_STATUSES=<?= json_encode($ALL_STATUSES) ?>;
 const DB_STATUSES=<?= json_encode($DB_STATUSES) ?>;
-const SEARCH_DELAY=400;
+const SEARCH_DELAY=250;
 let searchTimer=null;
 
 /* --- Distribution Bar --- */
@@ -482,19 +491,33 @@ dot.title=risks[id].reason||level;
 }catch(e){dots.forEach(dot=>{dot.classList.remove('loading');dot.classList.add('unk');});}
 }
 
-/* --- Search Debounce --- */
+/* Search filters the rendered directory locally; it never reloads the page. */
 const searchInput=document.getElementById('searchInput');
-if(searchInput){
-searchInput.addEventListener('input',function(){
-clearTimeout(searchTimer);
-searchTimer=setTimeout(()=>{
-const q=this.value.trim();
-const url=new URL(window.location);
-if(q){url.searchParams.set('q',q);}else{url.searchParams.delete('q');}
-url.searchParams.delete('page');
-window.location=url.toString();
-},SEARCH_DELAY);
-});
+const studentBody=document.getElementById('stStudentBody');
+if(searchInput && studentBody){
+  const rows=Array.from(studentBody.querySelectorAll('tr[data-student-row]'));
+  const applySearch=()=>{
+    const query=searchInput.value.trim().toLowerCase();
+    let visible=0;
+    rows.forEach(row=>{
+      const text=(row.textContent || '').toLowerCase();
+      const match=!query || text.includes(query);
+      row.hidden=!match;
+      if(match) visible++;
+    });
+    let empty=studentBody.querySelector('tr[data-search-empty]');
+    if(query && visible===0){
+      if(!empty){
+        empty=document.createElement('tr');
+        empty.dataset.searchEmpty='true';
+        empty.innerHTML='<td colspan="8" class="st-search-empty"><i class="fas fa-user-slash"></i><strong>No students match this search</strong><span>Try a different name, ID, or course.</span></td>';
+        studentBody.appendChild(empty);
+      }
+      empty.hidden=false;
+    }else if(empty){empty.hidden=true;}
+  };
+  searchInput.addEventListener('input',applySearch);
+  applySearch();
 }
 
 /* --- Student Modal --- */
@@ -513,22 +536,19 @@ fetchStudentHistory(id);
 };
 
 async function fetchStudentBrief(id){
-try{
-const r=await fetch('../api/ai-tools.php?action=profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});
-if(!r.ok)throw new Error();
-const d=await r.json();
-const brief=d.data?.summary||d.ai_brief||d.aiBrief||'No AI brief available.';
-const aiEl=document.getElementById('modalAI');
-if(aiEl){aiEl.querySelector('.st-modal-ai-txt').textContent=brief;
-const rec=d.ai_recommendation||d.aiRecommendation||'';
-aiEl.querySelector('.st-modal-ai-rec').textContent=rec?'Recommendation: '+rec:'';}
-}catch(e){const aiEl=document.getElementById('modalAI');
-if(aiEl)aiEl.querySelector('.st-modal-ai-txt').textContent='Unable to load AI brief.';}
+ try{
+  const r=await fetch('../api/ai-tools.php?action=profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})});
+  const d=await r.json(); if(!d.success) throw new Error(d.message||'Profile unavailable.');
+  const brief=d.data.summary||'No AI brief available.';
+  const rec=d.data.recommendation||'';
+  const aiEl=document.getElementById('modalAI');
+  if(aiEl){aiEl.querySelector('.st-modal-ai-txt').textContent=brief; aiEl.querySelector('.st-modal-ai-rec').textContent=rec?'Next step: '+rec:'';}
+ }catch(e){const aiEl=document.getElementById('modalAI'); if(aiEl) aiEl.querySelector('.st-modal-ai-txt').textContent='Unable to load the student profile.';}
 }
 
 async function runModalAIProfile(){
 const btn=document.getElementById('btnModalAIProfile');
-if(btn){btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Running...';btn.disabled=true;}
+if(btn){btn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Generating...';btn.disabled=true;}
 try{
 const r=await fetch('../api/ai-tools.php?action=profile',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:window._currentModalStudentId||0})});
 if(!r.ok)throw new Error();
@@ -540,7 +560,7 @@ if(aiEl){aiEl.querySelector('.st-modal-ai-txt').textContent=brief;
 aiEl.querySelector('.st-modal-ai-rec').textContent=rec?'Recommendation: '+rec:'';}
 toast('AI Profile generated','success');
 }catch(e){toast('Failed to generate AI profile','error');}
-if(btn){btn.innerHTML='<i class="fas fa-robot"></i> Run Full AI Profile';btn.disabled=false;}
+if(btn){btn.innerHTML='<i class="fas fa-robot"></i> Generate AI profile';btn.disabled=false;}
 }
 window.runModalAIProfile=runModalAIProfile;
 

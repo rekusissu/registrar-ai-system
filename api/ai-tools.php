@@ -250,6 +250,20 @@ switch ($action) {
         echo json_encode(['success' => true, 'data' => ['recommendations' => array_slice($recs, 0, 15), 'source' => $src]]);
         exit;
 
+    // ─── STUDENT PROFILE (registrar-safe read-only) ─────
+    case 'profile':
+        $studentId = (int)($input['id'] ?? 0);
+        if (!$studentId) { echo json_encode(['success'=>false,'message'=>'Student is required.']); exit; }
+        $student = $db->fetchOne("SELECT id, student_number, CONCAT(first_name,' ',last_name) AS name, course, year_level, status FROM students WHERE id = ?", [$studentId]);
+        if (!$student) { echo json_encode(['success'=>false,'message'=>'Student not found.']); exit; }
+        $history = $db->fetchAll("SELECT previous_status, current_status, reason, created_at FROM status_tracker WHERE student_id=? ORDER BY created_at DESC LIMIT 12", [$studentId]);
+        $current = strtolower((string)($student['status'] ?? 'inactive'));
+        $attention = in_array($current, ['at-risk','probation'], true) ? 'Review recommended' : ($current === 'inactive' ? 'Inactive record' : 'Routine review');
+        $summary = sprintf('%s is currently listed as %s with %d recorded status change(s).', $student['name'], $current, count($history));
+        $recommendation = $attention === 'Routine review' ? 'No immediate status action is indicated by the available tracker records.' : 'Review the student’s status history and supporting registrar records before making any status change.';
+        echo json_encode(['success'=>true,'data'=>['summary'=>$summary,'recommendation'=>$recommendation,'attention'=>$attention,'source'=>'rules','student'=>$student,'history_count'=>count($history)]]);
+        exit;
+
     // ─── STUDENT RISKS ──────────────────────────────────────
     case 'student_risks':
         $ids = $input['student_ids'] ?? [];
