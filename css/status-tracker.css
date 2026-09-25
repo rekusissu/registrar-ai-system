@@ -272,4 +272,19 @@ body[data-page="status-tracker"] .st-tl-b,.st-tl>.st-empty{overflow-y:auto;min-h
 body[data-page="status-tracker"] .st-modal-header{position:sticky;top:0;z-index:2}.st-modal-close{width:32px;height:32px;border:1px solid #dbeafe;border-radius:9px;background:#fff}
 @media(max-width:640px){body[data-page="status-tracker"] .st-tl-b{padding-left:18px}.st-tl-b::before{left:3px}.st-tl-dot{left:-18px}}
 
+
+/* Final full-length directory layout: directory first, activity below. */
+body[data-page="status-tracker"] .st-panels{grid-template-columns:minmax(0,1fr);gap:18px}
+body[data-page="status-tracker"] .st-table-wrap{width:100%;min-width:0;overflow:hidden}
+body[data-page="status-tracker"] .st-table-wrap table{width:100%;min-width:0;display:table;overflow-x:auto}
+body[data-page="status-tracker"] .st-tl{width:100%;max-height:none;min-height:220px}
+body[data-page="status-tracker"] .st-tl-b{max-height:420px;overflow-y:auto;padding:18px 8px 0 22px}
+body[data-page="status-tracker"] .st-dist{margin:0}
+body[data-page="status-tracker"] .st-dist .st-panel-heading{padding:19px 22px 16px}
+body[data-page="status-tracker"] .st-dist .st-dist-bar{margin:20px 22px 0}
+body[data-page="status-tracker"] .st-dist .st-dist-legend{margin:13px 22px 20px;gap:9px 12px}
+body[data-page="status-tracker"] .st-filters{margin:0}
+body[data-page="status-tracker"] .st-ai-output{margin:0}
+@media(max-width:640px){body[data-page="status-tracker"] .st-tl-b{max-height:none;padding-left:18px}body[data-page="status-tracker"] .st-dist .st-panel-heading{padding:15px 16px 13px}body[data-page="status-tracker"] .st-dist .st-dist-bar{margin:16px 16px 0}body[data-page="status-tracker"] .st-dist .st-dist-legend{margin:11px 16px 16px}}
+
 @media(max-width:640px){.st-ai-bar-label{width:100%;margin-bottom:2px}.st-ai-sep{display:none}.st-filters{align-items:stretch}.st-pill{text-align:center}.st-search{margin-left:0;width:100%}.st-search input,.st-search input:focus{width:100%}.st-panel-heading{padding:14px}.st-table-wrap .st-panel-heading{margin:0}.st-tl{padding:0 14px 14px}.st-tl .st-panel-heading{margin:0 -14px 14px}}
