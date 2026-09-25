@@ -44,6 +44,8 @@ elseif ($hour < 22)   { $timeGreeting = 'Good evening'; }
 else                   { $timeGreeting = 'Good night'; }
 
 $page_title = 'Clinic Dashboard';
+$page_description = 'Clinic operations and student visit dashboard';
+$body_page = 'clinic-dashboard';
 $APP_ROOT = '../';
 $thisWeek = date('Y-m-d', strtotime('monday this week'));
 $thisMonth = date('Y-m-01');
@@ -54,227 +56,11 @@ $stats = [
     'total' => $totalVisits,
     'pending' => (int) $db->fetchColumn("SELECT COUNT(*) FROM health_visits WHERE record_status = 'Pending'"),
 ];
+$extra_css = ['clinic-dashboard.css'];
 $ACTIVE_NAV = 'nurse_dashboard';
 include '../includes/header.php';
 include '../includes/sidebar.php';
 ?>
-<style>
-
-/* ================================================================
-   CLINIC DASHBOARD — Visit Statistics
-   A calm clinical reporting layer above the operational workspace.
-   ================================================================ */
-.clinic-stats{--clinic-teal:#0f766e;--clinic-teal-bright:#14b8a6;margin-top:18px}
-.visit-stats-heading{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-.visit-stat-strip{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 6px 22px rgba(15,23,42,.04);overflow:hidden}
-.visit-stat{position:relative;padding:20px 22px;border-right:1px solid #e2e8f0}
-.visit-stat:last-child{border-right:0}
-.visit-stat::after{content:"";position:absolute;left:22px;right:22px;bottom:0;height:3px;background:#ccfbf1}
-.visit-stat.is-current::after,.visit-stat.is-week::after{background:linear-gradient(90deg,var(--clinic-teal),var(--clinic-teal-bright))}
-.visit-stat.is-pending::after{background:#d97706}
-.visit-stat-label{font-size:11px;font-weight:700;letter-spacing:.06em;color:#64748b;text-transform:uppercase}
-.visit-stat-value{margin-top:7px;font-size:30px;line-height:1;font-weight:800;color:#0f172a;font-variant-numeric:tabular-nums}
-.visit-stat-context{margin-top:7px;font-size:11px;color:#94a3b8}
-.visit-stat.is-pending .visit-stat-value{color:#b45309}
-@media(max-width:1000px){.visit-stat-strip{grid-template-columns:repeat(3,1fr)}.visit-stat{border-bottom:1px solid #e2e8f0}}
-@media(max-width:700px){.visit-stat-strip{grid-template-columns:repeat(2,1fr)}.visit-stat{border-right:1px solid #e2e8f0}.visit-stat:last-child{grid-column:1/-1}}
-@media(max-width:480px){.visit-stat-strip{grid-template-columns:1fr}.visit-stat{border-right:0}.visit-stat:last-child{grid-column:auto}}
-@media(prefers-reduced-motion:reduce){.clinic-stats *{transition:none!important;animation:none!important}}
-
-/* ================================================================
-   NURSE DASHBOARD — Warm Clinical Design
-   ================================================================ */
-
-/* ── Hero (student-portal match) ────────────────────────── */
-.clinic-hero{display:flex;align-items:center;gap:24px;color:#fff;border-radius:20px;padding:42px 48px;box-shadow:0 20px 60px rgba(0,0,0,.25);position:relative;overflow:hidden;min-height:130px;background-size:cover;background-position:center}
-.clinic-hero::after{content:'';position:absolute;right:-80px;top:-80px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.12) 0%,transparent 70%)}
-.clinic-hero::before{content:'';position:absolute;right:40px;bottom:-120px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.08) 0%,transparent 70%)}
-.clinic-hero>*{position:relative;z-index:2}
-.hero-avatar{width:88px;height:88px;min-width:88px;border-radius:50%;background:rgba(255,255,255,.18);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;font-size:32px;font-weight:800;color:#fff;border:3.5px solid rgba(255,255,255,.6);box-shadow:0 8px 32px rgba(0,0,0,.2)}
-.hero-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%}
-.hero-body{flex:1;min-width:0}.hero-greet{font-size:11.5px;text-transform:uppercase;letter-spacing:1.4px;color:rgba(255,255,255,.95);font-weight:700;margin-bottom:8px;text-shadow:0 2px 4px rgba(0,0,0,.8),0 0 20px rgba(0,0,0,.6)}
-.hero-title{font-size:32px;font-weight:800;letter-spacing:-.6px;margin:0 0 10px;color:#fff;line-height:1.15;text-shadow:0 3px 6px rgba(0,0,0,.9),0 0 25px rgba(0,0,0,.7)}.hero-meta{display:flex;flex-wrap:wrap;gap:12px;margin-top:18px}
-.hero-chip{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:9999px;background:rgba(0,0,0,.25);border:1.5px solid rgba(255,255,255,.3);color:#fff;font-size:13px;font-weight:700;backdrop-filter:blur(10px);transition:all .2s;white-space:nowrap;text-shadow:0 2px 4px rgba(0,0,0,.8)}
-.hero-chip:hover{background:rgba(0,0,0,.35);border-color:rgba(255,255,255,.5);transform:translateY(-2px)}
-
-/* ── Status Strip ────────────────────────────────────────── */
-.status-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:18px}
-@media(max-width:860px){.status-strip{grid-template-columns:repeat(2,1fr)}}
-.s-item{background:#fff;border:1px solid #ebe8e3;border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:14px;box-shadow:0 4px 16px rgba(15,23,42,.04);transition:box-shadow .15s}
-.s-item:hover{box-shadow:0 6px 22px rgba(15,23,42,.07)}
-.s-icon{width:42px;height:42px;min-width:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:16px}
-.s-icon.green{background:#dcfce7;color:#16a34a}.s-icon.blue{background:#dbeafe;color:#2563eb}
-.s-icon.purple{background:#f3e8ff;color:#9333ea}.s-icon.amber{background:#fef3c7;color:#d97706}
-.s-value{font-size:18px;font-weight:800;color:#0f172a;line-height:1}
-.s-label{font-size:11px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.4px;margin-top:2px}
-
-/* Clinic Grid */
-.clinic-grid{display:grid;grid-template-columns:360px 1fr;gap:22px;align-items:start;transition:grid-template-columns .35s cubic-bezier(.4,0,.2,1)}
-.clinic-grid.assessment-active{grid-template-columns:1fr}
-.clinic-grid.assessment-active .tap-card{display:none}
-@media(max-width:1000px){.clinic-grid{grid-template-columns:1fr}}
-/* Tap-In Card */
-.tap-card{background:#fff;border:1px solid #ebe8e3;border-radius:20px;padding:32px 28px;text-align:center;position:relative;box-shadow:0 2px 8px rgba(0,0,0,.03)}
-.tap-card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#0d9488,#2dd4bf,#5eead4);border-radius:20px 20px 0 0}
-.tap-icon{width:88px;height:88px;margin:0 auto 18px;border-radius:50%;background:linear-gradient(135deg,#ccfbf1,#99f6e4);display:flex;align-items:center;justify-content:center;color:#0f766e;position:relative;box-shadow:0 8px 30px rgba(13,148,136,.12)}
-.tap-icon::before{content:"";position:absolute;inset:-8px;border-radius:50%;border:2px dashed rgba(13,148,136,.18);animation:tapRing 20s linear infinite}
-.tap-icon::after{content:"";position:absolute;inset:-16px;border-radius:50%;border:1.5px solid rgba(13,148,136,.06)}
-@keyframes tapRing{to{transform:rotate(360deg)}}
-.tap-icon i{font-size:32px}
-.tap-title{font-weight:800;font-size:17px;color:#0f172a;margin-bottom:4px}
-.tap-sub{font-size:13px;color:#718096;margin-bottom:18px}
-.tap-status{margin-top:0;padding:11px 16px;border-radius:12px;background:#f0fdfa;border:1px dashed #5eead4;text-align:center;font-weight:600;font-size:13px;color:#115e59;display:flex;align-items:center;justify-content:center;gap:8px}
-.tap-status.awaiting{animation:tapGlow 2.5s ease-in-out infinite}
-@keyframes tapGlow{0%,100%{background:#f0fdfa;border-color:#5eead4}50%{background:#ccfbf1;border-color:#0d9488}}
-#tapInput{display:block;width:100%;margin-top:14px;padding:13px 16px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:15px;font-family:"JetBrains Mono",monospace;text-align:center;letter-spacing:2px;font-weight:600;color:#0f172a;background:#fafaf8;transition:border-color .2s,box-shadow .2s;box-sizing:border-box}
-#tapInput:focus{outline:none;border-color:#0d9488;box-shadow:0 0 0 4px rgba(13,148,136,.1);background:#fff}
-#tapInput::placeholder{color:#a0aec0;letter-spacing:0;font-weight:400;font-family:inherit}
-.divider{display:flex;align-items:center;gap:14px;margin:20px 0 14px;font-size:12px;font-weight:500;color:#a0aec0}
-.divider::before,.divider::after{content:"";flex:1;height:1px;background:#ebe8e3}
-
-/* Search */
-.section-label{font-size:12px;font-weight:600;color:#718096;margin-bottom:8px}
-.student-search-wrap{position:relative}
-.student-search-wrap i{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#a0aec0;font-size:13px;pointer-events:none}
-.student-search-input{width:100%;padding:11px 14px 11px 38px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:13px;font-family:inherit;color:#0f172a;background:#fafaf8;transition:border-color .2s,box-shadow .2s;box-sizing:border-box}
-.student-search-input:focus{outline:none;border-color:#0d9488;box-shadow:0 0 0 4px rgba(13,148,136,.1);background:#fff}
-.student-search-input::placeholder{color:#a0aec0}
-.search-dropdown{display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,.1);z-index:100;max-height:240px;overflow-y:auto}
-.search-dropdown.open{display:block}
-.search-item{padding:11px 16px;cursor:pointer;font-size:13px;color:#334155;display:flex;align-items:center;gap:10px;transition:background .1s}
-.search-item:hover,.search-item.active{background:#f0fdfa}
-.search-item .si-name{font-weight:600;color:#0f172a}
-.search-item .si-sub{font-size:11px;color:#94a3b8}
-
-/* Workspace Panel */
-.ws-panel{background:#fff;border:1px solid #ebe8e3;border-radius:20px;padding:28px;box-shadow:0 2px 8px rgba(0,0,0,.03);min-height:300px}
-.student-chip-row{display:flex;align-items:center;gap:16px;margin-bottom:18px}
-.avatar{width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,#ccfbf1,#99f6e4);color:#0f766e;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;flex-shrink:0;overflow:hidden}
-.info-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-.info-cell{padding:11px 14px;background:#fafaf8;border-radius:11px;border:1px solid #f0ede9}
-.info-cell .k{font-size:11px;font-weight:600;color:#a0aec0;text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px}
-.info-cell .v{font-size:14px;font-weight:700;color:#0f172a}
-/* Stepper */
-.eval-stepper{display:none;align-items:center;justify-content:center;padding:26px 0 14px;gap:0}
-.eval-stepper.visible{display:flex}
-.eval-step{display:flex;align-items:center;gap:8px}
-.eval-step-num{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;border:2px solid #e2e8f0;color:#a0aec0;background:#fff;transition:all .3s;flex-shrink:0}
-.eval-step.active .eval-step-num{background:#0d9488;border-color:#0d9488;color:#fff;box-shadow:0 0 0 5px rgba(13,148,136,.12)}
-.eval-step.done .eval-step-num{background:#059669;border-color:#059669;color:#fff}
-.eval-step-label{font-size:13px;font-weight:600;color:#a0aec0;white-space:nowrap;transition:color .3s}
-.eval-step.active .eval-step-label{color:#0f766e;font-weight:700}
-.eval-step.done .eval-step-label{color:#059669}
-.eval-step-line{width:44px;height:2.5px;background:#ebe8e3;margin:0 4px;transition:background .3s;flex-shrink:0;border-radius:2px}
-.eval-step-line.done{background:#059669}
-@media(max-width:640px){.eval-step-label{display:none}.eval-step-line{width:24px}}
-
-/* Eval Panes */
-.eval-pane{display:none}.eval-pane.active{display:block;animation:paneIn .25s ease}
-@keyframes paneIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-.eval-pane-head{display:flex;align-items:center;gap:12px;margin-bottom:22px;padding-bottom:14px;border-bottom:2px solid #f0ede9}
-.eval-pane-head h3{font-size:17px;font-weight:800;color:#0f172a;margin:0;letter-spacing:-.2px}
-.pane-icon{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
-.eval-nav{display:flex;justify-content:space-between;align-items:center;margin-top:24px;padding-top:18px;border-top:1px solid #f0ede9}
-.btn-step-back{background:none;border:1.5px solid #e2e8f0;color:#4a5568;padding:10px 20px;border-radius:11px;font-family:inherit;font-weight:600;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:all .15s}
-.btn-step-back:hover{background:#fafaf8;border-color:#cbd5e1}
-.btn-step-next{background:linear-gradient(135deg,#0d9488,#0f766e);color:#fff;border:none;padding:11px 24px;border-radius:11px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:all .15s;box-shadow:0 4px 16px rgba(13,148,136,.25)}
-.btn-step-next:hover{transform:translateY(-1px);box-shadow:0 6px 22px rgba(13,148,136,.35)}
-
-/* Medical History Card */
-.eval-history-card{background:#fafaf8;border:1px solid #f0ede9;border-radius:14px;padding:16px 18px;margin-top:18px}
-.eval-history-card h4{font-size:12px;font-weight:700;color:#0f766e;text-transform:uppercase;letter-spacing:.4px;margin:0 0 10px;display:flex;align-items:center;gap:7px}
-.eval-history-card .eh-row{font-size:13px;color:#4a5568;padding:3px 0;line-height:1.6}
-.eval-history-card .eh-row strong{color:#0f172a}
-.eval-history-card .eh-empty{font-size:13px;color:#a0aec0;font-style:italic}
-
-/* AI Panel */
-.ai-panel{background:#fff;border:1.5px solid #ebe8e3;border-radius:16px;overflow:hidden;margin-top:20px;transition:border-color .2s}
-.ai-panel.collapsed .ai-panel-body{display:none}
-.ai-panel-header{display:flex;align-items:center;gap:10px;padding:14px 20px;background:linear-gradient(135deg,rgba(13,148,136,.04),rgba(13,148,136,.08));border-bottom:1px solid #f0ede9}
-.ai-title{font-size:13px;font-weight:700;color:#0f172a;flex:1;display:flex;align-items:center;gap:8px}
-.ai-title i{color:#0d9488}
-.ai-panel-body{padding:20px}
-.ai-btn{display:inline-flex;align-items:center;gap:8px;padding:10px 22px;border:none;border-radius:11px;background:linear-gradient(135deg,#0d9488,#0f766e);color:#fff;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;transition:all .15s;box-shadow:0 4px 16px rgba(13,148,136,.25)}
-.ai-btn:hover{transform:translateY(-1px);box-shadow:0 6px 22px rgba(13,148,136,.35)}
-.ai-loading{display:none;text-align:center;padding:28px 0}
-.ai-loading.active{display:block}
-.spinner{width:32px;height:32px;border:3px solid #e2e8f0;border-top-color:#0d9488;border-radius:50%;animation:ndSpin .7s linear infinite;margin:0 auto 12px}
-@keyframes ndSpin{to{transform:rotate(360deg)}}
-.ai-loading-text{font-size:13px;color:#718096}
-.ai-result{display:none}
-.ai-result.active{display:block}
-.ai-urgency{display:inline-flex;align-items:center;gap:6px;padding:5px 14px;border-radius:9999px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
-.ai-urgency.low{background:#ecfdf5;color:#059669}
-.ai-urgency.medium{background:#fffbeb;color:#d97706}
-.ai-urgency.high{background:#fef2f2;color:#e11d48}
-.ai-summary{font-size:13px;color:#718096;margin:12px 0;font-style:italic;line-height:1.6}
-.ai-recommendation{font-size:14px;color:#1e293b;line-height:1.7;background:#fafaf8;border:1px solid #f0ede9;border-radius:12px;padding:14px 16px;margin:12px 0}
-.ai-warnings{margin:10px 0;padding:0;list-style:none}
-.ai-warnings li{font-size:13px;color:#92400e;padding:5px 0 5px 22px;position:relative;line-height:1.5}
-.ai-warnings li::before{content:"";position:absolute;left:0;top:12px;width:10px;height:10px;border-radius:50%;background:#fbbf24}
-.ai-referral{display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border-radius:11px;background:#fef2f2;color:#991b1b;font-size:13px;font-weight:700;margin-top:8px}
-.ai-confidence{font-size:11px;color:#a0aec0;text-transform:uppercase;letter-spacing:.4px;font-weight:600}
-/* Other Toggle */
-.other-input{display:none;margin-top:8px}
-.other-input.show{display:block}
-.other-input input{width:100%;padding:10px 14px;border:1.5px solid #e2e8f0;border-radius:11px;font-size:14px;font-family:inherit;color:#0f172a;background:#fafaf8;transition:border-color .2s,box-shadow .2s;box-sizing:border-box}
-.other-input input:focus{outline:none;border-color:#0d9488;box-shadow:0 0 0 4px rgba(13,148,136,.1);background:#fff}
-
-/* Section Titles */
-.section-title{font-size:13px;font-weight:700;color:#0f172a;margin:20px 0 10px;display:flex;align-items:center;gap:8px}
-
-/* Messages */
-.ok,.err{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:11px;font-size:13px;font-weight:500;margin-top:14px}
-.ok{background:#ecfdf5;color:#065f46}
-.err{background:#fef2f2;color:#991b1b}
-
-/* Visit History */
-.visit-list{display:flex;flex-direction:column;gap:10px}
-.visit-item{padding:14px 16px;background:#fafaf8;border:1px solid #f0ede9;border-radius:12px;border-left:3px solid #0d9488}
-
-/* Pill */
-.pill{display:inline-flex;align-items:center;padding:3px 10px;border-radius:9999px;font-size:11px;font-weight:600}
-.pill.recorded,.pill.active{background:#ecfdf5;color:#059669}
-.pill.pending{background:#fffbeb;color:#d97706}
-.pill.cancelled{background:#fef2f2;color:#e11d48}
-
-/* Table */
-.table{width:100%;border-collapse:separate;border-spacing:0}
-.table th{text-align:left;padding:11px 14px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#718096;background:#fafaf8;border-bottom:1px solid #ebe8e3}
-.table th:first-child{border-radius:11px 0 0 0}.table th:last-child{border-radius:0 11px 0 0}
-.table td{padding:12px 14px;font-size:13px;color:#4a5568;border-bottom:1px solid #f0ede9;vertical-align:middle}
-.table tbody tr:hover{background:#fafaf8}
-.table tbody tr:last-child td{border-bottom:none}
-
-/* Buttons */
-.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 20px;border-radius:11px;font-size:14px;font-weight:600;font-family:inherit;border:1.5px solid transparent;cursor:pointer;transition:all .2s;text-decoration:none;white-space:nowrap;line-height:1.2}
-.btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important;box-shadow:none!important}
-.btn-primary{background:linear-gradient(135deg,#0d9488,#0f766e);color:#fff;border-color:#0f766e;box-shadow:0 2px 8px rgba(13,148,136,.18)}
-.btn-primary:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 18px rgba(13,148,136,.3)}
-.btn-light{background:#f1f5f9;color:#4a5568;border-color:transparent}
-.btn-light:hover:not(:disabled){background:#e2e8f0;color:#1e293b}
-.btn-outline{background:transparent;color:#0d9488;border-color:#0d9488}
-.btn-outline:hover:not(:disabled){background:#f0fdfa}
-.btn i{font-size:13px}
-
-/* Forms */
-.form-row{display:grid;grid-template-columns:repeat(2,1fr);gap:14px 16px}
-.form-group{margin-bottom:0;min-width:0}
-.form-group label{display:block;font-size:12px;font-weight:600;color:#718096;margin-bottom:5px}
-.form-control{width:100%;padding:10px 14px;border:1.5px solid #d1d5db;border-radius:11px;font-size:14px;font-family:inherit;color:#0f172a;background:#fafaf8;transition:border-color .2s,box-shadow .2s;box-sizing:border-box}
-.form-control:focus{outline:none;border-color:#0d9488;box-shadow:0 0 0 4px rgba(13,148,136,.1);background:#fff}
-.form-control::placeholder{color:#a0aec0}
-select.form-control{appearance:none;-webkit-appearance:none;padding-right:38px;cursor:pointer}
-
-/* Profile Modal */
-.profile-modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.4);backdrop-filter:blur(4px);z-index:9000;align-items:center;justify-content:center;padding:24px}
-.profile-modal-overlay.active{display:flex}
-.profile-modal{background:#fff;border-radius:20px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;padding:28px 30px;box-shadow:0 24px 64px rgba(0,0,0,.2);animation:modalIn .25s ease}
-@keyframes modalIn{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:none}}
-
-/* Responsive */
-@media(max-width:640px){.ws-panel{padding:20px 16px}.tap-card{padding:24px 20px}.info-grid{grid-template-columns:1fr}.form-row{grid-template-columns:1fr}.btn{padding:10px 16px;font-size:13px}}
-</style>
 
 
 <main class="dashboard-main">
@@ -287,9 +73,9 @@ select.form-control{appearance:none;-webkit-appearance:none;padding-right:38px;c
     </div>
     <div class="hero-body">
         <div class="hero-greet"><?= $timeGreeting ?></div>
-        <div class="hero-title"><?= h($nurseName) ?> &#x1f44b;</div>
+        <div class="hero-title">Clinic workspace</div>
         <div class="hero-meta">
-            <span class="hero-chip"><i class="fa-solid fa-hospital"></i> Clinic Portal</span>
+            <span class="hero-chip"><i class="fa-solid fa-hospital"></i> <?= h($nurseName) ?></span>
             <span class="hero-chip"><i class="fa-solid fa-clock"></i> <?= date('F d, Y') ?></span>
             <span class="hero-chip"><i class="fa-solid fa-calendar-day"></i> <?= $todayVisits ?> visit<?= $todayVisits === 1 ? '' : 's' ?> today</span>
         </div>
@@ -314,7 +100,7 @@ select.form-control{appearance:none;-webkit-appearance:none;padding-right:38px;c
     </div>
 </div>
 
-<div class="clinic-grid" style="margin-top:20px;">
+<div class="clinic-grid">
     <!-- TAP-IN -->
     <div class="tap-card">
         <div class="tap-icon"><i class="fas fa-credit-card"></i></div>
@@ -334,9 +120,10 @@ select.form-control{appearance:none;-webkit-appearance:none;padding-right:38px;c
     </div>
 <!-- ─── WORKSPACE ─── -->
     <div class="ws-panel" id="wsPanel">
-        <div id="wsEmpty" style="text-align:center;color:#94a3b8;padding:60px 10px;">
-            <i class="fas fa-hand-pointer" style="font-size:34px;display:block;margin-bottom:12px;color:#cbd5e1;"></i>
-            Tap a card or select a student to begin.
+        <div id="wsEmpty" class="workspace-empty">
+            <div class="workspace-empty-icon"><i class="fas fa-hand-pointer"></i></div>
+            <strong>Identify a student to begin</strong>
+            <span>Tap an RFID card or search by name or student number.</span>
         </div>
 
         <div id="wsStudent" style="display:none;">
@@ -354,7 +141,7 @@ select.form-control{appearance:none;-webkit-appearance:none;padding-right:38px;c
                 <div class="info-cell"><div class="k">Year Level</div><div class="v" id="wsYear">—</div></div>
                 <div class="info-cell"><div class="k">Section</div><div class="v" id="wsSection">—</div></div>
             </div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;">
+            <div class="identity-actions">
                 <button type="button" class="btn btn-outline" onclick="openProfile()"><i class="fas fa-id-card-clip"></i> Medical Profile</button>
                 <button type="button" class="btn btn-primary" onclick="startAssessment()"><i class="fas fa-user-check"></i> Verify &amp; Start Assessment</button>
                 <button type="button" class="btn btn-light" onclick="resetWorkspace()"><i class="fas fa-rotate"></i> New Scan</button>
@@ -424,7 +211,7 @@ select.form-control{appearance:none;-webkit-appearance:none;padding-right:38px;c
                 <div class="eval-pane-head"><div class="pane-icon" style="background:#fef3c7;color:#d97706;"><i class="fas fa-pen-to-square"></i></div><div><h3>Notes &amp; AI Review</h3><div style="font-size:12px;color:#94a3b8;margin-top:2px;">Add final notes, review AI recommendations, and save</div></div></div>
                 <div class="section-label" style="margin-top:0;">Nurse's Notes</div>
                 <textarea id="nurseNotes" class="form-control" rows="3" style="width:100%;" placeholder="Any additional observations or notes…"></textarea>
-                <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:20px;">
+                <div class="save-actions">
                     <button type="button" class="btn btn-primary" id="saveBtn" onclick="saveVisit(false)" style="padding:12px 26px;"><i class="fas fa-save"></i> Save complete visit</button>
                      <button type="button" class="btn btn-outline" onclick="saveVisit(true)" style="padding:12px 20px;"><i class="fas fa-file-pen"></i> Save draft</button>
 
@@ -461,17 +248,18 @@ select.form-control{appearance:none;-webkit-appearance:none;padding-right:38px;c
     </div>
 </div>
 <!-- ─── VISIT HISTORY (selected student) ─── -->
-<div class="ws-panel" id="historyPanel" style="margin-top:20px;display:none;">
-    <div style="font-weight:700;font-size:15px;color:#0f172a;margin-bottom:10px;"><i class="fas fa-timeline" style="color:#0d9488;"></i> Visit History — <span id="historyStudentName"></span></div>
+<div class="ws-panel clinic-data-panel" id="historyPanel" style="display:none;">
+    <div class="clinic-panel-heading"><i class="fas fa-timeline"></i> Visit history <span>— <span id="historyStudentName"></span></span></div>
     <div class="visit-list" id="visitList"><div style="color:#94a3b8;font-size:14px;">Loading…</div></div>
 </div>
 
 <!-- ─── RECENT RECORDS ─── -->
-<div class="ws-panel" style="margin-top:20px;">
-    <div style="font-weight:700;font-size:15px;color:#0f172a;margin-bottom:10px;"><i class="fas fa-clock-rotate-left" style="color:#0d9488;"></i> Recent Clinic Records</div>
+<div class="ws-panel clinic-data-panel">
+    <div class="clinic-panel-heading"><i class="fas fa-clock-rotate-left"></i> Recent clinic records</div>
     <?php if (empty($recent)): ?>
         <div style="color:#94a3b8;padding:14px 2px;">No clinic visits recorded yet.</div>
     <?php else: ?>
+        <div class="recent-wrap">
         <table class="table">
             <thead><tr><th>Student</th><th>Date &amp; Time</th><th>Reason</th><th>Assessment</th><th>Action</th><th>Status</th></tr></thead>
             <tbody>
@@ -487,6 +275,7 @@ select.form-control{appearance:none;-webkit-appearance:none;padding-right:38px;c
             <?php endforeach; ?>
             </tbody>
         </table>
+        </div>
     <?php endif; ?>
 </div>
 
