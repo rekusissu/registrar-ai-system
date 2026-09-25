@@ -214,5 +214,3 @@ body[data-page="status-tracker"] .st-panels{gap:18px}.st-table-wrap,.st-tl{borde
 body[data-page="status-tracker"] .st-table-wrap th{background:#f8fafc;color:#475569}.st-table-wrap td{color:#334155;border-bottom-color:#f1f5f9}.st-table-wrap tbody tr:hover{background:#eff6ff}
 @media(max-width:1024px){body[data-page="status-tracker"] .st-kpi-strip{grid-template-columns:repeat(2,1fr)}.st-kpi:nth-child(2){border-right:0}.st-kpi{border-bottom:1px solid #e5e7eb}}
 @media(max-width:640px){body[data-page="status-tracker"] .dashboard-main{padding:14px 12px 32px}.st-kpi-strip{grid-template-columns:1fr}.st-kpi{border-right:0;padding:17px 18px}.st-wrap{padding:0}}
-
-}
