@@ -27,10 +27,39 @@ function smtpRedact(string $text): string {
     return defined('SMTP_PASS') && SMTP_PASS !== '' ? str_replace(SMTP_PASS, '********', $text) : $text;
 }
 
+/** Which transport will actually carry a send right now. */
+function smtpActiveTransport(): string {
+    if (defined('BREVO_CONFIGURED') && BREVO_CONFIGURED) {
+        $sender = (defined('MAIL_FROM') ? MAIL_FROM : '') ?: (defined('SMTP_USER') ? SMTP_USER : '');
+        return $sender !== '' ? 'Brevo API' : 'Brevo API (no sender address)';
+    }
+    if (defined('GMAIL_API_CONFIGURED') && GMAIL_API_CONFIGURED) return 'Gmail API';
+    if (defined('SMTP_HOST') && SMTP_HOST !== '' && defined('SMTP_USER') && SMTP_USER !== '') {
+        return class_exists('PHPMailer\PHPMailer\PHPMailer') ? 'SMTP' : 'SMTP (PHPMailer not installed)';
+    }
+    return 'None';
+}
+
 /** Connect + authenticate only (no message is sent). */
 function smtpRunConnectionTest(): array {
+    $transport = smtpActiveTransport();
+    // The old test only spoke SMTP, so a working Brevo-only setup reported
+    // "SMTP is not configured" and looked broken when it was not.
+    if (strpos($transport, 'Brevo') === 0) {
+        $sender = (defined('MAIL_FROM') ? MAIL_FROM : '') ?: (defined('SMTP_USER') ? SMTP_USER : '');
+        if ($sender === '') {
+            return ['ok' => false, 'message' => 'Brevo API key is present, but no sender address is set. Add MAIL_FROM to an address verified in Brevo.'];
+        }
+        if (!function_exists('curl_init')) {
+            return ['ok' => false, 'message' => 'The PHP cURL extension is not enabled on this host. Brevo needs cURL — enable php_curl.'];
+        }
+        return ['ok' => true, 'message' => 'Email is sent via the Brevo API (not SMTP). No SMTP connection test applies. Sender: ' . $sender . '. Use "Send Test Email" to verify delivery.'];
+    }
+    if (strpos($transport, 'Gmail') === 0) {
+        return ['ok' => true, 'message' => 'Email is sent via the Gmail API (not SMTP). No SMTP connection test applies. Use "Send Test Email" to verify delivery.'];
+    }
     if (!defined('SMTP_HOST') || SMTP_HOST === '') {
-        return ['ok' => false, 'message' => 'SMTP is not configured (SMTP_HOST is empty).'];
+        return ['ok' => false, 'message' => 'No email transport is configured. Set BREVO_API_KEY (simplest) or the SMTP_* variables.'];
     }
     if (!class_exists('PHPMailer\PHPMailer\PHPMailer')) {
         return ['ok' => false, 'message' => 'PHPMailer is not installed (vendor/autoload.php missing).'];
@@ -97,11 +126,18 @@ if (strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
 }
 
 // ---- diagnostics ----
-$envSet  = env('SMTP_HOST') !== '' && env('SMTP_HOST') !== false;
-$fileSet = is_file(__DIR__ . '/../shared/email_secret.local');
+// The old check only looked at SMTP_HOST, so a Brevo-only deployment
+// reported "Not found (falling back to empty)" while mail was in fact
+// configured and working. Probe every transport that can enable email.
+$brevoSet = env('BREVO_API_KEY') !== '' && env('BREVO_API_KEY') !== false;
+$envSet   = $brevoSet || (env('SMTP_HOST') !== '' && env('SMTP_HOST') !== false);
+$fileSet  = is_file(__DIR__ . '/../shared/email_secret.local');
 $credSource = $envSet ? 'Environment variables' : ($fileSet ? 'shared/email_secret.local' : 'Not found (falling back to empty)');
 $configured = defined('EMAIL_CONFIGURED') && EMAIL_CONFIGURED;
 $hasOpenssl = extension_loaded('openssl');
+$hasCurl    = function_exists('curl_init');
+$transport  = smtpActiveTransport();
+$mailFrom   = (defined('MAIL_FROM') ? MAIL_FROM : '') ?: (defined('SMTP_USER') ? SMTP_USER : '');
 
 $page_title = 'SMTP Status';
 $APP_ROOT   = '../';
@@ -157,6 +193,11 @@ include '../includes/sidebar.php';
                 <table class="table">
                     <tbody>
                         <tr><td style="width:240px;color:#64748b;">Credential source</td><td><?= htmlspecialchars($credSource) ?></td></tr>
+                        <tr><td style="color:#64748b;">Active transport</td><td><strong><?= htmlspecialchars($transport) ?></strong></td></tr>
+                        <tr><td style="color:#64748b;">Sender address</td><td><?= $mailFrom !== ''
+                                ? htmlspecialchars($mailFrom) . ($transport === 'Brevo API' ? ' <span style="color:#64748b;">(must be verified in Brevo)</span>' : '')
+                                : '<span style="color:#dc2626;font-weight:600;">Not set — Brevo will reject every send. Set MAIL_FROM.</span>' ?></td></tr>
+                        <tr><td style="color:#64748b;">cURL extension</td><td><?= $hasCurl ? 'Enabled' : '<span style="color:#dc2626;font-weight:600;">Disabled — the Brevo transport cannot work without it</span>' ?></td></tr>
                         <tr><td style="color:#64748b;">SMTP user</td><td><?= htmlspecialchars(defined('SMTP_USER') ? SMTP_USER : '') ?></td></tr>
                         <tr><td style="color:#64748b;">MAIL_FROM</td><td><?= htmlspecialchars(defined('MAIL_FROM') ? MAIL_FROM : '') ?></td></tr>
                         <tr><td style="color:#64748b;">MAIL_FROM_NAME</td><td><?= htmlspecialchars(defined('MAIL_FROM_NAME') ? MAIL_FROM_NAME : '') ?></td></tr>

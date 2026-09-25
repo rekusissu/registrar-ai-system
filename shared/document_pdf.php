@@ -16,7 +16,13 @@
 //  raw PDF bytes + filename + fingerprint. No side effects.
 // ============================================================
 
-require_once __DIR__ . '/../vendor/autoload.php';
+// Guarded: vendor/ is gitignored, so a deploy without `composer install`
+// has no autoload.php, and an unguarded require_once on a missing file is
+// a FATAL error (not a warning). That killed the whole mail module on
+// hosts where the Brevo/Gmail API paths would otherwise have worked.
+if (is_file(__DIR__ . '/../vendor/autoload.php')) {
+    require_once __DIR__ . '/../vendor/autoload.php';
+}
 
 // NOTE: TCPDF's config (loaded via composer autoload) sets
 // K_TCPDF_THROW_EXCEPTION_ERROR=false, so raster Image() failures would

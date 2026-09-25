@@ -23,7 +23,19 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/database.php';
 require_once __DIR__ . '/functions.php';
 require_once __DIR__ . '/document_pdf.php'; // buildInvoicePdf / buildTranscriptPdf
-require_once __DIR__ . '/../vendor/autoload.php';
+// PHPMailer is only needed for the SMTP fallback transport. The Brevo
+// and Gmail API paths use cURL directly and need no composer packages.
+//
+// This require is GUARDED on purpose. vendor/ is gitignored, so a
+// git-based deploy that forgets `composer install` has no autoload.php —
+// and an unguarded require_once on a missing file is a FATAL error, not
+// a warning. That took the whole mail module (and any page that sent
+// mail) down on a host where Brevo alone was configured and working.
+if (is_file(__DIR__ . '/../vendor/autoload.php')) {
+    require_once __DIR__ . '/../vendor/autoload.php';
+} else {
+    error_log('mail: vendor/autoload.php missing — run composer install. Brevo/Gmail API still work; SMTP is disabled.');
+}
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception as PHPMailerException;
@@ -59,6 +71,13 @@ function sendEmail(array $to, string $subject, string $htmlBody, ?array $attachm
     }
 
     // ── SMTP fallback (PHPMailer) ──
+    // Only reachable if PHPMailer is actually installed. Without the
+    // composer autoloader the class is undefined, so guard before
+    // instantiating rather than fataling on a missing class.
+    if (!class_exists(PHPMailer::class)) {
+        error_log('mail: SMTP fallback requested but PHPMailer is not installed (run composer install).');
+        return false;
+    }
     $mail = new PHPMailer(true);
     try {
         $mail->isSMTP();
@@ -104,8 +123,18 @@ function sendEmail(array $to, string $subject, string $htmlBody, ?array $attachm
 function sendViaBrevo(array $to, string $subject, string $htmlBody, ?array $attachment = null): ?bool {
     if (!BREVO_CONFIGURED) return null;
 
+    // Brevo rejects a request whose sender is missing or unverified with
+    // an opaque HTTP 400 ("sender email is invalid"). A Brevo-only setup
+    // has no SMTP_USER to fall back on, so an unset MAIL_FROM silently
+    // produced an empty sender here. Fail loudly and specifically instead.
+    $senderEmail = (defined('MAIL_FROM') ? MAIL_FROM : '') ?: (defined('SMTP_USER') ? SMTP_USER : '');
+    if ($senderEmail === '') {
+        error_log('mail: Brevo API skipped — no sender address. Set MAIL_FROM to an address verified in Brevo.');
+        return false;
+    }
+
     $payload = [
-        'sender'      => ['email' => MAIL_FROM ?: SMTP_USER, 'name' => MAIL_FROM_NAME ?: 'BCP Registrar System'],
+        'sender'      => ['email' => $senderEmail, 'name' => MAIL_FROM_NAME ?: 'BCP Registrar System'],
         'to'          => [['email' => $to['email'], 'name' => $to['name'] ?? '']],
         'subject'     => $subject,
         'htmlContent' => $htmlBody,
