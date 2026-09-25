@@ -93,33 +93,36 @@ include '../includes/sidebar.php';
     </div>
 </section>
 
-<div class="status-strip" aria-label="Clinic workspace status">
-    <div class="s-item">
-        <div class="s-icon blue"><i class="fa-solid fa-id-card-clip"></i></div>
-        <div><div class="s-value" id="stripState">Ready</div><div class="s-label">Student Tap-In</div></div>
-    </div>
-</div>
-
 <div class="clinic-grid">
     <!-- TAP-IN -->
-    <div class="tap-card">
-        <div class="tap-icon"><i class="fas fa-credit-card"></i></div>
-        <div class="tap-title">Student Tap-In</div>
-        <div class="tap-sub">Tap the RFID student ID card on the reader</div>
-        <div class="tap-status awaiting" id="tapStatus"><i class="fas fa-circle-dot" style="color:#0d9488;margin-right:6px;"></i>Awaiting card tap&hellip;</div>
-        <input id="tapInput" type="text" maxlength="10" autocomplete="off" aria-label="Card UID" />
+    <section class="tap-card" aria-labelledby="tapInTitle">
+        <div class="tap-card-header">
+            <div class="tap-icon"><i class="fas fa-credit-card"></i></div>
+            <div class="tap-heading">
+                <div class="tap-title" id="tapInTitle">Student Tap-In</div>
+                <div class="tap-sub">RFID or student search</div>
+            </div>
+            <div class="tap-ready" aria-live="polite">
+                <span class="tap-ready-dot"></span>
+                <span id="stripState">Ready</span>
+            </div>
+        </div>
+        <p class="tap-instruction">Tap the student ID card on the connected reader.</p>
+        <div class="tap-status awaiting" id="tapStatus"><i class="fas fa-circle-dot"></i>Awaiting card tap&hellip;</div>
+        <label class="tap-field-label" for="tapInput">Card UID</label>
+        <input id="tapInput" class="tap-input" type="text" maxlength="10" inputmode="numeric" autocomplete="off" placeholder="Waiting for card" aria-label="Card UID" />
 
         <div class="divider">or</div>
 
-        <label class="section-label" style="margin-top:0;">Search student by name or ID</label>
+        <label class="section-label" for="studentSearch">Search student by name or ID</label>
         <div class="student-search-wrap">
             <i class="fas fa-magnifying-glass"></i>
-            <input id="studentSearch" type="text" class="student-search-input" placeholder="Type name or student number&hellip;" autocomplete="off" />
+            <input id="studentSearch" type="text" class="student-search-input" placeholder="Type name or student number" autocomplete="off" />
             <div id="searchDropdown" class="search-dropdown"></div>
         </div>
-    </div>
-<!-- ─── WORKSPACE ─── -->
-    <div class="ws-panel" id="wsPanel">
+    </section>
+    <!-- ─── WORKSPACE ─── -->
+    <section class="ws-panel" id="wsPanel" aria-label="Student visit workspace">
         <div id="wsEmpty" class="workspace-empty">
             <div class="workspace-empty-icon"><i class="fas fa-hand-pointer"></i></div>
             <strong>Identify a student to begin</strong>
@@ -245,7 +248,7 @@ include '../includes/sidebar.php';
                 </div>
             </div>
         </div>
-    </div>
+    </section>
 </div>
 <!-- ─── VISIT HISTORY (selected student) ─── -->
 <div class="ws-panel clinic-data-panel" id="historyPanel" style="display:none;">
