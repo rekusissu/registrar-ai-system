@@ -4,6 +4,8 @@ require_once __DIR__ . '/../shared/session_config.php';
 requireRole('nurse');
 require_once __DIR__ . '/../shared/database.php';
 
+$db = Database::getInstance();
+
 $page_title = 'Visit Statistics';
 $APP_ROOT = '../';
 $ACTIVE_NAV = 'nurse_stats';
@@ -14,122 +16,114 @@ $thisMonth = date('Y-m-01');
 
 $stats = [
     'today'     => (int) $db->fetchColumn("SELECT COUNT(*) FROM health_visits WHERE DATE(COALESCE(date_time, visit_date)) = ?", [$today]),
-    'thisWeek'  => (int) $db->fetchColumn("SELECT COUNT(*) FROM health_visits WHERE DATE(COALESCE(date_time, visit_date)) >= ?", [$thisWeek]),
-    'thisMonth' => (int) $db->fetchColumn("SELECT COUNT(*) FROM health_visits WHERE DATE(COALESCE(date_time, visit_date)) >= ?", [$thisMonth]),
+    'thisWeek'  => (int) $db->fetchColumn("SELECT COUNT(*) FROM health_visits WHERE DATE(COALESCE(date_time, visit_date)) BETWEEN ? AND ?", [$thisWeek, $today]),
+    'thisMonth' => (int) $db->fetchColumn("SELECT COUNT(*) FROM health_visits WHERE DATE(COALESCE(date_time, visit_date)) BETWEEN ? AND ?", [$thisMonth, $today]),
     'total'     => (int) $db->fetchColumn("SELECT COUNT(*) FROM health_visits"),
     'pending'   => (int) $db->fetchColumn("SELECT COUNT(*) FROM health_visits WHERE record_status = 'Pending'"),
 ];
 
-$thirtyDaysAgo = date('Y-m-d', strtotime('-30 days'));
-$topReasons = $db->fetchAll("SELECT reason_for_visit, COUNT(*) AS cnt FROM health_visits WHERE reason_for_visit IS NOT NULL AND reason_for_visit != '' AND DATE(COALESCE(date_time, visit_date)) >= ? GROUP BY reason_for_visit ORDER BY cnt DESC LIMIT 8", [$thirtyDaysAgo]);
-$dailyVisits = $db->fetchAll("SELECT DATE(COALESCE(date_time, visit_date)) AS dt, COUNT(*) AS cnt FROM health_visits WHERE DATE(COALESCE(date_time, visit_date)) >= DATE_SUB(CURDATE(), INTERVAL 14 DAY) GROUP BY dt ORDER BY dt ASC");
-$hourly = $db->fetchAll("SELECT HOUR(date_time) AS hr, COUNT(*) AS cnt FROM health_visits WHERE date_time IS NOT NULL AND DATE(date_time) >= ? GROUP BY hr ORDER BY hr ASC", [$thirtyDaysAgo]);
-$recentVisits = $db->fetchAll("SELECT hv.*, s.first_name, s.last_name, s.student_id FROM health_visits hv LEFT JOIN students s ON hv.student_id = s.id ORDER BY COALESCE(hv.date_time, hv.visit_date) DESC LIMIT 15");
-$chartData = json_encode(['topReasons'=>$topReasons, 'dailyVisits'=>$dailyVisits, 'hourly'=>$hourly]);
+$reportStartDate = date('Y-m-d', strtotime('-29 days'));
+$topReasons = $db->fetchAll("SELECT reason_for_visit, COUNT(*) AS cnt FROM health_visits WHERE reason_for_visit IS NOT NULL AND reason_for_visit != '' AND DATE(COALESCE(date_time, visit_date)) BETWEEN ? AND ? GROUP BY reason_for_visit ORDER BY cnt DESC LIMIT 8", [$reportStartDate, $today]);
+$dailyCounts = [];
+$dailyRows = $db->fetchAll("SELECT DATE(COALESCE(date_time, visit_date)) AS dt, COUNT(*) AS cnt FROM health_visits WHERE COALESCE(date_time, visit_date) IS NOT NULL AND DATE(COALESCE(date_time, visit_date)) BETWEEN DATE_SUB(CURDATE(), INTERVAL 13 DAY) AND CURDATE() GROUP BY dt");
+foreach ($dailyRows as $dailyRow) {
+    $dailyCounts[$dailyRow['dt']] = (int) $dailyRow['cnt'];
+}
+$dailyVisits = [];
+for ($offset = 13; $offset >= 0; $offset--) {
+    $chartDate = date('Y-m-d', strtotime("-{$offset} days"));
+    $dailyVisits[] = ['dt' => $chartDate, 'cnt' => $dailyCounts[$chartDate] ?? 0];
+}
+$hourly = $db->fetchAll("SELECT HOUR(date_time) AS hr, COUNT(*) AS cnt FROM health_visits WHERE date_time IS NOT NULL AND DATE(date_time) BETWEEN ? AND ? GROUP BY hr ORDER BY hr ASC", [$reportStartDate, $today]);
+$recentVisits = $db->fetchAll("SELECT hv.*, s.first_name, s.last_name, s.student_number FROM health_visits hv LEFT JOIN students s ON hv.student_id = s.id ORDER BY COALESCE(hv.date_time, hv.visit_date, hv.created_at) DESC, hv.id DESC LIMIT 15");
+$chartData = json_encode(
+    ['topReasons' => $topReasons, 'dailyVisits' => $dailyVisits, 'hourly' => $hourly, 'reportDate' => $today],
+    JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+);
 
 include '../includes/header.php';
 include '../includes/sidebar.php';
 ?>
 
 <style>
-.stats-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:1rem;margin-bottom:1.5rem}
-@media(max-width:1200px){.stats-grid{grid-template-columns:repeat(3,1fr)}}
-@media(max-width:768px){.stats-grid{grid-template-columns:repeat(2,1fr)}}
-.stat-card{background:#fff;border-radius:12px;padding:1.25rem;display:flex;align-items:center;gap:1rem;box-shadow:0 1px 3px rgba(0,0,0,.08);border-left:4px solid #0d9488}
-.stat-card .icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0}
-.stat-card.today .icon{background:#e0f2fe;color:#0284c7}
-.stat-card.week .icon{background:#d1fae5;color:#059669}
-.stat-card.month .icon{background:#fef3c7;color:#d97706}
-.stat-card.total .icon{background:#ede9fe;color:#7c3aed}
-.stat-card.pending .icon{background:#fee2e2;color:#dc2626}
-.stat-card .stat-label{font-size:.8rem;color:#6b7280;text-transform:uppercase;letter-spacing:.05em}
-.stat-card .stat-value{font-size:1.5rem;font-weight:700;color:#1f2937}
-.panels-grid{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem}
-@media(max-width:900px){.panels-grid{grid-template-columns:1fr}}
-.panel{background:#fff;border-radius:12px;padding:1.5rem;box-shadow:0 1px 3px rgba(0,0,0,.08)}
-.panel-title{font-size:1rem;font-weight:600;color:#1f2937;margin-bottom:1rem;padding-bottom:.5rem;border-bottom:1px solid #e5e7eb}
-.bar-chart{display:flex;align-items:flex-end;gap:6px;height:180px;padding-top:10px}
-.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
-.bar-col .bar{width:100%;max-width:36px;background:#0d9488;border-radius:4px 4px 0 0;min-height:2px}
-.bar-col .bar-val{font-size:.7rem;color:#374151;margin-bottom:3px;font-weight:600}
-.bar-col .bar-lbl{font-size:.65rem;color:#6b7280;margin-top:4px;white-space:nowrap}
-.hbar-row{display:flex;align-items:center;margin-bottom:.6rem;gap:.5rem}
-.hbar-label{width:140px;font-size:.8rem;color:#374151;text-align:right;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.hbar-track{flex:1;background:#f3f4f6;border-radius:6px;height:22px;overflow:hidden}
-.hbar-fill{height:100%;background:#0d9488;border-radius:6px;display:flex;align-items:center;padding-left:8px;min-width:24px}
-.hbar-fill span{font-size:.7rem;color:#fff;font-weight:600}
-.hour-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:6px}
-@media(max-width:600px){.hour-grid{grid-template-columns:repeat(6,1fr)}}
-.hour-cell{text-align:center;padding:.5rem .25rem;border-radius:8px;background:#f9fafb;border:1px solid #e5e7eb}
-.hour-cell .h-num{font-size:.7rem;color:#6b7280}
-.hour-cell .h-count{font-size:1.1rem;font-weight:700;color:#1f2937}
-.hour-cell.peak{background:#ccfbf1;border-color:#0d9488}
-.hour-cell.peak .h-count{color:#0d9488}
-.recent-table{width:100%;border-collapse:collapse}
-.recent-table th,.recent-table td{padding:.65rem .75rem;text-align:left;font-size:.82rem;border-bottom:1px solid #f3f4f6}
-.recent-table th{background:#f9fafb;color:#6b7280;font-weight:600;text-transform:uppercase;font-size:.7rem;letter-spacing:.04em}
-.recent-table tr:hover td{background:#f0fdfa}
-.status-badge{display:inline-block;padding:.15rem .55rem;border-radius:9999px;font-size:.72rem;font-weight:600}
-.status-badge.pending{background:#fef3c7;color:#92400e}
-.status-badge.completed{background:#d1fae5;color:#065f46}
-.status-badge.cancelled{background:#fee2e2;color:#991b1b}
-.back-link{display:inline-flex;align-items:center;gap:.4rem;color:#0d9488;text-decoration:none;font-weight:500;font-size:.9rem;margin-bottom:1rem}
-.back-link:hover{text-decoration:underline}
-.empty-msg{color:#9ca3af;font-style:italic;font-size:.85rem;padding:2rem;text-align:center}
+.visit-report{max-width:1480px;margin:0 auto;color:#0f172a}.visit-report-header{position:relative;overflow:hidden;margin-bottom:22px;padding:24px 26px;background:#fff;border:1px solid #dbe8e6;border-radius:18px;box-shadow:0 8px 28px rgba(15,118,110,.06)}.visit-report-header::before{content:"";position:absolute;inset:0 auto 0 0;width:5px;background:#0f766e}.visit-report-header::after{content:"";position:absolute;right:-80px;top:-120px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(13,148,136,.12),transparent 68%)}.visit-report-header h1{position:relative;margin:0 0 5px;font-size:26px;line-height:1.2;letter-spacing:-.5px;color:#0f172a}.visit-report-header p{position:relative;margin:0;color:#64748b;font-size:13px}.report-date{position:relative;display:inline-flex;margin-top:15px;padding:7px 11px;border:1px solid #ccfbf1;border-radius:999px;background:#f0fdfa;color:#0f766e;font-size:11px;font-weight:700}
+.stat-strip{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));margin-bottom:18px;background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 6px 22px rgba(15,23,42,.04);overflow:hidden}.stat-metric{position:relative;padding:20px 22px;border-right:1px solid #e2e8f0}.stat-metric:last-child{border-right:0}.stat-metric::after{content:"";position:absolute;left:22px;right:22px;bottom:0;height:3px;background:#ccfbf1}.stat-metric.today::after,.stat-metric.week::after{background:#0f766e}.stat-metric.pending::after{background:#b45309}.stat-metric .stat-label{font-size:11px;font-weight:700;letter-spacing:.07em;color:#64748b;text-transform:uppercase}.stat-metric .stat-value{margin-top:7px;font-size:30px;line-height:1;font-weight:800;color:#0f172a;font-variant-numeric:tabular-nums}.stat-metric .stat-context{margin-top:7px;font-size:11px;color:#94a3b8}.stat-metric.pending .stat-value{color:#b45309}
+.report-section{margin-bottom:18px}.report-grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(300px,.85fr);gap:18px;margin-bottom:18px}.report-panel{background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 6px 22px rgba(15,23,42,.04);overflow:hidden}.panel-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:18px 20px 15px;border-bottom:1px solid #e2e8f0}.panel-heading h2{margin:0 0 3px;font-size:14px;font-weight:750;color:#0f172a}.panel-heading p{margin:0;font-size:11px;color:#94a3b8}.panel-body{padding:18px 20px}.chart-note{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;font-size:10px;font-weight:700;color:#0f766e}.chart-note::before{content:"";width:7px;height:7px;border-radius:2px;background:#0f766e}
+.bar-chart{position:relative;display:grid;grid-template-columns:repeat(14,minmax(24px,1fr));align-items:end;gap:7px;height:238px;padding:12px 4px 26px;border-bottom:1px solid #cbd5e1;background:repeating-linear-gradient(to top,transparent 0,transparent 55px,rgba(226,232,240,.8) 56px)}.bar-col{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-width:0}.bar-col .bar-val{font-size:10px;font-weight:750;color:#475569;margin-bottom:5px;font-variant-numeric:tabular-nums}.bar-col .bar{width:min(26px,72%);min-height:3px;background:linear-gradient(180deg,#14b8a6,#0f766e);border-radius:5px 5px 1px 1px;box-shadow:0 5px 12px rgba(15,118,110,.13)}.bar-col .bar-lbl{position:absolute;bottom:-22px;font-size:9px;color:#94a3b8;white-space:nowrap}.bar-col:nth-child(even) .bar-lbl{display:none}
+.reason-list{display:grid;gap:14px}.hbar-row{display:grid;grid-template-columns:minmax(90px,140px) minmax(80px,1fr) 24px;align-items:center;gap:10px}.hbar-label{font-size:11px;color:#475569;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hbar-track{height:9px;background:#edf2f7;border-radius:99px;overflow:hidden}.hbar-fill{height:100%;background:linear-gradient(90deg,#0f766e,#2dd4bf);border-radius:99px}.hbar-count{font-size:11px;font-weight:750;color:#334155;text-align:right;font-variant-numeric:tabular-nums}
+.hour-grid{display:grid;grid-template-columns:repeat(12,minmax(42px,1fr));gap:7px;overflow-x:auto;padding-bottom:4px}.hour-cell{min-height:65px;padding:10px 6px;text-align:center;border:1px solid #e2e8f0;border-radius:9px;background:#f8fafc}.hour-cell .h-num{display:block;font-size:9px;font-weight:650;color:#94a3b8}.hour-cell .h-count{display:block;margin-top:5px;font-size:16px;font-weight:800;color:#334155;font-variant-numeric:tabular-nums}.hour-cell.peak{background:#ccfbf1;border-color:#0f766e;box-shadow:inset 0 -3px 0 #0f766e}.hour-cell.peak .h-count{color:#0f766e}
+.findings-list{display:grid;gap:0}.finding-row{display:grid;grid-template-columns:minmax(130px,.8fr) minmax(0,1.2fr);gap:14px;align-items:center;padding:13px 0;border-bottom:1px solid #f1f5f9}.finding-row:last-child{border-bottom:0;padding-bottom:0}.finding-row:first-child{padding-top:0}.finding-label{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#94a3b8}.finding-value{font-size:13px;font-weight:750;color:#0f172a;text-align:right;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+.recent-wrap{overflow-x:auto}.recent-table{width:100%;border-collapse:collapse}.recent-table th,.recent-table td{padding:13px 18px;text-align:left;font-size:12px;border-bottom:1px solid #f1f5f9}.recent-table th{background:#f8fafc;color:#64748b;font-size:10px;font-weight:750;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap}.recent-table td{color:#334155}.recent-table tr:last-child td{border-bottom:0}.recent-table tbody tr:hover td{background:#f0fdfa}.status-badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:10px;font-weight:750}.status-badge.pending{background:#fffbeb;color:#92400e}.status-badge.completed{background:#ecfdf5;color:#065f46}.status-badge.cancelled{background:#fef2f2;color:#991b1b}
+.empty-msg{grid-column:1/-1;color:#94a3b8;font-size:12px;padding:30px;text-align:center}.back-link{display:inline-flex;align-items:center;gap:7px;margin-bottom:14px;color:#0f766e;text-decoration:none;font-size:12px;font-weight:700}.back-link:hover{text-decoration:underline}.back-link:focus-visible{outline:3px solid rgba(15,118,110,.2);outline-offset:3px;border-radius:4px}
+@media(max-width:1150px){.stat-strip{grid-template-columns:repeat(3,1fr)}.stat-metric{border-bottom:1px solid #e2e8f0}.stat-metric:nth-child(3){border-right:0}.report-grid{grid-template-columns:1fr}}@media(max-width:700px){.visit-report-header{padding:20px}.stat-strip{grid-template-columns:1fr 1fr}.stat-metric{padding:17px}.stat-metric:nth-child(odd){border-right:1px solid #e2e8f0}.stat-metric:nth-child(even){border-right:0}.stat-metric:last-child{grid-column:1/-1}.report-grid{gap:14px}.bar-chart{gap:4px}.hour-grid{grid-template-columns:repeat(8,1fr)}.finding-row{grid-template-columns:1fr;gap:3px}.finding-value{text-align:left}}@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 </style>
 
 <div class="dashboard-main">
-<div class="dashboard-container">
-<a href="dashboard.php" class="back-link">&#8592; Back to Dashboard</a>
+<div class="dashboard-container visit-report">
+<a href="dashboard.php" class="back-link">Back to clinic dashboard</a>
+<header class="visit-report-header">
+    <h1>Visit statistics</h1>
+    <p>Monitor clinic demand, recurring reasons, and peak service periods.</p>
+    <span class="report-date">Reporting period: <?= htmlspecialchars(date('M d, Y'), ENT_QUOTES, 'UTF-8') ?></span>
+</header>
 
-<div class="stats-grid">
-<div class="stat-card today"><div class="icon">&#128197;</div><div><div class="stat-label">Today</div><div class="stat-value"><?php echo $stats['today']; ?></div></div></div>
-<div class="stat-card week"><div class="icon">&#128198;</div><div><div class="stat-label">This Week</div><div class="stat-value"><?php echo $stats['thisWeek']; ?></div></div></div>
-<div class="stat-card month"><div class="icon">&#128202;</div><div><div class="stat-label">This Month</div><div class="stat-value"><?php echo $stats['thisMonth']; ?></div></div></div>
-<div class="stat-card total"><div class="icon">&#128200;</div><div><div class="stat-label">Total Visits</div><div class="stat-value"><?php echo $stats['total']; ?></div></div></div>
-<div class="stat-card pending"><div class="icon">&#8987;</div><div><div class="stat-label">Pending</div><div class="stat-value"><?php echo $stats['pending']; ?></div></div></div>
-</div>
+<section class="stat-strip" aria-label="Visit totals">
+    <div class="stat-metric today"><div class="stat-label">Today</div><div class="stat-value"><?= $stats['today'] ?></div><div class="stat-context">Visits received today</div></div>
+    <div class="stat-metric week"><div class="stat-label">This week</div><div class="stat-value"><?= $stats['thisWeek'] ?></div><div class="stat-context">Monday through today</div></div>
+    <div class="stat-metric month"><div class="stat-label">This month</div><div class="stat-value"><?= $stats['thisMonth'] ?></div><div class="stat-context">Month-to-date activity</div></div>
+    <div class="stat-metric total"><div class="stat-label">All visits</div><div class="stat-value"><?= $stats['total'] ?></div><div class="stat-context">Complete visit history</div></div>
+    <div class="stat-metric pending"><div class="stat-label">Pending</div><div class="stat-value"><?= $stats['pending'] ?></div><div class="stat-context">Awaiting completion</div></div>
+</section>
 
-<div class="panels-grid">
-<div class="panel"><div class="panel-title">Daily Visits &mdash; Last 14 Days</div><div id="daily-chart" class="bar-chart"></div></div>
-<div class="panel"><div class="panel-title">Top Reasons for Visit &mdash; Last 30 Days</div><div id="reasons-chart"></div></div>
-</div>
-
-<div class="panels-grid">
-<div class="panel"><div class="panel-title">Visits by Hour &mdash; Last 30 Days</div><div id="hourly-chart" class="hour-grid"></div></div>
-<div class="panel"><div class="panel-title">Summary</div>
-<div style="padding:1rem 0;font-size:.9rem;color:#374151;line-height:1.8">
-<div>&#128197; <strong>Average per day (14d):</strong> <span id="avg-daily">-</span></div>
-<div>&#128202; <strong>Peak day (14d):</strong> <span id="peak-day">-</span></div>
-<div>&#127976; <strong>Peak hour (30d):</strong> <span id="peak-hour">-</span></div>
-<div>&#128211; <strong>Most common reason:</strong> <span id="top-reason">-</span></div>
-</div>
-</div>
-</div>
-
-<div class="panel" style="margin-bottom:1.5rem">
-<div class="panel-title">Recent Visits</div>
-<div style="overflow-x:auto">
-<table class="recent-table">
-<thead><tr><th>Date &amp; Time</th><th>Student</th><th>ID</th><th>Reason</th><th>Status</th></tr></thead>
-<tbody>
-<?php if (empty($recentVisits)): ?>
-<tr><td colspan="5" class="empty-msg">No visits recorded yet.</td></tr>
-<?php else: ?>
-<?php foreach ($recentVisits as $v): ?>
-<tr>
-<td><?php echo htmlspecialchars($v['date_time'] ?? $v['visit_date'] ?? 'N/A'); ?></td>
-<td><?php echo htmlspecialchars(($v['first_name'] ?? '') . ' ' . ($v['last_name'] ?? '')); ?></td>
-<td><?php echo htmlspecialchars($v['student_id'] ?? $v['student_id_number'] ?? 'N/A'); ?></td>
-<td><?php echo htmlspecialchars($v['reason_for_visit'] ?? '-'); ?></td>
-<td><?php $status = strtolower($v['record_status'] ?? 'pending'); $cls = 'pending'; if (strpos($status,'complet')!==false) $cls='completed'; elseif (strpos($status,'cancel')!==false) $cls='cancelled'; ?><span class="status-badge <?php echo $cls; ?>"><?php echo htmlspecialchars($v['record_status'] ?? 'Pending'); ?></span></td>
-</tr>
-<?php endforeach; ?>
-<?php endif; ?>
-</tbody></table>
-</div>
+<div class="report-grid">
+    <section class="report-panel">
+        <div class="panel-heading"><div><h2>Daily visit volume</h2><p>Fourteen-day clinic activity</p></div><span class="chart-note">Visits per day</span></div>
+        <div class="panel-body"><div id="daily-chart" class="bar-chart" role="img" aria-label="Daily clinic visits over the last fourteen days"></div></div>
+    </section>
+    <section class="report-panel">
+        <div class="panel-heading"><div><h2>Common reasons</h2><p>Leading reasons over 30 days</p></div></div>
+        <div class="panel-body"><div id="reasons-chart" class="reason-list" role="img" aria-label="Most common reasons for clinic visits"></div></div>
+    </section>
 </div>
 
+<div class="report-grid">
+    <section class="report-panel">
+        <div class="panel-heading"><div><h2>Service-hour distribution</h2><p>Visit volume by hour over 30 days</p></div><span class="chart-note">Peak hour highlighted</span></div>
+        <div class="panel-body"><div id="hourly-chart" class="hour-grid" role="img" aria-label="Clinic visits grouped by hour of day"></div></div>
+    </section>
+    <section class="report-panel">
+        <div class="panel-heading"><div><h2>Key findings</h2><p>Summary of the current reporting period</p></div></div>
+        <div class="panel-body"><div class="findings-list">
+            <div class="finding-row"><span class="finding-label">Average per day</span><strong class="finding-value" id="avg-daily">Not available</strong></div>
+            <div class="finding-row"><span class="finding-label">Peak day</span><strong class="finding-value" id="peak-day">Not available</strong></div>
+            <div class="finding-row"><span class="finding-label">Peak hour</span><strong class="finding-value" id="peak-hour">Not available</strong></div>
+            <div class="finding-row"><span class="finding-label">Common reason</span><strong class="finding-value" id="top-reason">Not available</strong></div>
+        </div></div>
+    </section>
+</div>
+
+<section class="report-panel">
+    <div class="panel-heading"><div><h2>Recent visits</h2><p>Latest clinic activity and record status</p></div><span class="chart-note">15 most recent</span></div>
+    <div class="recent-wrap">
+    <table class="recent-table">
+        <thead><tr><th>Date and time</th><th>Student</th><th>Student ID</th><th>Reason</th><th>Status</th></tr></thead>
+        <tbody>
+        <?php if (empty($recentVisits)): ?>
+        <tr><td colspan="5" class="empty-msg">No visits have been recorded yet.</td></tr>
+        <?php else: ?>
+        <?php foreach ($recentVisits as $v): ?>
+        <tr>
+            <td><?php echo htmlspecialchars($v['date_time'] ?? $v['visit_date'] ?? 'Not available', ENT_QUOTES, 'UTF-8'); ?></td>
+            <td><?php echo htmlspecialchars(trim(($v['first_name'] ?? '') . ' ' . ($v['last_name'] ?? '')), ENT_QUOTES, 'UTF-8'); ?></td>
+            <td><?php echo htmlspecialchars(($v['student_number'] ?? '') !== '' ? $v['student_number'] : ($v['student_id'] ?? 'Not available'), ENT_QUOTES, 'UTF-8'); ?></td>
+            <td><?php echo htmlspecialchars($v['reason_for_visit'] ?? 'Not recorded', ENT_QUOTES, 'UTF-8'); ?></td>
+            <td><?php $status = strtolower($v['record_status'] ?? 'pending'); $cls = 'pending'; if (strpos($status,'record')!==false) $cls = 'completed'; elseif (strpos($status,'cancel')!==false) $cls = 'cancelled'; ?><span class="status-badge <?= $cls ?>"><?php echo htmlspecialchars($v['record_status'] ?? 'Pending', ENT_QUOTES, 'UTF-8'); ?></span></td>
+        </tr>
+        <?php endforeach; ?>
+        <?php endif; ?>
+        </tbody></table>
+    </div>
+</section>
 </div>
 </div>
 
@@ -138,63 +132,53 @@ include '../includes/sidebar.php';
 var CHART_DATA = <?php echo $chartData; ?>;
 (function(){
     'use strict';
-    function renderDaily(d) {
+    function esc(value) {
+        return String(value == null ? '' : value)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    }
+    function renderDaily(data) {
         var el = document.getElementById('daily-chart');
-        if (!d || !d.length) { el.innerHTML = '<div class="empty-msg">No data</div>'; return; }
-        var mx = Math.max.apply(null, d.map(function(x){ return parseInt(x.cnt,10); }));
-        if (mx === 0) mx = 1;
-        var h = '';
-        d.forEach(function(r) {
-            var ht = Math.round((parseInt(r.cnt,10) / mx) * 100);
-            var s = r.dt ? r.dt.substring(5) : '';
-            h += '<div class="bar-col"><div class="bar-val">' + r.cnt + '</div><div class="bar" style="height:' + ht + '%"></div><div class="bar-lbl">' + s + '</div></div>';
-        });
-        el.innerHTML = h;
-        var tot = d.reduce(function(a,b){ return a + parseInt(b.cnt,10); }, 0);
-        var avg = (tot / d.length).toFixed(1);
-        var pk = d.reduce(function(a,b){ return parseInt(b.cnt,10) > parseInt(a.cnt,10) ? b : a; });
-        var ae = document.getElementById('avg-daily');
-        var pe = document.getElementById('peak-day');
-        if (ae) ae.textContent = avg;
-        if (pe) pe.textContent = (pk.dt || '-') + ' (' + pk.cnt + ')';
+        var values = data || [];
+        var total = values.reduce(function(sum, row) { return sum + Number(row.cnt || 0); }, 0);
+        var max = Math.max.apply(null, values.map(function(row) { return Number(row.cnt) || 0; })) || 1;
+        el.innerHTML = values.map(function(row) {
+            var count = Number(row.cnt) || 0;
+            var height = count ? Math.max(8, Math.round(count / max * 100)) : 2;
+            var label = row.dt.substring(5).replace('-', '/');
+            return '<div class="bar-col" title="' + esc(row.dt) + ': ' + count + ' visit' + (count === 1 ? '' : 's') + '">' +
+                '<span class="bar-val">' + count + '</span><span class="bar" style="height:' + height + '%"></span><span class="bar-lbl">' + esc(label) + '</span></div>';
+        }).join('');
+        var peak = values.reduce(function(best, row) { return row.cnt > best.cnt ? row : best; }, values[0]);
+        document.getElementById('avg-daily').textContent = (total / 14).toFixed(1);
+        document.getElementById('peak-day').textContent = total ? peak.dt + ' (' + peak.cnt + ')' : 'No visits recorded';
     }
 
-    function renderReasons(d) {
+    function renderReasons(data) {
         var el = document.getElementById('reasons-chart');
-        if (!d || !d.length) { el.innerHTML = '<div class="empty-msg">No data</div>'; return; }
-        var mx = Math.max.apply(null, d.map(function(x){ return parseInt(x.cnt,10); }));
-        if (mx === 0) mx = 1;
-        var h = '';
-        d.forEach(function(r) {
-            var w = Math.round((parseInt(r.cnt,10) / mx) * 100);
-            h += '<div class="hbar-row"><div class="hbar-label" title="' + (r.reason_for_visit||'') + '">' + (r.reason_for_visit||'') + '</div><div class="hbar-track"><div class="hbar-fill" style="width:' + w + '%"><span>' + r.cnt + '</span></div></div></div>';
-        });
-        el.innerHTML = h;
-        var te = document.getElementById('top-reason');
-        if (te && d.length) te.textContent = d[0].reason_for_visit + ' (' + d[0].cnt + ')';
+        if (!data || !data.length) { el.innerHTML = '<div class="empty-msg">No reasons recorded in the last 30 days.</div>'; document.getElementById('top-reason').textContent = 'Not available'; return; }
+        var max = Math.max.apply(null, data.map(function(row) { return Number(row.cnt) || 0; })) || 1;
+        el.innerHTML = data.map(function(row) {
+            var count = Number(row.cnt) || 0;
+            var width = Math.max(2, Math.round(count / max * 100));
+            return '<div class="hbar-row" title="' + esc(row.reason_for_visit) + '"><span class="hbar-label">' + esc(row.reason_for_visit) + '</span><span class="hbar-track"><span class="hbar-fill" style="width:' + width + '%"></span></span><span class="hbar-count">' + count + '</span></div>';
+        }).join('');
+        document.getElementById('top-reason').textContent = data[0].reason_for_visit + ' (' + Number(data[0].cnt) + ')';
     }
 
-    function renderHourly(d) {
+    function renderHourly(data) {
         var el = document.getElementById('hourly-chart');
-        var mp = {};
-        var mx = 0;
-        var pk = 0;
-        if (d) d.forEach(function(r) {
-            var hr = parseInt(r.hr,10);
-            var c = parseInt(r.cnt,10);
-            mp[hr] = c;
-            if (c > mx) { mx = c; pk = hr; }
-        });
-        var h = '';
-        for (var i = 0; i < 24; i++) {
-            var c = mp[i] || 0;
-            var cls = (c === mx && c > 0) ? ' hour-cell peak' : ' hour-cell';
-            var lb = i < 10 ? '0' + i : '' + i;
-            h += '<div class="' + cls + '"><div class="h-num">' + lb + ':00</div><div class="h-count">' + c + '</div></div>';
-        }
-        el.innerHTML = h;
-        var ph = document.getElementById('peak-hour');
-        if (ph && mx > 0) ph.textContent = (pk < 10 ? '0' : '') + pk + ':00 (' + mx + ')';
+        var counts = {};
+        (data || []).forEach(function(row) { counts[Number(row.hr)] = Number(row.cnt) || 0; });
+        var max = Math.max.apply(null, Object.keys(counts).map(function(hour) { return counts[hour]; })) || 0;
+        el.innerHTML = Array.from({ length: 24 }, function(_, hour) {
+            var count = counts[hour] || 0;
+            var label = (hour < 10 ? '0' : '') + hour + ':00';
+            return '<div class="hour-cell' + (count === max && count > 0 ? ' peak' : '') + '" title="' + label + ': ' + count + ' visit' + (count === 1 ? '' : 's') + '"><span class="h-num">' + label + '</span><span class="h-count">' + count + '</span></div>';
+        }).join('');
+        var peakHour = 0;
+        Object.keys(counts).forEach(function(hour) { if (counts[hour] > counts[peakHour]) peakHour = Number(hour); });
+        document.getElementById('peak-hour').textContent = max ? (peakHour < 10 ? '0' : '') + peakHour + ':00 (' + max + ')' : 'No visits recorded';
     }
 
     renderDaily(CHART_DATA.dailyVisits || []);
