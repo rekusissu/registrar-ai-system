@@ -158,8 +158,8 @@ include '../includes/sidebar.php';
 <!-- Two Panel Layout -->
 <div class="st-panels">
   <!-- Student Table -->
-  <div class="st-panel-heading"><div><h2>Student directory</h2><p>Select a student to review status history</p></div><span class="st-panel-chip"><i class="fas fa-users"></i> <?= number_format(count($students)) ?> shown</span></div>
   <div class="st-table-wrap">
+    <div class="st-panel-heading"><div><h2>Student directory</h2><p>Select a student to review status history</p></div><span class="st-panel-chip"><i class="fas fa-users"></i> <?= number_format(count($students)) ?> shown</span></div>
     <table>
       <thead>
         <tr>
@@ -222,8 +222,8 @@ include '../includes/sidebar.php';
   </div>
 
   <!-- Activity Timeline -->
-  <div class="st-tl">
-    <div class="st-panel-heading"><div><h2>Recent activity</h2><p>Latest status changes across students</p></div><span class="st-panel-chip"><i class="fas fa-clock-rotate-left"></i> Timeline</span></div>
+  <section class="st-tl" aria-labelledby="recentActivityTitle">
+    <div class="st-panel-heading"><div><h2 id="recentActivityTitle">Recent activity</h2><p>Latest status changes across students</p></div><span class="st-panel-chip"><i class="fas fa-clock-rotate-left"></i> Timeline</span></div>
     <?php if (empty($activityFeed)): ?>
       <div class="st-empty"><i class="fas fa-inbox"></i>No activity yet</div>
     <?php else: ?>
@@ -247,7 +247,7 @@ include '../includes/sidebar.php';
       <?php endforeach; ?>
     </div>
     <?php endif; ?>
-  </div>
+  </section>
 </div><!-- /st-panels -->
 </div><!-- /st-wrap -->
 </main><!-- /dashboard-main -->
