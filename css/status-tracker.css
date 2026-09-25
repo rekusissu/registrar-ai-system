@@ -232,4 +232,34 @@ body[data-page="status-tracker"] .st-tl{min-width:0;max-height:720px}
 @media(max-width:900px){body[data-page="status-tracker"] .st-panels{grid-template-columns:1fr}.st-tl{max-height:none}}
 @media(max-width:640px){body[data-page="status-tracker"] .st-ai-bar{grid-template-columns:1fr 1fr}.st-ai-bar-label{grid-column:1/-1}.st-ai-btn{justify-content:center}.st-ai-run-all{grid-column:1/-1}.st-table-wrap{overflow-x:auto}.st-table-wrap table{min-width:760px}}
 
+
+/* Final visual pass: coherent registrar-blue surfaces and readable data. */
+body[data-page="status-tracker"] .header{position:relative;overflow:hidden}
+body[data-page="status-tracker"] .header::after{content:"";position:absolute;right:-70px;top:-100px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(37,99,235,.1),transparent 68%);pointer-events:none}
+body[data-page="status-tracker"] .header>*{position:relative;z-index:1}
+body[data-page="status-tracker"] .st-kpi{transition:background .15s,box-shadow .15s}
+body[data-page="status-tracker"] .st-kpi:hover{background:#f8fbff;box-shadow:0 5px 16px rgba(37,99,235,.06)}
+body[data-page="status-tracker"] .st-kpi-icon{width:38px;height:38px;border-radius:11px}
+body[data-page="status-tracker"] .st-ai-section{position:relative}
+body[data-page="status-tracker"] .st-ai-bar{box-shadow:0 8px 24px rgba(37,99,235,.055)}
+body[data-page="status-tracker"] .st-ai-btn{min-height:38px;padding:8px 13px;border-radius:9px}
+body[data-page="status-tracker"] .st-ai-btn:focus-visible,body[data-page="status-tracker"] .st-pill:focus-visible,body[data-page="status-tracker"] .st-search input:focus-visible{outline:3px solid rgba(37,99,235,.22);outline-offset:2px}
+body[data-page="status-tracker"] .st-ai-run-all{box-shadow:0 5px 14px rgba(29,78,216,.18)}
+body[data-page="status-tracker"] .st-dist{box-shadow:0 8px 24px rgba(37,99,235,.045)}
+body[data-page="status-tracker"] .st-dist-bar{box-shadow:inset 0 0 0 1px rgba(30,64,175,.06)}
+body[data-page="status-tracker"] .st-dist-item{padding:4px 7px;border:1px solid #e5e7eb;border-radius:7px;background:#f8fafc}
+body[data-page="status-tracker"] .st-filters{position:relative}
+body[data-page="status-tracker"] .st-pill{min-height:34px;display:inline-flex;align-items:center;border-radius:9px}
+body[data-page="status-tracker"] .st-pill.active{box-shadow:0 4px 10px rgba(29,78,216,.2)}
+body[data-page="status-tracker"] .st-search input{height:36px;border-radius:9px;background:#f8fafc}
+body[data-page="status-tracker"] .st-table-wrap{box-shadow:0 10px 30px rgba(15,23,42,.06)}
+body[data-page="status-tracker"] .st-table-wrap th{height:44px}
+body[data-page="status-tracker"] .st-table-wrap td{height:58px}
+body[data-page="status-tracker"] .st-t-info{gap:12px}.st-t-av{width:38px;height:38px;font-size:12px}.st-t-name{font-size:12.5px}.st-t-num{font-size:10.5px;color:#64748b;margin-top:2px}
+body[data-page="status-tracker"] .st-badge{font-size:10.5px;padding:5px 9px}
+body[data-page="status-tracker"] .st-tl{box-shadow:0 10px 30px rgba(15,23,42,.06)}
+body[data-page="status-tracker"] .st-tl-b{padding-left:22px}.st-tl-b::before{content:"";position:absolute;left:4px;top:6px;bottom:4px;width:1px;background:#dbeafe}.st-tl-dot{left:-22px;top:5px;width:10px;height:10px;border:2px solid #fff}.st-tl-i{padding-bottom:20px}.st-tl-nm{font-size:12.5px}.st-tl-chg{margin-top:5px}.st-tl-rsn{border-radius:8px;background:#f8fafc}.st-tl-time{line-height:1.4}
+body[data-page="status-tracker"] .st-modal-header{position:sticky;top:0;z-index:2}.st-modal-close{width:32px;height:32px;border:1px solid #dbeafe;border-radius:9px;background:#fff}
+@media(max-width:640px){body[data-page="status-tracker"] .st-tl-b{padding-left:18px}.st-tl-b::before{left:3px}.st-tl-dot{left:-18px}}
+
 @media(max-width:640px){.st-ai-bar-label{width:100%;margin-bottom:2px}.st-ai-sep{display:none}.st-filters{align-items:stretch}.st-pill{text-align:center}.st-search{margin-left:0;width:100%}.st-search input,.st-search input:focus{width:100%}.st-panel-heading{padding:14px}.st-table-wrap .st-panel-heading{margin:0}.st-tl{padding:0 14px 14px}.st-tl .st-panel-heading{margin:0 -14px 14px}}
