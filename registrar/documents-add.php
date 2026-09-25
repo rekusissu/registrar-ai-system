@@ -18,7 +18,14 @@ requireRole('registrar');
 require_once __DIR__ . '/../shared/database.php';
 
 $db = Database::getInstance();
-$students = $db->fetchAll("SELECT id, student_number, CONCAT(first_name, ' ', last_name) AS name FROM students WHERE status = 'active' ORDER BY name");
+// Same status filter as documents.php: the column default is 'enrolled', so
+// `status = 'active'` hid most students from the picker. See the note there.
+$students = $db->fetchAll(
+    "SELECT id, student_number, CONCAT(first_name, ' ', last_name) AS name
+       FROM students
+      WHERE status IS NULL OR status NOT IN ('archived')
+      ORDER BY name"
+);
 $catalog = $db->fetchAll("SELECT * FROM document_catalog WHERE is_active = 1 ORDER BY id");
 
 $page_title = 'New Document Request';

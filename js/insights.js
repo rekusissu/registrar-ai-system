@@ -44,6 +44,9 @@
         generate:   document.getElementById('generateBtn'),
         cardGrid:   document.getElementById('statCards'),
         statusBadge: document.getElementById('statusBadge'),
+        programBadge: document.getElementById('programBadge'),
+        programCanvas: document.getElementById('programChart'),
+        programEmptyNote: document.getElementById('programEmptyNote'),
         docBadge:   document.getElementById('docBadge'),
         rfidBadge:  document.getElementById('rfidBadge'),
         rfidSubtitle: document.getElementById('rfidSubtitle'),
@@ -66,10 +69,24 @@
     };
 
     // ─── Chart.js global look (identical to the dashboard) ──────
+    // Neutral chrome is aligned to the registrar-blue tokens used by
+    // css/registrar*.css. Series colours are NOT touched: they come
+    // from shared/analytics.php and are shared with dashboard.php.
+    var T = {
+        ink:    '#0f172a',
+        muted:  '#64748b',
+        faint:  '#94a3b8',
+        grid:   '#f1f5f9',
+        axis:   '#e2e8f0',
+        brand:  '#2563eb',
+        deep:   '#1d4ed8',
+        pale:   '#93c5fd'
+    };
+
     if (window.Chart) {
         Chart.defaults.font.family = "'Inter', 'Segoe UI', -apple-system, sans-serif";
         Chart.defaults.font.weight = '500';
-        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.color = T.muted;
     }
 
     var tooltipStyle = {
@@ -116,11 +133,62 @@
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.font = '700 ' + big + "px 'Inter', sans-serif";
-            ctx.fillStyle = '#0f172a';
+            ctx.fillStyle = T.ink;
             ctx.fillText(String(chart.$centreValue == null ? total : chart.$centreValue), arc.x, arc.y - small * 0.4);
             ctx.font = '600 ' + small + "px 'Inter', sans-serif";
-            ctx.fillStyle = '#94a3b8';
+            ctx.fillStyle = T.faint;
             ctx.fillText(String(chart.$centreLabel || 'Total'), arc.x, arc.y + small * 1.1);
+            ctx.restore();
+        }
+    };
+
+    // Lollipop terminals. The datasets below draw only a thin stem; this
+    // draws the dot that the eye actually lands on, plus the value beside
+    // it, so a 4px stem never has to do the work of a full bar.
+    var lollipopEnds = {
+        id: 'lollipopEnds',
+        afterDatasetsDraw: function (chart) {
+            var totals = chart.$barTotals;
+            if (!totals || !totals.length) return;
+
+            // Stacked stems each report their own right edge; the furthest
+            // one per row is the true bar end.
+            var metas = chart.data.datasets.map(function (_, di) {
+                return chart.getDatasetMeta(di);
+            });
+            var radius = chart.$lollipopRadius || 5.5;
+
+            var ctx = chart.ctx;
+            ctx.save();
+
+            totals.forEach(function (total, i) {
+                var right = null, y = null;
+                for (var m = 0; m < metas.length; m++) {
+                    var bar = metas[m] && metas[m].data && metas[m].data[i];
+                    if (!bar) continue;
+                    if (right === null || bar.x > right) right = bar.x;
+                    if (y === null) y = bar.y;
+                }
+                if (right === null || y === null) return;
+
+                // No dot for an empty row — it would read as a real value.
+                if (total > 0) {
+                    ctx.beginPath();
+                    ctx.arc(right, y, radius, 0, Math.PI * 2);
+                    ctx.fillStyle = T.deep;
+                    ctx.fill();
+                    // White halo separates the dot from the stem it caps.
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = '#fff';
+                    ctx.stroke();
+                }
+
+                ctx.font = "700 11px 'Inter', 'Segoe UI', -apple-system, sans-serif";
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = T.ink;
+                ctx.fillText(String(total), right + radius + 8, y);
+            });
             ctx.restore();
         }
     };
@@ -208,66 +276,131 @@
             chartInstances.statusChart.update('none');
         }
 
-        // ── 2 · Student program distribution (treemap; grouped bar fallback) ──
+        // ── 2 · Student program distribution (ranked horizontal bars) ──
+        //
+        // Orientation: this chart was always authored for a horizontal
+        // layout — scales.x carries beginAtZero/grid/precision and scales.y
+        // turns its grid off, which is the value/category split of a
+        // horizontal bar. Without indexAxis:'y' Chart.js put the categories
+        // on x, so program names rendered as 40°-rotated ticks, the gridlines
+        // landed on the wrong axis, and the tooltip read ctx.parsed.x (the
+        // category index) instead of the enrolment count.
+        //
+        // Encoding: bars used to be coloured per program while the axis
+        // label already named the program — eight competing hues carrying no
+        // information, under a legend whose swatches matched none of them.
+        // Colour now means one thing only: the existing cohort vs. what
+        // arrived this period, with the count printed at each bar's end.
         var programCtx = mount('programChart');
         if (programCtx) {
             destroyChart('programChart');
-            var p = charts.program || { labels: [], values: [], new: [], colors: [] };
+            var p = charts.program || { labels: [], values: [], new: [] };
             var pHas = hasData(p.values);
 
-            chartInstances.programChart = new Chart(programCtx, {
-                type: 'bar',
-                data: {
-                    labels: (pHas ? p.labels : ['No students on record']).map(function (l) { return truncateLabel(l, 26); }),
-                    datasets: [
-                        {
-                            label: 'Total students',
-                            data: pHas ? p.values : [0],
-                            backgroundColor: pHas ? p.colors : ['#eef2f7'],
-                            borderRadius: 6,
-                            maxBarThickness: 22
-                        },
-                        {
-                            label: 'New this period',
-                            data: pHas ? (p.new || []) : [0],
-                            backgroundColor: '#0ea5e9',
-                            borderRadius: 6,
-                            maxBarThickness: 22
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    animation: { duration: 800, easing: 'easeOutQuart' },
-                    plugins: {
-                        legend: legendStyle,
-                        tooltip: Object.assign({}, tooltipStyle, {
-                            displayColors: true,
-                            callbacks: {
-                                title: function (items) {
-                                    var i = items[0].dataIndex;
-                                    return (p.labels && p.labels[i]) ? p.labels[i] : items[0].label;
-                                },
-                                label: function (ctx) { return ctx.dataset.label + ': ' + ctx.parsed.x; }
+            if (el.programEmptyNote) el.programEmptyNote.classList.toggle('is-empty', !pHas);
+            if (el.programCanvas) el.programCanvas.style.display = pHas ? '' : 'none';
+            if (el.programBadge) el.programBadge.textContent = pHas ? p.labels.length + ' programs' : 'No data';
+
+            if (pHas) {
+                // Rank by enrolment so position carries the ranking.
+                var order = p.values
+                    .map(function (_, i) { return i; })
+                    .sort(function (a, b) { return p.values[b] - p.values[a]; });
+
+                var names = order.map(function (i) { return String(p.labels[i] == null ? '' : p.labels[i]); });
+                var totals = order.map(function (i) { return Number(p.values[i]) || 0; });
+                // Guard against a new count exceeding the total it belongs to.
+                var fresh = order.map(function (i) {
+                    return Math.max(0, Math.min(Number((p.new || [])[i]) || 0, Number(p.values[i]) || 0));
+                });
+                var earlier = totals.map(function (t, i) { return Math.max(0, t - fresh[i]); });
+
+                var programChart = new Chart(programCtx, {
+                    type: 'bar',
+                    plugins: [lollipopEnds],
+                    data: {
+                        labels: names.map(function (l) { return truncateLabel(l, 30); }),
+                        datasets: [
+                            {
+                                label: 'Earlier students',
+                                data: earlier,
+                                backgroundColor: '#c7dcfd',
+                                borderRadius: 2,
+                                borderSkipped: 'start',
+                                maxBarThickness: 4,
+                                stack: 'enrolment'
+                            },
+                            {
+                                label: 'New this period',
+                                data: fresh,
+                                backgroundColor: T.deep,
+                                borderRadius: 2,
+                                borderSkipped: 'start',
+                                maxBarThickness: 4,
+                                stack: 'enrolment'
                             }
-                        })
+                        ]
                     },
-                    scales: {
-                        x: {
-                            beginAtZero: true,
-                            grid: { color: '#f1f5f9' },
-                            border: { display: false },
-                            ticks: { font: { size: 11, weight: '500' }, color: '#a8b3c4', padding: 6, precision: 0 }
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        // A 4px stem is a poor hover target, so the whole
+                        // row band is made interactive instead.
+                        interaction: { mode: 'index', intersect: false },
+                        layout: { padding: { right: 48, top: 2 } },
+                        animation: { duration: 800, easing: 'easeOutQuart' },
+                        plugins: {
+                            legend: legendStyle,
+                            tooltip: Object.assign({}, tooltipStyle, {
+                                displayColors: true,
+                                callbacks: {
+                                    title: function (items) {
+                                        return names[items[0].dataIndex] || items[0].label;
+                                    },
+                                    label: function (ctx) {
+                                        return ctx.dataset.label + ': ' + num(ctx.parsed.x);
+                                    },
+                                    footer: function (items) {
+                                        if (!items.length) return '';
+                                        var total = totals[items[0].dataIndex];
+                                        return 'Total: ' + num(total) + ' student' + (total === 1 ? '' : 's');
+                                    }
+                                }
+                            })
                         },
-                        y: {
-                            grid: { display: false },
-                            border: { display: false },
-                            ticks: { font: { size: 11, weight: '600' }, color: '#64748b', padding: 6 }
+                        scales: {
+                            x: {
+                                stacked: true,
+                                beginAtZero: true,
+                                grid: { color: T.grid },
+                                border: { display: false },
+                                ticks: {
+                                    font: { size: 11, weight: '500' },
+                                    color: T.faint,
+                                    padding: 6,
+                                    precision: 0,
+                                    maxTicksLimit: 6
+                                }
+                            },
+                            y: {
+                                stacked: true,
+                                grid: { display: false },
+                                border: { display: false },
+                                ticks: {
+                                    font: { size: 11.5, weight: '600' },
+                                    color: T.ink,
+                                    padding: 10,
+                                    autoSkip: false,
+                                    crossAlign: 'far'
+                                }
+                            }
                         }
                     }
-                }
-            });
+                });
+                programChart.$barTotals = totals;
+                chartInstances.programChart = programChart;
+            }
         }
 
         // ── 3 · Document transaction overview (stacked bar) ──
@@ -329,9 +462,9 @@
                         y: {
                             stacked: true,
                             beginAtZero: true,
-                            grid: { color: '#f1f5f9' },
+                            grid: { color: T.grid },
                             border: { display: false },
-                            ticks: { font: { size: 11, weight: '500' }, color: '#a8b3c4', padding: 8, precision: 0 }
+                            ticks: { font: { size: 11, weight: '500' }, color: T.muted, padding: 8, precision: 0 }
                         }
                     }
                 }
@@ -395,13 +528,13 @@
                     datasets: [{
                         label: r.trend_source === 'cards' ? 'Cards issued' : 'Kiosk taps',
                         data: trendValues,
-                        borderColor: '#2563eb',
+                        borderColor: T.brand,
                         backgroundColor: 'rgba(37, 99, 235, 0.12)',
                         borderWidth: 2.5,
                         tension: 0.35,
                         fill: true,
                         pointRadius: trendValues.map(function (v, i) { return i === highlight ? 6 : 3; }),
-                        pointBackgroundColor: trendValues.map(function (v, i) { return i === highlight ? '#1d4ed8' : '#93c5fd'; }),
+                        pointBackgroundColor: trendValues.map(function (v, i) { return i === highlight ? T.deep : T.pale; }),
                         pointBorderColor: '#ffffff',
                         pointBorderWidth: 2
                     }]
@@ -427,13 +560,13 @@
                         x: {
                             grid: { display: false },
                             border: { display: false },
-                            ticks: { font: { size: 10, weight: '600' }, color: '#a8b3c4', maxRotation: 0, autoSkipPadding: 8 }
+                            ticks: { font: { size: 10, weight: '600' }, color: T.muted, maxRotation: 0, autoSkipPadding: 8 }
                         },
                         y: {
                             beginAtZero: true,
-                            grid: { color: '#f1f5f9' },
+                            grid: { color: T.grid },
                             border: { display: false },
-                            ticks: { font: { size: 10, weight: '500' }, color: '#a8b3c4', padding: 6, precision: 0, maxTicksLimit: 4 }
+                            ticks: { font: { size: 10, weight: '500' }, color: T.muted, padding: 6, precision: 0, maxTicksLimit: 4 }
                         }
                     }
                 }

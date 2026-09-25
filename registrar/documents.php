@@ -86,7 +86,17 @@ $regularCount = $db->fetchColumn("SELECT COUNT(*) FROM document_requests WHERE r
 $expressCount = $db->fetchColumn("SELECT COUNT(*) FROM document_requests WHERE request_type = 'Express'") ?: 0;
 
 $catalog   = $db->fetchAll("SELECT * FROM document_catalog WHERE is_active = 1 ORDER BY id");
-$students  = $db->fetchAll("SELECT id, student_number, CONCAT(first_name,' ',last_name) AS name FROM students WHERE status='active' ORDER BY name");
+// The student picker must mirror the Student Management module, which lists
+// every student row regardless of status. Filtering on `status = 'active'`
+// hid anyone whose status is the column default ('enrolled'), plus
+// probation / at-risk / loa, so the modal came up empty. Only soft-deleted
+// rows are excluded so a request can't be filed for a removed student.
+$students  = $db->fetchAll(
+    "SELECT id, student_number, CONCAT(first_name,' ',last_name) AS name
+       FROM students
+      WHERE status IS NULL OR status NOT IN ('archived')
+      ORDER BY name"
+);
 
 $statusPill = [
     'Pending_Clearance' => ['pending-clearance','fa-triangle-exclamation'],
@@ -117,6 +127,8 @@ $catIcon = [
 ];
 
 $page_title = 'Document Requests';
+$page_description = 'Document request queue, workflow actions, and performance metrics';
+$body_page = 'documents';
 $APP_ROOT = '../';
 $ACTIVE_NAV = 'documents';
 $extra_css = ['documents.css'];
@@ -126,13 +138,143 @@ $use_chart = true;
 
 <?php include '../includes/header.php'; ?>
 <?php include '../includes/sidebar.php'; ?>
+<style>
+/* Document requests — registrar-blue system, matching the Queue console. */
+body[data-page="documents"]{background:#f5f7fb;color:#0f172a}
+body[data-page="documents"] .dashboard-main{padding:24px clamp(18px,2.5vw,38px) 48px;background:linear-gradient(180deg,#eef4ff 0,#f8faff 300px,#f8faff 100%);min-height:auto}
+
+/* ── Header ───────────────────────────────────────────── */
+.dq-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;margin:0 0 16px;padding:25px 27px;border:1px solid #c7d7fe;border-radius:19px;background:linear-gradient(120deg,#eff6ff,#fff 68%);box-shadow:0 10px 30px rgba(37,99,235,.08)}
+.dq-kicker{display:flex;align-items:center;gap:7px;margin-bottom:7px;color:#1d4ed8;font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.dq-head h1{margin:0 0 5px;font-size:28px;line-height:1.1;letter-spacing:-.03em;color:#172554}
+.dq-head p{max-width:640px;margin:0;font-size:12.5px;line-height:1.5;color:#64748b}
+.dq-head .header-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.dq-head .btn{min-height:36px;font-size:12px}
+
+/* ── Metric strip ─────────────────────────────────────── */
+.dq-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:0 0 16px;background:#fff;border:1px solid #dbeafe;border-radius:16px;box-shadow:0 6px 22px rgba(15,23,42,.04);overflow:hidden}
+.dq-metric{position:relative;padding:18px 20px;border-right:1px solid #e2e8f0}
+.dq-metric:last-child{border-right:0}
+.dq-metric::after{content:"";position:absolute;left:20px;right:20px;bottom:0;height:3px;background:#dbeafe}
+.dq-metric.is-tat::after{background:#1d4ed8}
+.dq-metric.is-rev::after{background:#16a34a}
+.dq-metric.is-reg::after{background:#64748b}
+.dq-metric.is-exp::after{background:#d97706}
+.dq-metric .dq-label{font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#64748b}
+.dq-metric .dq-value{margin-top:6px;font-size:28px;font-weight:800;line-height:1.1;color:#0f172a;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.dq-metric .dq-value .dq-unit{font-size:15px;font-weight:700;color:#64748b}
+.dq-metric.is-rev .dq-value{color:#15803d}
+
+/* ── Panels ───────────────────────────────────────────── */
+.dq-split{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:0 0 16px}
+.dq-split>.panel{margin-bottom:0}
+body[data-page="documents"] .panel{border:1px solid #dbeafe;border-radius:16px;background:#fff;box-shadow:0 8px 24px rgba(15,23,42,.045);margin-bottom:16px;overflow:hidden}
+body[data-page="documents"] .panel-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:13px 18px;background:#f8faff;border-bottom:1px solid #e5e7eb}
+body[data-page="documents"] .panel-title{display:flex;align-items:center;gap:8px;padding:0;font-size:13px;font-weight:700;letter-spacing:-.01em;color:#1e293b}
+body[data-page="documents"] .panel-title i{color:#2563eb;font-size:12px}
+body[data-page="documents"] .table-responsive{margin:0}
+body[data-page="documents"] .table{margin:0;width:100%;border-collapse:collapse}
+body[data-page="documents"] .table thead th{padding:11px 14px;background:#f8fafc;border-bottom:1px solid #e2e8f0;color:#475569;font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;text-align:left;white-space:nowrap}
+body[data-page="documents"] .table tbody td{padding:11px 14px;border-bottom:1px solid #f1f5f9;color:#1e293b;font-size:13px;vertical-align:middle}
+body[data-page="documents"] .table tbody tr[data-doc]{cursor:pointer}
+body[data-page="documents"] .table tbody tr[data-doc]:hover{background:#eff6ff}
+body[data-page="documents"] .student-avatar{width:32px;height:32px;font-size:12px}
+body[data-page="documents"] .empty-state td{padding:0}
+body[data-page="documents"] .dq-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:220px;padding:34px 20px;text-align:center}
+body[data-page="documents"] .dq-empty i{font-size:34px;color:#cbd5e1}
+body[data-page="documents"] .dq-empty p{margin:0;font-size:14px;font-weight:600;color:#64748b}
+body[data-page="documents"] .dq-empty span{font-size:12.5px;color:#94a3b8}
+
+/* Row actions stay quiet until the row is hovered. */
+.row-actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.row-actions .btn{opacity:.55;transition:opacity .15s ease}
+.row-actions .btn:focus-visible{opacity:1}
+
+/* ── Filter toolbar ───────────────────────────────────── */
+.dq-filters{display:flex;align-items:center;gap:9px;flex-wrap:wrap;padding:13px 18px;border-bottom:1px solid #e5e7eb;background:#fff}
+.dq-search{position:relative;flex:1 1 280px;min-width:200px}
+.dq-search i{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:#64748b;font-size:13px;pointer-events:none}
+.dq-search input{width:100%;height:38px;box-sizing:border-box;padding:0 12px 0 36px;border:1px solid #cbd5e1;border-radius:9px;background:#f8faff;color:#1e293b;font:13px Inter,sans-serif}
+.dq-search input:focus{outline:0;border-color:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,.1)}
+.dq-filters select{height:38px;padding:0 10px;border:1px solid #cbd5e1;border-radius:9px;background:#f8faff;color:#1e293b;font:13px Inter,sans-serif;cursor:pointer}
+.dq-filters select:focus{outline:0;border-color:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,.1)}
+.dq-count{font-size:12px;color:#64748b;white-space:nowrap}
+.dq-count strong{color:#0f172a}
+
+/* ── Revenue range picker ─────────────────────────────── */
+.dq-range{display:flex;align-items:center;gap:7px}
+.dq-range input[type="date"]{height:34px;width:150px;padding:0 9px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#1e293b;font:13px Inter,sans-serif;cursor:pointer}
+.dq-range input[type="date"]:focus{outline:0;border-color:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,.1)}
+.dq-range .dq-sep{color:#94a3b8;font-size:12px}
+.dq-range .btn{min-height:34px;width:34px;padding:0;display:inline-flex;align-items:center;justify-content:center}
+
+/* ── Expanded detail row ──────────────────────────────── */
+.doc-detail{background:#f8faff}
+.doc-detail .dq-fields{display:flex;flex-wrap:wrap;gap:8px 22px;font-size:12.5px;color:#475569}
+.doc-detail .dq-fields strong{color:#0f172a;font-weight:700}
+.doc-detail .dq-log{margin-top:14px;border-top:1px solid #e2e8f0;padding-top:12px}
+.doc-detail .dq-log-head{font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#64748b;margin-bottom:8px}
+.doc-detail .dq-log-row{display:flex;gap:10px;margin-bottom:5px;font-size:12px}
+.doc-detail .dq-log-row time{color:#94a3b8;white-space:nowrap;font-variant-numeric:tabular-nums}
+
+/* ── New Request modal ───────────────────────────────── */
+/* registrar.css makes .modal-content the scroll box (max-height:90vh,
+   overflow-y:auto). Here the dialog becomes a fixed-height flex column
+   instead: header and footer pinned, only the body scrolls. */
+#newRequestModal{align-items:flex-start}
+#newRequestModal .modal-content{display:flex;flex-direction:column;max-width:600px;max-height:calc(100vh - 40px);padding:0;border-radius:18px;border:1px solid #dbeafe;box-shadow:0 24px 60px rgba(15,23,42,.22);overflow:hidden}
+#newRequestModal .modal-header{flex:0 0 auto;display:flex;align-items:center;gap:13px;padding:18px 22px;background:linear-gradient(120deg,#eff6ff,#fff 70%);border-bottom:1px solid #dbeafe;margin-bottom:0}
+#newRequestModal .modal-header .nq-mark{display:grid;place-items:center;width:38px;height:38px;flex:0 0 38px;border-radius:11px;background:linear-gradient(140deg,#2563eb,#1d4ed8);color:#fff;font-size:15px;box-shadow:0 6px 16px rgba(37,99,235,.28)}
+#newRequestModal .modal-header h3{margin:0;font-size:17px;font-weight:700;letter-spacing:-.02em;color:#172554}
+#newRequestModal .modal-header p{margin:2px 0 0;font-size:12px;color:#64748b}
+#newRequestModal .modal-header .modal-close{margin-left:auto;background:transparent;border:1px solid #dbeafe;color:#64748b;width:32px;height:32px;border-radius:9px;display:grid;place-items:center;cursor:pointer;transition:background .15s ease,color .15s ease}
+#newRequestModal .modal-header .modal-close:hover{background:#e0e7ff;color:#1d4ed8}
+#newRequestModal .modal-body{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:20px 22px;margin-bottom:0;background:#fff}
+
+/* Section heads, so a long form stays scannable. */
+.nq-section{margin-bottom:16px}
+.nq-section-head{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.nq-section-head span{font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#1d4ed8}
+.nq-section-head::after{content:"";flex:1;height:1px;background:#e2e8f0}
+#newRequestModal .form-group{margin-bottom:0}
+#newRequestModal .form-group>label{display:block;margin-bottom:6px;font-size:12px;font-weight:600;color:#475569}
+#newRequestModal .form-group>label .nq-req{color:#dc2626;margin-left:2px}
+#newRequestModal .form-control{width:100%;height:40px;box-sizing:border-box;padding:0 12px;border:1px solid #cbd5e1;border-radius:9px;background:#f8faff;color:#1e293b;font:13px Inter,sans-serif;transition:border-color .15s ease,box-shadow .15s ease}
+#newRequestModal select.form-control{cursor:pointer;padding-right:30px}
+#newRequestModal .form-control:focus{outline:0;border-color:#2563eb;background:#fff;box-shadow:0 0 0 4px rgba(37,99,235,.12)}
+#newRequestModal .form-control::placeholder{color:#94a3b8}
+#newRequestModal .form-control[readonly]{background:#f1f5f9;color:#64748b;cursor:default}
+#newRequestModal .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+#newRequestModal .req-hint{margin-top:8px}
+
+/* The fee ticket — the one loud element. */
+.nq-fee{position:relative;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:0 0 4px;padding:16px 18px 15px;border:1px solid #bfdbfe;border-radius:14px;background:linear-gradient(140deg,#eff6ff,#fff 72%)}
+.nq-fee::before{content:"";position:absolute;left:18px;right:18px;top:11px;height:2px;background:repeating-linear-gradient(90deg,#c7d7fe 0 7px,transparent 7px 14px)}
+.nq-fee-cap{font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#1d4ed8}
+.nq-fee-note{margin-top:5px;font-size:12px;color:#64748b;max-width:34ch}
+.nq-fee-amount{font:800 30px/1 JetBrains Mono,ui-monospace,monospace;letter-spacing:-.03em;color:#1d4ed8;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+#newRequestModal .modal-footer{flex:0 0 auto;display:flex;align-items:center;justify-content:flex-end;gap:9px;padding:14px 22px;background:#f8faff;border-top:1px solid #e2e8f0}
+#newRequestModal .modal-footer .btn{min-height:40px;padding:0 20px;font-size:13px}
+#newRequestModal .modal-footer .btn-primary{display:inline-flex;align-items:center;gap:7px}
+
+@media(max-width:560px){#newRequestModal .modal-content{max-height:calc(100vh - 24px)}#newRequestModal .modal-body{padding:16px}#newRequestModal .form-row{grid-template-columns:1fr}#newRequestModal .modal-header{padding:15px 16px}#newRequestModal .modal-footer{padding:12px 16px}#newRequestModal .modal-footer .btn{flex:1 1 auto;justify-content:center}.nq-fee{flex-direction:column;align-items:flex-start;gap:8px}.nq-fee-amount{font-size:26px}}
+@media(prefers-reduced-motion:reduce){#newRequestModal .modal-header .modal-close{transition:none}}
+
+/* ── Responsive ───────────────────────────────────────── */
+@media(max-width:1000px){.dq-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.dq-metric:nth-child(2){border-right:0}.dq-metric:nth-child(-n+2){border-bottom:1px solid #e2e8f0}.dq-metric::after{display:none}.dq-split{grid-template-columns:1fr}}
+@media(max-width:900px){.dq-head{flex-direction:column;align-items:flex-start}.dq-head .header-actions{width:100%;justify-content:flex-start}}
+@media(max-width:600px){.dq-head{padding:21px 18px}.dq-head h1{font-size:25px}.dq-head .header-actions{flex-direction:column;align-items:stretch}.dq-head .btn{justify-content:center}.dq-strip{grid-template-columns:1fr}.dq-metric{border-right:0;border-bottom:1px solid #e2e8f0}.dq-metric:last-child{border-bottom:0}.dq-search,.dq-filters select{width:100%}.dq-range{width:100%}.dq-range input[type="date"]{flex:1 1 0;width:auto}}
+@media(prefers-reduced-motion:reduce){.row-actions .btn{transition:none}}
+</style>
 <main class="dashboard-main">
 <div class="dashboard-container">
 
-<header class="header">
-    <div class="title">
+<header class="dq-head">
+    <div>
+        <div class="dq-kicker"><i class="fa-solid fa-file-circle-check"></i> Registrar desk</div>
         <h1>Document Requests</h1>
-        <p>Queue, workflow actions, and performance metrics.</p>
+        <p>Process requests, track release status, and see how the desk is performing.</p>
     </div>
     <div class="header-actions">
         <button class="btn btn-primary" onclick="openNewRequest()"><i class="fas fa-plus"></i> New Request</button>
@@ -140,39 +282,35 @@ $use_chart = true;
 </header>
 
 <!-- ── Stats Cards ──────────────────────────────────────────── -->
-<div class="stats-grid">
-    <div class="stat-card">
-        <div class="stat-top"><div class="stat-icon blue"><i class="fa-solid fa-clock"></i></div></div>
-        <div class="stat-number"><?= $tatHours !== null ? htmlspecialchars($tatHours) . '<span style="font-size:15px;"> hrs</span>' : '—' ?></div>
-        <div class="stat-label">Avg Turnaround</div>
+<div class="dq-strip">
+    <div class="dq-metric is-tat">
+        <div class="dq-label">Avg turnaround</div>
+        <div class="dq-value"><?= $tatHours !== null ? htmlspecialchars($tatHours) . '<span class="dq-unit"> hrs</span>' : '&mdash;' ?></div>
     </div>
-    <div class="stat-card">
-        <div class="stat-top"><div class="stat-icon green"><i class="fa-solid fa-coins"></i></div></div>
-        <div class="stat-number">&#8369;<?= number_format($revenueTotal, 2) ?></div>
-        <div class="stat-label">Monthly Revenue</div>
+    <div class="dq-metric is-rev">
+        <div class="dq-label">Revenue in range</div>
+        <div class="dq-value">&#8369;<?= number_format($revenueTotal, 2) ?></div>
     </div>
-    <div class="stat-card">
-        <div class="stat-top"><div class="stat-icon yellow"><i class="fa-solid fa-file-lines"></i></div></div>
-        <div class="stat-number"><?= (int) $regularCount ?></div>
-        <div class="stat-label">Regular Requests</div>
+    <div class="dq-metric is-reg">
+        <div class="dq-label">Regular requests</div>
+        <div class="dq-value"><?= (int) $regularCount ?></div>
     </div>
-    <div class="stat-card">
-        <div class="stat-top"><div class="stat-icon purple"><i class="fa-solid fa-bolt"></i></div></div>
-        <div class="stat-number"><?= (int) $expressCount ?></div>
-        <div class="stat-label">Express Requests</div>
+    <div class="dq-metric is-exp">
+        <div class="dq-label">Express requests</div>
+        <div class="dq-value"><?= (int) $expressCount ?></div>
     </div>
 </div>
 
 <!-- ── Charts ───────────────────────────────────────────────── -->
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:24px;">
+<div class="dq-split">
     <div class="panel">
         <div class="panel-toolbar">
             <div class="panel-title"><i class="fa-solid fa-chart-bar"></i> Revenue by Document Type</div>
-            <div class="range-filter">
-                <input type="date" id="revFrom" class="form-control" value="<?= htmlspecialchars($from) ?>" style="height:34px;width:140px;">
-                <span style="color:#94a3b8;">–</span>
-                <input type="date" id="revTo" class="form-control" value="<?= htmlspecialchars($to) ?>" style="height:34px;width:140px;">
-                <button class="btn btn-sm btn-secondary" onclick="applyRevFilter()"><i class="fa-solid fa-filter"></i></button>
+            <div class="dq-range">
+                <input type="date" id="revFrom" value="<?= htmlspecialchars($from) ?>" aria-label="Revenue from">
+                <span class="dq-sep">&ndash;</span>
+                <input type="date" id="revTo" value="<?= htmlspecialchars($to) ?>" aria-label="Revenue to">
+                <button class="btn btn-sm btn-secondary" onclick="applyRevFilter()" title="Apply date range"><i class="fa-solid fa-filter"></i></button>
             </div>
         </div>
         <div style="padding:16px;">
@@ -186,7 +324,7 @@ $use_chart = true;
     </div>
     <div class="panel">
         <div class="panel-toolbar">
-            <div class="panel-title"><i class="fa-solid fa-chart-line"></i> Daily Queue Volume (Last 7 Days)</div>
+            <div class="panel-title"><i class="fa-solid fa-chart-line"></i> Daily Queue Volume, Last 7 Days</div>
         </div>
         <div style="padding:16px;">
             <div class="metric-canvas">
@@ -200,34 +338,31 @@ $use_chart = true;
 </div>
 
 <!-- ── Queue Table ──────────────────────────────────────────── -->
-<div class="panel" style="margin-top:24px;">
+<div class="panel">
     <div class="panel-toolbar">
         <div class="panel-title"><i class="fa-solid fa-list"></i> Request Queue</div>
     </div>
-    <div style="padding:16px 20px;">
-        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px;">
-            <div style="flex:1;min-width:200px;">
-                <div class="form-group" style="margin:0;">
-                    <input type="text" id="docSearch" class="form-control" placeholder="Search student, document, ID…" style="height:36px;">
-                </div>
-            </div>
-            <select id="typeFilter" class="form-control" style="height:36px;width:160px;" onchange="applyFilters()">
-                <option value="">All Types</option>
-                <option value="Regular">Regular</option>
-                <option value="Express">Express</option>
-            </select>
-            <select id="statusFilter" class="form-control" style="height:36px;width:180px;" onchange="applyFilters()">
-                <option value="">All Statuses</option>
-                <option value="Pending_Clearance">Pending Clearance</option>
-                <option value="Awaiting_Payment">Awaiting Payment</option>
-                <option value="Processing">Processing</option>
-                <option value="Ready">Ready for Release</option>
-                <option value="Shipped">Shipped</option>
-                <option value="Claimed">Claimed</option>
-                <option value="Rejected">Rejected</option>
-            </select>
-            <span style="font-size:12px;color:#94a3b8;">Showing <strong id="showingCount"><?= count($requests) ?></strong> of <?= count($requests) ?></span>
+    <div class="dq-filters">
+        <div class="dq-search">
+            <i class="fas fa-search"></i>
+            <input type="text" id="docSearch" placeholder="Search student, document, ID&hellip;" aria-label="Search requests">
         </div>
+        <select id="typeFilter" onchange="applyFilters()" aria-label="Filter by request type">
+            <option value="">All Types</option>
+            <option value="Regular">Regular</option>
+            <option value="Express">Express</option>
+        </select>
+        <select id="statusFilter" onchange="applyFilters()" aria-label="Filter by status">
+            <option value="">All Statuses</option>
+            <option value="Pending_Clearance">Pending Clearance</option>
+            <option value="Awaiting_Payment">Awaiting Payment</option>
+            <option value="Processing">Processing</option>
+            <option value="Ready">Ready for Release</option>
+            <option value="Shipped">Shipped</option>
+            <option value="Claimed">Claimed</option>
+            <option value="Rejected">Rejected</option>
+        </select>
+        <span class="dq-count">Showing <strong id="showingCount"><?= count($requests) ?></strong> of <?= count($requests) ?></span>
     </div>
 
     <div class="table-responsive" style="overflow-x:auto;">
@@ -237,7 +372,7 @@ $use_chart = true;
         </thead>
         <tbody>
             <?php if (empty($requests)): ?>
-                <tr><td colspan="7" class="empty-state"><i class="fas fa-file-lines"></i><p>No document requests found</p><span>Requests appear here once submitted.</span></td></tr>
+                <tr><td colspan="7" class="empty-state"><div class="dq-empty"><i class="fas fa-file-lines"></i><p>No document requests found</p><span>Requests appear here once a student or the registrar submits one.</span></div></td></tr>
             <?php else: foreach ($requests as $r):
                 $pill = $statusPill[$r['document_status']] ?? ['awaiting-payment','fa-clock'];
                 $label = $statusLabel[$r['document_status']] ?? str_replace('_', ' ', $r['document_status']);
@@ -278,14 +413,14 @@ $use_chart = true;
 
                 <tr class="doc-detail-row" id="detail-<?= (int) $r['id'] ?>" style="display:none;">
                     <td colspan="7" style="padding:0;">
-                        <div class="doc-detail" style="padding:18px 22px;background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+                        <div class="doc-detail" style="padding:18px 22px;border-bottom:1px solid #e2e8f0;">
                             <?php if ($st === 'Rejected'): ?>
                                 <div class="block-banner" style="margin-bottom:12px;">
                                     <div class="banner-icon"><i class="fa-solid fa-xmark"></i></div>
                                     <div><div class="banner-title">Request rejected</div><div class="banner-text"><?= htmlspecialchars($r['rejection_reason'] ?? 'No reason provided.') ?></div></div>
                                 </div>
                             <?php endif; ?>
-                            <div style="display:flex;flex-wrap:wrap;gap:14px;font-size:12.5px;color:#475569;">
+                            <div class="dq-fields">
                                 <div><strong>Purpose:</strong> <?= htmlspecialchars($r['purpose'] ?: '—') ?></div>
                                 <div><strong>Recipient:</strong> <?= htmlspecialchars($r['recipient'] ?: '—') ?></div>
                                 <div><strong>Qty:</strong> <?= (int) ($r['quantity'] ?? 1) ?></div>
@@ -296,12 +431,12 @@ $use_chart = true;
                                 <?php if (!empty($r['release_date'])): ?><div><strong>Release Date:</strong> <?= htmlspecialchars($r['release_date']) ?></div><?php endif; ?>
                             </div>
                             <?php if (!empty($reqEvents)): ?>
-                                <div style="margin-top:14px;border-top:1px solid #e2e8f0;padding-top:12px;">
-                                    <div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px;"><i class="fa-solid fa-timeline"></i> Activity Log</div>
+                                <div class="dq-log">
+                                    <div class="dq-log-head">Activity Log</div>
                                     <?php foreach ($reqEvents as $ev): ?>
-                                        <div style="display:flex;gap:10px;margin-bottom:6px;font-size:12px;">
-                                            <span style="color:#94a3b8;white-space:nowrap;"><?= date('M d, h:i A', strtotime($ev['created_at'])) ?></span>
-                                            <span style="color:#1e293b;"><?= htmlspecialchars($ev['note'] ?? $ev['status']) ?></span>
+                                        <div class="dq-log-row">
+                                            <time datetime="<?= htmlspecialchars(date('c', strtotime($ev['created_at']))) ?>"><?= date('M d, h:i A', strtotime($ev['created_at'])) ?></time>
+                                            <span><?= htmlspecialchars($ev['note'] ?? $ev['status']) ?></span>
                                         </div>
                                     <?php endforeach; ?>
                                 </div>
@@ -310,6 +445,7 @@ $use_chart = true;
                     </td>
                 </tr>
             <?php endforeach; endif; ?>
+            <tr id="docNoMatch" style="display:none;"><td colspan="7" class="empty-state"><div class="dq-empty"><i class="fas fa-magnifying-glass"></i><p>No requests match your search</p><span>Try a different name, ID number, document, or clear the filters.</span></div></td></tr>
         </tbody>
     </table>
     </div>
@@ -320,66 +456,89 @@ $use_chart = true;
 
 <!-- ═══ NEW REQUEST MODAL ═══════════════════════════════════════ -->
 <div class="modal-overlay" id="newRequestModal">
-    <div class="modal-content" style="max-width:560px;">
+    <div class="modal-content">
         <div class="modal-header">
-            <h3><i class="fa-solid fa-file-circle-plus"></i> New Document Request</h3>
-            <button class="modal-close" onclick="closeModal('newRequestModal')"><i class="fa-solid fa-xmark"></i></button>
+            <div class="nq-mark"><i class="fa-solid fa-file-circle-plus"></i></div>
+            <div>
+                <h3>New Document Request</h3>
+                <p>Raise a request on behalf of a student.</p>
+            </div>
+            <button class="modal-close" onclick="closeModal('newRequestModal')" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="modal-body">
             <form id="newRequestForm" onsubmit="submitNewRequest(event)">
-                <div class="form-group">
-                    <label>Student <span style="color:#dc2626;">*</span></label>
-                    <select name="student_id" id="nrStudent" class="form-control" data-searchable required>
-                        <option value="">Search or select a student…</option>
-                        <?php foreach ($students as $s): ?>
-                            <option value="<?= (int) $s['id'] ?>"><?= htmlspecialchars($s['student_number']) ?> — <?= htmlspecialchars($s['name']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Document Type <span style="color:#dc2626;">*</span></label>
-                    <select name="catalog_id" id="nrCatalog" class="form-control" required onchange="updateNrFee()">
-                        <option value="">Select a document…</option>
-                        <?php foreach ($catalog as $c):
-                            $feeTxt = $c['fee_type'] === 'flat'
-                                ? '&#8369;' . number_format((float) $c['base_fee'], 2)
-                                : '&#8369;' . number_format((float) $c['base_fee'], 2) . ' per ' . str_replace('_', ' ', $c['fee_type']); ?>
-                            <option value="<?= (int) $c['id'] ?>"
-                                data-fee="<?= (float) $c['base_fee'] ?>"
-                                data-fee-type="<?= htmlspecialchars($c['fee_type']) ?>"
-                                data-req="<?= htmlspecialchars((string) $c['requirement'], ENT_QUOTES) ?>">
-                                <?= htmlspecialchars($c['name']) ?> (<?= $feeTxt ?>)
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-                    <div id="nrHint" class="req-hint" style="margin-top:4px;"></div>
-                </div>
-                <div class="form-row">
-                    <div class="form-group" style="flex:1;">
-                        <label>Priority</label>
-                        <select id="nrPriority" class="form-control" onchange="updateNrFee()">
-                            <option value="Regular">Regular</option>
-                            <option value="Express">Express (+&#8369;100)</option>
+
+                <div class="nq-section">
+                    <div class="nq-section-head"><span>Student</span></div>
+                    <div class="form-group">
+                        <select name="student_id" id="nrStudent" class="form-control" data-searchable required aria-label="Student">
+                            <option value="">Search or select a student&hellip;</option>
+                            <?php foreach ($students as $s): ?>
+                                <option value="<?= (int) $s['id'] ?>"><?= htmlspecialchars($s['student_number']) ?> &mdash; <?= htmlspecialchars($s['name']) ?></option>
+                            <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="form-group" style="flex:1;">
-                        <label>Fulfillment</label>
-                        <input type="text" class="form-control" value="Pickup at Registrar" readonly style="background:#f1f5f9;">
+                </div>
+
+                <div class="nq-section">
+                    <div class="nq-section-head"><span>Document</span></div>
+                    <div class="form-group">
+                        <select name="catalog_id" id="nrCatalog" class="form-control" required onchange="updateNrFee()" aria-label="Document type">
+                            <option value="">Select a document&hellip;</option>
+                            <?php foreach ($catalog as $c):
+                                $feeTxt = $c['fee_type'] === 'flat'
+                                    ? '&#8369;' . number_format((float) $c['base_fee'], 2)
+                                    : '&#8369;' . number_format((float) $c['base_fee'], 2) . ' per ' . str_replace('_', ' ', $c['fee_type']); ?>
+                                <option value="<?= (int) $c['id'] ?>"
+                                    data-fee="<?= (float) $c['base_fee'] ?>"
+                                    data-fee-type="<?= htmlspecialchars($c['fee_type']) ?>"
+                                    data-req="<?= htmlspecialchars((string) $c['requirement'], ENT_QUOTES) ?>">
+                                    <?= htmlspecialchars($c['name']) ?> (<?= $feeTxt ?>)
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <div id="nrHint" class="req-hint"></div>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label>Purpose <span style="color:#dc2626;">*</span></label>
-                    <input type="text" name="purpose" id="nrPurpose" class="form-control" placeholder="e.g., Employment requirement" required>
+
+                <div class="nq-section">
+                    <div class="nq-section-head"><span>Handling</span></div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="nrPriority">Priority</label>
+                            <select id="nrPriority" class="form-control" onchange="updateNrFee()">
+                                <option value="Regular">Regular</option>
+                                <option value="Express">Express (+&#8369;100)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Fulfillment</label>
+                            <input type="text" class="form-control" value="Pickup at Registrar" readonly>
+                        </div>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>Recipient</label>
-                    <input type="text" name="recipient" id="nrRecipient" class="form-control" placeholder="e.g., UP Manila Registrar">
+
+                <div class="nq-section">
+                    <div class="nq-section-head"><span>Details</span></div>
+                    <div class="form-group" style="margin-bottom:12px;">
+                        <label for="nrPurpose">Purpose<span class="nq-req">*</span></label>
+                        <input type="text" name="purpose" id="nrPurpose" class="form-control" placeholder="Employment requirement" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="nrRecipient">Recipient</label>
+                        <input type="text" name="recipient" id="nrRecipient" class="form-control" placeholder="UP Manila Registrar">
+                    </div>
                 </div>
-                <div class="fee-preview">
-                    <span class="fp-label"><i class="fa-solid fa-coins"></i> Estimated Fee</span>
-                    <span class="fp-amount" id="nrFeePreview">&#8369;0.00</span>
+
+                <div class="nq-fee">
+                    <div>
+                        <div class="nq-fee-cap">Estimated fee</div>
+                        <div class="nq-fee-note">Updates as you change the document or priority.</div>
+                    </div>
+                    <div class="nq-fee-amount" id="nrFeePreview">&#8369;0.00</div>
                 </div>
-                <div class="modal-footer" style="border-top:1px solid #e2e8f0;margin-top:16px;padding-top:16px;">
+
+                <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="closeModal('newRequestModal')">Cancel</button>
                     <button type="submit" class="btn btn-primary" id="nrSubmitBtn"><i class="fa-solid fa-plus"></i> Add Request</button>
                 </div>
@@ -635,9 +794,13 @@ function applyFilters() {
         if (detail) detail.style.display = 'none';
         if (show) visible++;
     });
+    // Say so plainly when nothing matched, instead of leaving a blank table.
+    const noMatch = document.getElementById('docNoMatch');
+    if (noMatch) noMatch.style.display = visible === 0 ? '' : 'none';
     document.getElementById('showingCount').textContent = visible;
 }
 document.getElementById('docSearch').addEventListener('input', applyFilters);
+applyFilters();
 
 // ── Revenue Date Filter ────────────────────────────────────────
 function applyRevFilter() {

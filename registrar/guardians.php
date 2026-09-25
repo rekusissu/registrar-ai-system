@@ -75,6 +75,15 @@ foreach ($byStudent as $s) $statGuardians += count($s['guardians']);
 $statMissing = count(array_filter($byStudent, fn($s) => empty($s['guardians'])));
 $statEmgMissing = count(array_filter($byStudent, fn($s) => empty($emgByStudent[(int) $s['student_id']] ?? [])));
 
+// Reachability, as a share of the student list. A bare "2" doesn't tell a registrar
+// whether that's a rounding error or half the school; 60% does.
+$statEmgPct = $statStudents > 0
+    ? (int) round((($statStudents - $statEmgMissing) / $statStudents) * 100)
+    : 0;
+$statGuardPct = $statStudents > 0
+    ? (int) round((($statStudents - $statMissing) / $statStudents) * 100)
+    : 0;
+
 /** Two-letter initials from a name, for the student avatar tile. */
 function gdn_initials(string $name): string {
     $parts = preg_split('/\s+/', trim($name), -1, PREG_SPLIT_NO_EMPTY);
@@ -94,6 +103,7 @@ function gdn_esc(?string $s): string {
 $page_title = 'Guardians & Contacts';
 $APP_ROOT = '../';
 $ACTIVE_NAV = 'guardians';
+$body_page = 'guardians';   // scopes the registrar-blue layer below
 include '../includes/header.php';
 include '../includes/sidebar.php';
 ?>
@@ -102,6 +112,7 @@ include '../includes/sidebar.php';
     <div class="dashboard-container">
         <header class="header">
             <div class="title">
+                <div class="gdn-kicker"><i class="fas fa-address-book"></i> Contact records</div>
                 <h1>Guardians &amp; Contacts</h1>
                 <p>Registrar-managed guardians, emergency contacts, and email recipients for every student</p>
             </div>
@@ -110,37 +121,38 @@ include '../includes/sidebar.php';
             </div>
         </header>
 
-        <!-- ── Overview stats ─────────────────────────────────── -->
+        <!-- ── Metric strip ────────────────────────────────────
+             Mirrors the strip on the other registrar list pages
+             (RFID Cards, Masterlist): one connected panel, hairline
+             dividers, an inset accent underline per figure, and an
+             optional badge in the top row. The badges carry coverage,
+             since a bare gap count doesn't say whether it's a rounding
+             error or half the school. -->
         <div class="gdn-stats">
-            <div class="gdn-card">
-                <div class="gdn-ico gdn-blue"><i class="fa-solid fa-user-graduate"></i></div>
-                <div>
-                    <div class="gdn-val"><?= $statStudents ?></div>
-                    <div class="gdn-lbl">Students</div>
-                </div>
+            <div class="gdn-stat gk-students">
+                <div class="gdn-stat-top"></div>
+                <div class="gdn-stat-number"><?= $statStudents ?></div>
+                <div class="gdn-stat-label">Students on file</div>
             </div>
-            <div class="gdn-card">
-                <div class="gdn-ico gdn-teal"><i class="fa-solid fa-people-roof"></i></div>
-                <div>
-                    <div class="gdn-val"><?= $statGuardians ?></div>
-                    <div class="gdn-lbl">Guardians on file</div>
-                </div>
+            <div class="gdn-stat gk-guardians">
+                <div class="gdn-stat-top"></div>
+                <div class="gdn-stat-number"><?= $statGuardians ?></div>
+                <div class="gdn-stat-label">Guardians on file</div>
             </div>
-            <div class="gdn-card">
-                <div class="gdn-ico gdn-red"><i class="fa-solid fa-user-slash"></i></div>
-                <div>
-                    <div class="gdn-val"><?= $statEmgMissing ?></div>
-                    <div class="gdn-lbl">No emergency contacts</div>
+            <div class="gdn-stat gk-noemg">
+                <div class="gdn-stat-top">
+                    <span class="gdn-stat-badge down"><?= $statEmgPct ?>% covered</span>
                 </div>
+                <div class="gdn-stat-number"><?= $statEmgMissing ?></div>
+                <div class="gdn-stat-label">No emergency contact</div>
             </div>
-            <div class="gdn-card">
-                <div class="gdn-ico gdn-amber"><i class="fa-solid fa-circle-exclamation"></i></div>
-                <div>
-                    <div class="gdn-val"><?= $statMissing ?></div>
-                    <div class="gdn-lbl">No guardian recorded</div>
+            <div class="gdn-stat gk-noguard">
+                <div class="gdn-stat-top">
+                    <span class="gdn-stat-badge warn"><?= $statGuardPct ?>% covered</span>
                 </div>
+                <div class="gdn-stat-number"><?= $statMissing ?></div>
+                <div class="gdn-stat-label">No guardian recorded</div>
             </div>
-
         </div>
 
               <div class="panel gdn-panel">
@@ -157,7 +169,13 @@ include '../includes/sidebar.php';
 
             <div class="table-responsive" style="overflow-x:auto;">
             <table class="ct-table">
-                <thead><tr><th>Student</th><th>Guardians</th><th>Emergency Contacts</th><th>Email Recipients</th><th style="text-align:center;">Actions</th></tr></thead>
+                <thead><tr>
+                    <th>Student</th>
+                    <th><span class="gdn-h"><i class="fa-solid fa-people-roof"></i> Guardians</span></th>
+                    <th><span class="gdn-h"><i class="fa-solid fa-truck-medical"></i> Emergency Contacts</span></th>
+                    <th><span class="gdn-h"><i class="fa-solid fa-envelope-circle-check"></i> Email Recipients</span></th>
+                    <th style="text-align:center;"><span class="gdn-h"><i class="fa-solid fa-pen-to-square"></i> Manage</span></th>
+                </tr></thead>
                 <tbody id="guardBody">
                 <?php if (empty($byStudent)): ?>
                     <tr class="empty-state-row"><td colspan="5"><div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:8px;"><p style="font-size:16px;font-weight:600;color:#334155;margin:0;">No students found yet</p><p style="margin:0;color:#94a3b8;">Add students first to manage their contacts</p></div></td></tr>
@@ -175,7 +193,7 @@ include '../includes/sidebar.php';
                         </td>
                         <td>
                             <?php if (empty($s['guardians'])): ?>
-                                <span class="ct-none">No guardian recorded</span>
+                                <span class="ct-none ct-gap"><i class="fa-solid fa-circle-exclamation"></i> No guardian recorded</span>
                             <?php else: ?>
                                 <ul class="ct-details">
                                 <?php foreach ($s['guardians'] as $g): ?>
@@ -205,7 +223,7 @@ include '../includes/sidebar.php';
                         <td>
                             <?php $emgList = $emgByStudent[$s['student_id']] ?? []; ?>
                             <?php if (!$emgList): ?>
-                                <span class="ct-none">—</span>
+                                <span class="ct-none ct-empty"><i class="fa-solid fa-minus"></i> None on file</span>
                             <?php else: ?>
                                 <ul class="ct-details">
                                 <?php foreach ($emgList as $e): ?>
@@ -230,7 +248,7 @@ include '../includes/sidebar.php';
                         <td>
                             <?php $cList = $contactByStudent[$s['student_id']] ?? []; ?>
                             <?php if (!$cList): ?>
-                                <span class="ct-none">—</span>
+                                <span class="ct-none ct-empty"><i class="fa-solid fa-minus"></i> None on file</span>
                             <?php else: ?>
                                 <ul class="ct-details">
                                 <?php foreach ($cList as $c): ?>
@@ -323,37 +341,13 @@ include '../includes/sidebar.php';
 </div></div>
 
 <style>
-/* ── Overview stats ─────────────────────────────── */
+/* ── Metric strip ───────────────────────────────── */
+/* The overview figures reuse the shared registrar metric strip; see
+   body[data-page="guardians"] .gdn-stats below and rfid-cards.php. */
 .gdn-stats {
     display:grid; grid-template-columns:repeat(auto-fit,minmax(165px,1fr)); gap:16px;
     margin-bottom:24px;
 }
-.gdn-card {
-    background:#fff; border:1px solid #e8ecf3; border-radius:16px; padding:18px 20px;
-    display:flex; align-items:center; gap:14px;
-    box-shadow:0 2px 8px rgba(15,23,42,.05);
-    position:relative; overflow:hidden;
-    transition:all .25s cubic-bezier(.16,1,.3,1);
-}
-.gdn-card::before {
-    content:''; position:absolute; left:0; top:0; bottom:0; width:4px;
-    background:linear-gradient(180deg,#1a3a8c,#2563eb); opacity:0; transition:opacity .2s ease;
-}
-.gdn-card:hover { transform:translateY(-3px); box-shadow:0 8px 24px rgba(26,58,140,.12); border-color:#d4dce6; }
-.gdn-card:hover::before { opacity:1; }
-.gdn-card.clickable { cursor:pointer; }
-.gdn-ico {
-    width:46px; height:46px; border-radius:12px; flex-shrink:0;
-    display:flex; align-items:center; justify-content:center; font-size:18px;
-    box-shadow:0 4px 12px rgba(15,23,42,.08);
-}
-.gdn-blue   { background:#eff6ff; color:#2563eb; }
-.gdn-teal   { background:#ccfbf1; color:#0d9488; }
-.gdn-purple { background:#f3e8ff; color:#7c3aed; }
-.gdn-amber  { background:#ffedd5; color:#ea580c; }
-.gdn-red    { background:#fee2e2; color:#dc2626; }
-.gdn-val { font-size:24px; font-weight:800; color:#0d1b2e; letter-spacing:-.6px; line-height:1.1; }
-.gdn-lbl { font-size:11px; color:#64748b; margin-top:4px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; }
 
 /* ── List panel ─────────────────────────────────── */
 .gdn-panel { padding:0; overflow:hidden; }
@@ -544,10 +538,322 @@ include '../includes/sidebar.php';
 @media (max-width:640px)  {
     .gdn-stats { grid-template-columns:1fr; }
     .gdn-toolbar { flex-direction:column; align-items:stretch; }
-    .gdn-toolbar .search-wrap { max-width:none; margin-left:0; }
+    /* The search box is `flex:1 1 300px` — a WIDTH basis. Once the toolbar
+       flips to a column, that basis applies to height and inflates the
+       wrapper. Reset it to a normal block. */
+    .gdn-toolbar .search-wrap { flex:0 0 auto; width:100%; max-width:none; margin-left:0; }
     .mg-row-grid, .mg-row-sub, .mg-row-grid-e { grid-template-columns:1fr; }
     .ap-row { flex-direction:column; }
     .ap-actions { width:100%; justify-content:flex-end; }
+}
+</style>
+
+<style>
+/* ============================================================
+   REGISTRAR-BLUE LAYER — Guardians & Contacts
+   Appended after the page's own styles so it wins on cascade
+   order without rewriting rules the modal JS depends on
+   (.gdn-more, .ct-contact, .g-row, .e-row, .c-row are all
+   queried at runtime, so their markup and counts must hold).
+
+   The organising idea: the three contact columns are the same
+   repeated pattern, so they are colour-coded once — guardians
+   blue, emergency rose, email violet — in the column header, the
+   row icons, and the empty state. That does the wayfinding work
+   three identical grey blocks were failing to do.
+   ============================================================ */
+
+/* ── Page shell ──────────────────────────────── */
+body[data-page="guardians"]{background:#f5f7fb;color:#0f172a}
+
+/* ── Page header ─────────────────────────────── */
+body[data-page="guardians"] .header{
+    display:flex;align-items:flex-end;justify-content:space-between;gap:20px;
+    flex-wrap:wrap;margin:0 0 16px;padding:25px 27px;
+    border:1px solid #c7d7fe;border-radius:19px;
+    background:linear-gradient(120deg,#eff6ff,#fff 68%);
+    box-shadow:0 10px 30px rgba(37,99,235,.08);
+}
+body[data-page="guardians"] .header .title h1{
+    margin:0 0 5px;font-size:28px;line-height:1.1;letter-spacing:-.03em;color:#172554;
+}
+body[data-page="guardians"] .header .title p{
+    margin:0;max-width:620px;font-size:12.5px;line-height:1.5;color:#64748b;
+}
+/* Small caps kicker naming what the module holds — matches .rc-kicker on
+   rfid-cards.php, which uses the same two-word noun-phrase voice. */
+.gdn-kicker{
+    display:flex;align-items:center;gap:7px;margin-bottom:7px;color:#1d4ed8;
+    font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+}
+body[data-page="guardians"] .header-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+/* ── Metric strip ─────────────────────────────
+   Mirrors registrar/rfid-cards.php: one connected panel whose cells are
+   separated by hairlines rather than gaps, each carrying an inset 3px
+   accent underline, with an optional badge in the top row. */
+body[data-page="guardians"] .gdn-stats{
+    display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;
+    margin:0 0 16px;background:#fff;border:1px solid #dbeafe;border-radius:16px;
+    box-shadow:0 6px 22px rgba(15,23,42,.04);overflow:hidden;
+}
+body[data-page="guardians"] .gdn-stat{
+    position:relative;background:transparent;border:0;border-radius:0;padding:17px 20px;
+    border-right:1px solid #e2e8f0;box-shadow:none;transition:none;
+}
+body[data-page="guardians"] .gdn-stat:last-child{border-right:0}
+body[data-page="guardians"] .gdn-stat::after{
+    content:"";position:absolute;left:20px;right:20px;bottom:0;height:3px;background:#dbeafe;
+}
+body[data-page="guardians"] .gdn-stat:hover{transform:none;box-shadow:none;border-color:transparent}
+body[data-page="guardians"] .gdn-stat .gdn-stat-top{
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    margin:0 0 6px;min-height:16px;
+}
+body[data-page="guardians"] .gdn-stat .gdn-stat-number{
+    font-size:28px;font-weight:800;line-height:1.1;color:#0f172a;
+    font-variant-numeric:tabular-nums;
+}
+body[data-page="guardians"] .gdn-stat .gdn-stat-label{
+    color:#64748b;font-size:10px;font-weight:800;letter-spacing:.07em;
+    text-transform:uppercase;margin-top:2px;line-height:1.3;
+}
+body[data-page="guardians"] .gdn-stat-badge{
+    font-size:10px;font-weight:600;padding:1px 7px;border-radius:9999px;
+    display:inline-flex;align-items:center;gap:4px;
+}
+body[data-page="guardians"] .gdn-stat-badge.down{color:#dc2626;background:#fee2e2}
+body[data-page="guardians"] .gdn-stat-badge.warn{color:#b45309;background:#fef3c7}
+/* Each accent must carry the same specificity as the base ::after rule
+   above. Unprefixed (.gk-students = 0-1-0) loses to
+   body[data-page] .gdn-stat (0-2-1), which would pin every card to the
+   same pale blue. */
+body[data-page="guardians"] .gdn-stat.gk-students::after{background:#1d4ed8}
+body[data-page="guardians"] .gdn-stat.gk-guardians::after{background:#16a34a}
+body[data-page="guardians"] .gdn-stat.gk-noemg::after{background:#dc2626}
+body[data-page="guardians"] .gdn-stat.gk-noguard::after{background:#d97706}
+/* ── List panel ───────────────────────────────── */
+body[data-page="guardians"] .gdn-panel{
+    padding:0;overflow:hidden;background:#fff;
+    border:1px solid #e2e8f0;border-radius:16px;
+    box-shadow:0 1px 3px rgba(15,23,42,.04);
+}
+body[data-page="guardians"] .gdn-toolbar{
+    display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
+    padding:14px 18px;background:#fff;border-bottom:1px solid #e5e7eb;
+}
+body[data-page="guardians"] .gdn-toolbar-title{
+    display:flex;align-items:center;gap:9px;font-size:13px;font-weight:700;
+    letter-spacing:-.01em;color:#1e293b;
+}
+body[data-page="guardians"] .gdn-toolbar-title i{color:#2563eb;font-size:12px}
+body[data-page="guardians"] .gdn-pill{
+    display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:21px;
+    padding:0 8px;border-radius:999px;background:#eff6ff;color:#1d4ed8;
+    font-size:11px;font-weight:800;font-variant-numeric:tabular-nums;
+}
+body[data-page="guardians"] .gdn-toolbar .search-wrap{
+    position:relative;flex:1 1 300px;min-width:210px;max-width:380px;margin-left:auto;
+}
+body[data-page="guardians"] .gdn-toolbar .search-wrap i{
+    position:absolute;left:12px;top:50%;transform:translateY(-50%);
+    color:#94a3b8;font-size:13px;pointer-events:none;
+}
+body[data-page="guardians"] .gdn-toolbar .search-wrap input{
+    width:100%;height:38px;padding:0 12px 0 34px;box-sizing:border-box;
+    border:1px solid #cbd5e1;border-radius:9px;background:#f8faff;
+    font:13px Inter,sans-serif;color:#1e293b;outline:none;transition:all .18s ease;
+}
+body[data-page="guardians"] .gdn-toolbar .search-wrap input:focus{
+    border-color:#2563eb;background:#fff;box-shadow:0 0 0 4px rgba(37,99,235,.1);
+}
+
+/* ── Table ─────────────────────────────────────── */
+body[data-page="guardians"] .ct-table{min-width:900px;table-layout:fixed}
+body[data-page="guardians"] .ct-table th{
+    position:sticky;top:0;z-index:3;padding:11px 16px;background:#f8fafc;
+    border-bottom:1px solid #e2e8f0;color:#475569;
+    font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;
+}
+/* Colour-coded column headers: the wayfinding cue for the whole table. */
+body[data-page="guardians"] .ct-table th .gdn-h{display:inline-flex;align-items:center;gap:6px}
+body[data-page="guardians"] .ct-table th .gdn-h i{font-size:10px}
+body[data-page="guardians"] .ct-table th:nth-child(2) .gdn-h{color:#1d4ed8}
+body[data-page="guardians"] .ct-table th:nth-child(2) .gdn-h i{color:#2563eb}
+body[data-page="guardians"] .ct-table th:nth-child(3) .gdn-h{color:#be123c}
+body[data-page="guardians"] .ct-table th:nth-child(3) .gdn-h i{color:#e11d48}
+body[data-page="guardians"] .ct-table th:nth-child(4) .gdn-h{color:#6d28d9}
+body[data-page="guardians"] .ct-table th:nth-child(4) .gdn-h i{color:#7c3aed}
+body[data-page="guardians"] .ct-table th:last-child .gdn-h{color:#64748b}
+body[data-page="guardians"] .ct-table th:last-child .gdn-h i{color:#94a3b8}
+
+body[data-page="guardians"] .ct-table td{
+    padding:11px 16px;border-top:1px solid #f1f5f9;color:#334155;
+    font-size:12.5px;vertical-align:top;
+}
+body[data-page="guardians"] .ct-table td:last-child{vertical-align:middle;text-align:center}
+body[data-page="guardians"] .ct-table tbody tr{transition:background .14s ease}
+body[data-page="guardians"] .ct-table tbody tr:hover{background:#f8fbff}
+body[data-page="guardians"] .ct-table thead th:nth-child(1){width:21%}
+body[data-page="guardians"] .ct-table thead th:nth-child(2){width:28%}
+body[data-page="guardians"] .ct-table thead th:nth-child(3){width:20%}
+body[data-page="guardians"] .ct-table thead th:nth-child(4){width:22%}
+body[data-page="guardians"] .ct-table thead th:nth-child(5){width:9%;text-align:center}
+body[data-page="guardians"] .ct-avatar{
+    width:34px;height:34px;border-radius:11px;font-size:12.5px;
+    background:linear-gradient(140deg,#2563eb,#1d4ed8);
+}
+body[data-page="guardians"] .ct-avatar.none{background:#f1f5f9;color:#94a3b8}
+body[data-page="guardians"] .ct-name{font-size:13.5px;font-weight:700;color:#0f172a}
+body[data-page="guardians"] .ct-rel{
+    margin-top:1px;font-family:'JetBrains Mono',ui-monospace,monospace;
+    font-size:11px;color:#64748b;
+}
+
+body[data-page="guardians"] .ct-contact{padding:6px 0;gap:9px}
+body[data-page="guardians"] .ct-contact + .ct-contact{border-top:1px solid #f1f5f9}
+/* Tinted icon chips carry the column colour into the rows. */
+body[data-page="guardians"] .ct-contact > i{
+    display:grid;place-items:center;width:20px;height:20px;flex:0 0 20px;
+    border-radius:6px;font-size:9.5px;margin-top:1px;
+}
+body[data-page="guardians"] td:nth-child(2) .ct-contact > i{background:#dbeafe;color:#1d4ed8}
+body[data-page="guardians"] td:nth-child(3) .ct-contact > i{background:#ffe4e6;color:#be123c}
+body[data-page="guardians"] td:nth-child(4) .ct-contact > i{background:#ede9fe;color:#6d28d9}
+body[data-page="guardians"] .ct-contact-name{font-size:12.5px;font-weight:700;color:#0f172a;line-height:1.35}
+body[data-page="guardians"] .ct-contact-sub{font-size:11px;color:#64748b;margin-top:2px;gap:9px;line-height:1.5}
+body[data-page="guardians"] .ct-contact-sub i{color:#94a3b8;font-size:9.5px}
+body[data-page="guardians"] .ct-vdot{background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.18)}
+
+/* Empty states — one consistent chip, tinted per column, so a blank
+   cell reads as "checked, nothing here" rather than as missing data. */
+body[data-page="guardians"] .ct-none{
+    display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;
+    font-size:11px;font-style:normal;font-weight:700;line-height:1.5;
+}
+body[data-page="guardians"] .ct-none i{font-size:9px}
+body[data-page="guardians"] td:nth-child(2) .ct-none{background:#fff7ed;color:#b45309}
+body[data-page="guardians"] td:nth-child(3) .ct-none{background:#fff1f2;color:#be123c}
+body[data-page="guardians"] td:nth-child(4) .ct-none{background:#f8fafc;color:#94a3b8}
+body[data-page="guardians"] .ct-tag{font-size:10px;font-weight:700;padding:2px 8px;letter-spacing:.01em}
+
+body[data-page="guardians"] .ct-table .action-group{
+    gap:5px;justify-content:center !important;align-items:center;
+}
+body[data-page="guardians"] .ct-table .action-btn{
+    width:30px;height:30px;border-radius:9px;border:1px solid #e2e8f0;
+    background:#fff;color:#475569;transition:all .18s ease;
+}
+body[data-page="guardians"] .ct-table .action-btn:hover{
+    background:#2563eb;border-color:#2563eb;color:#fff;
+    box-shadow:0 5px 14px rgba(37,99,235,.28);transform:translateY(-1px);
+}
+body[data-page="guardians"] .gdn-more{
+    margin-top:6px;padding:3px 9px;border:1px dashed #cbd5e1;border-radius:999px;
+    background:#fff;color:#2563eb;font-size:10.5px;font-weight:700;
+}
+body[data-page="guardians"] .gdn-more:hover{background:#eff6ff;border-color:#93c5fd}
+
+body[data-page="guardians"] .table-footer{padding:11px 18px;background:#f8faff;border-top:1px solid #e2e8f0}
+body[data-page="guardians"] .table-footer .info-text{font-size:12px;color:#64748b}
+body[data-page="guardians"] .table-footer .info-text strong{color:#0f172a;font-variant-numeric:tabular-nums}
+/* ── Manage Contacts modal ─────────────────────── */
+/* Pinned blue header, independently scrolling body, pinned footer —
+   the same shell as the Documents / RFID modals. */
+body[data-page="guardians"] #manageModal .modal-content.wide{
+    box-sizing:border-box;display:flex;flex-direction:column;padding:0;
+    max-width:760px;max-height:calc(100vh - 40px);overflow:hidden;
+    border:1px solid #dbeafe;border-radius:19px;
+    box-shadow:0 26px 64px rgba(15,23,42,.24);
+}
+body[data-page="guardians"] #manageModal .modal-header.mg-header{
+    flex:0 0 auto;display:flex;align-items:center;gap:12px;margin:0;padding:18px 22px;
+    background:linear-gradient(120deg,#eff6ff,#fff 70%);
+    border-bottom:1px solid #dbeafe;border-radius:0;
+}
+body[data-page="guardians"] #manageModal .modal-header.mg-header h2{
+    display:flex;align-items:center;gap:10px;margin:0;
+    font-size:16px;font-weight:700;letter-spacing:-.02em;color:#172554;
+}
+body[data-page="guardians"] #manageModal .modal-header.mg-header h2 i{
+    display:grid;place-items:center;width:34px;height:34px;flex:0 0 34px;
+    border-radius:10px;background:linear-gradient(140deg,#2563eb,#1d4ed8);
+    color:#fff;font-size:14px;box-shadow:0 6px 16px rgba(37,99,235,.26);
+}
+body[data-page="guardians"] #manageModal .modal-close{
+    display:grid;place-items:center;width:32px;height:32px;margin-left:auto;
+    border:1px solid #dbeafe;border-radius:9px;background:#fff;color:#64748b;
+}
+body[data-page="guardians"] #manageModal .modal-close:hover{background:#f1f5f9;color:#0f172a}
+body[data-page="guardians"] #manageModal .modal-body{
+    flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+    margin:0;padding:20px 22px;background:#fff;
+}
+body[data-page="guardians"] #manageModal .modal-footer{
+    flex:0 0 auto;display:flex;align-items:center;justify-content:flex-end;gap:9px;
+    margin:0;padding:14px 22px;background:#f8faff;border-top:1px solid #e2e8f0;
+}
+
+body[data-page="guardians"] .mg-tabs{
+    display:flex;gap:5px;flex-wrap:wrap;margin:0 0 16px;padding:0 0 10px;
+    border-bottom:1px solid #e2e8f0;
+}
+body[data-page="guardians"] .mg-tab{
+    display:inline-flex;align-items:center;gap:8px;padding:9px 13px;
+    border:1px solid transparent;background:transparent;cursor:pointer;
+    border-radius:10px;font-family:inherit;font-size:12.5px;font-weight:700;
+    color:#64748b;transition:all .16s ease;
+}
+body[data-page="guardians"] .mg-tab:hover{color:#1d4ed8;background:#f8fafc}
+body[data-page="guardians"] .mg-tab.active{
+    color:#1d4ed8;background:#eff6ff;border-color:#dbeafe;
+    box-shadow:0 3px 10px rgba(37,99,235,.12);
+}
+body[data-page="guardians"] .mg-count{background:#e0e7ff;color:#4338ca}
+body[data-page="guardians"] .mg-tab.active .mg-count{background:#2563eb;color:#fff}
+body[data-page="guardians"] .mg-pane-toolbar{margin-bottom:12px}
+body[data-page="guardians"] .mg-hint{font-size:12px;color:#64748b}
+
+body[data-page="guardians"] .mg-empty{padding:14px 2px;color:#94a3b8;font-size:12.5px;font-style:italic}
+body[data-page="guardians"] .mg-row{
+    padding:12px 14px;margin-bottom:9px;background:#f8fafc;
+    border:1px solid #e5e7eb;border-radius:12px;
+}
+body[data-page="guardians"] .mg-row:hover{border-color:#c7d7fe;background:#fff}
+body[data-page="guardians"] .mg-toggle span{
+    background:#f1f5f9;border-color:#e2e8f0;color:#64748b;padding:6px 11px;font-size:11px;
+}
+body[data-page="guardians"] .mg-toggle input:checked + span{
+    background:linear-gradient(135deg,#2563eb,#1d4ed8) !important;
+    border-color:transparent !important;
+    color:#fff !important;
+    box-shadow:0 4px 11px rgba(37,99,235,.3);
+}
+body[data-page="guardians"] .mg-add{
+    width:100%;justify-content:center;margin-top:4px;padding:10px;
+    border:1.5px dashed #cbd5e1;background:#fff;color:#2563eb;
+}
+body[data-page="guardians"] .mg-add:hover{border-color:#93c5fd;background:#eff6ff}
+
+@media (max-width:1200px){
+    body[data-page="guardians"] .gdn-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+    /* The panel is one border, so reflowing it means re-drawing the
+       dividers — drop the trailing one in each row, add the row rule. */
+    body[data-page="guardians"] .gdn-stat:nth-child(2n){border-right:0}
+    body[data-page="guardians"] .gdn-stat:nth-child(-n+2){border-bottom:1px solid #e2e8f0}
+}
+@media (max-width:640px){
+    body[data-page="guardians"] .gdn-stats{grid-template-columns:1fr}
+    body[data-page="guardians"] .gdn-stat{border-right:0}
+    body[data-page="guardians"] .gdn-stat + .gdn-stat{border-bottom:1px solid #e2e8f0}
+    body[data-page="guardians"] .header{padding:21px 18px}
+    body[data-page="guardians"] .gdn-toolbar .search-wrap{max-width:none;margin-left:0}
+    body[data-page="guardians"] .mg-row-grid,
+    body[data-page="guardians"] .mg-row-sub,
+    body[data-page="guardians"] .mg-row-grid-e{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){
+    body[data-page="guardians"] .gdn-stat{transition:none}
 }
 </style>
 

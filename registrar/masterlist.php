@@ -116,6 +116,8 @@ foreach ($rfidCards as $rc) {
 }
 
 $page_title = 'Masterlist';
+$page_description = 'Enrolled student masterlist and section management';
+$body_page = 'masterlist';
 $APP_ROOT = '../';
 $ACTIVE_NAV = 'masterlist';
 $assignedSuccess = isset($_GET['assigned']) && $_GET['assigned'] === '1';
@@ -123,39 +125,81 @@ $assignedSuccess = isset($_GET['assigned']) && $_GET['assigned'] === '1';
 include '../includes/header.php';
 include '../includes/sidebar.php';
 ?>
+<style>
+body[data-page="masterlist"]{background:#f5f7fb;color:#0f172a}
+body[data-page="masterlist"] .main{padding:24px clamp(18px,2.5vw,38px) 48px;background:linear-gradient(180deg,#eef4ff 0,#f8faff 300px,#f8faff 100%)}
+.masterlist-header{display:flex;flex-direction:column;gap:14px;margin-bottom:16px;padding:25px 27px;border:1px solid #c7d7fe;border-radius:19px;background:linear-gradient(120deg,#eff6ff,#fff 68%);box-shadow:0 10px 30px rgba(37,99,235,.08)}
+.masterlist-kicker{display:flex;align-items:center;gap:7px;margin-bottom:7px;color:#1d4ed8;font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.masterlist-header h1{margin:0 0 5px;font-size:28px;line-height:1.1;letter-spacing:-.03em;color:#172554}
+.masterlist-header p{max-width:680px;margin:0;font-size:12.5px;line-height:1.5;color:#64748b}
+.masterlist-actionbar{display:flex;align-items:stretch;gap:12px;flex-wrap:wrap;margin:0 0 16px;padding:12px 14px;border:1px solid #dbeafe;border-radius:16px;background:#fff;box-shadow:0 7px 24px rgba(15,23,42,.04)}
+.masterlist-action-group{flex:1 1 320px;min-width:0;display:flex;flex-direction:column;gap:8px;padding:11px 13px;border:1px solid #e2e8f0;border-radius:13px;background:#f8faff}
+.masterlist-action-label{padding-left:2px;color:#1d4ed8;font-size:9.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase}
+.masterlist-action-buttons{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.masterlist-action-buttons .btn{min-height:34px;padding:0 12px;font-size:12px}
+.masterlist-action-buttons .export-wrap{display:flex}
+.masterlist-toolbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 16px;padding:13px 16px;border:1px solid #dbeafe;border-radius:14px;background:#fff;box-shadow:0 7px 24px rgba(15,23,42,.04)}
+.masterlist-search{position:relative;flex:1 1 300px;min-width:220px}
+.masterlist-search i{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:#64748b;font-size:13px;pointer-events:none}
+.masterlist-search input{width:100%;height:40px;box-sizing:border-box;padding:0 12px 0 36px;border:1px solid #cbd5e1;border-radius:9px;background:#f8faff;color:#1e293b;font:13px Inter,sans-serif}
+.masterlist-search input:focus{outline:0;border-color:#2563eb;box-shadow:0 0 0 4px rgba(37,99,235,.1)}
+.masterlist-ai{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.masterlist-ai i{color:#7c3aed}
+.masterlist-filter-btn{display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+body[data-page="masterlist"] .card{border:1px solid #dbeafe!important;border-radius:16px!important;background:#fff!important;box-shadow:0 8px 24px rgba(15,23,42,.045)!important}
+body[data-page="masterlist"] .masterlist-section-block{overflow:hidden;margin-bottom:16px!important;border:1px solid #dbeafe!important;border-radius:16px!important;box-shadow:0 8px 24px rgba(15,23,42,.045)!important}
+body[data-page="masterlist"] .masterlist-section-block>div:first-child{background:#f8faff;border-bottom-color:#e5e7eb}
+body[data-page="masterlist"] .masterlist-table th{background:#f8fafc!important;color:#475569!important;padding:11px 12px!important;font-size:10px!important;letter-spacing:.05em}
+body[data-page="masterlist"] .masterlist-table td{padding:10px 12px!important}
+body[data-page="masterlist"] .masterlist-table tbody tr:hover{background:#eff6ff!important}
+@media(max-width:640px){.masterlist-header{padding:21px 18px}.masterlist-header h1{font-size:25px}.masterlist-actionbar{flex-direction:column}.masterlist-action-group{width:100%}.masterlist-action-buttons .btn{flex:1 1 100%;justify-content:center}.masterlist-toolbar{align-items:stretch}.masterlist-search{flex-basis:100%}.masterlist-ai,.masterlist-filter-btn{justify-content:center}}
+</style>
 
 <main class="main">
-    <header class="header">
-        <div class="title">
-            <h1><i class="fas fa-table-list" style="color:#2563eb;margin-right:8px;"></i>Masterlist</h1>
-            <p>Search, filter, and manage enrolled students (max <?= (int) $maxPerSection ?> students per section)</p>
+    <header class="masterlist-header">
+        <div>
+            <div class="masterlist-kicker"><i class="fas fa-table-list"></i> Registrar directory</div>
+            <h1>Masterlist</h1>
+            <p>Search, filter, and manage enrolled students (max <?= (int) $maxPerSection ?> students per section).</p>
         </div>
-        <div class="header-actions">
-            <button type="button" class="btn btn-primary" id="btnCreateSection" title="Create a section manually, then add or assign students to it">
-                <i class="fas fa-plus-circle"></i> Create Section
-            </button>
-            <button type="button" class="btn btn-secondary" id="btnAutoAssign" title="Fill existing sections, create new ones only when needed (<?= (int) $maxPerSection ?> max each)">
-                <i class="fas fa-wand-magic-sparkles"></i> Auto-assign
-            </button>
-            <button class="btn btn-secondary" onclick="openGenerateModal()">
-                <i class="fas fa-sliders"></i> Generate
-            </button>
-            <button class="btn btn-secondary" onclick="window.print()">
-                <i class="fas fa-print"></i> Print
-            </button>
-            <button type="button" class="btn btn-primary" onclick="sendList()" title="Send the masterlist to the Academic Strand / Course Assignment module (CMS)">
-                <i class="fas fa-paper-plane"></i> Send List
-            </button>
-            <div class="export-wrap" style="position:relative;">
-                <button class="btn btn-primary" id="exportBtn"><i class="fas fa-download"></i> Export</button>
-                <div class="export-menu" id="exportMenu" style="position:absolute;top:100%;right:0;z-index:50;background:white;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.1);min-width:160px;padding:4px;margin-top:4px;display:none;">
-                    <a href="#" onclick="exportCSV()" style="display:block;padding:8px 12px;font-size:12px;font-weight:600;color:#1e293b;text-decoration:none;border-radius:6px;"><i class="fas fa-file-csv"></i> Export CSV</a>
-                    <a href="#" onclick="exportExcel()" style="display:block;padding:8px 12px;font-size:12px;font-weight:600;color:#1e293b;text-decoration:none;border-radius:6px;"><i class="fas fa-file-excel"></i> Export Excel</a>
-                    <a href="#" onclick="window.print()" style="display:block;padding:8px 12px;font-size:12px;font-weight:600;color:#1e293b;text-decoration:none;border-radius:6px;"><i class="fas fa-file-pdf"></i> Export PDF</a>
+    </header>
+
+    <!-- Action bar: section tools + output -->
+    <section class="masterlist-actionbar" aria-label="Masterlist actions">
+        <div class="masterlist-action-group">
+            <span class="masterlist-action-label">Section tools</span>
+            <div class="masterlist-action-buttons">
+                <button type="button" class="btn btn-primary" id="btnCreateSection" title="Create a section manually, then add or assign students to it">
+                    <i class="fas fa-plus-circle"></i> Create Section
+                </button>
+                <button type="button" class="btn btn-secondary" id="btnAutoAssign" title="Fill existing sections, create new ones only when needed (<?= (int) $maxPerSection ?> max each)">
+                    <i class="fas fa-wand-magic-sparkles"></i> Auto-assign
+                </button>
+                <button class="btn btn-secondary" onclick="openGenerateModal()">
+                    <i class="fas fa-sliders"></i> Generate
+                </button>
+            </div>
+        </div>
+        <div class="masterlist-action-group">
+            <span class="masterlist-action-label">Output &amp; handoff</span>
+            <div class="masterlist-action-buttons">
+                <button class="btn btn-secondary" onclick="window.print()">
+                    <i class="fas fa-print"></i> Print
+                </button>
+                <button type="button" class="btn btn-primary" onclick="sendList()" title="Send the masterlist to the Academic Strand / Course Assignment module (CMS)">
+                    <i class="fas fa-paper-plane"></i> Send List
+                </button>
+                <div class="export-wrap" style="position:relative;">
+                    <button class="btn btn-secondary" id="exportBtn"><i class="fas fa-download"></i> Export</button>
+                    <div class="export-menu" id="exportMenu" style="position:absolute;top:100%;right:0;z-index:50;background:white;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.1);min-width:160px;padding:4px;margin-top:4px;display:none;">
+                        <a href="#" onclick="exportCSV()" style="display:block;padding:8px 12px;font-size:12px;font-weight:600;color:#1e293b;text-decoration:none;border-radius:6px;"><i class="fas fa-file-csv"></i> Export CSV</a>
+                        <a href="#" onclick="exportExcel()" style="display:block;padding:8px 12px;font-size:12px;font-weight:600;color:#1e293b;text-decoration:none;border-radius:6px;"><i class="fas fa-file-excel"></i> Export Excel</a>
+                        <a href="#" onclick="window.print()" style="display:block;padding:8px 12px;font-size:12px;font-weight:600;color:#1e293b;text-decoration:none;border-radius:6px;"><i class="fas fa-file-pdf"></i> Export PDF</a>
+                    </div>
                 </div>
             </div>
         </div>
-    </header>
+    </section>
 
     <?php if ($assignedSuccess): ?>
         <div class="card" style="margin-bottom: 16px; padding: 12px 16px; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
@@ -164,15 +208,15 @@ include '../includes/sidebar.php';
     <?php endif; ?>
 
     <!-- Toolbar: search bar + filter button -->
-    <div class="card" style="margin-bottom: 16px; padding: 12px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-        <div style="flex:1; min-width:220px; position:relative;">
-            <i class="fas fa-search" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:14px;"></i>
-            <input type="text" id="masterlistSearch" name="q" class="form-control" style="padding-left:38px;" placeholder="Search by name, student no., course…">
+    <section class="masterlist-toolbar" aria-label="Masterlist filters">
+        <div class="masterlist-search">
+            <i class="fas fa-search"></i>
+            <input type="text" id="masterlistSearch" name="q" class="form-control" placeholder="Search by name, student no., course…">
         </div>
-        <button type="button" class="btn btn-secondary" id="aiSearchBtn" style="white-space:nowrap;display:inline-flex;align-items:center;gap:6px;" title="Ask AI to build the filters for you - e.g. 'at-risk BSIT 3rd year'">
-            <i class="fas fa-wand-magic-sparkles" style="color:#7c3aed;"></i> AI
+        <button type="button" class="btn btn-secondary masterlist-ai" id="aiSearchBtn" title="Ask AI to build the filters for you - e.g. 'at-risk BSIT 3rd year'">
+            <i class="fas fa-wand-magic-sparkles"></i> AI
         </button>
-        <button type="button" class="btn btn-primary" onclick="openFilterSearchModal()" style="display:inline-flex;align-items:center;gap:8px;">
+        <button type="button" class="btn btn-primary masterlist-filter-btn" onclick="openFilterSearchModal()">
             <i class="fas fa-sliders"></i> Filter
             <?php if ($filterCourse !== '' || $filterYear !== '' || $filterSchoolYear !== '' || $filterSemester !== '' || $filterSection !== '' || $filterStatus !== ''): ?>
                 <span style="background:#dc2626;color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;">Active</span>
@@ -184,7 +228,7 @@ include '../includes/sidebar.php';
         </label>
         <span style="font-size:13px;color:#64748b;">Showing <strong id="showingCount"><?= count($students) ?></strong> student(s)</span>
         <?php endif; ?>
-    </div>
+    </section>
 
     <!-- AI interpretation banner (below the search bar) -->
     <div id="aiInterpretation" style="display:none;padding:10px 14px;background:#eef4ff;border:1px solid #bfdbfe;border-radius:10px;margin-bottom:16px;box-shadow: 0 1px 3px rgba(0,0,0,0.08);">
@@ -1144,9 +1188,12 @@ select.form-control { cursor: pointer !important; }
     border-radius: 12px !important;
     overflow: hidden !important;
 }
-.masterlist-table thead th {
-    color: #fff !important;
-    background: #1a2d4a !important;
+body[data-page="masterlist"] .masterlist-table thead th {
+    background: #f8fafc !important;
+    color: #475569 !important;
+}
+body[data-page="masterlist"] .masterlist-table tbody tr:hover {
+    background: #eff6ff !important;
 }
 .masterlist-table thead th:first-child {
     border-radius: 12px 0 0 0 !important;
@@ -1164,12 +1211,9 @@ select.form-control { cursor: pointer !important; }
 .masterlist-table tbody tr:last-child td:last-child {
     border-radius: 0 0 12px 0 !important;
 }
-.masterlist-table tbody tr:hover {
-    background: #f8fafc !important;
-}
 
 @media print {
-    .sidebar, .header-actions, .form-row, .btn, .bulk-bar, #masterlistSearch, #selectAllPage, .modal-overlay { display: none !important; }
+    .sidebar, .header-actions, .masterlist-actionbar, .form-row, .btn, .bulk-bar, #masterlistSearch, #selectAllPage, .modal-overlay { display: none !important; }
     .masterlist-section-block { break-inside: avoid; page-break-inside: avoid; }
     .masterlist-table th[data-sort] i { display: none; }
     #masterlistContent { margin: 0; }

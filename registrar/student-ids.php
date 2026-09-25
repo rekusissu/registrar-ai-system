@@ -10,6 +10,7 @@ require_once __DIR__ . '/../shared/session_config.php';
 if (empty($_SESSION['user_id'])) { header('Location: ../login.php'); exit; }
 requireRole('registrar');
 require_once __DIR__ . '/../shared/database.php';
+require_once __DIR__ . '/../shared/qr_generator.php';
 
 $db = Database::getInstance();
 $ids = $db->fetchAll("
@@ -191,7 +192,7 @@ include '../includes/sidebar.php';
                     <td><?= $i['issue_date'] ? date('M d, Y', strtotime($i['issue_date'])) : '—' ?></td>
                     <td><?= $i['expiry_date'] ? date('M d, Y', strtotime($i['expiry_date'])) : '—' ?></td>
                     <td><span class="badge <?= $i['status'] ?>"><?= ucfirst($i['status']) ?></span></td>
-                    <td><?php if ($i['qr_code_path']): ?><img class="qr-thumb" src="<?= htmlspecialchars($i['qr_code_path']) ?>" alt="QR" onclick="showQrModal(this)" data-name="<?= htmlspecialchars($i['student_name'], ENT_QUOTES) ?>" data-id="<?= htmlspecialchars($i['student_number'], ENT_QUOTES) ?>"><?php elseif (!empty($i['student_id'])): ?><img class="qr-thumb qr-auto" data-qr-student-id="<?= (int)$i['student_id'] ?>" data-qr-name="<?= htmlspecialchars($i['student_name'], ENT_QUOTES) ?>" data-qr-number="<?= htmlspecialchars($i['student_number'], ENT_QUOTES) ?>" alt="QR" style="cursor:pointer;" onclick="showQrModal(this)"><?php else: ?>—<?php endif; ?></td>
+                    <td><?php if ($i['qr_code_path']): ?><img class="qr-thumb" src="<?= htmlspecialchars(resolveStudentQrUrl($i['qr_code_path'], $APP_ROOT)) ?>" alt="QR" onclick="showQrModal(this)" data-name="<?= htmlspecialchars($i['student_name'], ENT_QUOTES) ?>" data-id="<?= htmlspecialchars($i['student_number'], ENT_QUOTES) ?>"><?php elseif (!empty($i['student_id'])): ?><img class="qr-thumb qr-auto" data-qr-student-id="<?= (int)$i['student_id'] ?>" data-qr-name="<?= htmlspecialchars($i['student_name'], ENT_QUOTES) ?>" data-qr-number="<?= htmlspecialchars($i['student_number'], ENT_QUOTES) ?>" alt="QR" style="cursor:pointer;" onclick="showQrModal(this)"><?php else: ?>—<?php endif; ?></td>
                     <td><div class="action-group">
                         <button class="action-btn view" onclick="viewCard(this)" title="View ID Card"><i class="fas fa-id-card"></i></button>
                         <button class="action-btn edit" onclick="editStatus(this)" title="Update Status"><i class="fas fa-pen"></i></button>

@@ -18,11 +18,11 @@ $db = Database::getInstance();
 
 // ─── FETCH ALL DATA ──────────────────────────────────────────────
 
-// Stats
+// Stats.
+// The per-status counts (active / at-risk / graduated) are NOT queried
+// here — they are derived from the single GROUP BY further down, so the
+// headline cards and the Student Status Overview panel can never disagree.
 $totalStudents = (int) $db->fetchColumn("SELECT COUNT(*) FROM students");
-$activeStudents = (int) $db->fetchColumn("SELECT COUNT(*) FROM students WHERE status = 'active'");
-$atRiskStudents = (int) $db->fetchColumn("SELECT COUNT(*) FROM students WHERE status IN ('at-risk', 'probation')");
-$graduatedStudents = (int) $db->fetchColumn("SELECT COUNT(*) FROM students WHERE status = 'graduated'");
 $totalCards = (int) $db->fetchColumn("SELECT COUNT(*) FROM rfid_cards");
 $activeCards = (int) $db->fetchColumn("SELECT COUNT(*) FROM rfid_cards WHERE status = 'active'");
 $expiredCards = (int) $db->fetchColumn("SELECT COUNT(*) FROM rfid_cards WHERE status = 'expired'");
@@ -41,12 +41,36 @@ $monthlyData = $db->fetchAll("
     ORDER BY month ASC
 ");
 
-$months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-$monthCounts = array_fill(0, 6, 0);
-foreach ($monthlyData as $d) {
-    $idx = $d['month'] - 1;
-    if ($idx >= 0 && $idx < 6) $monthCounts[$idx] = (int) $d['count'];
+// Build the label axis from the actual current month, back 6 months.
+// It used to be a hardcoded Jan-Jun list, so the chart silently
+// showed the wrong axis for most of the year.
+$months = [];
+$monthCounts = [];
+$monthKeys = [];
+for ($i = 5; $i >= 0; $i--) {
+    $ts = strtotime("first day of -{$i} month");
+    $months[] = date('M', $ts);
+    $monthKeys[] = (int) date('n', $ts);
+    $monthCounts[] = 0;
 }
+foreach ($monthlyData as $d) {
+    $idx = array_search((int) $d['month'], $monthKeys, true);
+    if ($idx !== false) $monthCounts[$idx] = (int) $d['count'];
+}
+
+// Students added in the last 30 days. This is a real, computed
+// figure — the old stat cards carried hardcoded "12%" / "5%" /
+// "3%" / "8%" badges that never moved and meant nothing.
+$recentJoins = (int) $db->fetchColumn("
+    SELECT COUNT(*) FROM students
+    WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+");
+$prevJoins = (int) $db->fetchColumn("
+    SELECT COUNT(*) FROM students
+    WHERE created_at >= DATE_SUB(NOW(), INTERVAL 60 DAY)
+      AND created_at <  DATE_SUB(NOW(), INTERVAL 30 DAY)
+");
+$joinDelta = $prevJoins > 0 ? (int) round((($recentJoins - $prevJoins) / $prevJoins) * 100) : null;
 
 // Course distribution (top 5)
 $courseData = $db->fetchAll("
@@ -60,13 +84,50 @@ $courseData = $db->fetchAll("
 $courseLabels = array_column($courseData, 'course');
 $courseCounts = array_column($courseData, 'count');
 
-// Status distribution
-$statusData = [
-    'active' => (int) $db->fetchColumn("SELECT COUNT(*) FROM students WHERE status = 'active'"),
-    'at-risk' => (int) $db->fetchColumn("SELECT COUNT(*) FROM students WHERE status = 'at-risk'"),
-    'probation' => (int) $db->fetchColumn("SELECT COUNT(*) FROM students WHERE status = 'probation'"),
-    'graduated' => (int) $db->fetchColumn("SELECT COUNT(*) FROM students WHERE status = 'graduated'")
+// Status distribution — the four canonical buckets the panel displays.
+//
+// The original code ran four separate `WHERE status = '...'` counts. That
+// was the bug: the column is an 8-value enum whose DEFAULT is 'enrolled',
+// so students created through the normal flow never matched any of the
+// four branches and every row rendered 0. One GROUP BY replaces all four
+// queries and covers the whole enum, so the figures are real.
+//
+// The raw per-status counts are collapsed back into the four buckets the
+// panel has always shown, so the layout is unchanged. 'Active' means
+// currently in class (enrolled + active + loa), matching how
+// brain/Status Tracker.md classifies LOA as Active.
+$statusRows = $db->fetchAll("
+    SELECT status, COUNT(*) AS count
+    FROM students
+    GROUP BY status
+");
+
+$rawStatus = [];
+foreach ($statusRows as $row) {
+    $rawStatus[(string) ($row['status'] ?? '')] = (int) ($row['count'] ?? 0);
+}
+
+$DASH_STATUS_META = [
+    'active'    => ['label' => 'Active',    'fill' => 'green',  'icon' => 'fa-check-circle',   'color' => '#16a34a', 'from' => ['enrolled', 'active', 'loa']],
+    'at-risk'   => ['label' => 'At Risk',   'fill' => 'red',    'icon' => 'fa-exclamation-triangle', 'color' => '#dc2626', 'from' => ['at-risk']],
+    'probation' => ['label' => 'Probation', 'fill' => 'yellow', 'icon' => 'fa-clock',         'color' => '#b45309', 'from' => ['probation']],
+    'graduated' => ['label' => 'Graduated', 'fill' => 'blue',   'icon' => 'fa-graduation-cap', 'color' => '#2563eb', 'from' => ['graduated']],
 ];
+
+// Sum each bucket from the real GROUP BY result.
+$statusData = [];
+foreach ($DASH_STATUS_META as $key => $meta) {
+    $statusData[$key] = 0;
+    foreach ($meta['from'] as $src) {
+        $statusData[$key] += $rawStatus[$src] ?? 0;
+    }
+}
+
+// The headline stat cards read from the same buckets, so the top strip and
+// this panel can never disagree.
+$activeStudents    = $statusData['active'];
+$atRiskStudents    = $statusData['at-risk'] + $statusData['probation'];
+$graduatedStudents = $statusData['graduated'];
 
 // Recent activity
 $recentActivity = $db->fetchAll("
@@ -90,66 +151,218 @@ include 'includes/header.php';
 include 'includes/sidebar.php';
 ?>
 
-<main class="dashboard-main">
+    <style>
+    /* ============================================================
+       DASHBOARD — registrar-blue layer.
+       Scoped to body[data-page="dashboard"].
+
+       The hero previously used a photographic banner
+       (assets/images/bestlink banner.jpg) behind white text held
+       legible by heavy text-shadow. Text over an arbitrary photo
+       has no guaranteed contrast — it depends on which part of the
+       image happens to sit behind the words, and it changes if the
+       image is ever replaced. The solid gradient below keeps the
+       white text reliably legible and the page on system blue.
+       ============================================================ */
+    body[data-page="dashboard"] .dash-hero{
+        position:relative;overflow:hidden;margin-bottom:20px;padding:34px 38px;
+        border-radius:22px;
+        /* Solid blue sits underneath as the fallback (and as the colour
+           behind the text if the photo ever fails to load). No
+           background-blend-mode here: overlay tinted the ENTIRE photo
+           blue, which flattened it into a coloured box. */
+        background:#1b3fa8;
+        background-image:url('./assets/images/bestlink%20banner.jpg');
+        background-size:cover;background-position:center right;
+        box-shadow:0 14px 38px rgba(26,58,140,.26);
+    }
+    /* Dim from the left only, fading to fully clear by ~72%. The text
+       lives entirely on the left, so the right two-thirds of the photo
+       is left untouched. */
+    body[data-page="dashboard"] .dash-hero::after{
+        content:'';position:absolute;inset:0;z-index:0;
+        background:linear-gradient(100deg,
+            rgba(9,22,68,.90) 0%,
+            rgba(14,32,86,.78) 34%,
+            rgba(20,44,110,.42) 58%,
+            rgba(27,63,168,.06) 76%,
+            rgba(27,63,168,0) 100%);
+    }
+    body[data-page="dashboard"] .dash-hero::before{
+        content:'';position:absolute;right:-90px;top:-110px;width:380px;height:380px;
+        border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.14),transparent 70%);
+        pointer-events:none;z-index:0;
+    }
+    body[data-page="dashboard"] .dash-hero-in{position:relative;z-index:1;display:flex;
+        align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap}
+    body[data-page="dashboard"] .dash-kicker{
+        display:flex;align-items:center;gap:7px;margin-bottom:7px;color:#dbeafe;
+        font-size:10.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;
+    }
+    body[data-page="dashboard"] .dash-hero h1{
+        margin:0 0 10px;font-size:29px;font-weight:800;line-height:1.15;
+        letter-spacing:-.03em;color:#fff;
+    }
+    /* The name is the one warm accent in an otherwise blue block. */
+    body[data-page="dashboard"] .dash-hero h1 .dash-who{color:#fde68a}
+    body[data-page="dashboard"] .dash-hero-meta{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+    body[data-page="dashboard"] .dash-chip{
+        display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;
+        background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.32);
+        color:#fff;font-size:11px;font-weight:700;
+    }
+    body[data-page="dashboard"] .dash-chip-plain{border-color:transparent;background:transparent;padding-left:0}
+
+    /* ── Stat strip ───────────────────────────────────────────
+       Same connected-strip treatment as registrar/students.php:
+       one unit, hairline-separated cells, no gaps between them, and
+       a tone-coloured bar along the bottom of each cell. The old
+       version here was four floating cards with an icon tile. */
+    body[data-page="dashboard"] .stats-grid{
+        display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+        gap:0;margin:0 0 16px;background:#fff;border:1px solid #dbeafe;
+        border-radius:16px;box-shadow:0 6px 22px rgba(15,23,42,.04);overflow:hidden;
+    }
+    body[data-page="dashboard"] .stat-card{
+        position:relative;padding:16px 20px 15px;border-right:1px solid #e2e8f0;
+        border-radius:0;box-shadow:none;background:#fff;
+    }
+    body[data-page="dashboard"] .stat-card:last-child{border-right:0}
+    body[data-page="dashboard"] .stat-card::after{
+        content:"";position:absolute;left:20px;right:20px;bottom:0;height:3px;background:#dbeafe;
+    }
+    body[data-page="dashboard"] .stat-card.tone-blue::after  {background:#1d4ed8}
+    body[data-page="dashboard"] .stat-card.tone-green::after {background:#16a34a}
+    body[data-page="dashboard"] .stat-card.tone-amber::after {background:#d97706}
+    body[data-page="dashboard"] .stat-card.tone-violet::after{background:#7c3aed}
+
+    body[data-page="dashboard"] .stat-header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+    body[data-page="dashboard"] .stat-icon{
+        width:34px;height:34px;border-radius:10px;font-size:14px;
+    }
+    body[data-page="dashboard"] .stat-label{
+        font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;
+        color:#64748b;line-height:1.3;margin:0 0 5px;
+    }
+    body[data-page="dashboard"] .stat-value{
+        font-size:27px;font-weight:800;line-height:1.1;color:#0f172a;
+        font-variant-numeric:tabular-nums;letter-spacing:-.5px;
+    }
+    body[data-page="dashboard"] .stat-foot{
+        display:flex;align-items:center;gap:6px;margin-top:9px;padding-top:8px;
+        border-top:1px solid #f1f5f9;font-size:11px;color:#64748b;line-height:1.4;
+    }
+    body[data-page="dashboard"] .stat-foot b{color:#0f172a;font-weight:800}
+
+    /* Inline meter, matching the students strip. display:inline-block
+       is required — as a bare <span> the width is ignored and it
+       renders as a full-width rule sitting on the accent bar. */
+    body[data-page="dashboard"] .stat-meter{
+        display:inline-block;width:46px;height:4px;border-radius:3px;
+        background:#e2e8f0;overflow:hidden;vertical-align:middle;flex:0 0 46px;
+    }
+    body[data-page="dashboard"] .stat-meter i{display:block;height:100%;border-radius:3px}
+
+    /* A real trend, shown only when there is history to compute one. */
+    body[data-page="dashboard"] .stat-trend{
+        display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;
+        font-size:10.5px;font-weight:700;line-height:1.5;white-space:nowrap;
+    }
+    body[data-page="dashboard"] .stat-trend i{font-size:9px}
+    body[data-page="dashboard"] .stat-trend.up{color:#15803d;background:#dcfce7}
+    body[data-page="dashboard"] .stat-trend.down{color:#b91c1c;background:#fee2e2}
+    body[data-page="dashboard"] .stat-trend.flat{color:#64748b;background:#f1f5f9}
+
+    @media (max-width: 1024px) {
+        body[data-page="dashboard"] .stats-grid{grid-template-columns:repeat(2,1fr)}
+        body[data-page="dashboard"] .stat-card:nth-child(2n){border-right:0}
+        body[data-page="dashboard"] .stat-card:nth-child(-n+2){border-bottom:1px solid #e2e8f0}
+    }
+    @media (max-width: 560px) {
+        body[data-page="dashboard"] .stats-grid{grid-template-columns:1fr}
+        body[data-page="dashboard"] .stat-card{border-right:0;border-bottom:1px solid #e2e8f0}
+        body[data-page="dashboard"] .stat-card:last-child{border-bottom:0}
+        body[data-page="dashboard"] .stat-card{padding:14px 16px 13px}
+        body[data-page="dashboard"] .stat-value{font-size:23px}
+        body[data-page="dashboard"] .dash-hero{padding:24px 20px;border-radius:16px}
+        body[data-page="dashboard"] .dash-hero h1{font-size:24px}
+        body[data-page="dashboard"] .dash-hero-in{align-items:flex-start}
+    }
+    </style>
+
+    <main class="dashboard-main">
     <div class="dashboard-container">
 
-        <!-- Premium Hero Section with Banner -->
-        <div style="background: linear-gradient(135deg, #1a3a8c 0%, #2563eb 100%); background-image: url('./assets/images/bestlink%20banner.jpg'); background-size: cover; background-position: center; background-blend-mode: overlay; border-radius: 20px; padding: 42px 48px; margin-bottom: 32px; box-shadow: 0 20px 60px rgba(26, 58, 140, 0.35); overflow: hidden; position: relative;">
-            <!-- Decorative gradient element -->
-            <div style="position: absolute; right: -100px; top: -100px; width: 400px; height: 400px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%); z-index: 0;"></div>
-
-            <!-- Content -->
-            <div style="position: relative; z-index: 1;">
-                <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px; color: #fff; font-weight: 800; margin-bottom: 6px; text-shadow: 0 4px 12px rgba(0,0,0,0.6), 0 2px 4px rgba(0,0,0,0.8);">Registrar Portal</div>
-                <h1 style="font-size: 36px; font-weight: 900; letter-spacing: -1px; margin: 0 0 12px; line-height: 1.1; color: #fff; text-shadow: 0 6px 16px rgba(0,0,0,0.7), 0 3px 8px rgba(0,0,0,0.9);">Welcome back, <span style="color: #fbbf24; font-weight: 900; letter-spacing: -0.5px; font-size: 32px; text-shadow: 0 6px 16px rgba(0,0,0,0.7), 0 3px 8px rgba(0,0,0,0.9);"><?= htmlspecialchars($userName) ?></span></h1>
-                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                    <span style="display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; background: rgba(255,255,255,0.15); border: 1.5px solid rgba(255,255,255,0.5); color: #fff; border-radius: 20px; font-size: 11px; font-weight: 800; backdrop-filter: blur(12px); text-shadow: 0 2px 6px rgba(0,0,0,0.5); box-shadow: 0 2px 8px rgba(0,0,0,0.2);">
-                        <i class="fa-solid fa-shield-check" style="font-size: 14px;"></i> <?= htmlspecialchars($userRole) ?>
-                    </span>
-                    <span style="font-size: 12px; color: #fff; font-weight: 700; text-shadow: 0 2px 6px rgba(0,0,0,0.5);">
-                        <i class="fa-solid fa-calendar-days" style="margin-right: 6px; font-size: 13px;"></i> <?= date('M d, Y') ?>
-                    </span>
+        <!-- Hero. Solid registrar-blue rather than a stock photo, so
+             the white text keeps a guaranteed contrast ratio. -->
+        <header class="dash-hero">
+            <div class="dash-hero-in">
+                <div>
+                    <div class="dash-kicker"><i class="fas fa-graduation-cap"></i> Registrar portal</div>
+                    <h1>Welcome back, <span class="dash-who"><?= htmlspecialchars($userName) ?></span></h1>
+                    <div class="dash-hero-meta">
+                        <span class="dash-chip"><i class="fas fa-shield-check"></i> <?= htmlspecialchars($userRole) ?></span>
+                        <span class="dash-chip dash-chip-plain"><i class="fas fa-calendar-days"></i> <?= date('M d, Y') ?></span>
+                    </div>
                 </div>
             </div>
-        </div>
+        </header>
 
-        <!-- Stats -->
+        <!-- Stats. Same connected strip as registrar/students.php:
+             one unit, hairline-separated cells. The trend badge is only
+             rendered when there is a prior 30-day window to compare
+             against, so it is never a made-up number. -->
         <div class="stats-grid dashboard-section">
-            <div class="stat-card">
+            <div class="stat-card tone-blue">
                 <div class="stat-header">
                     <div class="stat-icon blue"><i class="fas fa-user-graduate"></i></div>
-                    <span class="stat-trend up"><i class="fas fa-arrow-up"></i> 12%</span>
+                    <?php if ($joinDelta !== null): ?>
+                    <span class="stat-trend <?= $joinDelta >= 0 ? 'up' : 'down' ?>">
+                        <i class="fas <?= $joinDelta >= 0 ? 'fa-arrow-up' : 'fa-arrow-down' ?>"></i> <?= abs($joinDelta) ?>%
+                    </span>
+                    <?php endif; ?>
                 </div>
+                <p class="stat-label">Total students</p>
                 <div class="stat-value"><?= number_format($totalStudents) ?></div>
-                <div class="stat-label">Total Students</div>
-                <div class="stat-footer"><span class="dot green"></span> <?= $activeStudents ?> active</div>
+                <div class="stat-foot">
+                    <span><b><?= $recentJoins ?></b> joined in 30 days</span>
+                </div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card tone-green">
                 <div class="stat-header">
                     <div class="stat-icon green"><i class="fas fa-user-check"></i></div>
-                    <span class="stat-trend up"><i class="fas fa-arrow-up"></i> 5%</span>
                 </div>
+                <p class="stat-label">Active</p>
                 <div class="stat-value"><?= number_format($activeStudents) ?></div>
-                <div class="stat-label">Active Students</div>
-                <div class="stat-footer"><span class="dot blue"></span> <?= round(($activeStudents / max($totalStudents, 1)) * 100) ?>% of total</div>
+                <div class="stat-foot">
+                    <span><?= $totalStudents > 0 ? round($activeStudents / $totalStudents * 100) : 0 ?>% of students</span>
+                    <span class="stat-meter"><i style="width:<?= $totalStudents > 0 ? round($activeStudents / $totalStudents * 100) : 0 ?>%;background:#16a34a"></i></span>
+                </div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card tone-amber">
                 <div class="stat-header">
                     <div class="stat-icon yellow"><i class="fas fa-triangle-exclamation"></i></div>
-                    <span class="stat-trend down"><i class="fas fa-arrow-up"></i> 3%</span>
                 </div>
+                <p class="stat-label">At risk or probation</p>
                 <div class="stat-value"><?= number_format($atRiskStudents) ?></div>
-                <div class="stat-label">At Risk Students</div>
-                <div class="stat-footer"><span class="dot red"></span> Needs attention</div>
+                <div class="stat-foot">
+                    <?php if ($atRiskStudents > 0): ?>
+                    <span class="stat-trend down"><i class="fas fa-triangle-exclamation"></i>Needs follow-up</span>
+                    <?php else: ?>
+                    <span class="stat-trend up"><i class="fas fa-circle-check"></i>None flagged</span>
+                    <?php endif; ?>
+                </div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card tone-violet">
                 <div class="stat-header">
                     <div class="stat-icon purple"><i class="fas fa-graduation-cap"></i></div>
-                    <span class="stat-trend up"><i class="fas fa-arrow-up"></i> 8%</span>
                 </div>
+                <p class="stat-label">Graduated</p>
                 <div class="stat-value"><?= number_format($graduatedStudents) ?></div>
-                <div class="stat-label">Graduated</div>
-                <div class="stat-footer"><span class="dot purple"></span> <?= round(($graduatedStudents / max($totalStudents, 1)) * 100) ?>% rate</div>
+                <div class="stat-foot">
+                    <span><?= $totalStudents > 0 ? round($graduatedStudents / $totalStudents * 100) : 0 ?>% of all records</span>
+                    <span class="stat-meter"><i style="width:<?= $totalStudents > 0 ? round($graduatedStudents / $totalStudents * 100) : 0 ?>%;background:#7c3aed"></i></span>
+                </div>
             </div>
         </div>
 
@@ -192,25 +405,28 @@ include 'includes/sidebar.php';
                 </div>
                 <div class="status-distribution">
                     <?php
-                    $total = max(array_sum($statusData), 1);
-                    $colors = ['active' => 'green', 'at-risk' => 'red', 'probation' => 'yellow', 'graduated' => 'blue'];
-                    $labels = ['active' => 'Active', 'at-risk' => 'At Risk', 'probation' => 'Probation', 'graduated' => 'Graduated'];
-                    $icons = ['active' => 'fa-check-circle', 'at-risk' => 'fa-exclamation-triangle', 'probation' => 'fa-clock', 'graduated' => 'fa-graduation-cap'];
-                    $iconColors = ['active' => '#16a34a', 'at-risk' => '#dc2626', 'probation' => '#b45309', 'graduated' => '#2563eb'];
+                    // The four canonical rows are always rendered, exactly as
+                    // before. Only the numbers behind them changed: they now
+                    // come from a single real GROUP BY instead of four queries
+                    // that missed the 'enrolled' default.
+                    $statusTotal = max(array_sum($statusData), 1);
                     ?>
-                    <?php foreach ($statusData as $key => $value): ?>
+                    <?php foreach ($statusData as $key => $value):
+                        $meta = $DASH_STATUS_META[$key];
+                        $pct = round(($value / $statusTotal) * 100);
+                    ?>
                         <div class="status-row">
                             <div class="status-left">
-                                <i class="fas <?= $icons[$key] ?? 'fa-circle' ?>" style="color: <?= $iconColors[$key] ?? '#64748b' ?>;"></i>
+                                <i class="fas <?= htmlspecialchars($meta['icon']) ?>" style="color: <?= htmlspecialchars($meta['color']) ?>;"></i>
                                 <div class="status-info">
-                                    <div class="status-label"><?= $labels[$key] ?? ucfirst($key) ?></div>
+                                    <div class="status-label"><?= htmlspecialchars($meta['label']) ?></div>
                                     <div class="status-count"><?= number_format($value) ?> students</div>
                                 </div>
                             </div>
                             <div class="status-right">
-                                <div class="status-percent"><?= round(($value / $total) * 100) ?>%</div>
+                                <div class="status-percent"><?= $pct ?>%</div>
                                 <div class="status-bar">
-                                    <div class="status-fill <?= $colors[$key] ?? 'blue' ?>" style="width: <?= round(($value / $total) * 100) ?>%;"></div>
+                                    <div class="status-fill <?= htmlspecialchars($meta['fill']) ?>" style="width: <?= $pct ?>%;"></div>
                                 </div>
                             </div>
                         </div>
@@ -254,7 +470,7 @@ include 'includes/sidebar.php';
                             <div class="resource-stat"><?= number_format($pendingDocs) ?></div>
                         </div>
                         <div class="resource-bar">
-                            <div class="resource-fill" style="width: <?= $pendingDocs > 0 ? min(100, $pendingDocs * 10) : 0 ?>%; background: linear-gradient(90deg, #7c3aed, #a78bfa);"></div>
+                            <div class="resource-fill" style="width: <?= $totalDocs > 0 ? round(($pendingDocs / $totalDocs) * 100) : 0 ?>%; background: linear-gradient(90deg, #7c3aed, #a78bfa);"></div>
                         </div>
                         <div class="resource-footer">In processing</div>
                     </div>
@@ -265,7 +481,7 @@ include 'includes/sidebar.php';
                             <div class="resource-stat"><?= number_format($approvedDocs) ?></div>
                         </div>
                         <div class="resource-bar">
-                            <div class="resource-fill" style="width: <?= $approvedDocs > 0 ? min(100, $approvedDocs * 5) : 0 ?>%; background: linear-gradient(90deg, #16a34a, #4ade80);"></div>
+                            <div class="resource-fill" style="width: <?= $totalDocs > 0 ? round(($approvedDocs / $totalDocs) * 100) : 0 ?>%; background: linear-gradient(90deg, #16a34a, #4ade80);"></div>
                         </div>
                         <div class="resource-footer">Ready for pickup</div>
                     </div>

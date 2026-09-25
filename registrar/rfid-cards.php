@@ -116,7 +116,11 @@ if ($idStudentIds) {
     }
 }
 
+require_once __DIR__ . '/../shared/qr_generator.php';
+
 $page_title = 'RFID Cards';
+$page_description = 'Issue, track, and archive student RFID cards';
+$body_page = 'rfid';
 $APP_ROOT = '../';
 $ACTIVE_NAV = 'rfid';
 
@@ -957,11 +961,311 @@ foreach ($cards as $i => $c) {
 }
 </style>
 
+<style>
+/* RFID cards ? registrar-blue system, matching Queue / Documents / Scan Logs.
+   Appended after the page's own styles so it wins on specificity without
+   having to rewrite rules the modals below also depend on. */
+body[data-page="rfid"]{background:#f5f7fb;color:#0f172a}
+body[data-page="rfid"] .dashboard-main{padding:24px clamp(18px,2.5vw,38px) 48px;background:linear-gradient(180deg,#eef4ff 0,#f8faff 300px,#f8faff 100%);min-height:auto}
+
+/* -- Header -- */
+body[data-page="rfid"] .dashboard-main>.header{
+    display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap;
+    margin:0 0 16px;padding:25px 27px;border:1px solid #c7d7fe;border-radius:19px;
+    background:linear-gradient(120deg,#eff6ff,#fff 68%);box-shadow:0 10px 30px rgba(37,99,235,.08);
+}
+body[data-page="rfid"] .dashboard-main>.header .title h1{margin:0 0 5px;font-size:28px;line-height:1.1;letter-spacing:-.03em;color:#172554}
+body[data-page="rfid"] .dashboard-main>.header .title p{max-width:620px;margin:0;font-size:12.5px;line-height:1.5;color:#64748b}
+.rc-kicker{display:flex;align-items:center;gap:7px;margin-bottom:7px;color:#1d4ed8;font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+/* box-sizing is load-bearing here. There is no global `* { box-sizing }` reset
+   in the shared stylesheets, and Chrome's UA sheet applies border-box to
+   <button> but NOT to <a>. Without this, "Scan Logs" (an anchor) is content-box:
+   min-height 36px + 16px padding + 3px border = 54px, while the two <button>
+   siblings measure a true 36px. Measured in Edge: 54.0 vs 36.0 vs 36.0. */
+body[data-page="rfid"] .dashboard-main>.header .header-actions .btn{box-sizing:border-box;min-height:36px;font-size:12px}
+
+/* -- Metric strip (was 6 icon cards) -- */
+body[data-page="rfid"] .rfid-stats{
+    display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:0;
+    margin:0 0 16px;background:#fff;border:1px solid #dbeafe;border-radius:16px;
+    box-shadow:0 6px 22px rgba(15,23,42,.04);overflow:hidden;
+}
+body[data-page="rfid"] .rfid-stat-card{
+    position:relative;background:transparent;border:0;border-radius:0;padding:17px 20px;
+    border-right:1px solid #e2e8f0;box-shadow:none;transition:none;
+}
+body[data-page="rfid"] .rfid-stat-card:last-child{border-right:0}
+body[data-page="rfid"] .rfid-stat-card::after{content:"";position:absolute;left:20px;right:20px;bottom:0;height:3px;background:#dbeafe}
+body[data-page="rfid"] .rfid-stat-card:hover{transform:none;box-shadow:none;border-color:transparent}
+body[data-page="rfid"] .rfid-stat-card .stat-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 6px}
+body[data-page="rfid"] .rfid-stat-card .stat-icon{display:none}
+body[data-page="rfid"] .rfid-stat-card .stat-label{order:1;color:#64748b;font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;margin:0;line-height:1.3}
+body[data-page="rfid"] .rfid-stat-card .stat-trend{order:2;font-size:10px;padding:1px 7px}
+body[data-page="rfid"] .rfid-stat-card .stat-number{order:3;font-size:28px;font-weight:800;line-height:1.1;color:#0f172a;font-variant-numeric:tabular-nums}
+/* Each accent must carry the same specificity as the base rule above.
+   Unprefixed (.rc-k-total = 0-1-0) loses to body[data-page] .rfid-stat-card
+   (0-2-1), which pinned every card to the same pale blue. */
+body[data-page="rfid"] .rfid-stat-card.rc-k-total::after{background:#1d4ed8}
+body[data-page="rfid"] .rfid-stat-card.rc-k-active::after{background:#16a34a}
+body[data-page="rfid"] .rfid-stat-card.rc-k-pool::after{background:#6366f1}
+body[data-page="rfid"] .rfid-stat-card.rc-k-expired::after{background:#d97706}
+body[data-page="rfid"] .rfid-stat-card.rc-k-lost::after{background:#dc2626}
+body[data-page="rfid"] .rfid-stat-card.rc-k-archived::after{background:#94a3b8}
+
+/* -- Panels -- */
+body[data-page="rfid"] .search-table-container,
+body[data-page="rfid"] .pool-section,
+body[data-page="rfid"] .ai-panel{
+    border:1px solid #dbeafe;border-radius:16px;background:#fff;
+    box-shadow:0 8px 24px rgba(15,23,42,.045);overflow:hidden;
+}
+body[data-page="rfid"] .search-table-container{margin-bottom:16px}
+body[data-page="rfid"] .pool-section{margin:0 0 16px}
+body[data-page="rfid"] .ai-panel{margin:0 0 16px;padding:0}
+body[data-page="rfid"] .ai-panel-header{margin:0;padding:14px 18px;background:#f8faff;border-bottom:1px solid #e5e7eb}
+body[data-page="rfid"] .ai-insight-card{border-radius:0;border:0;border-top:1px solid #e5e7eb!important;background:#f8faff;padding:14px 18px}
+body[data-page="rfid"] .ai-panel-header .ai-icon{background:linear-gradient(140deg,#2563eb,#1d4ed8);color:#fff;box-shadow:0 4px 12px rgba(37,99,235,.25)}
+body[data-page="rfid"] .ai-panel-header h3{font-size:13.5px}
+
+/* -- Search bar -- */
+body[data-page="rfid"] .search-bar{background:#fff;padding:13px 18px;border-bottom:1px solid #e5e7eb;display:flex;gap:9px;flex-wrap:wrap;align-items:center}
+body[data-page="rfid"] .search-bar .search-wrapper{max-width:none}
+body[data-page="rfid"] .search-bar input,
+body[data-page="rfid"] .search-bar select{height:38px;border:1px solid #cbd5e1!important;border-radius:9px;background:#f8faff!important;font:13px Inter,sans-serif;padding:0 12px}
+body[data-page="rfid"] .search-bar input:focus,
+body[data-page="rfid"] .search-bar select:focus{outline:0;border-color:#2563eb!important;background:#fff!important;box-shadow:0 0 0 4px rgba(37,99,235,.1)}
+body[data-page="rfid"] .search-bar .search-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+body[data-page="rfid"] .search-bar .btn{min-height:38px;font-size:12px}
+body[data-page="rfid"] .ai-panel + *{margin-top:0}
+
+/* -- AI interpretation banner -- */
+body[data-page="rfid"] #aiRfidInterpretation{border-radius:0!important;border:0!important;border-bottom:1px solid #dbeafe!important;background:#eff6ff!important;margin:0!important;padding:11px 18px!important}
+
+/* -- Assigned cards table -- */
+body[data-page="rfid"] .rfid-table-wrapper{border:0;border-radius:0;box-shadow:none;background:transparent}
+body[data-page="rfid"] .rfid-table-header{padding:13px 18px;background:#fff;border-bottom:1px solid #e5e7eb}
+body[data-page="rfid"] .rfid-table-header h3{font-size:13px;font-weight:700;letter-spacing:-.01em;display:flex;align-items:center;gap:8px;color:#1e293b}
+body[data-page="rfid"] .rfid-table-header p{display:none}
+body[data-page="rfid"] .rfid-table-header .rfid-table-count{background:#eff6ff;color:#1d4ed8;border-radius:999px;padding:1px 9px;font-size:11px;font-weight:800}
+body[data-page="rfid"] .rfid-table-header h3 i{color:#2563eb;font-size:12px}
+body[data-page="rfid"] .rfid-table-wrapper table{min-width:880px}
+body[data-page="rfid"] .rfid-table-wrapper th{
+    position:sticky;top:0;z-index:3;padding:11px 14px;background:#f8fafc;
+    border-bottom:1px solid #e2e8f0;color:#475569;font-size:10px;font-weight:800;
+    letter-spacing:.05em;text-transform:uppercase;
+}
+body[data-page="rfid"] .rfid-table-wrapper td{padding:10px 14px;border-bottom:1px solid #f1f5f9;font-size:13px;vertical-align:middle}
+body[data-page="rfid"] .rfid-table-wrapper tbody tr:hover{background:#eff6ff}
+body[data-page="rfid"] .rfid-table-wrap{max-height:62vh;overflow:auto}
+body[data-page="rfid"] .rfid-table-wrapper .card-uid-display{
+    font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12.5px;font-weight:600;
+    color:#0f172a;background:#f8fafc;border:1px solid #e2e8f0;padding:4px 10px;border-radius:8px;gap:7px;
+}
+body[data-page="rfid"] .rfid-table-wrapper .card-uid-display .chip{background:#eff6ff;color:#1d4ed8;border-radius:6px}
+body[data-page="rfid"] .rfid-table-wrapper .expiry-warning{
+    display:inline-flex;align-items:center;gap:4px;margin:0 0 0 7px;padding:2px 8px;border-radius:999px;
+    background:#fef3c7;color:#b45309;font-size:10.5px;font-weight:700;
+}
+body[data-page="rfid"] .rfid-table-wrapper .action-group{gap:4px;justify-content:flex-end}
+
+/* -- Pool table -- */
+body[data-page="rfid"] .pool-header{padding:13px 18px;background:#f8faff;border-bottom:1px solid #e5e7eb}
+body[data-page="rfid"] .pool-title h3{font-size:13px;font-weight:700;letter-spacing:-.01em;color:#1e293b}
+body[data-page="rfid"] .pool-title i{color:#6366f1!important;font-size:12px}
+body[data-page="rfid"] .pool-count{background:#e0e7ff;color:#4338ca;font-size:11px;font-weight:800;min-width:22px;height:20px}
+body[data-page="rfid"] .pool-subtitle{padding-left:0;margin:3px 0 0;font-size:12px}
+body[data-page="rfid"] .pool-table-wrap{padding:0;max-height:300px;overflow:auto}
+body[data-page="rfid"] .pool-table thead th{
+    position:sticky;top:0;z-index:2;background:#f8fafc;padding:9px 14px;
+    border-bottom:1px solid #e2e8f0;color:#475569;font-size:10px;font-weight:800;
+    letter-spacing:.05em;text-transform:uppercase;
+}
+body[data-page="rfid"] .pool-table td{padding:9px 14px;border-bottom:1px solid #f1f5f9;font-size:12.5px}
+body[data-page="rfid"] .pool-table tbody tr:hover{background:#eff6ff}
+body[data-page="rfid"] .pool-uid{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12.5px;font-weight:600;color:#0f172a;background:#f8fafc;border:1px solid #e2e8f0;padding:3px 9px;border-radius:7px}
+body[data-page="rfid"] .pool-idx{color:#94a3b8;font-size:12px;font-weight:600;width:40px}
+
+/* -- Footer -- */
+body[data-page="rfid"] .table-footer{padding:12px 18px;background:#f8faff;border-top:1px solid #e2e8f0}
+body[data-page="rfid"] .table-footer .info-text{font-size:12.5px;color:#64748b}
+body[data-page="rfid"] .table-footer .info-text strong{color:#0f172a;font-variant-numeric:tabular-nums}
+
+/* -- Assign / Edit modals ---------------------------------
+   Same treatment as the Documents modal: pinned blue header,
+   scrolling body, pinned footer band. The page's own .rfid-modal
+   keeps its flex column; these rules only re-skin it and reset the
+   negative-margin/padding pairing that assumed the old 30px gutter. */
+#assignModal .rfid-modal, #editModal .rfid-modal{
+    box-sizing:border-box;max-width:600px;max-height:calc(100vh - 40px);padding:0;
+    border:1px solid #dbeafe;border-radius:18px;overflow:hidden;
+    box-shadow:0 24px 60px rgba(15,23,42,.22);
+}
+#assignModal .rfid-modal-header, #editModal .rfid-modal-header{
+    flex:0 0 auto;align-items:center;gap:13px;margin:0;padding:18px 22px;
+    background:linear-gradient(120deg,#eff6ff,#fff 70%);border-bottom:1px solid #dbeafe;
+}
+#assignModal .rfid-modal-header .header-icon, #editModal .rfid-modal-header .header-icon{
+    width:38px;height:38px;border-radius:11px;font-size:15px;color:#fff;
+    background:linear-gradient(140deg,#2563eb,#1d4ed8);
+    box-shadow:0 6px 16px rgba(37,99,235,.28);
+}
+#assignModal .rfid-modal-header h3, #editModal .rfid-modal-header h3{
+    margin:0;font-size:17px;font-weight:700;letter-spacing:-.02em;color:#172554;
+}
+#assignModal .rfid-modal-header p, #editModal .rfid-modal-header p{
+    margin:2px 0 0;font-size:12px;color:#64748b;
+}
+#assignModal .rfid-modal .rfid-modal-body-wrapper, #editModal .rfid-modal .rfid-modal-body-wrapper{
+    flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+    margin:0;padding:20px 22px;background:#fff;
+}
+
+/* Section heads: small uppercase label, hairline rule to the edge. */
+#assignModal .form-section, #editModal .form-section{
+    padding:0 0 16px;margin:0 0 16px;border-bottom:1px solid #e2e8f0;
+}
+#assignModal .form-section:last-of-type, #editModal .form-section:last-of-type{
+    padding-bottom:0;margin-bottom:0;border-bottom:none;
+}
+#assignModal .form-section-header, #editModal .form-section-header{
+    display:flex;align-items:center;gap:9px;margin:0 0 10px;
+}
+#assignModal .form-section-icon, #editModal .form-section-icon{
+    width:26px;height:26px;flex:0 0 26px;border-radius:7px;font-size:11px;
+    background:#eff6ff;color:#1d4ed8;display:grid;place-items:center;
+}
+#assignModal .form-section-title, #editModal .form-section-title{
+    font-size:10.5px;font-weight:800;letter-spacing:.075em;text-transform:uppercase;color:#1d4ed8;
+}
+#assignModal .form-section-subtitle, #editModal .form-section-subtitle{display:none}
+#assignModal .form-group, #editModal .form-group{margin:0 0 12px}
+#assignModal .form-group:last-child, #editModal .form-group:last-child{margin-bottom:0}
+#assignModal .form-group>label, #editModal .form-group>label{
+    display:block;margin:0 0 6px;font-size:12px;font-weight:600;color:#475569;
+}
+#assignModal .form-control, #editModal .form-control{
+    box-sizing:border-box;width:100%;height:40px;padding:0 12px;
+    border:1px solid #cbd5e1;border-radius:9px;background:#f8faff;color:#1e293b;
+    font:13px Inter,sans-serif;transition:border-color .15s ease,box-shadow .15s ease;
+}
+#assignModal select.form-control, #editModal select.form-control{padding-right:28px}
+#assignModal .form-control:focus, #editModal .form-control:focus{
+    outline:0;border-color:#2563eb;background:#fff;box-shadow:0 0 0 4px rgba(37,99,235,.12);
+}
+#assignModal .form-control::placeholder, #editModal .form-control::placeholder{color:#94a3b8}
+#assignModal textarea.form-control, #editModal textarea.form-control{height:auto;padding:10px 12px;line-height:1.5}
+#editModal .form-control[readonly]{background:#f1f5f9;color:#64748b;cursor:default}
+#editModal .form-group>label i{margin-right:5px;color:#94a3b8;font-size:11px}
+/* No custom caret: registrar.css forces `appearance:auto` on selects so the
+   native dropdown arrow is already drawn. Adding one produced a double arrow. */
+#editModal .rc-select{position:relative}
+
+/* Assign: tab switcher */
+#assignModal .assign-tabs{
+    display:flex;gap:6px;margin:0 0 14px;padding:4px;border:1px solid #dbeafe;
+    border-radius:11px;background:#f8faff;
+}
+#assignModal .assign-tab{
+    flex:1;display:inline-flex;align-items:center;justify-content:center;gap:7px;
+    padding:8px 10px;border:1px solid transparent;border-radius:8px;background:transparent;
+    color:#475569;font:600 12.5px Inter,sans-serif;cursor:pointer;transition:all .15s ease;
+}
+#assignModal .assign-tab:hover{background:#eef4ff;color:#1d4ed8}
+#assignModal .assign-tab.active{background:#1d4ed8;border-color:#1d4ed8;color:#fff;box-shadow:0 4px 12px rgba(29,78,216,.22)}
+#assignModal .assign-tab-pane{display:none}
+#assignModal .assign-tab-pane.active{display:block}
+
+/* Edit: the card itself, as a record. Read-only, so it is visually separate
+   from the fields below — you can tell at a glance what you cannot change. */
+#editModal .rc-record{
+    margin:0 0 18px;padding:14px 16px 12px;border:1px solid #dbeafe;border-radius:13px;
+    background:linear-gradient(150deg,#eff6ff,#fff 78%);
+}
+#editModal .rc-record-top{display:flex;align-items:center;gap:12px}
+#editModal .rc-record-chip{
+    display:grid;place-items:center;width:38px;height:38px;flex:0 0 38px;border-radius:10px;
+    background:linear-gradient(140deg,#2563eb,#1d4ed8);color:#fff;font-size:14px;
+    box-shadow:0 5px 14px rgba(37,99,235,.26);
+}
+#editModal .rc-record-id{min-width:0;flex:1}
+#editModal .rc-record-cap{
+    display:block;font-size:9.5px;font-weight:800;letter-spacing:.09em;
+    text-transform:uppercase;color:#64748b;margin-bottom:2px;
+}
+#editModal .rc-record-uid{
+    display:block;font:700 19px/1.15 'JetBrains Mono',ui-monospace,monospace;
+    letter-spacing:-.02em;color:#172554;overflow-wrap:anywhere;
+}
+/* Tone variants are class-based (not attribute-based) and deliberately outrank
+   the base rule on specificity so the pill can never render stale colours. */
+#editModal .rc-record .rc-record-status{
+    flex:0 0 auto;padding:4px 11px;border-radius:999px;font-size:11px;font-weight:800;
+    letter-spacing:.02em;white-space:nowrap;background:#dcfce7;color:#15803d;
+}
+#editModal .rc-record .rc-record-status.tone-expired{background:#fef3c7 !important;color:#b45309 !important}
+#editModal .rc-record .rc-record-status.tone-lost{background:#fee2e2 !important;color:#dc2626 !important}
+#editModal .rc-record .rc-record-status.tone-inactive,
+#editModal .rc-record .rc-record-status.tone-archived{background:#f1f5f9 !important;color:#475569 !important}
+#editModal .rc-record-student{
+    display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;margin:12px 0 0;padding-top:11px;
+    border-top:1px solid #e0e7ff;
+}
+#editModal .rc-record-student #editStudentName{font-size:13.5px;font-weight:600;color:#0f172a}
+#editModal .rc-record-sub{font-size:12px;color:#64748b}
+#editModal .rc-record-foot{
+    display:flex;align-items:center;gap:7px;margin:9px 0 0;font-size:11.5px;color:#64748b;
+}
+#editModal .rc-record-foot i{color:#94a3b8;font-size:10.5px;flex:0 0 auto}
+
+/* Notices */
+#assignModal .rfid-notice, #editModal .rfid-notice{
+    flex:0 0 auto;margin:0;padding:12px 22px;font-size:12px;line-height:1.5;color:#475569;
+    background:#f8faff;border-top:1px solid #e2e8f0;display:flex;align-items:flex-start;gap:8px;
+}
+#assignModal .rfid-notice i, #editModal .rfid-notice i{color:#2563eb;margin-top:1px;flex:0 0 auto}
+
+/* Footer: pinned band */
+#assignModal .rfid-modal-actions, #editModal .rfid-modal-actions{
+    flex:0 0 auto;display:flex;align-items:center;justify-content:flex-end;gap:9px;
+    margin:0;padding:14px 22px;background:#f8faff;border-top:1px solid #e2e8f0;
+}
+#assignModal .rfid-modal-actions .btn, #editModal .rfid-modal-actions .btn{
+    box-sizing:border-box;min-height:40px;padding:0 20px;font-size:13px;
+    display:inline-flex;align-items:center;gap:7px;justify-content:center;
+}
+#assignModal #assignSubmitBtn:disabled{opacity:.55;cursor:not-allowed}
+
+/* -- Empty state -- */
+.rc-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:220px;padding:38px 20px;text-align:center}
+.rc-empty i{font-size:34px;color:#cbd5e1}
+.rc-empty p{margin:0;font-size:14px;font-weight:600;color:#64748b}
+.rc-empty span{font-size:12.5px;color:#94a3b8}
+
+/* -- Responsive -- */
+@media(max-width:1200px){body[data-page="rfid"] .rfid-stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+    body[data-page="rfid"] .rfid-stat-card:nth-child(3n){border-right:0}
+    body[data-page="rfid"] .rfid-stat-card:nth-child(-n+3){border-bottom:1px solid #e2e8f0}}
+@media(max-width:900px){body[data-page="rfid"] .dashboard-main>.header{flex-direction:column;align-items:flex-start}
+    body[data-page="rfid"] .dashboard-main>.header .header-actions{width:100%;justify-content:flex-start}
+    body[data-page="rfid"] .rfid-table-wrap{max-height:none}}
+@media(max-width:600px){body[data-page="rfid"] .dashboard-main>.header{padding:21px 18px}
+    body[data-page="rfid"] .dashboard-main>.header .title h1{font-size:25px}
+    body[data-page="rfid"] .dashboard-main>.header .header-actions{flex-direction:column;align-items:stretch}
+    body[data-page="rfid"] .dashboard-main>.header .btn{justify-content:center}
+    body[data-page="rfid"] .rfid-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+    body[data-page="rfid"] .rfid-stat-card:nth-child(3n){border-right:1px solid #e2e8f0}
+    body[data-page="rfid"] .rfid-stat-card:nth-child(2n){border-right:0}
+    body[data-page="rfid"] .rfid-stat-card{border-bottom:1px solid #e2e8f0}
+    body[data-page="rfid"] .search-bar .search-actions{width:100%}
+    body[data-page="rfid"] .search-bar .search-actions .btn{flex:1 1 auto;justify-content:center}}
+@media(prefers-reduced-motion:reduce){body[data-page="rfid"] .rfid-stat-card{transition:none}}
+</style>
 <main class="dashboard-main">
     <header class="header">
         <div class="title">
+            <div class="rc-kicker"><i class="fas fa-id-card"></i> Card registry</div>
             <h1>RFID Cards</h1>
-            <p>Manage student RFID cards</p>
+            <p>Issue cards to students, watch for expiries, and archive cards that are no longer in use.</p>
         </div>
         <div class="header-actions">
             <a href="rfid-scan-logs.php" class="btn btn-secondary">
@@ -977,47 +1281,36 @@ foreach ($cards as $i => $c) {
     </header>
 
     <!-- Stats -->
-    <div class="rfid-stats" style="grid-template-columns: repeat(6, 1fr);">
-        <div class="rfid-stat-card">
+    <div class="rfid-stats">
+        <div class="rfid-stat-card rc-k-total">
             <div class="stat-top">
-                <div class="stat-icon blue"><i class="fas fa-credit-card"></i></div>
                 <span class="stat-trend up"><i class="fas fa-arrow-up"></i> <?= $trendActive ?>%</span>
             </div>
             <div class="stat-number"><?= $totalCards ?></div>
             <div class="stat-label">Total Cards</div>
         </div>
-        <div class="rfid-stat-card">
-            <div class="stat-top">
-                <div class="stat-icon green"><i class="fas fa-check-circle"></i></div>
-            </div>
+        <div class="rfid-stat-card rc-k-active">
+            <div class="stat-top"></div>
             <div class="stat-number"><?= $activeCards ?></div>
             <div class="stat-label">Active</div>
         </div>
-        <div class="rfid-stat-card">
-            <div class="stat-top">
-                <div class="stat-icon" style="background:#e0e7ff;color:#4f46e5;"><i class="fas fa-box-open"></i></div>
-            </div>
+        <div class="rfid-stat-card rc-k-pool">
+            <div class="stat-top"></div>
             <div class="stat-number"><?= $availableCards ?></div>
-            <div class="stat-label">Available (Pool)</div>
+            <div class="stat-label">In Pool</div>
         </div>
-        <div class="rfid-stat-card">
-            <div class="stat-top">
-                <div class="stat-icon yellow"><i class="fas fa-clock"></i></div>
-            </div>
+        <div class="rfid-stat-card rc-k-expired">
+            <div class="stat-top"></div>
             <div class="stat-number"><?= $expiredCards ?></div>
             <div class="stat-label">Expired</div>
         </div>
-        <div class="rfid-stat-card">
-            <div class="stat-top">
-                <div class="stat-icon red"><i class="fas fa-triangle-exclamation"></i></div>
-            </div>
+        <div class="rfid-stat-card rc-k-lost">
+            <div class="stat-top"></div>
             <div class="stat-number"><?= $lostCards ?></div>
             <div class="stat-label">Lost</div>
         </div>
-        <div class="rfid-stat-card">
-            <div class="stat-top">
-                <div class="stat-icon" style="background:#f3f4f6;color:#6b7280;"><i class="fas fa-box-archive"></i></div>
-            </div>
+        <div class="rfid-stat-card rc-k-archived">
+            <div class="stat-top"></div>
             <div class="stat-number"><?= $archivedCards ?></div>
             <div class="stat-label">Archived</div>
         </div>
@@ -1062,6 +1355,7 @@ foreach ($cards as $i => $c) {
             <h3><i class="fas fa-credit-card" style="color:#2563eb;"></i> Assigned Cards <span class="rfid-table-count"><?= count($tableCards) ?></span></h3>
             <p>Cards currently assigned to students</p>
         </div>
+        <div class="rfid-table-wrap">
         <table>
             <thead>
                 <tr>
@@ -1079,10 +1373,10 @@ foreach ($cards as $i => $c) {
             <tbody id="rfidTableBody">
                 <?php if (empty($tableCards)): ?>
                     <tr>
-                        <td colspan="9" style="text-align:center; padding:48px 12px; color:#94a3b8;">
-                            <i class="fas fa-credit-card" style="font-size:42px; color:#cbd5e1; display:block; margin-bottom:10px;"></i>
-                            <p style="font-size:15px; font-weight:600; color:#64748b; margin:0;">No assigned cards</p>
-                            <p style="font-size:13px; margin:4px 0 0;">Assign cards to students to get started</p>
+                        <td colspan="9" class="rc-empty">
+                            <i class="fas fa-credit-card"></i>
+                            <p>No assigned cards</p>
+                            <span>Assign a card to a student to get started.</span>
                         </td>
                     </tr>
                 <?php else: ?>
@@ -1105,7 +1399,7 @@ foreach ($cards as $i => $c) {
                             data-idtype="<?= htmlspecialchars($card['id_type'] ?? 'school_id', ENT_QUOTES) ?>"
                             data-issued="<?= htmlspecialchars($card['id_issue_date'] ?? $card['issued_date'] ?? '', ENT_QUOTES) ?>"
                             data-expiry="<?= htmlspecialchars($card['id_expiry_date'] ?? $card['expiry_date'] ?? '', ENT_QUOTES) ?>"
-                            data-qr="<?= htmlspecialchars($card['qr_code_path'] ?? '', ENT_QUOTES) ?>"
+                            data-qr="<?= htmlspecialchars(resolveStudentQrUrl($card['qr_code_path'] ?? '', $APP_ROOT), ENT_QUOTES) ?>"
                             data-student-number="<?= htmlspecialchars($card['student_number'] ?? '', ENT_QUOTES) ?>">
                             <td style="color:#94a3b8;font-size:13px;font-weight:600;"><?= $cardIndex + 1 ?></td>
                             <td>
@@ -1141,7 +1435,8 @@ foreach ($cards as $i => $c) {
                             </td>
                             <td>
                                 <?php if (!empty($card['qr_code_path'])): ?>
-                                    <img class="qr-thumb" src="<?= htmlspecialchars($card['qr_code_path']) ?>" alt="QR"
+                                    <img class="qr-thumb" src="<?= htmlspecialchars(resolveStudentQrUrl($card['qr_code_path'], $APP_ROOT)) ?>" alt="QR"
+                                         onerror="this.onerror=null;this.classList.add('qr-auto');this.removeAttribute('data-qr-student-id');generateQrThumbFallback(this);"
                                          onclick="showQrModal(this)"
                                          data-name="<?= htmlspecialchars($card['student_name'] ?? '', ENT_QUOTES) ?>"
                                          data-id="<?= htmlspecialchars($card['student_number'] ?? '', ENT_QUOTES) ?>">
@@ -1193,6 +1488,7 @@ foreach ($cards as $i => $c) {
                 <?php endif; ?>
             </tbody>
         </table>
+        </div>
     </div>
 
     <div class="table-footer">
@@ -1346,7 +1642,7 @@ foreach ($cards as $i => $c) {
                     <div class="form-group"><textarea id="cardNotes" name="notes" class="form-control" rows="2" placeholder="e.g. Replacement card..."></textarea></div>
                 </div>
             </div>
-            <div style="padding:10px 20px;font-size:12px;color:#64748b;background:#f8fafc;border-top:1px solid #e2e8f0;"><i class="fas fa-info-circle" style="color:#2563eb;"></i> A Student ID (school_id) with QR code will also be issued automatically.</div>
+            <div class="rfid-notice"><i class="fas fa-circle-info"></i> A Student ID (school_id) with QR code will also be issued automatically.</div>
             <div class="rfid-modal-actions">
                 <button type="button" class="btn btn-light" data-close-modal="assign">Cancel</button>
                 <button type="submit" class="btn btn-primary" id="assignSubmitBtn" disabled><i class="fas fa-save"></i> Assign Card</button>
@@ -1369,67 +1665,54 @@ foreach ($cards as $i => $c) {
             <input type="hidden" id="editCardId" value="">
             <div class="rfid-modal-body-wrapper">
 
-            <div class="form-section">
-                <div class="form-section-header">
-                    <div class="form-section-icon"><i class="fas fa-microchip"></i></div>
-                    <div>
-                        <div class="form-section-title">Card Identity</div>
-                        <div class="form-section-subtitle">Read-only card and student details</div>
+            <!-- What this card is. Read-only, so it is presented as a record
+                 rather than as more form fields to scan past. -->
+            <div class="rc-record">
+                <div class="rc-record-top">
+                    <span class="rc-record-chip"><i class="fas fa-microchip"></i></span>
+                    <div class="rc-record-id">
+                        <span class="rc-record-cap">Card UID</span>
+                        <span id="editUid" class="rc-record-uid">&mdash;</span>
                     </div>
+                    <span class="rc-record-status" id="editStatusPill">Active</span>
                 </div>
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>Card UID</label>
-                        <div class="uid-row" style="margin-top:5px;">
-                            <span class="chip" style="display:inline-flex;width:32px;height:32px;align-items:center;justify-content:center;background:linear-gradient(135deg,#e2e8f0,#cbd5e1);border-radius:6px;font-size:12px;color:#64748b;flex-shrink:0;"><i class="fas fa-microchip"></i></span>
-                            <span id="editUid" style="font-family:'Courier New',monospace;font-size:16px;font-weight:700;color:#1e40af;letter-spacing:1px;line-height:32px;"></span>
-                        </div>
-                    </div>
+                <div class="rc-record-student">
+                    <span class="rc-record-cap">Assigned to</span>
+                    <span id="editStudentName">&mdash;</span>
+                    <span id="editStudentNumber" class="rc-record-sub"></span>
                 </div>
-                <div class="form-row">
-                    <div class="form-group" style="flex:1;">
-                        <label>Assigned Student</label>
-                        <div style="padding:9px 12px;background:#f8fafc;border:1.5px solid #e2e8f0;border-radius:8px;font-weight:600;font-size:14px;color:#0f172a;">
-                            <span id="editStudentName">&mdash;</span>
-                            <span id="editStudentNumber" style="font-weight:400;color:#64748b;margin-left:8px;"></span>
-                        </div>
-                    </div>
-                </div>
-                <div style="margin-top:8px;padding:8px 12px;background:#fef9c3;border:1px solid #facc15;border-radius:8px;font-size:11px;color:#92400e;display:flex;align-items:center;gap:8px;">
-                    <i class="fas fa-info-circle"></i>
-                    <span>Last updated: <span id="editUpdatedAt">&mdash;</span></span>
+                <div class="rc-record-foot">
+                    <i class="fas fa-clock"></i>
+                    <span>Last updated <span id="editUpdatedAt">&mdash;</span></span>
                 </div>
             </div>
 
+            <!-- What you can change. -->
             <div class="form-section">
                 <div class="form-section-header">
                     <div class="form-section-icon"><i class="fas fa-sliders"></i></div>
-                    <div>
-                        <div class="form-section-title">Status & Validity</div>
-                        <div class="form-section-subtitle">Change status and expiration</div>
-                    </div>
+                    <div class="form-section-title">Update</div>
                 </div>
                 <div class="form-row">
                     <div class="form-group">
-                        <label><i class="fas fa-flag" style="margin-right:4px;color:#64748b;"></i>Status</label>
-                        <div style="position:relative;">
+                        <label for="editStatus">Status</label>
+                        <div class="rc-select">
                             <select id="editStatus" class="form-control">
                                 <option value="active">Active</option>
                                 <option value="expired">Expired</option>
                                 <option value="lost">Lost</option>
                                 <option value="inactive">Inactive</option>
                             </select>
-                            <i class="fas fa-chevron-down" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:10px;pointer-events:none;"></i>
                         </div>
                     </div>
                     <div class="form-group">
-                        <label><i class="fas fa-calendar" style="margin-right:4px;color:#64748b;"></i>Expiry Date</label>
+                        <label for="editExpiryDate">Expiry date</label>
                         <input type="date" id="editExpiryDate" class="form-control" />
                     </div>
                 </div>
                 <div class="form-group">
-                    <label><i class="fas fa-question-circle" style="margin-right:4px;color:#64748b;"></i>Status Reason</label>
-                    <div style="position:relative;">
+                    <label for="editStatusReason">Reason for change</label>
+                    <div class="rc-select">
                         <select id="editStatusReason" class="form-control">
                             <option value="">&mdash; Select reason &mdash;</option>
                             <option value="active">Active</option>
@@ -1440,21 +1723,11 @@ foreach ($cards as $i => $c) {
                             <option value="inactive">Inactive</option>
                             <option value="other">Other</option>
                         </select>
-                        <i class="fas fa-chevron-down" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:10px;pointer-events:none;"></i>
-                    </div>
-                </div>
-            </div>
-
-            <div class="form-section" style="border-bottom: none;">
-                <div class="form-section-header">
-                    <div class="form-section-icon"><i class="fas fa-sticky-note"></i></div>
-                    <div>
-                        <div class="form-section-title">Notes</div>
-                        <div class="form-section-subtitle">Additional remarks</div>
                     </div>
                 </div>
                 <div class="form-group">
-                    <textarea id="editNotes" class="form-control" rows="3" placeholder="Optional notes..."></textarea>
+                    <label for="editNotes">Notes</label>
+                    <textarea id="editNotes" class="form-control" rows="3" placeholder="Anything the next person should know about this card."></textarea>
                 </div>
             </div>
 
@@ -2075,6 +2348,7 @@ async function openEditModal(id) {
         document.getElementById('editStudentName').textContent = c.student_name || 'Unassigned';
         document.getElementById('editStudentNumber').textContent = c.student_number || '';
         document.getElementById('editStatus').value = c.status;
+        setEditStatusPill(c.status);
         document.getElementById('editStatusReason').value = c.status_reason || '';
         document.getElementById('editExpiryDate').value = c.expiry_date || '';
         document.getElementById('editNotes').value = c.notes || '';
@@ -2086,6 +2360,28 @@ async function openEditModal(id) {
         showToast('Failed to load card details.', 'error');
     }
 }
+
+// Keeps the record panel's status pill in step with the select, so the outcome
+// of a change is visible before saving. The tone is a class so the CSS owns the
+// colours; setting them from JS left the pill painting its initial green.
+const EDIT_STATUS_TONE = {
+    active:   '',
+    expired:  'tone-expired',
+    lost:     'tone-lost',
+    inactive: 'tone-inactive',
+    archived: 'tone-archived'
+};
+function setEditStatusPill(value) {
+    const pill = document.getElementById('editStatusPill');
+    if (!pill) return;
+    const v = value || 'active';
+    pill.textContent = v.charAt(0).toUpperCase() + v.slice(1);
+    pill.setAttribute('data-status', v);
+    pill.className = 'rc-record-status ' + (EDIT_STATUS_TONE[v] || EDIT_STATUS_TONE.active);
+}
+document.getElementById('editStatus')?.addEventListener('change', function () {
+    setEditStatusPill(this.value);
+});
 
 document.getElementById('editCardForm')?.addEventListener('submit', async function (e) {
     e.preventDefault();
@@ -2279,6 +2575,17 @@ function generateQrDataUrl(studentId) {
         qr.make();
         return qr.createDataURL(8, 8);
     } catch (e) { return ''; }
+}
+
+// A stored QR file can be missing (deleted, or an older deployment wrote it
+// somewhere else). Rather than show a broken image, regenerate the QR in the
+// browser from the student id and use that instead.
+function generateQrThumbFallback(img) {
+    var tr = img.closest('tr[data-student-id]');
+    var sid = tr ? tr.getAttribute('data-student-id') : null;
+    var url = (sid && sid !== '0') ? generateQrDataUrl(sid) : '';
+    if (url) { img.src = url; }
+    else { img.style.display = 'none'; }
 }
 
 // Auto-populate QR thumbnails for rows where server QR is missing

@@ -202,8 +202,15 @@ body[data-page="status-tracker"] .header p{margin:0;max-width:680px;font-size:12
 body[data-page="status-tracker"] .st-kpi-strip{gap:0;margin-bottom:18px;overflow:hidden;border:1px solid #dbeafe;border-radius:18px;background:#fff;box-shadow:0 8px 28px rgba(15,23,42,.045)}
 body[data-page="status-tracker"] .st-kpi{position:relative;border:0;border-right:1px solid #e5e7eb;border-radius:0;box-shadow:none;padding:20px 22px}
 body[data-page="status-tracker"] .st-kpi:last-child{border-right:0}
+/* Accent system. The icon chips above already carry the right colour
+   (brand / success / danger / purple via inline styles); the rule beneath
+   was hardcoded blue on cards 1-2, so the strip lost that signal. Each
+   bar now matches the icon sitting on it. */
 body[data-page="status-tracker"] .st-kpi::after{content:"";position:absolute;left:22px;right:22px;bottom:0;height:3px;background:#dbeafe}
-body[data-page="status-tracker"] .st-kpi:first-child::after,body[data-page="status-tracker"] .st-kpi:nth-child(2)::after{background:linear-gradient(90deg,#2563eb,#60a5fa)}
+body[data-page="status-tracker"] .st-kpi:nth-child(1)::after{background:linear-gradient(90deg,#2563eb,#60a5fa)}
+body[data-page="status-tracker"] .st-kpi:nth-child(2)::after{background:linear-gradient(90deg,#16a34a,#4ade80)}
+body[data-page="status-tracker"] .st-kpi:nth-child(3)::after{background:linear-gradient(90deg,#dc2626,#fca5a5)}
+body[data-page="status-tracker"] .st-kpi:nth-child(4)::after{background:linear-gradient(90deg,#7c3aed,#a78bfa)}
 body[data-page="status-tracker"] .st-kpi-num{color:#172554;font-size:29px;font-variant-numeric:tabular-nums}
 body[data-page="status-tracker"] .st-kpi-label{color:#64748b;font-size:11px;font-weight:750;letter-spacing:.045em;text-transform:uppercase}
 body[data-page="status-tracker"] .st-ai-bar,body[data-page="status-tracker"] .st-filters,body[data-page="status-tracker"] .st-dist{border-color:#dbeafe;box-shadow:0 7px 24px rgba(15,23,42,.04)}

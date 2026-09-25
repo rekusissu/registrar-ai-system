@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 // ============================================================
 //  REGISTRAR/FILE-STORAGE.PHP
 //  Digital File Storage — Upload / preview / download / delete
@@ -83,51 +83,104 @@ usort($sortedStudents, function ($a, $b) use ($studentMissing) {
 });
 
 $page_title = 'File Storage';
-$page_description = 'Digital student document storage and management';
-$body_page = 'file-storage';
 $APP_ROOT   = '../';
-$extra_css = ['file-storage.css'];
-$page_styles = '';
 $ACTIVE_NAV = 'filestorage';
 include '../includes/header.php';
 include '../includes/sidebar.php';
-?>
 
+
+?>
 <style>
-/* File Storage v2 — authoritative page layout */
-body[data-page="file-storage"] .storage-v2-stats{display:grid!important;grid-template-columns:repeat(3,1fr)!important;gap:0!important;margin:0 0 18px!important;padding:0!important;overflow:hidden!important;border:1px solid #bfdbfe!important;border-radius:16px!important;background:#fff!important;box-shadow:0 8px 24px rgba(15,23,42,.05)!important}
-body[data-page="file-storage"] .storage-v2-stat{display:flex!important;align-items:center!important;gap:14px!important;min-width:0!important;margin:0!important;padding:22px!important;border:0!important;border-right:1px solid #e2e8f0!important;border-radius:0!important;background:#fff!important;box-shadow:none!important}
-body[data-page="file-storage"] .storage-v2-stat:last-child{border-right:0!important}.storage-v2-stat strong{display:block!important;font-size:28px!important;line-height:1!important;font-weight:800!important;color:#172554!important}.storage-v2-stat span{display:block!important;margin-top:8px!important;color:#64748b!important;font-size:11px!important;font-weight:750!important;letter-spacing:.04em!important;text-transform:uppercase!important}
-body[data-page="file-storage"] .storage-v2-directory{overflow:hidden!important;margin:0!important;border:1px solid #bfdbfe!important;border-radius:16px!important;background:#fff!important;box-shadow:0 8px 24px rgba(15,23,42,.05)!important}.storage-v2-directory .storage-directory-head{padding:18px 20px!important}.storage-v2-directory .fs-toolbar{display:flex!important;align-items:center!important;gap:12px!important;padding:14px 20px!important;background:#f8fafc!important}.storage-v2-directory .table-responsive{overflow-x:auto!important}.storage-v2-directory .table{width:100%!important;min-width:760px!important}.storage-v2-directory .table th{padding:13px 15px!important;background:#f8fafc!important;color:#475569!important}.storage-v2-directory .table td{padding:13px 15px!important;border-bottom:1px solid #e2e8f0!important;color:#334155!important}
-@media(max-width:640px){body[data-page="file-storage"] .storage-v2-stats{grid-template-columns:1fr!important}.storage-v2-stat{border-right:0!important;border-bottom:1px solid #e2e8f0!important}.storage-v2-stat:last-child{border-bottom:0!important}}
+.storage-header{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:18px;padding:25px 27px;border:1px solid #c7d7fe;border-radius:19px;background:linear-gradient(120deg,#eff6ff,#fff 68%);box-shadow:0 10px 30px rgba(37,99,235,.08)}
+.storage-kicker{display:flex;align-items:center;gap:7px;margin-bottom:7px;color:#1d4ed8;font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.storage-header h1{margin:0 0 5px;font-size:28px;line-height:1.1;letter-spacing:-.03em;color:#172554}.storage-header p{max-width:660px;margin:0;font-size:12.5px;line-height:1.5;color:#64748b}.storage-header .header-actions{display:flex;align-items:center;gap:9px}.storage-header .btn{min-height:38px}
+.storage-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;margin:0 0 18px;overflow:hidden;border:1px solid #bfdbfe;border-radius:16px;background:#fff;box-shadow:0 8px 24px rgba(15,23,42,.05)}
+.storage-stat{display:flex;align-items:center;gap:14px;min-width:0;padding:22px;border-right:1px solid #e2e8f0;background:#fff}.storage-stat:last-child{border-right:0}/* Accent system.
+   Each card carries ONE --accent token; the icon chip and the bottom
+   rule both read from it, so they can never drift apart. The old rules
+   hardcoded the same blue on .blue/.teal/.red, which silently overrode
+   the teal and red hooks to identical blue and flattened the strip. */
+.storage-stat{--accent:#1d4ed8;--accent-soft:#dbeafe;--accent-bar:linear-gradient(90deg,#2563eb,#60a5fa)}
+.storage-stat:nth-child(1){--accent:#1d4ed8;--accent-soft:#dbeafe;--accent-bar:linear-gradient(90deg,#2563eb,#60a5fa)}
+.storage-stat:nth-child(2){--accent:#0f766e;--accent-soft:#ccfbf1;--accent-bar:linear-gradient(90deg,#0d9488,#5eead4)}
+.storage-stat:nth-child(3){--accent:#b91c1c;--accent-soft:#fee2e2;--accent-bar:linear-gradient(90deg,#dc2626,#fca5a5)}
+.storage-stat-icon{width:40px;height:40px;display:grid;place-items:center;flex:0 0 auto;border-radius:11px;font-size:17px;background:var(--accent-soft)!important;color:var(--accent)!important}.storage-stat strong{display:block;font-size:28px;line-height:1;font-weight:800;color:#172554}.storage-stat span{display:block;margin-top:8px;color:#64748b;font-size:11px;font-weight:750;letter-spacing:.04em;text-transform:uppercase}
+@media(max-width:900px){.storage-header{align-items:flex-start;flex-direction:column}.storage-header .header-actions{width:100%;justify-content:flex-end}}
+
+/* Match the Status Tracker KPI strip: unified surface with bottom accent bars. */
+.storage-stats{position:relative;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:0!important;margin:0 0 20px!important;overflow:hidden!important;border:1px solid #dce7e6!important;border-radius:18px!important;background:#fff!important;box-shadow:0 8px 28px rgba(15,23,42,.045)!important}
+.storage-stat{position:relative!important;display:flex!important;align-items:flex-start!important;gap:14px!important;min-width:0!important;padding:20px 22px!important;border:0!important;border-right:1px solid #e5eceb!important;border-radius:0!important;background:#fff!important;box-shadow:none!important}
+.storage-stat:last-child{border-right:0!important}
+.storage-stat::after{content:"";position:absolute;left:22px;right:22px;bottom:0;height:3px;background:var(--accent-bar)}
+.storage-stat-icon{width:42px!important;height:42px!important;display:flex!important;align-items:center!important;justify-content:center!important;flex:0 0 auto!important;border-radius:10px!important;font-size:17px!important}
+.storage-stat strong{display:block!important;margin-top:0!important;font-size:26px!important;line-height:1.1!important;font-weight:800!important;letter-spacing:-.5px!important;color:#172554!important}
+.storage-stat span{display:block!important;margin-top:2px!important;color:#64748b!important;font-size:13px!important;font-weight:500!important;letter-spacing:0!important;text-transform:none!important}
+@media(max-width:640px){.storage-stats{grid-template-columns:1fr!important}.storage-stat{border-right:0!important;border-bottom:1px solid #e5eceb!important;padding:18px!important}.storage-stat:last-child{border-bottom:0!important}}
+
+@media(max-width:640px){.storage-header{padding:21px 18px}.storage-header h1{font-size:25px}.storage-header .header-actions{flex-direction:column}.storage-header .btn{justify-content:center}.storage-stats{grid-template-columns:1fr}.storage-stat{border-right:0;border-bottom:1px solid #e2e8f0;padding:17px 18px}.storage-stat:last-child{border-bottom:0}}
+.file-icon { width:42px; height:42px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0; }
+.file-state { display:flex; align-items:center; gap:10px; }
+.fname { font-weight:600; color:#0f172a; font-size:13px; word-break:break-all; }
+.fmeta { font-size:11px; color:#94a3b8; }
+.thumb { width:44px; height:44px; object-fit:cover; border:1px solid #e2e8f0; border-radius:8px; background:#f8fafc; }
+.dropzone { border:2px dashed #cbd5e1; border-radius:12px; padding:22px 16px; text-align:center; color:#64748b; background:#f8fafc; cursor:pointer; transition:all .15s; }
+.dropzone:hover, .dropzone.over { border-color:#2563eb; background:#eef4ff; }
+.file-expand { display:none; padding:10px 14px; background:#f8fafc; border-radius:10px; margin-top:6px; }
+.file-expand.open { display:block; }
+.file-expand-row { display:flex; align-items:center; gap:10px; padding:8px 0; border-bottom:1px solid #eef1f6; }
+.file-expand-row:last-child { border-bottom:none; }
+.q-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; }
+.q-item { display:flex; align-items:center; gap:10px; padding:12px; background:#f8fafc; border-radius:10px; }
+.q-icon { width:36px; height:36px; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:14px; flex-shrink:0; }
+.q-item .q-pct { font-size:20px; font-weight:700; color:#0f172a; }
+.q-item .q-label { font-size:12px; color:#64748b; }
+
+/* ── Toolbar search / filter bar ──────────────────────── */
+.fs-toolbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;row-gap:10px}
+.fs-toolbar-left{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.fs-toolbar-left .count-badge{font-size:12px;font-weight:600;color:#64748b;background:#f1f5f9;padding:3px 10px;border-radius:9999px;white-space:nowrap;line-height:1.4}
+.fs-toolbar-right{display:flex;align-items:center;gap:10px;margin-left:auto;flex-wrap:wrap;row-gap:8px}
+.fs-search{position:relative;display:flex;align-items:center;height:38px;min-width:200px;flex:1 1 240px;max-width:320px}
+.fs-search i.fa-magnifying-glass{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:13px;pointer-events:none}
+.fs-search input{width:100%;height:100%;padding:0 32px 0 36px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:13px;font-family:inherit;outline:none;background:#fff;color:#1e293b;box-sizing:border-box;transition:border-color .15s,box-shadow .15s}
+.fs-search input:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.08)}
+.fs-search input::placeholder{color:#94a3b8}
+.fs-search .clear-btn{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:22px;height:22px;border:none;background:none;color:#94a3b8;border-radius:50%;cursor:pointer;display:none;align-items:center;justify-content:center;font-size:13px;line-height:1;transition:background .12s,color .12s}
+.fs-search .clear-btn:hover{background:#f1f5f9;color:#475569}
+.fs-search .clear-btn.show{display:flex}
+.fs-filter{height:38px;min-width:150px;max-width:180px;padding:0 12px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:13px;font-family:inherit;color:#1e293b;background:#fff;cursor:pointer;outline:none;appearance:auto;transition:border-color .15s}
+.fs-filter:focus{border-color:#2563eb;box-shadow:0 0 0 3px rgba(37,99,235,.08)}
+.fs-divider{width:1px;height:24px;background:#e2e8f0;flex-shrink:0}
+.fs-count{font-size:12px;font-weight:600;color:#94a3b8;white-space:nowrap}
 </style>
-<link rel="stylesheet" href="../css/file-storage.css?v=<?= filemtime(__DIR__ . '/../css/file-storage.css') ?>">
+
 <main class="dashboard-main">
     <div class="dashboard-container">
         <header class="storage-header">
             <div>
                 <div class="storage-kicker"><i class="fas fa-folder-open"></i> Registrar document center</div>
                 <h1>Digital File Storage</h1>
-                <p>Store, preview, and manage student documents such as transcripts, clearances, and health records.</p>
+                <p>Store, preview and manage student documents — transcripts, clearances, health records</p>
             </div>
             <div class="header-actions">
-                <button class="btn btn-secondary" onclick="openModal('qualityModal')"><i class="fas fa-chart-pie"></i> Data quality</button>
-                <button class="btn btn-primary" onclick="openUpload()"><i class="fas fa-cloud-arrow-up"></i> Upload files</button>
+                <button class="btn btn-secondary" onclick="openModal('qualityModal')"><i class="fas fa-chart-pie"></i> Data Quality</button>
+                <button class="btn btn-primary" onclick="openUpload()"><i class="fas fa-cloud-arrow-up"></i> Upload Files</button>
             </div>
         </header>
 
-        <section class="storage-stats storage-v2-stats" aria-label="File storage summary">
-            <div class="storage-stat storage-v2-stat"><div class="storage-stat-icon files"><i class="fas fa-file-lines"></i></div><div><strong><?= $totalFiles ?></strong><span>Total files</span></div></div>
-            <div class="storage-stat storage-v2-stat"><div class="storage-stat-icon bytes"><i class="fas fa-hard-drive"></i></div><div><strong><?= fmtBytes($sumBytes) ?></strong><span>Total storage</span></div></div>
-            <div class="storage-stat storage-v2-stat"><div class="storage-stat-icon missing"><i class="fas fa-triangle-exclamation"></i></div><div><strong><?= $missingCount ?></strong><span>Missing document sets</span></div></div>
+        <section class="storage-stats" aria-label="File storage summary">
+            <div class="storage-stat"><div class="storage-stat-icon blue"><i class="fas fa-file-lines"></i></div><div><strong><?= $totalFiles ?></strong><span>Total files</span></div></div>
+            <div class="storage-stat"><div class="storage-stat-icon teal"><i class="fas fa-hard-drive"></i></div><div><strong><?= fmtBytes($sumBytes) ?></strong><span>Total storage</span></div></div>
+            <div class="storage-stat"><div class="storage-stat-icon red"><i class="fas fa-triangle-exclamation"></i></div><div><strong><?= $missingCount ?></strong><span>Missing document sets</span></div></div>
         </section>
 
-        <section class="storage-directory storage-v2-directory">
-            <div class="storage-directory-head"><div><h2>Student files</h2><p>Browse documents by student and expand a row to manage files.</p></div><span class="storage-count" id="shownCount"><?= count($sortedStudents) ?> shown</span></div>
-            <div class="fs-toolbar">
+        <div class="panel" style="margin-bottom:18px;">
+            <div class="panel-toolbar" style="flex-direction:column;align-items:stretch;border-bottom:none;padding-bottom:0;margin-bottom:0;">
+                <div class="fs-toolbar">
                     <!-- Left: title + count -->
                     <div class="fs-toolbar-left">
-                        <div class="panel-title"><i class="fas fa-users"></i> Student files</div>
+                        <div class="panel-title"><i class="fas fa-users" style="color:#2563eb;"></i> Student Files</div>
+                        <span class="count-badge" id="shownCount"><?= count($sortedStudents) ?> shown</span>
                     </div>
                     <!-- Right: search, filter, notify -->
                     <div class="fs-toolbar-right">
@@ -185,7 +238,7 @@ body[data-page="file-storage"] .storage-v2-directory{overflow:hidden!important;m
                             <?php if ($mc > 0): ?>
                                 <div style="padding:6px 0 10px;">
                                     <span style="font-size:11px;font-weight:600;color:#dc2626;"><i class="fas fa-triangle-exclamation"></i> Missing:</span>
-                                <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;">
+                                    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;">
                                         <?php foreach ($stu['missing_types'] as $mt): ?>
                                             <span class="pill at-risk"><?= ucfirst(htmlspecialchars($mt)) ?></span>
                                         <?php endforeach; ?>
@@ -237,7 +290,7 @@ body[data-page="file-storage"] .storage-v2-directory{overflow:hidden!important;m
             <div class="table-footer">
                 <div class="info-text">Showing <strong id="storageTotalCount"><?= count($sortedStudents) ?></strong> of <strong><?= count($sortedStudents) ?></strong> students</div>
             </div>
-        </section>
+        </div>
     </div>
 </main>
 
@@ -465,6 +518,10 @@ var searchInput    = document.getElementById('stuSearch');
 var searchClearBtn = document.getElementById('stuSearchClear');
 var docTypeFilter  = document.getElementById('docTypeFilter');
 var shownCountEl   = document.getElementById('shownCount');
+// The table footer carries its own id. It used to be 'shownCount' too,
+// which made getElementById return the toolbar badge first and left the
+// footer permanently stale.
+var footerCountEl  = document.getElementById('storageTotalCount');
 var totalStudents  = document.querySelectorAll('#studentTableBody tr[data-search]').length;
 
 function applyFilter() {
@@ -484,6 +541,7 @@ function applyFilter() {
         if (okQ && okT) visible++;
     });
     shownCountEl.textContent = visible + ' shown';
+    if (footerCountEl) footerCountEl.textContent = visible;
     searchClearBtn.classList.toggle('show', searchInput.value.length > 0);
 }
 searchInput.addEventListener('input', applyFilter);

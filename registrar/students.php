@@ -24,10 +24,29 @@ $atRiskStudents = count(array_filter($students, fn($s) => $s['status'] === 'at-r
 $graduatedStudents = count(array_filter($students, fn($s) => $s['status'] === 'graduated'));
 // Per-year-level counts for the Year 1-4 cards.
 $yearLevelCounts = [1 => 0, 2 => 0, 3 => 0, 4 => 0];
+$unassignedStudents = 0;
 foreach ($students as $s) {
     $yl = (int) ($s['year_level'] ?? 0);
     if (isset($yearLevelCounts[$yl])) { $yearLevelCounts[$yl]++; }
+    else { $unassignedStudents++; }
 }
+
+// Cohort ribbon: one proportional stacked bar instead of four
+// same-weight year cards. Percentages are of the total, so the
+// segments read as parts of a whole rather than four tallies.
+$ribbonSegments = [];
+foreach ([1, 2, 3, 4] as $yl) {
+    $ribbonSegments[] = [
+        'key'  => 'y' . $yl,
+        'year' => $yl,
+        'tone' => ['y1', 'y2', 'y3', 'y4'][$yl - 1],
+        'count' => $yearLevelCounts[$yl],
+    ];
+}
+if ($unassignedStudents > 0) {
+    $ribbonSegments[] = ['key' => 'unassigned', 'year' => null, 'tone' => 'unassigned', 'count' => $unassignedStudents];
+}
+$ribbonBase = max(1, $totalStudents); // never divide by zero on an empty list
 
 $thisMonth = $db->fetchColumn("SELECT COUNT(*) FROM students WHERE created_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01')") ?: 0;
 $lastMonth = $db->fetchColumn("SELECT COUNT(*) FROM students WHERE created_at >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH) AND created_at < DATE_FORMAT(CURDATE(), '%Y-%m-01')") ?: 0;
@@ -53,6 +72,7 @@ foreach ($rfidCards as $rc) {
 $page_title = 'Students';
 $APP_ROOT = '../';
 $ACTIVE_NAV = 'students';
+$body_page = 'students';   // scopes the registrar-blue layer below
 include '../includes/header.php';
 include '../includes/sidebar.php';
 ?><style>
@@ -60,22 +80,205 @@ include '../includes/sidebar.php';
 .dashboard-main { margin-left:var(--sidebar-width); padding:24px 32px; min-height:100vh; width:calc(100% - var(--sidebar-width)); max-width:calc(100% - var(--sidebar-width)); overflow-x:hidden; transition:margin-left .3s,width .3s,max-width .3s; }
 .sidebar.collapsed~.dashboard-main,body.sidebar-collapsed .dashboard-main { margin-left:var(--sidebar-collapsed-width); width:calc(100% - var(--sidebar-collapsed-width)); max-width:calc(100% - var(--sidebar-collapsed-width)); }
 
-/* Stats */
-.dashboard-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:16px; margin-bottom:24px; }
-.stat-card { background:white; border-radius:14px; padding:18px 20px; border:1px solid #e2e8f0; transition:all .3s; box-shadow:0 1px 3px rgba(15,23,42,0.04); }
-.stat-card:hover { transform:translateY(-3px); box-shadow:0 6px 20px rgba(15,23,42,0.06); border-color:#d8dde4; }
-.stat-card .stat-top { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
-.stat-card .stat-icon { width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0; }
-.stat-icon.blue{background:#eef4ff;color:#2563eb} .stat-icon.green{background:#dcfce7;color:#16a34a} .stat-icon.teal{background:#ccfbf1;color:#0d9488}
-.stat-icon.yellow{background:#fef3c7;color:#b45309} .stat-icon.purple{background:#f3e8ff;color:#7c3aed}
-.stat-card .stat-trend{font-size:11px;font-weight:600;padding:2px 10px;border-radius:9999px;display:inline-flex;align-items:center;gap:4px}
-.stat-trend.up{color:#16a34a;background:#dcfce7} .stat-trend.down{color:#dc2626;background:#fee2e2} .stat-trend.neutral{color:#64748b;background:#f1f5f9}
-.stat-card .stat-number{font-size:24px;font-weight:700;color:#0f172a;line-height:1.2}
-.stat-card .stat-label{color:#64748b;font-size:13px;margin-top:1px}
+/* ============================================================
+   STUDENT RECORDS — registrar-blue layer.
+   Same header, same connected metric strip, same toolbar band
+   as ai/insights.php and registrar/masterlist.php, so the three
+   read as one product. Scoped to body[data-page="students"].
+
+   The year-level figures become one proportional ribbon rather
+   than four same-weight cards: year level is ordinal, so it gets
+   a one-hue sequential ramp and segment widths that mean share.
+   The icon tiles are gone — they carried colour but no
+   information, and the strip now reads as one unit instead.
+   ============================================================ */
+body[data-page="students"]{background:#f5f7fb;color:#0f172a}
+body[data-page="students"] .main{background:linear-gradient(180deg,#eef4ff 0,#f8faff 300px,#f8faff 100%)}
+
+/* ── Page header ───────────────────────────────────────────
+   Masthead only — every action moved to the action bar below,
+   so this is a single left-aligned block, not a flex row. */
+body[data-page="students"] .header{
+    display:block;margin:0 0 16px;padding:25px 27px;
+    border:1px solid #c7d7fe;border-radius:19px;
+    background:linear-gradient(120deg,#eff6ff,#fff 68%);
+    box-shadow:0 10px 30px rgba(37,99,235,.08);
+}
+body[data-page="students"] .header .title h1{
+    margin:0 0 5px;font-size:28px;line-height:1.1;letter-spacing:-.03em;color:#172554;
+}
+body[data-page="students"] .header .title p{margin:0;max-width:620px;font-size:12.5px;line-height:1.5;color:#64748b}
+body[data-page="students"] .stu-kicker{
+    display:flex;align-items:center;gap:7px;margin-bottom:7px;color:#1d4ed8;
+    font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;
+}
+/* ── Action bar ───────────────────────────────────────────
+   Four header buttons split into two kinds of work, so they
+   are grouped rather than lined up: intake creates records,
+   tools operate on the student list you are already looking at.
+   Same grouped pattern as registrar/masterlist.php. */
+body[data-page="students"] .stu-actionbar{
+    display:flex;align-items:stretch;gap:12px;flex-wrap:wrap;
+    margin:0 0 16px;padding:12px 14px;border:1px solid #dbeafe;border-radius:16px;
+    background:#fff;box-shadow:0 7px 24px rgba(15,23,42,.04);
+}
+body[data-page="students"] .stu-action-group{
+    flex:1 1 300px;min-width:0;display:flex;flex-direction:column;gap:8px;
+    padding:11px 13px;border:1px solid #e2e8f0;border-radius:13px;background:#f8faff;
+}
+body[data-page="students"] .stu-action-label{
+    padding-left:2px;color:#1d4ed8;font-size:9.5px;font-weight:800;
+    letter-spacing:.09em;text-transform:uppercase;
+}
+body[data-page="students"] .stu-action-buttons{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+body[data-page="students"] .stu-action-buttons .btn{min-height:34px;padding:0 12px;font-size:12px}
+body[data-page="students"] .stu-action-buttons .export-wrap{display:flex}
+/* The dropdown is anchored to this group, not the viewport, so it
+   cannot open off-screen when the bar wraps on narrow screens. */
+body[data-page="students"] .stu-action-buttons .export-wrap{position:relative}
+body[data-page="students"] .stu-action-buttons .export-menu{right:0;left:auto}
+
+/* ── Connected metric strip ───────────────────────────────
+   One unit, hairline-separated cells, no gaps between them.
+   At-risk / graduated / intake are rendered here for the first
+   time — lines 22-34 already queried them but nothing displayed
+   the result. */
+body[data-page="students"] .stu-strip{
+    display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+    margin:0 0 16px;background:#fff;border:1px solid #dbeafe;border-radius:16px;
+    box-shadow:0 6px 22px rgba(15,23,42,.04);overflow:hidden;
+}
+body[data-page="students"] .stu-metric{
+    position:relative;padding:16px 20px 15px;border-right:1px solid #e2e8f0;
+}
+body[data-page="students"] .stu-metric:last-child{border-right:0}
+body[data-page="students"] .stu-metric::after{
+    content:"";position:absolute;left:20px;right:20px;bottom:0;height:3px;background:#dbeafe;
+}
+body[data-page="students"] .stu-metric.tone-blue::after{background:#1d4ed8}
+body[data-page="students"] .stu-metric.tone-green::after{background:#16a34a}
+body[data-page="students"] .stu-metric.tone-amber::after{background:#d97706}
+body[data-page="students"] .stu-metric.tone-violet::after{background:#7c3aed}
+body[data-page="students"] .stu-metric .stu-metric-label{
+    font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;
+    color:#64748b;line-height:1.3;margin:0 0 5px;
+}
+body[data-page="students"] .stu-metric .stu-metric-value{
+    font-size:27px;font-weight:800;line-height:1.1;color:#0f172a;
+    font-variant-numeric:tabular-nums;
+}
+body[data-page="students"] .stu-metric .stu-metric-foot{
+    display:flex;align-items:center;gap:6px;margin-top:9px;padding-top:8px;
+    border-top:1px solid #f1f5f9;font-size:11px;color:#64748b;line-height:1.4;
+}
+body[data-page="students"] .stu-trend{
+    display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;
+    font-size:10.5px;font-weight:700;line-height:1.5;white-space:nowrap;
+}
+body[data-page="students"] .stu-trend i{font-size:9px}
+body[data-page="students"] .stu-trend.up{color:#15803d;background:#dcfce7}
+body[data-page="students"] .stu-trend.down{color:#b91c1c;background:#fee2e2}
+body[data-page="students"] .stu-trend.flat{color:#64748b;background:#f1f5f9}
+/* Inline meter next to the footer text. display:inline-block is
+   required — as a bare <span> the width is ignored and it renders
+   as a full-width rule sitting on top of the accent bar. */
+body[data-page="students"] .stu-meter{
+    display:inline-block;vertical-align:middle;flex:1 1 40px;min-width:34px;max-width:120px;
+    height:4px;border-radius:999px;background:#eef2f7;overflow:hidden;
+}
+body[data-page="students"] .stu-meter > i{display:block;height:100%;border-radius:999px}
+
+/* ── Cohort ribbon ─────────────────────────────────────────
+   The one loud element on the page. Four categorical hues
+   rather than one sequential ramp: a registrar looks up
+   "the Year 3s" as a discrete thing, so distinct hues let a
+   segment be named by pointing at it. Order is carried by
+   position (Y1→Y4) plus the legend, not by lightness.
+   Counts sit on the segment only when it is wide enough to
+   hold them; otherwise the legend carries the number. */
+body[data-page="students"] .stu-ribbon{
+    background:#fff;border:1px solid #dbeafe;border-radius:16px;
+    box-shadow:0 6px 22px rgba(15,23,42,.04);margin:0 0 16px;overflow:hidden;
+}
+body[data-page="students"] .stu-ribbon-head{
+    display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;
+    padding:14px 20px 12px;border-bottom:1px solid #e2e8f0;background:#f8faff;
+}
+body[data-page="students"] .stu-ribbon-title{
+    display:flex;align-items:center;gap:9px;margin:0;font-size:14px;font-weight:800;
+    color:#0d1b2e;letter-spacing:-.3px;
+}
+body[data-page="students"] .stu-ribbon-title i{color:#2563eb;font-size:13px}
+body[data-page="students"] .stu-ribbon-note{font-size:11.5px;color:#64748b}
+body[data-page="students"] .stu-ribbon-bar{
+    display:flex;height:34px;margin:16px 20px 0;border-radius:9px;overflow:hidden;background:#f1f5f9;
+}
+body[data-page="students"] .stu-seg{position:relative;min-width:3px;transition:filter .2s}
+/* Adjacent segments sit within ~1.1:1 luminance of each other, so
+   hue alone leaves a soft, ambiguous edge. This inset ring is what
+   makes the boundaries read. Painted, not a border, so it never
+   shifts the segment widths that encode share. */
+body[data-page="students"] .stu-seg::after{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    box-shadow:inset -2px 0 0 rgba(255,255,255,.92);
+}
+body[data-page="students"] .stu-seg:last-child::after{box-shadow:none}
+body[data-page="students"] .stu-seg:hover{filter:brightness(1.08)}
+/* Cool analogous set: cyan → blue → indigo → violet. Held to
+   the blue family on purpose, so the four are told apart by hue
+   (~50° of spread) rather than by lightness. Measured adjacent
+   luminance ratios are only ~1.1–1.2:1, so the 2px white rule
+   below is what actually guarantees the edges read. Every
+   colour clears 4.5:1 against white for the on-segment count.
+   Y1 uses sky-700, not sky-600 (#0284c7, only 4.10:1). */
+body[data-page="students"] .stu-seg.tone-y1{background:#0369a1}
+body[data-page="students"] .stu-seg.tone-y2{background:#2563eb}
+body[data-page="students"] .stu-seg.tone-y3{background:#4f46e5}
+body[data-page="students"] .stu-seg.tone-y4{background:#7c3aed}
+body[data-page="students"] .stu-seg.tone-unassigned{background:repeating-linear-gradient(135deg,#cbd5e1 0 5px,#e2e8f0 5px 10px)}
+body[data-page="students"] .stu-seg b{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:11.5px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;
+    text-shadow:0 1px 2px rgba(15,23,42,.28);pointer-events:none;
+}
+/* Only the pale hatch needs dark ink; the four year hues all
+   carry white labels. */
+body[data-page="students"] .stu-seg.tone-unassigned b{color:#12336f;text-shadow:none}
+body[data-page="students"] .stu-ribbon-legend{
+    display:flex;flex-wrap:wrap;gap:0;margin:0;padding:0 20px;list-style:none;
+}
+body[data-page="students"] .stu-ribbon-legend li{flex:1 1 118px;min-width:0;padding:12px 14px 14px}
+body[data-page="students"] .stu-legend-key{
+    display:flex;align-items:center;gap:7px;margin-bottom:5px;
+    font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#64748b;
+}
+body[data-page="students"] .stu-legend-key i{width:9px;height:9px;flex:0 0 9px;border-radius:2px;display:inline-block}
+body[data-page="students"] .stu-legend-key i.tone-y1{background:#0369a1}
+body[data-page="students"] .stu-legend-key i.tone-y2{background:#2563eb}
+body[data-page="students"] .stu-legend-key i.tone-y3{background:#4f46e5}
+body[data-page="students"] .stu-legend-key i.tone-y4{background:#7c3aed}
+body[data-page="students"] .stu-legend-key i.tone-unassigned{background:#cbd5e1}
+body[data-page="students"] .stu-legend-val{
+    font-size:19px;font-weight:800;color:#0f172a;line-height:1.1;font-variant-numeric:tabular-nums;
+}
+body[data-page="students"] .stu-legend-pct{font-size:11.5px;color:#94a3b8;margin-left:5px;font-weight:600}
+body[data-page="students"] .stu-ribbon-empty{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:30px 20px 32px;text-align:center;
+}
+body[data-page="students"] .stu-ribbon-empty i{font-size:24px;color:#cbd5e1;margin-bottom:9px}
+body[data-page="students"] .stu-ribbon-empty p{margin:0 0 4px;font-size:13.5px;font-weight:600;color:#64748b}
+body[data-page="students"] .stu-ribbon-empty span{font-size:11.5px;color:#94a3b8;line-height:1.5}
 
 /* Search + Table container */
-.search-table-container{background:white;border-radius:14px;border:1px solid #e2e8f0;overflow:hidden;box-shadow:0 1px 3px rgba(15,23,42,0.04)}
-.search-bar{padding:14px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;row-gap:10px}
+body[data-page="students"] .search-table-container{
+    background:#fff;border:1px solid #dbeafe;border-radius:16px;overflow:hidden;
+    box-shadow:0 6px 22px rgba(15,23,42,.04);
+}
+body[data-page="students"] .search-bar{
+    padding:13px 16px;background:#fff;border-bottom:1px solid #e2e8f0;
+    display:flex;align-items:center;gap:9px;flex-wrap:wrap;row-gap:10px;
+}
 .search-bar .search-wrapper{flex:1 1 320px;min-width:240px;max-width:100%;position:relative;display:flex;align-items:center;height:40px}
 .search-bar .search-wrapper i{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:14px;pointer-events:none;z-index:2}
 .search-bar .search-wrapper input{width:100%;height:40px;padding:0 38px 0 38px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:14px;font-family:inherit;outline:none;background:white;color:#1e293b;box-sizing:border-box}
@@ -94,6 +297,28 @@ include '../includes/sidebar.php';
 .bulk-bar .bulk-actions{display:flex;gap:8px;margin-left:auto}
 
 /* Table */
+body[data-page="students"] .table-responsive th{
+    position:sticky;top:0;z-index:3;background:#f8faff;border-bottom:1px solid #dbeafe;
+    color:#64748b;
+}
+body[data-page="students"] .table-responsive tbody tr:hover{background:#f5f9ff}
+body[data-page="students"] .table-footer{background:#fff;border-top:1px solid #e2e8f0}
+body[data-page="students"] #emptyState{min-height:320px}
+body[data-page="students"] #emptyState i{color:#cbd5e1}
+body[data-page="students"] .table-responsive td.num,
+body[data-page="students"] .table-responsive th.num{text-align:center;font-variant-numeric:tabular-nums}
+body[data-page="students"] .table-responsive td.rownum{color:#94a3b8;font-size:11px;font-variant-numeric:tabular-nums}
+body[data-page="students"] .student-id{font-variant-numeric:tabular-nums;letter-spacing:-.1px}
+body[data-page="students"] .student-name{font-size:13.5px}
+body[data-page="students"] .student-email{font-size:11px;margin-top:1px}
+/* A flagged row earns a full-width rail, not just a warning glyph. */
+body[data-page="students"] .table-responsive tbody tr.q-flag td:first-child{box-shadow:inset 3px 0 0 #f59e0b}
+body[data-page="students"] .q-dot{width:8px;height:8px;display:inline-block;border-radius:50%;vertical-align:middle}
+/* Same three thresholds the column header legend documents. */
+body[data-page="students"] .q-dot.q-good{background:#22c55e}
+body[data-page="students"] .q-dot.q-warn{background:#f59e0b}
+body[data-page="students"] .q-dot.q-bad{background:#ef4444}
+
 .table-responsive{overflow-x:auto}
 .table-responsive table{width:100%;border-collapse:collapse}
 .table-responsive th{text-align:left;padding:10px 10px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:#64748b;background:#fafcfd;border-bottom:2px solid #e8edf4;white-space:nowrap}
@@ -272,12 +497,23 @@ select.form-control{cursor:pointer;appearance:auto;-webkit-appearance:auto;}
 .export-menu a:hover{background:#f1f5f9}
 
 /* Responsive */
-@media(max-width:992px){.dashboard-main{padding:20px}.dashboard-stats{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:900px){.search-bar .search-wrapper{flex:1 1 240px;min-width:200px}}
+@media(max-width:992px){
+ .dashboard-main{padding:20px}
+ .stu-strip{grid-template-columns:repeat(2,1fr)!important}
+ .stu-metric:nth-child(2){border-right:0}
+ .stu-metric:nth-child(-n+2){border-bottom:1px solid #e2e8f0}
+}
+@media(max-width:900px){.search-bar .search-wrapper{flex:1 1 240px;min-width:200px}
+body[data-page="students"] .stu-action-group{flex:1 1 100%}}
 @media(max-width:768px){
 .dashboard-main{margin-left:0;padding:16px;width:100%;max-width:100%}
-.dashboard-stats{grid-template-columns:1fr 1fr;gap:12px}
-.stat-card{padding:14px 16px}.stat-card .stat-number{font-size:20px}.stat-card .stat-icon{width:34px;height:34px;font-size:14px}
+body[data-page="students"] .header{padding:21px 18px;border-radius:16px}
+body[data-page="students"] .header .title h1{font-size:25px}
+body[data-page="students"] .stu-metric{padding:14px 16px 13px}
+body[data-page="students"] .stu-metric .stu-metric-value{font-size:23px}
+body[data-page="students"] .stu-ribbon-bar{height:28px;margin:14px 16px 0}
+body[data-page="students"] .stu-ribbon-legend{padding:0 16px}
+body[data-page="students"] .stu-ribbon-legend li{flex:1 1 50%}
 .search-bar{flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:10px}
 .search-bar .search-wrapper{flex:1 1 auto;min-width:0;max-width:100%;width:100%}
 .search-bar .search-actions{width:100%;height:auto;justify-content:flex-end;flex-wrap:wrap}
@@ -289,8 +525,11 @@ select.form-control{cursor:pointer;appearance:auto;-webkit-appearance:auto;}
 }
 @media(max-width:480px){
 .dashboard-main{padding:12px}
-.dashboard-stats{grid-template-columns:1fr}
-.stat-card .stat-number{font-size:18px}
+body[data-page="students"] .stu-strip{grid-template-columns:1fr!important}
+body[data-page="students"] .stu-metric{border-right:0;border-bottom:1px solid #e2e8f0}
+body[data-page="students"] .stu-metric:last-child{border-bottom:0}
+body[data-page="students"] .stu-ribbon-legend li{flex:1 1 45%;padding:9px 6px 10px}
+body[data-page="students"] .stu-legend-val{font-size:16px}
 .search-bar{padding:10px 14px;gap:8px}
 .search-bar .search-wrapper{height:38px}
 .search-bar .search-wrapper input{height:38px;font-size:13px}
@@ -305,28 +544,112 @@ select.form-control{cursor:pointer;appearance:auto;-webkit-appearance:auto;}
 </style>
 <main class="dashboard-main">
 <header class="header">
-<div class="title"><h1>Students</h1><p>Manage all student records</p></div>
-<div class="header-actions">
-<div class="export-wrap">
-<button class="btn btn-secondary" id="exportBtn"><i class="fas fa-download"></i> Export</button>
-<div class="export-menu" id="exportMenu">
-<a href="#" onclick="exportCSV()"><i class="fas fa-file-csv"></i> Export CSV</a>
-<a href="#" onclick="exportFiltered()"><i class="fas fa-filter-circle-dollar"></i> Export Filtered</a>
-</div>
-</div>
-<button class="btn btn-secondary" onclick="openQualityPanel()"><i class="fas fa-shield-halved"></i> Data Quality</button>
-<button class="btn btn-primary" onclick="openReceiveModal()"><i class="fas fa-inbox"></i> Receive Student</button>
-<button class="btn btn-secondary" title="Manually add a student record" onclick="openAddModal()"><i class="fas fa-user-plus"></i></button>
-</div>
+<div class="title">
+    <div class="stu-kicker"><i class="fas fa-user-graduate"></i> Student records</div>
+    <h1>Students</h1>
+    <p>Every enrolled record with year level, standing and record quality. Search, filter and update without leaving the page.</p>
+  </div>
 </header>
 
-<!-- Stats -->
-<div class="dashboard-stats">
-<div class="stat-card"><div class="stat-top"><div class="stat-icon blue"><i class="fas fa-users"></i></div></div><div class="stat-number"><?= $totalStudents ?></div><div class="stat-label">Total Students</div></div>
-<div class="stat-card"><div class="stat-top"><div class="stat-icon green"><i class="fas fa-1"></i></div></div><div class="stat-number"><?= $yearLevelCounts[1] ?></div><div class="stat-label">Year 1</div></div>
-<div class="stat-card"><div class="stat-top"><div class="stat-icon yellow"><i class="fas fa-2"></i></div></div><div class="stat-number"><?= $yearLevelCounts[2] ?></div><div class="stat-label">Year 2</div></div>
-<div class="stat-card"><div class="stat-top"><div class="stat-icon purple"><i class="fas fa-3"></i></div></div><div class="stat-number"><?= $yearLevelCounts[3] ?></div><div class="stat-label">Year 3</div></div>
-<div class="stat-card"><div class="stat-top"><div class="stat-icon teal"><i class="fas fa-4"></i></div></div><div class="stat-number"><?= $yearLevelCounts[4] ?></div><div class="stat-label">Year 4</div></div>
+<!-- Action bar: intake creates records, tools operate on the student list -->
+<section class="stu-actionbar" aria-label="Student actions">
+  <div class="stu-action-group">
+    <span class="stu-action-label">Add students</span>
+    <div class="stu-action-buttons">
+      <button type="button" class="btn btn-primary" onclick="openReceiveModal()" title="Enroll students who have a pending enrollment record"><i class="fas fa-inbox"></i> Receive Student</button>
+      <button type="button" class="btn btn-secondary" onclick="openAddModal()" title="Create a single student record by hand"><i class="fas fa-user-plus"></i> Add Student</button>
+    </div>
+  </div>
+  <div class="stu-action-group">
+    <span class="stu-action-label">Student tools</span>
+    <div class="stu-action-buttons">
+      <button type="button" class="btn btn-secondary" onclick="openQualityPanel()" title="Review incomplete or inconsistent student records"><i class="fas fa-shield-halved"></i> Data Quality</button>
+      <div class="export-wrap">
+        <button type="button" class="btn btn-secondary" id="exportBtn"><i class="fas fa-download"></i> Export</button>
+        <div class="export-menu" id="exportMenu">
+        <a href="#" onclick="exportCSV()"><i class="fas fa-file-csv"></i> Export CSV</a>
+        <a href="#" onclick="exportFiltered()"><i class="fas fa-filter-circle-dollar"></i> Export Filtered</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Metric strip + cohort ribbon -->
+<div class="stu-strip">
+<div class="stu-metric tone-blue">
+<p class="stu-metric-label">Total students</p>
+<div class="stu-metric-value"><?= $totalStudents ?></div>
+<div class="stu-metric-foot">
+<?php if ($trendTotal > 0): ?>
+<span class="stu-trend up"><i class="fas fa-arrow-up"></i><?= $trendTotal ?>%</span><span><?= $thisMonth ?> joined this month</span>
+<?php elseif ($trendTotal < 0): ?>
+<span class="stu-trend down"><i class="fas fa-arrow-down"></i><?= abs($trendTotal) ?>%</span><span><?= $thisMonth ?> joined this month</span>
+<?php else: ?>
+<span class="stu-trend flat"><i class="fas fa-minus"></i>0%</span><span><?= $thisMonth ?> joined this month</span>
+<?php endif; ?>
+</div>
+</div>
+<div class="stu-metric tone-green">
+<p class="stu-metric-label">Active</p>
+<div class="stu-metric-value"><?= $activeStudents ?></div>
+<div class="stu-metric-foot">
+<span><?= $totalStudents > 0 ? round($activeStudents / $totalStudents * 100) : 0 ?>% of students</span>
+<span class="stu-meter"><i style="width:<?= $totalStudents > 0 ? round($activeStudents / $totalStudents * 100) : 0 ?>%;background:#16a34a"></i></span>
+</div>
+</div>
+<div class="stu-metric tone-amber">
+<p class="stu-metric-label">At risk or probation</p>
+<div class="stu-metric-value"><?= $atRiskStudents ?></div>
+<div class="stu-metric-foot">
+<?php if ($atRiskStudents > 0): ?>
+<span class="stu-trend down"><i class="fas fa-triangle-exclamation"></i>Needs follow-up</span>
+<?php else: ?>
+<span class="stu-trend up"><i class="fas fa-circle-check"></i>None flagged</span>
+<?php endif; ?>
+</div>
+</div>
+<div class="stu-metric tone-violet">
+<p class="stu-metric-label">Graduated</p>
+<div class="stu-metric-value"><?= $graduatedStudents ?></div>
+<div class="stu-metric-foot">
+<span><?= $totalStudents > 0 ? round($graduatedStudents / $totalStudents * 100) : 0 ?>% of all records</span>
+<span class="stu-meter"><i style="width:<?= $totalStudents > 0 ? round($graduatedStudents / $totalStudents * 100) : 0 ?>%;background:#7c3aed"></i></span>
+</div>
+</div>
+</div>
+
+<div class="stu-ribbon">
+<div class="stu-ribbon-head">
+<h2 class="stu-ribbon-title"><i class="fas fa-layer-group"></i> Cohort by year level</h2>
+<span class="stu-ribbon-note">Each segment is that year's share of all <?= $totalStudents ?> records</span>
+</div>
+<?php if ($totalStudents > 0): ?>
+<div class="stu-ribbon-bar" role="img" aria-label="<?= htmlspecialchars(implode(', ', array_map(fn($sg) => ($sg['year'] ? 'Year ' . $sg['year'] : 'Unassigned') . ': ' . $sg['count'] . ' students', $ribbonSegments)), ENT_QUOTES) ?>">
+<?php foreach ($ribbonSegments as $sg):
+$pct = round($sg['count'] / $ribbonBase * 100, 2);
+$segLabel = $sg['year'] ? 'Year ' . $sg['year'] : 'Unassigned year level';
+?>
+<div class="stu-seg tone-<?= $sg['tone'] ?>" style="width:<?= $pct ?>%" title="<?= htmlspecialchars($segLabel . ' — ' . $sg['count'] . ' students (' . round($pct) . '%)', ENT_QUOTES) ?>">
+<?php /* Label the segment only when it is wide enough to hold the number; the legend always carries it. */ if ($pct >= 7): ?><b><?= $sg['count'] ?></b><?php endif; ?>
+</div>
+<?php endforeach; ?>
+</div>
+<ul class="stu-ribbon-legend">
+<?php foreach ($ribbonSegments as $sg): ?>
+<li>
+<div class="stu-legend-key"><i class="tone-<?= $sg['tone'] ?>"></i><?= $sg['year'] ? 'Year ' . $sg['year'] : 'Unassigned' ?></div>
+<div class="stu-legend-val"><?= $sg['count'] ?><span class="stu-legend-pct"><?= round($sg['count'] / $ribbonBase * 100) ?>%</span></div>
+</li>
+<?php endforeach; ?>
+</ul>
+<?php else: ?>
+<div class="stu-ribbon-empty">
+<i class="fas fa-user-graduate"></i>
+<p>No cohort to show yet</p>
+<span>Receive or add a student and the year-level split appears here.</span>
+</div>
+<?php endif; ?>
 </div>
 
 <!-- Search + Table -->
@@ -353,11 +676,11 @@ select.form-control{cursor:pointer;appearance:auto;-webkit-appearance:auto;}
 <div class="table-responsive" id="studentTableWrap">
 <table id="studentTable">
 <thead>
-<tr><th style="width:30px;"><div class="cb-wrap"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></div></th><th>#</th><th>Student ID</th><th>Name</th><th>Course</th><th>Year</th><th>Section</th><th>Gender</th><th>RFID</th><th>Status</th><th style="text-align:center;">Quality <span class="quality-legend" title=""><i class="fas fa-circle-info" style="cursor:help;"></i><span class="quality-legend-box">Quality score = % of required student fields filled.
+<tr><th style="width:30px;"><div class="cb-wrap"><input type="checkbox" id="selectAll" onchange="toggleSelectAll()"></div></th><th class="rownum">#</th><th>Student ID</th><th>Name</th><th>Course</th><th class="num">Year</th><th class="num">Section</th><th class="num">Gender</th><th>RFID</th><th>Status</th><th class="num">Quality <span class="quality-legend" title=""><i class="fas fa-circle-info" style="cursor:help;"></i><span class="quality-legend-box">Quality score = % of required student fields filled.
 <span style="color:#22c55e;">●</span> 85–100% &nbsp; Complete
 <span style="color:#f59e0b;">●</span> 60–84% &nbsp; Some fields missing
 <span style="color:#ef4444;">●</span> &lt;60% &nbsp; Many fields missing
-<span style="color:#f59e0b;">⚠</span> Anomaly worth checking (hover the row)</span></span></th><th style="text-align:center;">Actions</th></tr>
+<span style="color:#f59e0b;">⚠</span> Anomaly worth checking (hover the row)</span></span></th><th class="num">Actions</th></tr>
 </thead>
 <tbody id="studentTableBody">
 <?php if (!empty($students)): ?>
@@ -373,18 +696,18 @@ $qScore = studentQualityScore($s);
 $qAnoms = studentAnomalies($s);
 $qDotClass = $qScore >= 85 ? 'good' : ($qScore >= 60 ? 'warn' : 'bad');
 ?>
-<tr data-student='<?= htmlspecialchars(json_encode($s),ENT_QUOTES,'UTF-8') ?>' class="<?= $s['status']==='archived'?'archived':'' ?>">
+<tr data-student='<?= htmlspecialchars(json_encode($s),ENT_QUOTES,'UTF-8') ?>' class="<?= $s['status']==='archived'?'archived':'' ?><?= !empty($qAnoms) ? ' q-flag' : '' ?>">
 <td><div class="cb-wrap"><input type="checkbox" class="student-cb" value="<?= (int)$s['id'] ?>" onchange="updateBulkBar()"></div></td>
-<td class="student-id" style="font-weight:600;font-size:12px;color:#64748b;"><?= (int)$s['id'] ?></td>
+<td class="rownum"><?= (int)$s['id'] ?></td>
 <td class="student-id" style="font-weight:600;font-size:12px;"><?= htmlspecialchars($s['student_number'] ?: '—') ?></td>
 <td><div class="student-info"><div class="student-avatar <?= $ac ?>"><?= $initials ?: '?' ?></div><div><div class="student-name"><?= htmlspecialchars($s['first_name']." ".$s['last_name']) ?></div><div class="student-email"><?= htmlspecialchars($s['email'] ?? '') ?></div></div></div></td>
 <td><?= htmlspecialchars($s['course'] ?? 'N/A') ?></td>
-<td><?= htmlspecialchars($s['year_level'] ?? 'N/A') ?></td>
-<td><?= htmlspecialchars($s['section'] ?? '—') ?></td>
-<td><?= htmlspecialchars(($s['gender'] ?? '') ?: '—') ?></td>
+<td class="num"><?= htmlspecialchars($s['year_level'] ?? 'N/A') ?></td>
+<td class="num"><?= htmlspecialchars($s['section'] ?? '—') ?></td>
+<td class="num"><?= htmlspecialchars(($s['gender'] ?? '') ?: '—') ?></td>
 <td><a href="../registrar/rfid-cards.php?search=<?= urlencode($s['student_number']) ?>" class="rfid-chip <?= $rfidStatus ?>"><i class="fas fa-<?= $rfidStatus==='active'?'check-circle':'credit-card' ?>"></i> <?= $rfidStatus==='active'?($rfidMap[$s['id']]['card_uid']):($rfidStatus==='none'?'—':$rfidMap[$s['id']]['status']) ?></a></td>
 <td><div class="quick-status-wrap"><button class="status-badge <?= $s['status']??'active' ?>" onclick="toggleQuickMenu(<?= (int)$s['id'] ?>)"><span class="status-dot <?= $s['status']??'active' ?>"></span><?= ucfirst($s['status']??'Active') ?></button><div class="quick-status-menu" id="qsm_<?= (int)$s['id'] ?>"><?php $statuses=['active','probation','at-risk','graduated','loa','transferred','dropped']; if($s['status']==='archived')$statuses[]='archived'; foreach($statuses as $st): ?><button onclick="quickStatus(<?= (int)$s['id'] ?>,'<?= $st ?>')" class="<?= ($s['status']??'active')===$st?'active':'' ?>"><?= ucfirst($st) ?></button><?php endforeach; ?></div></div></td>
-<td style="text-align:center;">
+<td class="num">
 <?php
 $qAnomLabels = array_map(function ($k) {
     return [
@@ -398,7 +721,7 @@ $qAnomLabels = array_map(function ($k) {
 }, $qAnoms);
 $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; ', $qAnomLabels) : ' — all key fields filled');
 ?>
-<span class="q-dot q-<?= $qDotClass ?>" title="<?= htmlspecialchars($qTitle) ?>" style="display:inline-block;width:10px;height:10px;border-radius:50%;<?= $qScore>=85?'background:#22c55e':($qScore>=60?'background:#f59e0b':'background:#ef4444') ?>;"></span>
+<span class="q-dot q-<?= $qDotClass ?>" title="<?= htmlspecialchars($qTitle) ?>"></span>
 <?php if (!empty($qAnoms)): ?><i class="fas fa-exclamation-triangle" style="color:#f59e0b;margin-left:4px;font-size:11px;" title="<?= htmlspecialchars(implode('; ', $qAnomLabels)) ?>"></i><?php endif; ?>
 </td>
 <td><div class="action-group"><button class="action-btn view" onclick="viewStudent(<?= (int)$s['id'] ?>)" title="View"><i class="fas fa-eye"></i></button><button class="action-btn edit" onclick="editStudent(<?= (int)$s['id'] ?>)" title="Edit"><i class="fas fa-pen"></i></button><?php if ($s['status']==='archived'): ?><button class="action-btn restore" onclick="restoreStudent(<?= (int)$s['id'] ?>,'<?= htmlspecialchars($s['first_name']." ".$s['last_name'],ENT_QUOTES) ?>')" title="Restore"><i class="fas fa-undo"></i></button><?php endif; ?></div></td>
@@ -1248,7 +1571,7 @@ function checkDuplicateHint() {
     .then(d => {
         if (d.success && d.data && d.data.length) {
             const hit = d.data[0];
-            let msg = 'Possible duplicate: ' + hit.name + ' (' + (hit.student_number||'') + '). Enrol anyway?';
+            let msg = 'Possible duplicate: ' + hit.name + ' (' + (hit.student_number||'') + '). Enroll anyway?';
             if (hit.score >= 0.9 && hit.birth_date === bd) {
                 msg = 'Likely duplicate of ' + hit.name + ' (' + hit.student_number + ').';
             }

@@ -7,6 +7,29 @@
 // ============================================================
 
 /**
+ * Resolve a stored student_ids.qr_code_path into a URL the current page can load.
+ *
+ * generateStudentQrFile() returns a path relative to the api/ folder
+ * ("../uploads/ids/x.svg"), but that same string is consumed from pages one level
+ * up. It happens to resolve correctly only while the app sits at a fixed depth;
+ * on a deployment at a different depth every QR thumbnail 404s. Rebuild the URL
+ * from the filename plus the caller's $APP_ROOT so it works wherever the app is
+ * mounted. Absolute URLs and data:/blob: URIs are passed through untouched, and
+ * traversal segments cannot escape uploads/ids/.
+ *
+ * @param string|null $stored  Raw qr_code_path value
+ * @param string      $appRoot Prefix from the including page, e.g. '../'
+ */
+function resolveStudentQrUrl(?string $stored, string $appRoot = './'): string {
+    $stored = trim((string) $stored);
+    if ($stored === '') return '';
+    if (preg_match('#^(https?:)?//|^data:|^blob:#i', $stored)) return $stored;
+    $file = basename(str_replace('\\', '/', $stored));
+    if ($file === '' || $file === '.' || $file === '..') return '';
+    return rtrim($appRoot, '/') . '/uploads/ids/' . rawurlencode($file);
+}
+
+/**
  * Generate a QR code SVG pointing to the student verification page.
  *
  * @param int $studentId The student's DB id (primary key)
