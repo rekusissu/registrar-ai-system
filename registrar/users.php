@@ -10,6 +10,10 @@ require_once __DIR__ . '/../shared/session_config.php';
 if (empty($_SESSION['user_id'])) { header('Location: ../login.php'); exit; }
 requireRole('admin');
 require_once __DIR__ . '/../shared/database.php';
+require_once __DIR__ . '/../shared/password_policy.php';
+
+$passwordMinLength = passwordPolicyMinimumLength();
+$passwordRequirements = passwordPolicyRequirements();
 
 $db = Database::getInstance();
 
@@ -113,20 +117,27 @@ include '../includes/sidebar.php';
 </main>
 
 <!-- Add User Modal -->
-<div class="modal-overlay" id="addModal"><div class="modal-content"><div class="modal-header"><h2><i class="fas fa-user-plus"></i> Add User</h2><button class="modal-close" onclick="closeModal('addModal')"><i class="fas fa-times"></i></button></div>
+<style>
+.password-field-shell{position:relative}.password-field-shell input{padding-right:82px}.password-tools{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:flex;gap:2px}.password-tool{border:0;background:transparent;color:#64748b;width:30px;height:30px;border-radius:6px;cursor:pointer}.password-tool:hover,.password-tool:focus-visible{background:#eef2ff;color:#2563eb;outline:none}.password-meter{margin-top:10px;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px}.password-meter-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}.password-meter-head span:first-child{font-size:11px;font-weight:700;letter-spacing:.04em;color:#475569}.password-score{font-size:12px;font-weight:700;color:#b45309}.password-track{height:5px;background:#e2e8f0;border-radius:99px;overflow:hidden}.password-track span{display:block;width:0;height:100%;background:#b45309;transition:width .18s ease,background-color .18s ease}.password-requirements{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-top:10px}.password-requirement{display:flex;align-items:center;gap:7px;font-size:12px;color:#64748b}.password-requirement i{width:16px;height:16px;display:grid;place-items:center;border-radius:50%;background:#e2e8f0;color:#64748b;font-size:9px}.password-requirement.met{color:#166534}.password-requirement.met i{background:#dcfce7;color:#15803d}.password-strength-complete .password-score{color:#15803d}.password-strength-complete .password-track span{background:#15803d}.password-error{color:#b91c1c;font-size:12px;margin-top:8px;min-height:18px}.password-error:empty{display:none}.password-identity{font-size:12px;color:#64748b;margin-top:8px}.password-confirm{margin-top:12px}@media(max-width:600px){.form-row{grid-template-columns:1fr!important}.password-requirements{grid-template-columns:1fr}}@media(prefers-reduced-motion:reduce){.password-track span{transition:none}}
+</style>
+<div class="modal-overlay" id="addModal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="addModalTitle"><div class="modal-content"><div class="modal-header"><h2 id="addModalTitle"><i class="fas fa-user-plus"></i> Add User</h2><button class="modal-close" type="button" onclick="closeModal('addModal')" aria-label="Close"><i class="fas fa-times"></i></button></div>
 <form id="addForm"><div class="modal-body">
-    <div class="form-group"><label>Full Name <span style="color:#dc2626;">*</span></label><input type="text" id="addFullName" class="form-control" required></div>
-    <div class="form-group"><label>Email <span style="color:#dc2626;">*</span></label><input type="email" id="addEmail" class="form-control" required></div>
+    <div class="form-group"><label for="addFullName">Full Name <span style="color:#dc2626;">*</span></label><input type="text" id="addFullName" class="form-control" autocomplete="name" required></div>
+    <div class="form-group"><label for="addEmail">Email <span style="color:#dc2626;">*</span></label><input type="email" id="addEmail" class="form-control" autocomplete="email" required></div>
     <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-        <div class="form-group"><label>Role</label><select id="addRole" class="form-control"><option value="staff">Staff</option><option value="registrar">Registrar</option><option value="nurse">Nurse</option><option value="admin">Admin</option></select></div>
-        <div class="form-group"><label>Password <span style="color:#dc2626;">*</span></label><input type="password" id="addPassword" class="form-control" required minlength="6" placeholder="Min 6 chars"></div>
+        <div class="form-group"><label for="addRole">Role</label><select id="addRole" class="form-control"><option value="staff">Staff</option><option value="registrar">Registrar</option><option value="nurse">Nurse</option><option value="admin">Admin</option></select></div>
+        <div class="form-group"><label for="addPassword">Password <span style="color:#dc2626;">*</span></label><div class="password-field-shell"><input type="password" id="addPassword" class="form-control" autocomplete="new-password" required minlength="<?= $passwordMinLength ?>" aria-describedby="addPasswordMeter addPasswordError"><div class="password-tools"><button type="button" class="password-tool" data-password-toggle="addPassword" aria-label="Show password"><i class="fas fa-eye"></i></button><button type="button" class="password-tool" data-password-generate="addPassword" aria-label="Generate strong password" title="Generate strong password"><i class="fas fa-wand-magic-sparkles"></i></button></div></div></div>
     </div>
-
+    <div class="password-meter" id="addPasswordMeter" data-password-meter="addPassword" data-min-length="<?= $passwordMinLength ?>"><div class="password-meter-head"><span>Password strength</span><span class="password-score" aria-live="polite">Not started</span></div><div class="password-track" aria-hidden="true"><span></span></div><div class="password-requirements">
+        <?php foreach ($passwordRequirements as $key => $label): ?><div class="password-requirement" data-requirement="<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-times" aria-hidden="true"></i><span><?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?></span></div><?php endforeach; ?>
+    </div></div>
+    <div class="form-group password-confirm"><label for="addPasswordConfirm">Confirm Password <span style="color:#dc2626;">*</span></label><div class="password-field-shell"><input type="password" id="addPasswordConfirm" class="form-control" autocomplete="new-password" required minlength="<?= $passwordMinLength ?>" aria-describedby="addPasswordError"><div class="password-tools"><button type="button" class="password-tool" data-password-toggle="addPasswordConfirm" aria-label="Show confirmation"><i class="fas fa-eye"></i></button></div></div></div>
+    <p class="password-identity" id="addPasswordIdentity">Use a password not used for any other account.</p><div class="password-error" id="addPasswordError" role="alert"></div>
 </div>
-<div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeModal('addModal')">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Create</button></div></form></div></div>
+<div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeModal('addModal')">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-user-plus"></i> Create user</button></div></form></div></div>
 
 <!-- Edit User Modal -->
-<div class="modal-overlay" id="editModal"><div class="modal-content"><div class="modal-header"><h2><i class="fas fa-user-pen"></i> Edit User</h2><button class="modal-close" onclick="closeModal('editModal')"><i class="fas fa-times"></i></button></div>
+<div class="modal-overlay" id="editModal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="editModalTitle"><div class="modal-content"><div class="modal-header"><h2 id="editModalTitle"><i class="fas fa-user-pen"></i> Edit User</h2><button class="modal-close" type="button" onclick="closeModal('editModal')" aria-label="Close"><i class="fas fa-times"></i></button></div>
 <form id="editForm"><input type="hidden" id="editId" value=""><div class="modal-body">
     <div class="form-group"><label>Full Name <span style="color:#dc2626;">*</span></label><input type="text" id="editFullName" class="form-control" required></div>
     <div class="form-group"><label>Email</label><input type="email" id="editEmail" class="form-control" disabled style="background:#f8fafc;font-size:12px;"></div>
@@ -136,12 +147,15 @@ include '../includes/sidebar.php';
 <div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeModal('editModal')">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save</button></div></form></div></div>
 
 <!-- Reset Password Modal -->
-<div class="modal-overlay" id="passwordModal"><div class="modal-content"><div class="modal-header"><h2><i class="fas fa-key"></i> Reset Password</h2><button class="modal-close" onclick="closeModal('passwordModal')"><i class="fas fa-times"></i></button></div>
+<div class="modal-overlay" id="passwordModal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="passwordModalTitle"><div class="modal-content"><div class="modal-header"><h2 id="passwordModalTitle"><i class="fas fa-key"></i> Reset Password</h2><button class="modal-close" type="button" onclick="closeModal('passwordModal')" aria-label="Close"><i class="fas fa-times"></i></button></div>
 <form id="passwordForm"><input type="hidden" id="passwordUserId" value=""><div class="modal-body">
     <p id="passwordTarget" style="font-size:13px;color:#64748b;margin-bottom:12px;"></p>
-    <div class="form-group"><label>New Password <span style="color:#dc2626;">*</span></label><input type="password" id="passwordValue" class="form-control" required minlength="6" placeholder="Min 6 chars"></div>
+    <div class="form-group"><label for="passwordValue">New Password <span style="color:#dc2626;">*</span></label><div class="password-field-shell"><input type="password" id="passwordValue" class="form-control" autocomplete="new-password" required minlength="<?= $passwordMinLength ?>" aria-describedby="passwordMeter passwordError"><div class="password-tools"><button type="button" class="password-tool" data-password-toggle="passwordValue" aria-label="Show password"><i class="fas fa-eye"></i></button><button type="button" class="password-tool" data-password-generate="passwordValue" aria-label="Generate strong password"><i class="fas fa-wand-magic-sparkles"></i></button></div></div></div>
+    <div class="password-meter" id="passwordMeter" data-password-meter="passwordValue" data-min-length="<?= $passwordMinLength ?>"><div class="password-meter-head"><span>Password strength</span><span class="password-score" aria-live="polite">Not started</span></div><div class="password-track" aria-hidden="true"><span></span></div><div class="password-requirements"><?php foreach ($passwordRequirements as $key => $label): ?><div class="password-requirement" data-requirement="<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-times" aria-hidden="true"></i><span><?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?></span></div><?php endforeach; ?></div></div>
+    <div class="form-group password-confirm"><label for="passwordConfirm">Confirm Password <span style="color:#dc2626;">*</span></label><div class="password-field-shell"><input type="password" id="passwordConfirm" class="form-control" autocomplete="new-password" required minlength="<?= $passwordMinLength ?>" aria-describedby="passwordError"><div class="password-tools"><button type="button" class="password-tool" data-password-toggle="passwordConfirm" aria-label="Show confirmation"><i class="fas fa-eye"></i></button></div></div></div>
+    <p class="password-identity">The user must use a unique password they do not use elsewhere.</p><div class="password-error" id="passwordError" role="alert"></div>
 </div>
-<div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeModal('passwordModal')">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Set Password</button></div></form></div></div>
+<div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeModal('passwordModal')">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Set password</button></div></form></div></div>
 
 <script>
 const allUsers = [];
@@ -165,15 +179,123 @@ function performSearch() {
 }
 document.getElementById('userSearch').addEventListener('input', performSearch);
 
-function openModal(id) { document.getElementById(id).classList.add('active'); document.body.style.overflow = 'hidden'; }
-function closeModal(id) { document.getElementById(id).classList.remove('active'); document.body.style.overflow = ''; }
+let lastFocusedElement = null;
+function openModal(id) {
+    lastFocusedElement = document.activeElement;
+    const modal = document.getElementById(id);
+    modal.classList.add('active');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    const first = modal.querySelector('input:not([type="hidden"]), select, button, [tabindex]:not([tabindex="-1"])');
+    if (first) first.focus();
+}
+function closeModal(id) {
+    const modal = document.getElementById(id);
+    modal.classList.remove('active');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') lastFocusedElement.focus();
+}
 ['addModal','editModal','passwordModal'].forEach(id => {
     document.getElementById(id).addEventListener('click', function(e) { if (e.target === this) closeModal(id); });
 });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { ['addModal','editModal','passwordModal'].forEach(closeModal); } });
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { ['addModal','editModal','passwordModal'].forEach(closeModal); return; }
+    if (e.key !== 'Tab') return;
+    const modal = document.querySelector('.modal-overlay.active');
+    if (!modal) return;
+    const focusable = [...modal.querySelectorAll('input:not([type="hidden"]):not([disabled]), select, button:not([disabled]), [tabindex]:not([tabindex="-1"])')];
+    if (!focusable.length) return;
+    const first = focusable[0], last = focusable[focusable.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+});
+
+function updatePasswordMeter(passwordId) {
+    const input = document.getElementById(passwordId);
+    const meter = document.querySelector(`[data-password-meter="${passwordId}"]`);
+    if (!input || !meter) return true;
+    const value = input.value;
+    const min = Number(meter.dataset.minLength || 8);
+    const normalized = value.toLowerCase().trim();
+    const compact = normalized.replace(/[^a-z0-9]/g, '');
+    const identities = passwordId === 'addPassword'
+        ? [document.getElementById('addFullName').value, document.getElementById('addEmail').value]
+        : (meter.dataset.identity ? JSON.parse(meter.dataset.identity) : []);
+    const identityTokens = identities.flatMap(value => value.toLowerCase().split(/[^a-z0-9]+/).filter(token => token.length >= 4));
+    const commonBases = ['password','qwerty','admin','administrator','registrar','bestlink','welcome','letmein','iloveyou','changeme','default','secret'];
+    const checks = {
+        length: Array.from(value).length >= min && new TextEncoder().encode(value).length <= 72,
+        uppercase: /[A-Z]/.test(value),
+        lowercase: /[a-z]/.test(value),
+        number: /[0-9]/.test(value),
+        symbol: /[^A-Za-z0-9\s]/.test(value),
+        common: !commonBases.some(base => new RegExp(`^${base}[0-9!@#$%^&*._-]*$`).test(normalized)),
+        identity: !identityTokens.some(token => compact.includes(token.replace(/[^a-z0-9]/g, '')))
+    };
+    const met = Object.values(checks).filter(Boolean).length;
+    const total = Object.keys(checks).length;
+    meter.querySelectorAll('[data-requirement]').forEach(item => {
+        const pass = checks[item.dataset.requirement] === true;
+        const label = item.querySelector('span').textContent;
+        item.classList.toggle('met', pass);
+        item.setAttribute('aria-label', label + (pass ? ', met' : ', not met'));
+        item.querySelector('i').className = pass ? 'fas fa-check' : 'fas fa-times';
+    });
+    const labels = value ? ['', 'Weak', 'Needs work', 'Good', 'Strong'] : ['Not started', '', '', '', ''];
+    const score = meter.querySelector('.password-score');
+    const fill = meter.querySelector('.password-track span');
+    score.textContent = labels[Math.max(1, Math.min(4, Math.ceil(met / total * 4)))];
+    fill.style.width = `${(met / total) * 100}%`;
+    meter.classList.toggle('password-strength-complete', met === total);
+    return met === total;
+}
+
+function generatePassword() {
+    const randomIndex = length => {
+        const limit = Math.floor(256 / length) * length;
+        const bytes = crypto.getRandomValues(new Uint8Array(128));
+        return bytes.find(byte => byte < limit) % length;
+    };
+    const sets = ['abcdefghjkmnpqrstuvwxyz', 'ABCDEFGHJKLMNPQRSTUVWXYZ', '23456789', '!@#$%&*?-_'];
+    const all = sets.join('');
+    const values = Array.from({ length: 16 }, () => all[randomIndex(all.length)]);
+    sets.forEach((set, index) => { if (!values.some(v => set.includes(v))) values[index] = set[randomIndex(set.length)]; });
+    for (let i = values.length - 1; i > 0; i--) {
+        const j = randomIndex(i + 1);
+        [values[i], values[j]] = [values[j], values[i]];
+    }
+    return values.join('');
+}
+
+document.querySelectorAll('[data-password-toggle]').forEach(button => {
+    button.addEventListener('click', () => {
+        const input = document.getElementById(button.dataset.passwordToggle);
+        const show = input.type === 'password';
+        input.type = show ? 'text' : 'password';
+        button.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
+        button.querySelector('i').className = show ? 'fas fa-eye-slash' : 'fas fa-eye';
+    });
+});
+document.querySelectorAll('[data-password-generate]').forEach(button => {
+    button.addEventListener('click', () => {
+        const input = document.getElementById(button.dataset.passwordGenerate);
+        input.value = generatePassword();
+        const confirmation = document.getElementById(input.id + 'Confirm');
+        if (confirmation) confirmation.value = input.value;
+        updatePasswordMeter(input.id);
+        confirmation?.focus();
+    });
+});
+document.querySelectorAll('[data-password-meter]').forEach(meter => {
+    const input = document.getElementById(meter.dataset.passwordMeter);
+    input.addEventListener('input', () => updatePasswordMeter(input.id));
+});
 
 function openAddModal() {
     document.getElementById('addForm').reset();
+    document.getElementById('addPasswordError').textContent = '';
+    updatePasswordMeter('addPassword');
     openModal('addModal');
 }
 
@@ -188,9 +310,12 @@ function editUser(id) {
 }
 
 function resetPassword(id, name) {
+    document.getElementById('passwordForm').reset();
     document.getElementById('passwordUserId').value = id;
-    document.getElementById('passwordValue').value = '';
     document.getElementById('passwordTarget').textContent = 'Set a new password for ' + name + '.';
+    document.getElementById('passwordMeter').dataset.identity = JSON.stringify([name]);
+    document.getElementById('passwordError').textContent = '';
+    updatePasswordMeter('passwordValue');
     openModal('passwordModal');
 }
 
@@ -207,20 +332,30 @@ async function submitJson(url, method, body) {
     return await res.json();
 }
 
+document.getElementById('addForm').addEventListener('input', function(e) {
+    if (e.target.id === 'addFullName' || e.target.id === 'addEmail') updatePasswordMeter('addPassword');
+});
 document.getElementById('addForm').addEventListener('submit', async function(e) {
     e.preventDefault();
+    const password = document.getElementById('addPassword').value;
+    const confirmation = document.getElementById('addPasswordConfirm').value;
+    const error = document.getElementById('addPasswordError');
+    if (!updatePasswordMeter('addPassword')) { error.textContent = 'Complete every password requirement before continuing.'; document.getElementById('addPassword').focus(); return; }
+    if (password !== confirmation) { error.textContent = 'Password confirmation does not match.'; document.getElementById('addPasswordConfirm').focus(); return; }
+    error.textContent = '';
     const btn = this.querySelector('button[type="submit"]');
+    const label = btn.innerHTML;
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
     try {
         const d = await submitJson('../api/users.php', 'POST', {
             full_name: document.getElementById('addFullName').value,
             email: document.getElementById('addEmail').value,
             role: document.getElementById('addRole').value,
-            password: document.getElementById('addPassword').value
+            password
         });
         if (d.success) { showToast('User created successfully.', 'success'); window.location.reload(); }
-        else { showToast(d.message || 'Failed to create user.', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Create'; }
-    } catch(e) { showToast('Network error.', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Create'; }
+        else { error.textContent = d.message || 'Failed to create user.'; showToast(d.message || 'Failed to create user.', 'error'); btn.disabled = false; btn.innerHTML = label; }
+    } catch(e) { const message = 'Network error. Check your connection and try again.'; error.textContent = message; showToast(message, 'error'); btn.disabled = false; btn.innerHTML = label; }
 });
 
 document.getElementById('editForm').addEventListener('submit', async function(e) {
@@ -241,16 +376,20 @@ document.getElementById('editForm').addEventListener('submit', async function(e)
 document.getElementById('passwordForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     const id = document.getElementById('passwordUserId').value;
+    const password = document.getElementById('passwordValue').value;
+    const confirmation = document.getElementById('passwordConfirm').value;
+    const error = document.getElementById('passwordError');
+    if (!updatePasswordMeter('passwordValue')) { error.textContent = 'Complete every password requirement before continuing.'; document.getElementById('passwordValue').focus(); return; }
+    if (password !== confirmation) { error.textContent = 'Password confirmation does not match.'; document.getElementById('passwordConfirm').focus(); return; }
+    error.textContent = '';
     const btn = this.querySelector('button[type="submit"]');
+    const label = btn.innerHTML;
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
     try {
-        const d = await submitJson('../api/users.php?id=' + id, 'PATCH', {
-            action: 'password',
-            password: document.getElementById('passwordValue').value
-        });
+        const d = await submitJson('../api/users.php?id=' + id, 'PATCH', { action: 'password', password });
         if (d.success) { showToast('Password updated.', 'success'); window.location.reload(); }
-        else { showToast(d.message || 'Failed to update password.', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Set Password'; }
-    } catch(e) { showToast('Network error.', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Set Password'; }
+        else { error.textContent = d.message || 'Failed to update password.'; showToast(d.message || 'Failed to update password.', 'error'); btn.disabled = false; btn.innerHTML = label; }
+    } catch(e) { const message = 'Network error. Check your connection and try again.'; error.textContent = message; showToast(message, 'error'); btn.disabled = false; btn.innerHTML = label; }
 });
 </script>
 

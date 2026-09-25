@@ -15,6 +15,7 @@ require_once __DIR__ . '/../shared/database.php';
 require_once __DIR__ . '/../shared/session_config.php';
 require_once __DIR__ . '/../shared/csrf_guard.php';
 require_once __DIR__ . '/../shared/functions.php';
+require_once __DIR__ . '/../shared/password_policy.php';
 
 if (!isLoggedIn()) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized.']);
@@ -71,8 +72,9 @@ if ($method === 'POST') {
         echo json_encode(['success' => false, 'message' => 'A valid email is required.']);
         exit;
     }
-    if (strlen($password) < 6) {
-        echo json_encode(['success' => false, 'message' => 'Password must be at least 6 characters.']);
+    $passwordCheck = checkPasswordPolicy($password, [$email, $fullName]);
+    if (!$passwordCheck['valid']) {
+        echo json_encode(['success' => false, 'message' => $passwordCheck['message']]);
         exit;
     }
     if ($fullName === '') {
@@ -133,13 +135,20 @@ if ($method === 'PUT' || $method === 'PATCH') {
     // ── Reset password (PATCH action=password) ──
     if ($action === 'password' || ($method === 'PATCH' && isset($input['password']))) {
         $password = (string)($input['password'] ?? '');
-        if (strlen($password) < 6) {
-            echo json_encode(['success' => false, 'message' => 'Password must be at least 6 characters.']);
+        $passwordCheck = checkPasswordPolicy($password, [
+            (string) ($user['email'] ?? ''),
+            (string) ($user['full_name'] ?? ''),
+            (string) ($user['username'] ?? ''),
+        ]);
+        if (!$passwordCheck['valid']) {
+            echo json_encode(['success' => false, 'message' => $passwordCheck['message']]);
             exit;
         }
         $db->update('users', [
             'password_hash' => password_hash($password, PASSWORD_DEFAULT),
-            'updated_at'    => date('Y-m-d H:i:s'),
+            'login_attempts' => 0,
+            'locked_until'   => null,
+            'updated_at'     => date('Y-m-d H:i:s'),
         ], 'id = ?', [$id]);
         logActivity($_SESSION['user_id'], 'user_password_reset', null, 'users', $id);
         echo json_encode(['success' => true, 'message' => 'Password updated.']);
