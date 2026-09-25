@@ -67,7 +67,7 @@ $ACTIVE_NAV = 'tracker';
 include '../includes/header.php';
 include '../includes/sidebar.php';
 ?>
-<link rel="stylesheet" href="../css/status-tracker.css">
+<link rel="stylesheet" href="../css/status-tracker.css?v=<?= filemtime(__DIR__ . '/../css/status-tracker.css') ?>">
 <main class="dashboard-main">
 <header class="header">
     <div class="title">
