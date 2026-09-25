@@ -34,21 +34,37 @@ try {
     foreach ($visits as $visit) {
         $reason = trim((string)($visit['reason_for_visit'] ?? ''));
         if ($reason !== '') $reasonCounts[$reason] = ($reasonCounts[$reason] ?? 0) + 1;
-        if (empty($visit['action_taken'])) $issues[] = 'One visit has no recorded action.';
-        if (empty($visit['assessment'])) $issues[] = 'One visit has no recorded assessment.';
-        if (empty($visit['immunization_records'])) $issues[] = 'Immunization information is not recorded in this visit.';
-        if (!empty($visit['allergies'])) $issues[] = 'Allergy information is present; confirm it with the Clinic Portal before acting.';
+        if (empty($visit['action_taken'])) $issues[] = 'One visit does not include a recorded action.';
+        if (empty($visit['assessment'])) $issues[] = 'One visit does not include a recorded assessment.';
+        if (empty($visit['immunization_records'])) $issues[] = 'Immunization information is not documented in the available record.';
+        if (!empty($visit['allergies'])) $issues[] = 'Allergy information is documented and may need routine clinic confirmation.';
     }
     arsort($reasonCounts);
     $repeated = array_filter($reasonCounts, static fn(int $count): bool => $count >= 2);
-    foreach ($repeated as $reason => $count) $issues[] = "Repeated visit reason: {$reason} ({$count} visits).";
+    foreach ($repeated as $reason => $count) $issues[] = "{$reason} appears as the visit reason in {$count} records.";
     $issues = array_values(array_unique($issues));
     $latest = $visits[0] ?? null;
-    $fallback = sprintf('%d clinic record(s) found. Latest visit: %s. %d information item(s) may need clinic confirmation.', count($visits), $latest ? (string)($latest['date_time'] ?: $latest['visit_date'] ?: 'not recorded') : 'none', count($issues));
-
     $facts = ['student' => $student, 'visit_count' => count($visits), 'latest_visit' => $latest, 'repeated_reasons' => $repeated, 'information_flags' => $issues];
-    $review = aiGenerate('You provide a read-only administrative review of existing school clinic records for a registrar. Summarize facts and missing information in two concise sentences. Do not diagnose, prescribe, clear, restrict, or invent medical facts. Recommend confirming unclear information with the Clinic Portal or nurse.', json_encode($facts), ['max_tokens' => 220, 'temperature' => 0.1, 'ttl' => 300]);
-    echo json_encode(['success' => true, 'data' => ['summary' => $review !== '' ? $review : $fallback, 'source' => $review !== '' ? 'ai' : 'rules', 'visit_count' => count($visits), 'latest_visit' => $latest, 'information_flags' => $issues, 'disclaimer' => 'Informational review only. Confirm with the Clinic Portal or nurse before taking action.']]);
+
+    // Keep this administrative and deterministic. The registrar view is a
+    // record summary, not a diagnostic assistant, and must not expose model
+    // reasoning or issue instructions to clinic staff.
+    $studentName = trim((string)($student['name'] ?? 'The student'));
+    $program = trim((string)($student['course'] ?? ''));
+    $year = trim((string)($student['year_level'] ?? ''));
+    $studentLabel = $studentName . ($program !== '' ? ', ' . $program . ($year !== '' ? ' year ' . $year : '') : '');
+    $latestDate = $latest ? (string)($latest['date_time'] ?: $latest['visit_date'] ?: 'date not recorded') : 'no visit date recorded';
+    $summary = sprintf('%s has %d clinic record%s on file; the latest record is dated %s.', $studentLabel, count($visits), count($visits) === 1 ? '' : 's', $latestDate);
+    if ($latest) {
+        $reason = trim((string)($latest['reason_for_visit'] ?? ''));
+        $assessment = trim((string)($latest['assessment'] ?? ''));
+        $action = trim((string)($latest['action_taken'] ?? ''));
+        if ($reason !== '') $summary .= ' The latest visit lists “' . $reason . '” as the reason.';
+        if ($assessment !== '') $summary .= ' Assessment: ' . $assessment . '.';
+        if ($action !== '') $summary .= ' Action recorded: ' . $action . '.';
+    }
+    if ($issues) $summary .= ' The record set also contains documentation notes for routine clinic confirmation.';
+    echo json_encode(['success' => true, 'data' => ['summary' => $summary, 'source' => 'rules', 'visit_count' => count($visits), 'latest_visit' => $latest, 'information_flags' => $issues, 'disclaimer' => 'Administrative summary only. Confirm details with the Clinic Portal or nurse when needed.']]);
 } catch (Exception $e) {
     error_log('[clinic-ai-review] ' . $e->getMessage());
     echo json_encode(['success' => false, 'message' => 'Health review unavailable.']);
