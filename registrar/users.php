@@ -32,39 +32,55 @@ $adminUsers    = count(array_filter($users, fn($u) => $u['role'] === 'admin'));
 $page_title = 'Users';
 $APP_ROOT = '../';
 $ACTIVE_NAV = 'users';
+$body_page = 'admin-users';           // scopes the admin-blue layer
+$extra_css = ['admin.css'];
 include '../includes/header.php';
 include '../includes/sidebar.php';
 ?>
 <main class="dashboard-main">
 <div class="dashboard-container">
 
-<header class="header">
-    <div class="title"><h1>Users</h1><p>Manage system accounts and roles</p></div>
-    <div class="header-actions">
-        <button class="btn btn-primary" onclick="openAddModal()"><i class="fas fa-plus"></i> Add User</button>
+<header class="adm-head">
+    <div>
+        <div class="adm-kicker"><i class="fas fa-user-shield"></i> Accounts</div>
+        <h1>Users</h1>
+        <p>Staff accounts that can sign in to the registrar. Students are created from the student record and managed on the Students page.</p>
+    </div>
+    <div class="adm-head-actions">
+        <span class="adm-chip <?= $activeUsers === $totalUsers ? 'ok' : 'warn' ?>">
+            <i class="fas <?= $activeUsers === $totalUsers ? 'fa-circle-check' : 'fa-user-slash' ?>"></i>
+            <b><?= $activeUsers ?></b> of <?= $totalUsers ?> active
+        </span>
+        <button class="btn btn-primary" onclick="openAddModal()"><i class="fas fa-user-plus"></i> Add user</button>
     </div>
 </header>
 
 <!-- Stats -->
-<div class="stats-grid">
-    <div class="stat-card"><div class="stat-top"><div class="stat-icon blue"><i class="fas fa-users"></i></div></div><div class="stat-number"><?= $totalUsers ?></div><div class="stat-label">Total Users</div></div>
-    <div class="stat-card"><div class="stat-top"><div class="stat-icon green"><i class="fas fa-user-check"></i></div></div><div class="stat-number"><?= $activeUsers ?></div><div class="stat-label">Active</div></div>
-    <div class="stat-card"><div class="stat-top"><div class="stat-icon yellow"><i class="fas fa-user-slash"></i></div></div><div class="stat-number"><?= $disabledUsers ?></div><div class="stat-label">Disabled</div></div>
-    <div class="stat-card"><div class="stat-top"><div class="stat-icon purple"><i class="fas fa-user-shield"></i></div></div><div class="stat-number"><?= $adminUsers ?></div><div class="stat-label">Admins</div></div>
+<div class="adm-stats" style="--adm-cols:4" aria-label="User summary">
+    <div class="adm-stat"><div class="adm-stat-icon"><i class="fas fa-users"></i></div>
+        <div><div class="adm-stat-value"><?= number_format($totalUsers) ?></div><div class="adm-stat-label">Total accounts</div></div></div>
+    <div class="adm-stat tone-green"><div class="adm-stat-icon"><i class="fas fa-user-check"></i></div>
+        <div><div class="adm-stat-value"><?= number_format($activeUsers) ?></div><div class="adm-stat-label">Active</div></div></div>
+    <div class="adm-stat tone-amber"><div class="adm-stat-icon"><i class="fas fa-user-slash"></i></div>
+        <div><div class="adm-stat-value"><?= number_format($disabledUsers) ?></div><div class="adm-stat-label">Disabled</div></div></div>
+    <div class="adm-stat tone-purple"><div class="adm-stat-icon"><i class="fas fa-user-shield"></i></div>
+        <div><div class="adm-stat-value"><?= number_format($adminUsers) ?></div><div class="adm-stat-label">Administrators</div></div></div>
 </div>
 
 <!-- Search + Table -->
-<div class="panel">
-    <div class="search-toolbar">
-        <div class="search-wrap">
-            <i class="fas fa-search"></i>
-            <input type="text" id="userSearch" placeholder="Search by name or email...">
-        </div>
-        <select id="roleFilter" class="form-control" style="width:auto;height:40px;" onchange="performSearch()">
-            <option value="">All roles</option>
-            <option value="admin">Admin</option>
-            <option value="registrar">Registrar</option>
-            <option value="nurse">Nurse</option>
+<div class="adm-panel">
+<div class="adm-panel-title"><i class="fas fa-list"></i> Staff accounts</div>
+<div class="adm-filters">
+    <div class="search-wrap">
+        <i class="fas fa-search"></i>
+        <input type="text" id="userSearch" placeholder="Search name or email...">
+    </div>
+    <label class="adm-filters-label" for="roleFilter">Role</label>
+    <select id="roleFilter" class="form-control" onchange="performSearch()">
+        <option value="">All roles</option>
+        <option value="admin">Admin</option>
+        <option value="registrar">Registrar</option>
+        <option value="nurse">Nurse</option>
             <option value="staff">Staff</option>
         </select>
     </div>
@@ -108,8 +124,8 @@ include '../includes/sidebar.php';
     </table>
     </div>
 
-    <div class="table-footer">
-        <div class="info-text">Showing <strong id="showingCount"><?= count($users) ?></strong> of <strong id="totalCount"><?= count($users) ?></strong> users</div>
+    <div class="adm-panel-foot">
+        <div>Showing <strong id="showingCount"><?= count($users) ?></strong> of <strong id="totalCount"><?= count($users) ?></strong> accounts</div>
     </div>
 </div>
 

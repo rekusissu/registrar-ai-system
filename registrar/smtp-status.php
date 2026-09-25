@@ -142,87 +142,101 @@ $mailFrom   = (defined('MAIL_FROM') ? MAIL_FROM : '') ?: (defined('SMTP_USER') ?
 $page_title = 'SMTP Status';
 $APP_ROOT   = '../';
 $ACTIVE_NAV = 'smtp';
+$body_page  = 'smtp-status';          // scopes the admin-blue layer
+$extra_css  = ['admin.css'];
 include '../includes/header.php';
 include '../includes/sidebar.php';
 ?>
 <main class="dashboard-main">
     <div class="dashboard-container">
 
-        <header class="header">
-            <div class="title">
-                <h1>SMTP Status</h1>
-                <p>Diagnose email/SMTP configuration and delivery</p>
+        <header class="adm-head">
+            <div>
+                <div class="adm-kicker"><i class="fas fa-envelope-open-text"></i> Outbound mail</div>
+                <h1>Email delivery</h1>
+                <p>Which transport carries outgoing mail, where the sender comes from, and whether the host can actually make the call.</p>
+            </div>
+            <div class="adm-head-actions">
+                <span class="adm-chip <?= $configured ? ($transport === 'None' ? 'bad' : 'ok') : 'bad' ?>">
+                    <i class="fas <?= $configured && $transport !== 'None' ? 'fa-circle-check' : 'fa-circle-xmark' ?>"></i>
+                    <?= $configured && $transport !== 'None' ? 'Ready' : 'Not sending' ?>
+                </span>
             </div>
         </header>
 
         <?php if ($actionResult): ?>
-        <div class="panel" style="margin-bottom:18px;border-left:4px solid <?= $actionResult['ok'] ? '#16a34a' : '#dc2626' ?>;">
-            <div style="display:flex;gap:10px;align-items:center;padding:14px 16px;">
-                <i class="fas <?= $actionResult['ok'] ? 'fa-circle-check' : 'fa-circle-xmark' ?>" style="font-size:18px;color:<?= $actionResult['ok'] ? '#16a34a' : '#dc2626' ?>;"></i>
+        <div class="adm-panel" style="margin-bottom:18px;border-left:3px solid <?= $actionResult['ok'] ? '#16a34a' : '#dc2626' ?>;">
+            <div class="adm-panel-body" style="display:flex;gap:11px;align-items:flex-start;">
+                <i class="fas <?= $actionResult['ok'] ? 'fa-circle-check' : 'fa-circle-xmark' ?>" style="font-size:17px;margin-top:1px;color:<?= $actionResult['ok'] ? '#16a34a' : '#dc2626' ?>;"></i>
                 <div>
-                    <div style="font-weight:600;color:#0f172a;"><?= $actionResult['ok'] ? 'Success' : 'Failed' ?></div>
-                    <div style="font-size:13px;color:#475569;"><?= htmlspecialchars($actionResult['message']) ?></div>
+                    <div style="font-weight:700;font-size:13px;color:#172554;"><?= $actionResult['ok'] ? 'Test passed' : 'Test failed' ?></div>
+                    <div style="font-size:12.5px;line-height:1.5;color:#475569;margin-top:2px;"><?= htmlspecialchars($actionResult['message']) ?></div>
                 </div>
             </div>
         </div>
         <?php endif; ?>
 
-        <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);">
-            <div class="stat-card">
-                <div class="stat-top"><div class="stat-icon <?= $configured ? 'green' : 'red' ?>"><i class="fas fa-envelope"></i></div></div>
-                <div class="stat-number"><?= $configured ? 'Configured' : 'Not configured' ?></div>
-                <div class="stat-label">EMAIL_CONFIGURED</div>
+        <div class="adm-stats" style="--adm-cols:3" aria-label="Mail transport summary">
+            <div class="adm-stat <?= $configured && $transport !== 'None' ? 'tone-green' : 'tone-red' ?>">
+                <div class="adm-stat-icon"><i class="fas fa-envelope"></i></div>
+                <div><div class="adm-stat-value" style="font-size:19px;"><?= htmlspecialchars($transport) ?></div><div class="adm-stat-label">Active transport</div></div>
             </div>
-            <div class="stat-card">
-                <div class="stat-top"><div class="stat-icon blue"><i class="fas fa-server"></i></div></div>
-                <div class="stat-number" style="font-size:18px;"><?= htmlspecialchars(defined('SMTP_HOST') ? SMTP_HOST : '') ?></div>
-                <div class="stat-label">Host : <?= intval(SMTP_PORT ?? 587) ?></div>
+            <div class="adm-stat <?= $mailFrom !== '' ? '' : 'tone-red' ?>">
+                <div class="adm-stat-icon"><i class="fas fa-signature"></i></div>
+                <div><div class="adm-stat-value" style="font-size:15px;overflow-wrap:anywhere;"><?= $mailFrom !== '' ? htmlspecialchars($mailFrom) : 'Not set' ?></div><div class="adm-stat-label">Sender address</div></div>
             </div>
-            <div class="stat-card">
-                <div class="stat-top"><div class="stat-icon purple"><i class="fas fa-key"></i></div></div>
-                <div class="stat-number" style="font-size:18px;">
-                    <?= defined('SMTP_PASS') && SMTP_PASS !== '' ? 'Set (' . strlen(SMTP_PASS) . ' chars)' : 'Missing' ?>
-                </div>
-                <div class="stat-label">Password (never shown)</div>
+            <div class="adm-stat <?= $hasCurl ? 'tone-green' : 'tone-red' ?>">
+                <div class="adm-stat-icon"><i class="fas fa-plug"></i></div>
+                <div><div class="adm-stat-value" style="font-size:19px;"><?= $hasCurl ? 'Enabled' : 'Disabled' ?></div><div class="adm-stat-label">cURL on this host</div></div>
             </div>
         </div>
 
-        <div class="panel" style="margin-bottom:18px;">
-            <div class="panel-title" style="padding:14px 16px;"><i class="fas fa-circle-info" style="color:#2563eb;"></i> Configuration</div>
-            <div class="table-responsive">
-                <table class="table">
-                    <tbody>
-                        <tr><td style="width:240px;color:#64748b;">Credential source</td><td><?= htmlspecialchars($credSource) ?></td></tr>
-                        <tr><td style="color:#64748b;">Active transport</td><td><strong><?= htmlspecialchars($transport) ?></strong></td></tr>
-                        <tr><td style="color:#64748b;">Sender address</td><td><?= $mailFrom !== ''
-                                ? htmlspecialchars($mailFrom) . ($transport === 'Brevo API' ? ' <span style="color:#64748b;">(must be verified in Brevo)</span>' : '')
-                                : '<span style="color:#dc2626;font-weight:600;">Not set — Brevo will reject every send. Set MAIL_FROM.</span>' ?></td></tr>
-                        <tr><td style="color:#64748b;">cURL extension</td><td><?= $hasCurl ? 'Enabled' : '<span style="color:#dc2626;font-weight:600;">Disabled — the Brevo transport cannot work without it</span>' ?></td></tr>
-                        <tr><td style="color:#64748b;">SMTP user</td><td><?= htmlspecialchars(defined('SMTP_USER') ? SMTP_USER : '') ?></td></tr>
-                        <tr><td style="color:#64748b;">MAIL_FROM</td><td><?= htmlspecialchars(defined('MAIL_FROM') ? MAIL_FROM : '') ?></td></tr>
-                        <tr><td style="color:#64748b;">MAIL_FROM_NAME</td><td><?= htmlspecialchars(defined('MAIL_FROM_NAME') ? MAIL_FROM_NAME : '') ?></td></tr>
-                        <tr><td style="color:#64748b;">PHPMailer (vendor)</td><td><?= $hasPhpMailer ? 'Installed' : 'Missing' ?></td></tr>
-                        <tr><td style="color:#64748b;">OpenSSL extension</td><td><?= $hasOpenssl ? 'Enabled' : 'Disabled (STARTTLS needs it)' ?></td></tr>
-                        <tr><td style="color:#64748b;">Brevo API</td><td><?= defined('BREVO_CONFIGURED') && BREVO_CONFIGURED ? '<span style="color:#16a34a;font-weight:600;">Active — emails sent via Brevo</span>' : '<span style="color:#94a3b8;">Not configured</span>' ?></td></tr>
-                        <tr><td style="color:#64748b;">Gmail API (OAuth2)</td><td><?= defined('GMAIL_API_CONFIGURED') && GMAIL_API_CONFIGURED ? '<span style="color:#16a34a;font-weight:600;">Active — emails sent via Gmail API</span>' : '<span style="color:#94a3b8;">Not configured</span>' ?></td></tr>
-                        <tr><td style="color:#64748b;">Gmail API Client ID</td><td><?= defined('GMAIL_API_CLIENT_ID') && GMAIL_API_CLIENT_ID !== '' ? 'Set' : 'Not set' ?></td></tr>
-                    </tbody>
-                </table>
-            </div>
+        <div class="adm-panel">
+            <div class="adm-panel-title"><i class="fas fa-sliders"></i> Configuration</div>
+            <dl class="adm-kv">
+                <dt>Credential source</dt>
+                <dd class="<?= $envSet ? 'val-ok' : 'val-warn' ?>"><?= htmlspecialchars($credSource) ?></dd>
+                <dt>Active transport</dt>
+                <dd><strong><?= htmlspecialchars($transport) ?></strong></dd>
+                <dt>Sender address</dt>
+                <dd class="<?= $mailFrom !== '' ? 'val-ok' : 'val-bad' ?>"><?= $mailFrom !== ''
+                        ? htmlspecialchars($mailFrom) . ' <span style="color:#64748b;font-weight:500;">(must be verified in Brevo)</span>'
+                        : 'Not set — every send will be rejected. Set MAIL_FROM.' ?></dd>
+                <dt>Brevo API key</dt>
+                <dd class="<?= (defined('BREVO_CONFIGURED') && BREVO_CONFIGURED) ? 'val-ok' : 'val-mute' ?>">
+                    <?= (defined('BREVO_CONFIGURED') && BREVO_CONFIGURED) ? 'Present' : 'Not set' ?>
+                </dd>
+                <dt>SMTP host</dt>
+                <dd class="<?= (defined('SMTP_HOST') && SMTP_HOST !== '') ? 'val-ok' : 'val-mute' ?>">
+                    <?= (defined('SMTP_HOST') && SMTP_HOST !== '') ? '<code>' . htmlspecialchars(SMTP_HOST) . ':' . intval(SMTP_PORT ?? 587) . '</code>' : 'Not used' ?>
+                </dd>
+                <dt>PHPMailer (vendor)</dt>
+                <dd class="<?= $hasPhpMailer ? 'val-ok' : 'val-warn' ?>">
+                    <?= $hasPhpMailer ? 'Installed' : 'Missing — run composer install on this host' ?>
+                </dd>
+                <dt>cURL extension</dt>
+                <dd class="<?= $hasCurl ? 'val-ok' : 'val-bad' ?>">
+                    <?= $hasCurl ? 'Enabled' : 'Disabled — the Brevo transport cannot work without it' ?>
+                </dd>
+                <dt>OpenSSL extension</dt>
+                <dd class="<?= $hasOpenssl ? 'val-ok' : 'val-warn' ?>">
+                    <?= $hasOpenssl ? 'Enabled' : 'Disabled (STARTTLS needs it)' ?>
+                </dd>
+            </dl>
         </div>
 
-        <div class="panel">
-            <div class="panel-title" style="padding:14px 16px;"><i class="fas fa-vial-circle-check" style="color:#2563eb;"></i> Test SMTP</div>
-            <div style="padding:16px;">
-                <form method="post" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <div class="adm-panel">
+            <div class="adm-panel-title"><i class="fas fa-vial-circle-check"></i> Send a test</div>
+            <div class="adm-panel-body">
+                <form method="post" class="adm-test-row">
                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8') ?>">
-                    <button type="submit" name="action" value="test_connection" class="btn btn-secondary"><i class="fas fa-plug"></i> Test Connection</button>
-                    <button type="submit" name="action" value="test_send" class="btn btn-primary" <?= $configured ? '' : 'disabled' ?>><i class="fas fa-paper-plane"></i> Send Test Email</button>
+                    <button type="submit" name="action" value="test_connection" class="btn btn-secondary"><i class="fas fa-plug"></i> Check transport</button>
+                    <button type="submit" name="action" value="test_send" class="btn btn-primary" <?= $configured ? '' : 'disabled' ?>><i class="fas fa-paper-plane"></i> Send test email</button>
                     <?php if (!$configured): ?>
-                    <span style="font-size:12px;color:#b45309;"><i class="fas fa-triangle-exclamation"></i> Add SMTP credentials first (env vars or shared/email_secret.local), then reload.</span>
+                    <span style="font-size:12px;color:#b45309;"><i class="fas fa-triangle-exclamation"></i> Set BREVO_API_KEY or the SMTP_* variables, then reload.</span>
                     <?php endif; ?>
                 </form>
-                <p style="font-size:12px;color:#94a3b8;margin-top:12px;">"Test Connection" only connects and authenticates. "Send Test Email" delivers one message to <?= htmlspecialchars(defined('MAIL_FROM') && MAIL_FROM !== '' ? MAIL_FROM : 'MAIL_FROM') ?>.</p>
+                <p class="adm-note">A test email goes to <?= htmlspecialchars($mailFrom !== '' ? $mailFrom : 'the sender address') ?>. Check the spam folder if it does not arrive. Failures are written to the PHP error log with a <code>mail:</code> prefix.</p>
             </div>
         </div>
 

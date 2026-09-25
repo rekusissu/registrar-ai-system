@@ -13,47 +13,67 @@ requireRole('admin');
 $page_title = 'Audit Logs';
 $APP_ROOT = '../';
 $ACTIVE_NAV = 'audit';
+$body_page = 'audit-logs';            // scopes the admin-blue layer
+$extra_css = ['admin.css'];
 include '../includes/header.php';
 include '../includes/sidebar.php';
 ?>
 <main class="dashboard-main">
 <div class="dashboard-container">
 
-<header class="header">
-    <div class="title"><h1>Audit Logs</h1><p>Complete action history across the system</p></div>
+<header class="adm-head">
+    <div>
+        <div class="adm-kicker"><i class="fas fa-receipt"></i> Record of changes</div>
+        <h1>Audit logs</h1>
+        <p>Every action recorded in the system, newest first. Use this to trace who changed a record and when.</p>
+    </div>
+    <div class="adm-head-actions">
+        <span class="adm-chip">
+            <i class="fas fa-clock-rotate-left"></i>
+            Newest entries first
+        </span>
+    </div>
 </header>
 
 <!-- Filters -->
-<div class="panel">
-    <div class="search-toolbar" style="flex-wrap:wrap;gap:10px;">
-        <div class="search-wrap" style="flex:1;min-width:200px;">
+<div class="adm-panel">
+    <div class="adm-panel-title"><i class="fas fa-filter"></i> Narrow the log</div>
+    <div class="adm-filters">
+        <div class="search-wrap">
             <i class="fas fa-search"></i>
             <input type="text" id="logSearch" placeholder="Search action, table, or IP...">
         </div>
-        <select id="userFilter" class="form-control" style="width:auto;height:40px;"><option value="">All users</option></select>
-        <select id="actionFilter" class="form-control" style="width:auto;height:40px;"><option value="">All actions</option></select>
-        <input type="date" id="fromDate" class="form-control" style="width:auto;height:40px;" title="From date">
-        <span style="color:#94a3b8;font-size:12px;">to</span>
-        <input type="date" id="toDate" class="form-control" style="width:auto;height:40px;" title="To date">
+        <label class="adm-filters-label" for="userFilter">User</label>
+        <select id="userFilter" class="form-control"><option value="">All users</option></select>
+        <label class="adm-filters-label" for="actionFilter">Action</label>
+        <select id="actionFilter" class="form-control"><option value="">All actions</option></select>
+        <label class="adm-filters-label" for="fromDate">From</label>
+        <input type="date" id="fromDate" class="form-control">
+        <span class="adm-filters-label">to</span>
+        <input type="date" id="toDate" class="form-control" aria-label="To date">
         <button class="btn btn-primary" onclick="loadLogs(1)"><i class="fas fa-filter"></i> Apply</button>
     </div>
 </div>
 
 <!-- Table -->
-<div class="panel">
-    <div class="table-responsive" style="overflow-x:auto;">
+<div class="adm-panel">
+    <div class="adm-panel-title"><i class="fas fa-list"></i> Activity</div>
+    <div class="table-responsive">
     <table class="table">
         <thead>
         <tr><th>#</th><th>Action</th><th>User</th><th>Table</th><th>Record</th><th>IP Address</th><th>Timestamp</th><th style="text-align:center;">Details</th></tr>
         </thead>
         <tbody id="logBody">
-            <tr><td colspan="8" class="empty-state"><i class="fas fa-circle-notch fa-spin"></i><p>Loading logs...</p></td></tr>
+            <tr><td colspan="8" style="padding:0;"><div class="adm-empty">
+                <i class="fas fa-circle-notch fa-spin"></i>
+                <p>Loading the log...</p>
+            </div></td></tr>
         </tbody>
     </table>
     </div>
 
-    <div class="table-footer">
-        <div class="info-text">Showing <strong id="showingFrom">0</strong>–<strong id="showingTo">0</strong> of <strong id="totalCount">0</strong> entries</div>
+    <div class="adm-panel-foot">
+        <div>Showing <strong id="showingFrom">0</strong>&ndash;<strong id="showingTo">0</strong> of <strong id="totalCount">0</strong> entries</div>
         <div class="pagination" id="pagination"></div>
     </div>
 </div>
@@ -100,10 +120,36 @@ function esc(s) {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+/* Split a timestamp into a day and a time so the column reads as a
+   ledger rather than one long string. Falls back to the raw value if
+   the server sent something unparseable. */
+function fmtWhen(value) {
+    if (!value) return { day: '—', time: '' };
+    const d = new Date(String(value).replace(' ', 'T'));
+    if (isNaN(d.getTime())) return { day: String(value), time: '' };
+    const opts = { day: { year: 'numeric', month: 'short', day: 'numeric' },
+                   time: { hour: '2-digit', minute: '2-digit' } };
+    return { day: d.toLocaleDateString('en-GB', opts.day),
+             time: d.toLocaleTimeString('en-GB', opts.time) };
+}
+
+/* Actions carry meaning, so colour them by verb. Everything used to
+   render as the same green "active" pill, which made a DELETE look
+   identical to a login. */
+function actionChip(label) {
+    const s = String(label || '').toLowerCase();
+    let tone = 'v-read', icon = 'fa-circle-dot';
+    if (/delete|remove|archive|purge|revoke|wipe/.test(s))        { tone = 'v-delete'; icon = 'fa-trash-can'; }
+    else if (/create|add|insert|register|enroll|upload/.test(s))  { tone = 'v-create'; icon = 'fa-plus'; }
+    else if (/login|logout|auth|password|otp|verify|sign/.test(s)){ tone = 'v-auth';   icon = 'fa-right-to-bracket'; }
+    else if (/update|edit|change|status|approve|deny|set|enable|disable|assign|transfer/.test(s)) { tone = 'v-update'; icon = 'fa-pen'; }
+    return '<span class="act ' + tone + '"><i class="fas ' + icon + '"></i>' + esc(label || 'unknown') + '</span>';
+}
+
 async function loadLogs(page) {
     currentPage = page;
     const body = document.getElementById('logBody');
-    body.innerHTML = '<tr><td colspan="8" class="empty-state"><i class="fas fa-circle-notch fa-spin"></i><p>Loading logs...</p></td></tr>';
+    body.innerHTML = '<tr><td colspan="8" style="padding:0;"><div class="adm-empty"><i class="fas fa-circle-notch fa-spin"></i><p>Loading the log...</p></div></td></tr>';
 
     const params = new URLSearchParams({ page });
     const q = document.getElementById('logSearch').value.trim();
@@ -120,28 +166,29 @@ async function loadLogs(page) {
     try {
         const res = await fetch('../api/audit-logs.php?' + params.toString());
         const d = await res.json();
-        if (!d.success) { body.innerHTML = '<tr><td colspan="8" class="empty-state"><p>' + esc(d.message || 'Error loading logs.') + '</p></td></tr>'; return; }
+        if (!d.success) { body.innerHTML = '<tr><td colspan="8" style="padding:0;"><div class="adm-empty"><i class="fas fa-triangle-exclamation"></i><p>Could not load the log</p><span>' + esc(d.message || 'Try again in a moment.') + '</span></div></td></tr>'; return; }
         renderLogs(d.data || [], d.meta || {});
     } catch(e) {
-        body.innerHTML = '<tr><td colspan="8" class="empty-state"><p>Failed to load logs.</p></td></tr>';
+        body.innerHTML = '<tr><td colspan="8" style="padding:0;"><div class="adm-empty"><i class="fas fa-triangle-exclamation"></i><p>Could not reach the log service</p><span>Check the connection and try again.</span></div></td></tr>';
     }
 }
 
 function renderLogs(rows, meta) {
     const body = document.getElementById('logBody');
     if (!rows.length) {
-        body.innerHTML = '<tr><td colspan="8" class="empty-state"><i class="fas fa-inbox"></i><p>No logs found</p><span>Try adjusting your filters</span></td></tr>';
+        body.innerHTML = '<tr><td colspan="8" style="padding:0;"><div class="adm-empty"><i class="fas fa-inbox"></i><p>No entries match these filters</p><span>Widen the date range or clear the user and action filters.</span></div></td></tr>';
     } else {
         body.innerHTML = rows.map(r => {
             const who = r.user_name ? esc(r.user_name) : (r.user_email ? esc(r.user_email) : '<span style="color:#94a3b8;">System</span>');
+            const dash = '<span style="color:#cbd5e1;">—</span>';
             return '<tr>' +
-                '<td style="color:#94a3b8;font-size:12px;">' + r.id + '</td>' +
-                '<td><span class="pill active">' + esc(r.action_label || r.action) + '</span></td>' +
+                '<td class="mono">' + r.id + '</td>' +
+                '<td>' + actionChip(r.action_label || r.action) + '</td>' +
                 '<td>' + who + '</td>' +
-                '<td><code style="font-size:12px;color:#7c3aed;">' + esc(r.table_name || '—') + '</code></td>' +
-                '<td style="font-size:12px;">' + (r.record_id ? '#' + r.record_id : '—') + '</td>' +
-                '<td style="font-size:12px;color:#64748b;">' + esc(r.ip_address || '—') + '</td>' +
-                '<td style="font-size:12px;color:#64748b;white-space:nowrap;">' + esc(r.created_at) + '</td>' +
+                '<td><code style="font-size:11.5px;color:#6d28d9;">' + esc(r.table_name || '—') + '</code></td>' +
+                '<td class="mono">' + (r.record_id ? '#' + r.record_id : dash) + '</td>' +
+                '<td class="mono">' + esc(r.ip_address || '—') + '</td>' +
+                '<td><div class="audit-when"><b>' + esc(fmtWhen(r.created_at).day) + '</b><span>' + esc(fmtWhen(r.created_at).time) + '</span></div></td>' +
                 '<td style="text-align:center;"><button class="action-btn edit" onclick="viewDetail(' + r.id + ')" title="View details"><i class="fas fa-eye"></i></button></td>' +
             '</tr>';
         }).join('');
