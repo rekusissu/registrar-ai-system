@@ -129,39 +129,50 @@ include '../includes/sidebar.php';
             <span>Tap an RFID card or search by name or student number.</span>
         </div>
 
-        <div id="wsStudent" style="display:none;">
-            <span class="pill active" style="margin-bottom:14px;"><i class="fas fa-check-circle"></i> Student Identified — Verify Identity</span>
-            <div class="student-chip-row">
-                <div class="avatar" id="wsAvatar">?</div>
-                <div>
-                    <div style="font-weight:800;font-size:18px;color:#0f172a;" id="wsName">—</div>
-                    <div style="font-size:12px;color:#64748b;" id="wsCard">—</div>
+        <div id="wsStudent" class="student-verification" style="display:none;">
+            <div class="verification-card">
+                <div class="verification-accent"></div>
+                <div class="student-chip-row">
+                    <div class="avatar" id="wsAvatar">?</div>
+                    <div class="student-identity">
+                        <span class="pill active"><i class="fas fa-check-circle"></i> Identity matched</span>
+                        <div class="identity-name" id="wsName">—</div>
+                        <div class="identity-source" id="wsCard">—</div>
+                    </div>
+                    <div class="verification-state"><i class="fas fa-shield-halved"></i><span>Ready to verify</span></div>
+                </div>
+                <div class="info-grid">
+                    <div class="info-cell"><div class="k">Student ID</div><div class="v" id="wsId">—</div></div>
+                    <div class="info-cell"><div class="k">Program</div><div class="v" id="wsProgram">—</div></div>
+                    <div class="info-cell"><div class="k">Year Level</div><div class="v" id="wsYear">—</div></div>
+                    <div class="info-cell"><div class="k">Section</div><div class="v" id="wsSection">—</div></div>
                 </div>
             </div>
-            <div class="info-grid">
-                <div class="info-cell"><div class="k">Student ID</div><div class="v" id="wsId">—</div></div>
-                <div class="info-cell"><div class="k">Program</div><div class="v" id="wsProgram">—</div></div>
-                <div class="info-cell"><div class="k">Year Level</div><div class="v" id="wsYear">—</div></div>
-                <div class="info-cell"><div class="k">Section</div><div class="v" id="wsSection">—</div></div>
-            </div>
-            <div class="identity-actions">
-                <button type="button" class="btn btn-outline" onclick="openProfile()"><i class="fas fa-id-card-clip"></i> Medical Profile</button>
-                <button type="button" class="btn btn-primary" onclick="startAssessment()"><i class="fas fa-user-check"></i> Verify &amp; Start Assessment</button>
-                <button type="button" class="btn btn-light" onclick="resetWorkspace()"><i class="fas fa-rotate"></i> New Scan</button>
+            <div class="verification-next">
+                <div><strong>Confirm the student and medical profile</strong><span>Check the details before starting this visit.</span></div>
+                <div class="identity-actions">
+                    <button type="button" class="btn btn-outline" onclick="openProfile()"><i class="fas fa-id-card-clip"></i> Medical Profile</button>
+                    <button type="button" class="btn btn-primary" onclick="startAssessment()"><i class="fas fa-user-check"></i> Verify &amp; Start Assessment</button>
+                    <button type="button" class="btn btn-light" onclick="resetWorkspace()"><i class="fas fa-rotate"></i> New Scan</button>
+                </div>
             </div>
         </div>
 
-        <div id="wsForm" style="display:none;">
-            <div class="eval-stepper visible" id="evalStepper">
-                <div class="eval-step active" data-step="1"><div class="eval-step-num">1</div><div class="eval-step-label">Patient Info</div></div>
-                <div class="eval-step-line"></div>
-                <div class="eval-step" data-step="2"><div class="eval-step-num">2</div><div class="eval-step-label">Assessment</div></div>
-                <div class="eval-step-line"></div>
-                <div class="eval-step" data-step="3"><div class="eval-step-num">3</div><div class="eval-step-label">Notes &amp; Save</div></div>
+        <div id="wsForm" class="assessment-workspace" style="display:none;">
+            <div class="assessment-context">
+                <div><span>Assessment for</span><strong id="formStudentName"></strong></div>
+                <div class="assessment-context-state"><i class="fas fa-user-check"></i> Student verified</div>
+            </div>
+            <div class="eval-stepper visible" id="evalStepper" role="list" aria-label="Assessment progress">
+                <div class="eval-step active" data-step="1" role="listitem" aria-current="step"><div class="eval-step-num" aria-hidden="true">1</div><div class="eval-step-label">Patient Info</div></div>
+                <div class="eval-step-line" aria-hidden="true"></div>
+                <div class="eval-step" data-step="2" role="listitem"><div class="eval-step-num" aria-hidden="true">2</div><div class="eval-step-label">Assessment</div></div>
+                <div class="eval-step-line" aria-hidden="true"></div>
+                <div class="eval-step" data-step="3" role="listitem"><div class="eval-step-num" aria-hidden="true">3</div><div class="eval-step-label">Notes &amp; Save</div></div>
             </div>
             <div class="eval-pane active" data-pane="1">
                 <div class="eval-pane-head"><div class="pane-icon" style="background:#f0fdfa;color:#0d9488;"><i class="fas fa-user-check"></i></div><div><h3>Patient Information</h3><div style="font-size:12px;color:#94a3b8;margin-top:2px;">Verify student and record visit reason</div></div></div>
-                <div class="section-title"><i class="fas fa-clipboard-list" style="color:#2563eb;"></i> This Visit &mdash; <span id="formStudentName"></span></div>
+                <div class="section-title"><i class="fas fa-clipboard-list" style="color:#2563eb;"></i> Visit details</div>
                 <div class="section-label">Reason for Visit <span style="color:#dc2626;">*</span></div>
                 <select id="reasonSelect" class="form-control" style="width:100%;"><option value="">— Select a reason —</option><?php foreach (['Headache','Fever','Stomachache','Menstrual Cramps','Dizziness','Minor Injury','Other'] as $r): ?><option value="<?= h($r) ?>"><?= h($r) ?></option><?php endforeach; ?></select>
                 <div class="other-input" id="reasonOther"><input type="text" id="reasonOtherInput" class="form-control" placeholder="Enter the reason for visit…"></div>
@@ -172,8 +183,8 @@ include '../includes/sidebar.php';
                 <div class="form-group"><label>Affected area / incident details</label><textarea id="incidentDetails" class="form-control" rows="2" placeholder="Where did it happen? What body area is affected?"></textarea></div>
                 <div class="form-group"><label>Symptoms and observations</label><textarea id="symptoms" class="form-control" rows="2" placeholder="Primary complaint, other symptoms, appearance, breathing, bleeding, mobility…"></textarea></div>
                 <div class="form-group"><label>Pain scale (0–10)</label><input type="number" min="0" max="10" id="painScore" class="form-control" style="max-width:120px" placeholder="0"></div>
-                <div class="section-title"><i class="fas fa-triangle-exclamation" style="color:#b45309;"></i> Safety check</div>
-                <div class="form-row">
+                <div class="section-title safety-title"><i class="fas fa-triangle-exclamation"></i> Safety check</div>
+                <div class="form-row safety-grid">
                     <div class="form-group"><label><input type="checkbox" id="flagBreathing"> Difficulty breathing</label></div>
                     <div class="form-group"><label><input type="checkbox" id="flagChestPain"> Chest pain</label></div>
                     <div class="form-group"><label><input type="checkbox" id="flagUnconscious"> Loss of consciousness</label></div>
@@ -181,7 +192,7 @@ include '../includes/sidebar.php';
                     <div class="form-group"><label><input type="checkbox" id="flagBleeding"> Uncontrolled bleeding</label></div>
                     <div class="form-group"><label><input type="checkbox" id="flagConfusion"> Confusion / altered awareness</label></div>
                 </div>
-                <div style="display:flex;justify-content:flex-end;margin-top:20px;"><button type="button" class="btn-step-next" onclick="goPane(2)">Next: Assessment <i class="fas fa-arrow-right"></i></button></div>
+                <div class="pane-nav pane-nav-end"><button type="button" class="btn btn-primary btn-step-next" onclick="goPane(2)">Continue to assessment <i class="fas fa-arrow-right"></i></button></div>
             </div>
             <div class="eval-pane" data-pane="2">
                 <div class="eval-pane-head"><div class="pane-icon" style="background:#eff6ff;color:#2563eb;"><i class="fas fa-stethoscope"></i></div><div><h3>Clinical Assessment</h3><div style="font-size:12px;color:#94a3b8;margin-top:2px;">Record vitals, diagnosis, and action taken</div></div></div>
@@ -198,7 +209,7 @@ include '../includes/sidebar.php';
                 <div class="form-group"><label>Disposition <span style="color:#dc2626;">*</span></label><select id="disposition" class="form-control"><option value="">— Select outcome —</option><option>Returned to class</option><option>Observed / rest</option><option>Sent home</option><option>Sent to physician</option><option>Emergency referral</option><option>Transferred to external facility</option><option>Parent / guardian notified</option><option>No follow-up required</option></select></div>
                 <div class="form-group"><label>Return precautions / education given</label><textarea id="returnPrecautions" class="form-control" rows="2" placeholder="Instructions given to student and guardian, warning signs to watch for…"></textarea></div>
                 <div class="form-group"><label>Follow-up plan</label><textarea id="followUpPlan" class="form-control" rows="2" placeholder="When and why should the student return or be rechecked?"></textarea></div>
-                <div class="section-title"><i class="fas fa-stethoscope" style="color:#2563eb;"></i> Diagnosis &amp; Action</div>
+                <div class="section-title diagnosis-title"><i class="fas fa-stethoscope" style="color:#2563eb;"></i> Diagnosis &amp; Action</div>
                 <div class="section-label">Nurse's Assessment / Initial Diagnosis</div>
                 <select id="assessSelect" class="form-control" style="width:100%;"><option value="">— Select assessment —</option><?php foreach (['Headache','Fever','Dysmenorrhea','Possible Dehydration','Minor Abrasion','Other'] as $a): ?><option value="<?= h($a) ?>"><?= h($a) ?></option><?php endforeach; ?></select>
                 <div class="other-input" id="assessOther"><input type="text" id="assessOtherInput" class="form-control" placeholder="Enter the assessment / diagnosis…"></div>
@@ -206,23 +217,24 @@ include '../includes/sidebar.php';
                 <select id="actionSelect" class="form-control" style="width:100%;"><option value="">— Select action —</option><?php foreach (['Rest','Hydration','First Aid','Medication Administered','Referred to Physician','Sent Home','Other'] as $a): ?><option value="<?= h($a) ?>"><?= h($a) ?></option><?php endforeach; ?></select>
                 <div class="other-input" id="actionOther"><input type="text" id="actionOtherInput" class="form-control" placeholder="Enter the action performed…"></div>
                 <div class="eval-nav">
-                    <button type="button" class="btn-step-back" onclick="goPane(1)"><i class="fas fa-arrow-left"></i> Back</button>
-                    <button type="button" class="btn-step-next" onclick="goPane(3)">Next: Notes <i class="fas fa-arrow-right"></i></button>
+                    <button type="button" class="btn btn-light btn-step-back" onclick="goPane(1)"><i class="fas fa-arrow-left"></i> Back</button>
+                    <button type="button" class="btn btn-primary btn-step-next" onclick="goPane(3)">Continue to notes <i class="fas fa-arrow-right"></i></button>
                 </div>
             </div>
             <div class="eval-pane" data-pane="3">
                 <div class="eval-pane-head"><div class="pane-icon" style="background:#fef3c7;color:#d97706;"><i class="fas fa-pen-to-square"></i></div><div><h3>Notes &amp; AI Review</h3><div style="font-size:12px;color:#94a3b8;margin-top:2px;">Add final notes, review AI recommendations, and save</div></div></div>
-                <div class="section-label" style="margin-top:0;">Nurse's Notes</div>
-                <textarea id="nurseNotes" class="form-control" rows="3" style="width:100%;" placeholder="Any additional observations or notes…"></textarea>
-                <div class="save-actions">
-                    <button type="button" class="btn btn-primary" id="saveBtn" onclick="saveVisit(false)" style="padding:12px 26px;"><i class="fas fa-save"></i> Save complete visit</button>
-                     <button type="button" class="btn btn-outline" onclick="saveVisit(true)" style="padding:12px 20px;"><i class="fas fa-file-pen"></i> Save draft</button>
-
-                    <button type="button" class="btn btn-light" onclick="resetVisitFields()" style="padding:12px 20px;">Clear Fields</button>
+                <div class="notes-card">
+                    <div class="section-label">Nurse's Notes</div>
+                    <textarea id="nurseNotes" class="form-control" rows="5" placeholder="Add observations, instructions, or follow-up details…"></textarea>
+                    <div class="save-actions">
+                        <button type="button" class="btn btn-primary" id="saveBtn" onclick="saveVisit(false)"><i class="fas fa-save"></i> Save complete visit</button>
+                        <button type="button" class="btn btn-outline" onclick="saveVisit(true)"><i class="fas fa-file-pen"></i> Save draft</button>
+                        <button type="button" class="btn btn-light" onclick="resetVisitFields()"><i class="fas fa-eraser"></i> Clear fields</button>
+                    </div>
                 </div>
                 <div id="formMsg"></div>
                 <div class="eval-nav">
-                    <button type="button" class="btn-step-back" onclick="goPane(2)"><i class="fas fa-arrow-left"></i> Back</button>
+                    <button type="button" class="btn btn-light btn-step-back" onclick="goPane(2)"><i class="fas fa-arrow-left"></i> Back to assessment</button>
                     <div></div>
                 </div>
             </div>
@@ -518,8 +530,13 @@ include '../includes/sidebar.php';
         steps.forEach(function(s){
             var sn = parseInt(s.dataset.step);
             s.classList.remove('active','done');
-            if(sn === n) s.classList.add('active');
-            else if(sn < n) s.classList.add('done');
+            if(sn === n){
+                s.classList.add('active');
+                s.setAttribute('aria-current','step');
+            } else {
+                s.removeAttribute('aria-current');
+                if(sn < n) s.classList.add('done');
+            }
         });
         lines.forEach(function(l, i){ l.classList.toggle('done', i < n - 1); });
         // Show AI panel only on pane 3
