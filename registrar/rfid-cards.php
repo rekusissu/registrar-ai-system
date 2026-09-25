@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // ============================================================
 //  REGISTRAR/RFID-CARDS.PHP
 //  RFID cards management &mdash; fully inline (CSS + JS)
