@@ -47,7 +47,6 @@ $page_title = 'Clinic Dashboard';
 $APP_ROOT = '../';
 $thisWeek = date('Y-m-d', strtotime('monday this week'));
 $thisMonth = date('Y-m-01');
-$reportStartDate = date('Y-m-d', strtotime('-29 days'));
 $stats = [
     'today' => $todayVisits,
     'thisWeek' => (int) $db->fetchColumn("SELECT COUNT(*) FROM health_visits WHERE DATE(COALESCE(date_time, visit_date)) BETWEEN ? AND ?", [$thisWeek, $today]),
@@ -55,21 +54,6 @@ $stats = [
     'total' => $totalVisits,
     'pending' => (int) $db->fetchColumn("SELECT COUNT(*) FROM health_visits WHERE record_status = 'Pending'"),
 ];
-$topReasons = $db->fetchAll("SELECT reason_for_visit, COUNT(*) AS cnt FROM health_visits WHERE reason_for_visit IS NOT NULL AND reason_for_visit != '' AND DATE(COALESCE(date_time, visit_date)) BETWEEN ? AND ? GROUP BY reason_for_visit ORDER BY cnt DESC LIMIT 6", [$reportStartDate, $today]);
-$dailyRows = $db->fetchAll("SELECT DATE(COALESCE(date_time, visit_date)) AS dt, COUNT(*) AS cnt FROM health_visits WHERE COALESCE(date_time, visit_date) IS NOT NULL AND DATE(COALESCE(date_time, visit_date)) BETWEEN DATE_SUB(CURDATE(), INTERVAL 13 DAY) AND CURDATE() GROUP BY dt");
-$dailyCounts = [];
-foreach ($dailyRows as $dailyRow) {
-    $dailyCounts[$dailyRow['dt']] = (int) $dailyRow['cnt'];
-}
-$dailyVisits = [];
-for ($offset = 13; $offset >= 0; $offset--) {
-    $chartDate = date('Y-m-d', strtotime("-{$offset} days"));
-    $dailyVisits[] = ['dt' => $chartDate, 'cnt' => $dailyCounts[$chartDate] ?? 0];
-}
-$hourly = $db->fetchAll("SELECT HOUR(date_time) AS hr, COUNT(*) AS cnt FROM health_visits WHERE date_time IS NOT NULL AND DATE(date_time) BETWEEN ? AND ? GROUP BY hr ORDER BY hr ASC", [$reportStartDate, $today]);
-$chartData = json_encode(['topReasons' => $topReasons, 'dailyVisits' => $dailyVisits, 'hourly' => $hourly], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
-
-$page_scripts = ['clinic-statistics.js'];
 $ACTIVE_NAV = 'nurse_dashboard';
 include '../includes/header.php';
 include '../includes/sidebar.php';
@@ -82,7 +66,6 @@ include '../includes/sidebar.php';
    ================================================================ */
 .clinic-stats{--clinic-teal:#0f766e;--clinic-teal-bright:#14b8a6;margin-top:18px}
 .visit-stats-heading{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-.visit-chart-data{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .visit-stat-strip{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 6px 22px rgba(15,23,42,.04);overflow:hidden}
 .visit-stat{position:relative;padding:20px 22px;border-right:1px solid #e2e8f0}
 .visit-stat:last-child{border-right:0}
@@ -93,40 +76,9 @@ include '../includes/sidebar.php';
 .visit-stat-value{margin-top:7px;font-size:30px;line-height:1;font-weight:800;color:#0f172a;font-variant-numeric:tabular-nums}
 .visit-stat-context{margin-top:7px;font-size:11px;color:#94a3b8}
 .visit-stat.is-pending .visit-stat-value{color:#b45309}
-.visit-report-grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(300px,.85fr);gap:18px;margin-top:18px}
-.visit-report-panel{background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 6px 22px rgba(15,23,42,.04);overflow:hidden}
-.visit-panel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:18px 20px 15px;border-bottom:1px solid #e2e8f0}
-.visit-panel-head h2{margin:0 0 3px;font-size:14px;font-weight:750;color:#0f172a}
-.visit-panel-head p{margin:0;font-size:11px;color:#94a3b8}
-.visit-panel-body{padding:18px 20px;overflow-x:auto}
-.visit-chart-note{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;font-size:10px;font-weight:700;color:var(--clinic-teal)}
-.visit-chart-note::before{content:"";width:7px;height:7px;border-radius:2px;background:var(--clinic-teal)}
-.visit-bar-chart{min-width:420px;position:relative;display:grid;grid-template-columns:repeat(14,minmax(24px,1fr));align-items:end;gap:7px;height:238px;padding:12px 4px 26px;border-bottom:1px solid #cbd5e1;background:repeating-linear-gradient(to top,transparent 0,transparent 55px,rgba(226,232,240,.8) 56px)}
-.visit-bar-col{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;min-width:0}
-.visit-bar-value{font-size:10px;font-weight:750;color:#475569;margin-bottom:5px;font-variant-numeric:tabular-nums}
-.visit-bar{width:min(26px,72%);min-height:3px;background:linear-gradient(180deg,var(--clinic-teal-bright),var(--clinic-teal));border-radius:5px 5px 1px 1px;box-shadow:0 5px 12px rgba(15,118,110,.13)}
-.visit-bar-label{position:absolute;bottom:-22px;font-size:9px;color:#94a3b8;white-space:nowrap}
-.visit-bar-col:nth-child(even) .visit-bar-label{display:none}
-.visit-reason-list{display:grid;gap:14px}
-.visit-reason-row{display:grid;grid-template-columns:minmax(90px,140px) minmax(80px,1fr) 24px;align-items:center;gap:10px}
-.visit-reason-label{font-size:11px;color:#475569;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.visit-reason-track{height:9px;background:#edf2f7;border-radius:99px;overflow:hidden}
-.visit-reason-fill{height:100%;background:linear-gradient(90deg,var(--clinic-teal),#2dd4bf);border-radius:99px}
-.visit-reason-count{font-size:11px;font-weight:800;color:#0f172a;text-align:right;font-variant-numeric:tabular-nums}
-.visit-hour-grid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:7px}
-.visit-hour{position:relative;min-height:47px;padding:7px 3px;border-radius:7px;background:#f8fafc;border:1px solid #edf2f7;text-align:center}
-.visit-hour.peak{background:#ccfbf1;border-color:#99f6e4}
-.visit-hour-time{display:block;font-size:8px;color:#64748b}
-.visit-hour-count{display:block;margin-top:3px;font-size:12px;font-weight:800;color:#0f172a;font-variant-numeric:tabular-nums}
-.visit-hour.peak .visit-hour-count{color:#0f766e}
-.visit-findings{display:grid;gap:0}
-.visit-finding{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 0;border-bottom:1px solid #f1f5f9}
-.visit-finding:last-child{border-bottom:0}
-.visit-finding span{font-size:11px;color:#64748b}.visit-finding strong{max-width:68%;font-size:11px;text-align:right;color:#0f172a}
-.visit-empty{padding:30px;text-align:center;color:#94a3b8;font-size:12px}
-@media(max-width:1000px){.visit-stat-strip{grid-template-columns:repeat(3,1fr)}.visit-stat{border-bottom:1px solid #e2e8f0}.visit-report-grid{grid-template-columns:1fr}}
-@media(max-width:700px){.visit-stat-strip{grid-template-columns:repeat(2,1fr)}.visit-stat{border-right:1px solid #e2e8f0}.visit-stat:last-child{grid-column:1/-1}.visit-hour-grid{grid-template-columns:repeat(4,1fr)}}
-@media(max-width:480px){.visit-stat-strip{grid-template-columns:1fr}.visit-stat{border-right:0}.visit-stat:last-child{grid-column:auto}.visit-bar-chart{gap:3px}.visit-hour-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:1000px){.visit-stat-strip{grid-template-columns:repeat(3,1fr)}.visit-stat{border-bottom:1px solid #e2e8f0}}
+@media(max-width:700px){.visit-stat-strip{grid-template-columns:repeat(2,1fr)}.visit-stat{border-right:1px solid #e2e8f0}.visit-stat:last-child{grid-column:1/-1}}
+@media(max-width:480px){.visit-stat-strip{grid-template-columns:1fr}.visit-stat{border-right:0}.visit-stat:last-child{grid-column:auto}}
 @media(prefers-reduced-motion:reduce){.clinic-stats *{transition:none!important;animation:none!important}}
 
 /* ================================================================
@@ -353,33 +305,6 @@ select.form-control{appearance:none;-webkit-appearance:none;padding-right:38px;c
         <div class="visit-stat"><div class="visit-stat-label">All visits</div><div class="visit-stat-value"><?= number_format($stats['total']) ?></div><div class="visit-stat-context">Clinic records</div></div>
         <div class="visit-stat is-pending"><div class="visit-stat-label">Pending</div><div class="visit-stat-value"><?= number_format($stats['pending']) ?></div><div class="visit-stat-context">Need completion</div></div>
     </div>
-
-    <div class="visit-report-grid">
-        <section class="visit-report-panel">
-            <div class="visit-panel-head"><div><h2>Daily visit volume</h2><p>Fourteen-day clinic activity</p></div><span class="visit-chart-note">Visits per day</span></div>
-            <div class="visit-panel-body"><div id="clinicDailyChart" class="visit-bar-chart"></div><ul id="clinicDailyData" class="visit-chart-data"></ul></div>
-        </section>
-        <section class="visit-report-panel">
-            <div class="visit-panel-head"><div><h2>Common reasons</h2><p>Leading reasons over 30 days</p></div></div>
-            <div class="visit-panel-body"><div id="clinicReasonsChart" class="visit-reason-list"></div><ul id="clinicReasonsData" class="visit-chart-data"></ul></div>
-        </section>
-    </div>
-
-    <div class="visit-report-grid">
-        <section class="visit-report-panel">
-            <div class="visit-panel-head"><div><h2>Service-hour distribution</h2><p>Visit volume by hour over 30 days</p></div><span class="visit-chart-note">Peak hour highlighted</span></div>
-            <div class="visit-panel-body"><div id="clinicHourlyChart" class="visit-hour-grid"></div><ul id="clinicHourlyData" class="visit-chart-data"></ul></div>
-        </section>
-        <section class="visit-report-panel">
-            <div class="visit-panel-head"><div><h2>Key findings</h2><p>Summary of the current reporting period</p></div></div>
-            <div class="visit-panel-body"><div class="visit-findings">
-                <div class="visit-finding"><span>Average per day</span><strong id="clinicAvgDaily">Not available</strong></div>
-                <div class="visit-finding"><span>Peak day</span><strong id="clinicPeakDay">Not available</strong></div>
-                <div class="visit-finding"><span>Peak hour</span><strong id="clinicPeakHour">Not available</strong></div>
-                <div class="visit-finding"><span>Common reason</span><strong id="clinicTopReason">Not available</strong></div>
-            </div></div>
-        </section>
-    </div>
 </section>
 
 <div class="status-strip" aria-label="Clinic workspace status">
@@ -600,9 +525,6 @@ select.form-control{appearance:none;-webkit-appearance:none;padding-right:38px;c
         </div>
     </div>
 </div>
-<script>
-window.CLINIC_VISIT_DATA = <?= $chartData ?>;
-</script>
 <script>
 (function(){
     'use strict';
