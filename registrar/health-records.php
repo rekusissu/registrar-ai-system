@@ -15,7 +15,10 @@ requireRole('registrar');
 require_once __DIR__ . '/../shared/database.php';
 
 $page_title = 'Health Record Log';
+$page_description = 'View-only clinic health record log';
+$body_page = 'health-record-log';
 $APP_ROOT = '../';
+$extra_css = ['health-records.css'];
 $ACTIVE_NAV = 'health';
 include '../includes/header.php';
 include '../includes/sidebar.php';
@@ -24,38 +27,37 @@ include '../includes/sidebar.php';
 <main class="dashboard-main">
 <div class="dashboard-container">
 
-<header class="header">
-    <div class="title"><h1>Health Record Log</h1>
-    <p>View-only records synced from the Clinic Portal - record creation is the clinic's job</p></div>
+<header class="health-log-header">
+    <div>
+        <div class="health-log-kicker"><i class="fa-solid fa-file-medical"></i> Clinic archive</div>
+        <h1>Health Record Log</h1>
+        <p>View-only records synced from the Clinic Portal. New records are created by clinic staff.</p>
+    </div>
     <div class="header-actions">
-        <button class="btn btn-light" onclick="loadHealthLog()"><i class="fas fa-rotate"></i> Refresh</button>
+        <span class="readonly-chip"><i class="fa-solid fa-lock"></i> View only</span>
+        <button class="btn btn-light" onclick="loadHealthLog()"><i class="fas fa-rotate"></i> Refresh log</button>
     </div>
 </header>
 
 <!-- Filters: search + date range only -->
-<div class="panel" style="padding:16px 18px;margin-bottom:18px;">
-    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
-        <div class="search-wrap" style="flex:1;min-width:200px;">
-            <i class="fas fa-search"></i>
-            <input type="text" id="hlogQ" placeholder="Search name or student ID">
-        </div>
-        <input type="date" id="hlogFrom" class="form-control" style="width:auto;" title="Date from">
-        <span style="color:#94a3b8;">-</span>
-        <input type="date" id="hlogTo" class="form-control" style="width:auto;" title="Date to">
+<section class="health-log-filters" aria-label="Health record filters">
+    <div class="filter-field filter-search">
+        <label for="hlogQ">Find a record</label>
+        <div class="search-wrap"><i class="fas fa-search"></i><input type="text" id="hlogQ" placeholder="Search name or student ID"></div>
     </div>
-</div>
+    <div class="filter-field"><label for="hlogFrom">From</label><input type="date" id="hlogFrom" class="form-control" title="Date from"></div>
+    <div class="filter-separator" aria-hidden="true">to</div>
+    <div class="filter-field"><label for="hlogTo">To</label><input type="date" id="hlogTo" class="form-control" title="Date to"></div>
+</section>
 
-<div class="stats-grid" style="margin-bottom:18px;">
-    <div class="stat-card"><div class="stat-top"><div class="stat-icon blue"><i class="fas fa-file-medical"></i></div></div>
-        <div class="stat-number" id="statCount">0</div><div class="stat-label">Filtered Records</div></div>
-    <div class="stat-card"><div class="stat-top"><div class="stat-icon green"><i class="fas fa-user-graduate"></i></div></div>
-        <div class="stat-number" id="statStudents">0</div><div class="stat-label">Distinct Students</div></div>
-    <div class="stat-card"><div class="stat-top"><div class="stat-icon purple"><i class="fas fa-check-circle"></i></div></div>
-        <div class="stat-number" id="statRecorded">0</div><div class="stat-label">Recorded</div></div>
-</div>
+<section class="health-log-stats" aria-label="Health record summary">
+    <div class="health-stat"><div class="health-stat-icon records"><i class="fas fa-file-medical"></i></div><div><div class="health-stat-value" id="statCount">0</div><div class="health-stat-label">Filtered records</div></div></div>
+    <div class="health-stat"><div class="health-stat-icon students"><i class="fas fa-user-graduate"></i></div><div><div class="health-stat-value" id="statStudents">0</div><div class="health-stat-label">Distinct students</div></div></div>
+    <div class="health-stat"><div class="health-stat-icon recorded"><i class="fas fa-circle-check"></i></div><div><div class="health-stat-value" id="statRecorded">0</div><div class="health-stat-label">Recorded</div></div></div>
+</section>
 
-<div class="panel">
-    <div class="table-responsive" style="overflow-x:auto;">
+<section class="health-log-table-panel">
+    <div class="health-log-table-wrap">
     <table class="table">
         <thead>
         <tr>
@@ -73,16 +75,16 @@ include '../includes/sidebar.php';
         </tbody>
     </table>
     </div>
-    <div class="table-footer"><div class="info-text" id="hlogInfo"></div></div>
-</div>
+    <div class="health-log-footer"><div class="info-text" id="hlogInfo"></div></div>
+</section>
 
 </div>
 </main>
 
 <!-- Record View Modal -->
-<div class="modal-overlay" id="hrViewModal"><div class="modal-content" style="max-width:520px;">
+<div class="modal-overlay health-record-modal" id="hrViewModal"><div class="modal-content health-record-modal-content">
     <div class="modal-header">
-        <h3><i class="fas fa-file-medical" style="color:#2563eb;"></i> Health Record</h3>
+        <h3><i class="fas fa-file-medical health-modal-icon"></i> Health record</h3>
         <button class="modal-close" onclick="closeHrView()"><i class="fas fa-times"></i></button>
     </div>
     <div class="modal-body">
