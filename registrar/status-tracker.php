@@ -64,10 +64,10 @@ $page_description = 'Student status monitoring and activity tracker';
 $body_page = 'status-tracker';
 $APP_ROOT   = '../';
 $ACTIVE_NAV = 'tracker';
+$extra_css = ['status-tracker.css'];
 include '../includes/header.php';
 include '../includes/sidebar.php';
 ?>
-<link rel="stylesheet" href="../css/status-tracker.css?v=<?= filemtime(__DIR__ . '/../css/status-tracker.css') ?>">
 <main class="dashboard-main">
 <header class="header">
     <div class="title">
