@@ -60,6 +60,8 @@ $students = $db->fetchAll($sql, $params);
 
 
 $page_title = 'Status Tracker';
+$page_description = 'Student status monitoring and activity tracker';
+$body_page = 'status-tracker';
 $APP_ROOT   = '../';
 $ACTIVE_NAV = 'tracker';
 include '../includes/header.php';
@@ -68,10 +70,11 @@ include '../includes/sidebar.php';
 <link rel="stylesheet" href="../css/status-tracker.css">
 <main class="dashboard-main">
 <header class="header">
-  <div class="title">
-    <h1><i class="fas fa-chart-line" style="color:var(--brand-500);margin-right:8px"></i>Status Tracker</h1>
-    <p>AI-powered status monitoring, recommendations, and student risk assessment</p>
-  </div>
+    <div class="title">
+      <div class="st-kicker"><i class="fas fa-chart-line"></i> Registrar intelligence</div>
+      <h1>Status Tracker</h1>
+      <p>Monitor student status changes, review activity, and identify students who need attention.</p>
+    </div>
 </header>
 <div class="st-wrap">
 <!-- KPI Cards -->
