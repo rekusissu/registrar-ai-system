@@ -17,3 +17,15 @@ docker/entrypoint.sh text eol=lf
 *.ttf         binary
 *.pdf         binary
 *.sql         text
+
+# NOTE: keep every source file UTF-8 WITHOUT a byte-order mark.
+#
+# A BOM before an opening <?php makes PHP emit three invisible bytes as
+# output before any code runs. That blocks every header() call in the file
+# ("headers already sent"), so session redirects are silently discarded and
+# the page renders completely blank - no HTML, no sidebar, no error text.
+# It is easy to add by accident (PowerShell 5.1 Set-Content -Encoding UTF8,
+# some editors) and is invisible in most diffs.
+#
+# Git cannot strip a BOM that is already committed, so verify with:
+#   powershell -File scripts/check-bom.ps1

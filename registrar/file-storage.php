@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 // ============================================================
 //  REGISTRAR/FILE-STORAGE.PHP
 //  Digital File Storage — Upload / preview / download / delete
