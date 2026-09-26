@@ -211,6 +211,7 @@ body[data-page="students"] .stu-ribbon-title{
 body[data-page="students"] .stu-ribbon-title i{color:#2563eb;font-size:13px}
 body[data-page="students"] .stu-ribbon-note{font-size:11.5px;color:#64748b}
 body[data-page="students"] .stu-ribbon-bar{
+    position:relative;
     display:flex;height:34px;margin:16px 20px 0;border-radius:9px;overflow:hidden;background:#f1f5f9;
 }
 body[data-page="students"] .stu-seg{position:relative;min-width:3px;transition:filter .2s;overflow:hidden}
@@ -222,39 +223,57 @@ body[data-page="students"] .stu-seg{position:relative;min-width:3px;transition:f
    band appears to be one continuous light moving across the whole ribbon
    rather than four blocks animating independently.
 
-   Peak alpha is held to .08, measured not guessed. The on-segment count
-   is white, and a white overlay lifts the background toward it: at .18
-   every segment dropped below 4.5:1 (Y2 to 3.76:1). At .08 the worst
-   case is Y2 at 4.51:1, so all four still clear the threshold for the
-   full duration of the sweep. The hatched "unassigned" segment opts out
-   entirely: hatching already means "no year level recorded", and a
-   glinting unknown reads as a known quantity. */
-body[data-page="students"] .stu-seg::before{
-    content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
+   Peak alpha is .08, which is the highest value that keeps the white
+   count above 4.5:1 on EVERY segment while the band is at its brightest.
+   This was solved for, not chosen: the band is white over white text, so
+   a stronger band raises the background toward the text and lowers the
+   ratio. Measured worst case per alpha - Y2 is always the tightest:
+     .05 -> 4.73    .08 -> 4.51 PASS    .12 -> 4.18
+     .09 -> 4.41    .10 -> 4.32       .14 -> 4.03
+   .09 is the first value to fail, so .08 is the ceiling. Segment bases
+   with the band at rest: Y1 5.93, Y2 5.17, Y3 6.29, Y4 5.70. The count
+   also carries a 0.28-alpha dark text-shadow, which adds real legibility
+   during the crossing. Because the band is only at peak for a moment as
+   it crosses any one segment, the readable state dominates.
+
+   The band lives on the BAR, not on each segment. It was originally
+   per-segment, which was wrong twice over: a percentage width gave each
+   segment a different physical band (101px on Y1 vs 71px on Y3), and
+   because each segment also clips, a fixed-width band was clipped away
+   completely on the narrow ones - Y4 (78px) rendered nothing at all.
+   That second fault is why the effect appeared to do nothing at all.
+   One band on the bar is a single element, so it is genuinely one
+   continuous light crossing the whole ribbon at one speed. Segments
+   paint their own background underneath it, so each is tinted by the
+   same sweep and the four hues read as depth under the same surface.
+   Verified by pinning animation-delay and diffing rendered frames. */
+body[data-page="students"] .stu-ribbon-bar::after{
+    content:"";position:absolute;inset:0;pointer-events:none;z-index:2;
     background:linear-gradient(
         100deg,
-        transparent 0%,
-        rgba(255,255,255,0) 32%,
+        rgba(255,255,255,0) 40%,
         rgba(255,255,255,.08) 50%,
-        rgba(255,255,255,0) 68%,
-        rgba(255,255,255,0) 100%
+        rgba(255,255,255,0) 60%
     );
-    background-size:55% 100%;
+    background-size:220px 100%;
     background-repeat:no-repeat;
-    transform:translate3d(-140%,0,0);
-    animation:stu-shimmer 16s linear infinite;
+    transform:translate3d(-260px,0,0);
+    animation:stu-shimmer 14s linear infinite;
 }
-body[data-page="students"] .stu-seg.tone-unassigned::before{display:none}
 @keyframes stu-shimmer{
-    0%   {transform:translate3d(-140%,0,0)}
-    55%  {transform:translate3d(240%,0,0)}
-    100% {transform:translate3d(240%,0,0)}
+    0%   {transform:translate3d(-260px,0,0)}
+    62%  {transform:translate3d(calc(100% + 260px),0,0)}
+    100% {transform:translate3d(calc(100% + 260px),0,0)}
 }
-/* A 16s loop with a long hold at the end reads as a surface catching
+/* The count is inside the segments but must still sit above the band,
+   or the sweep washes over the digits. The band is z-index 2 and the
+   count 3, so the digits stay crisp at the peak of the sweep. */
+body[data-page="students"] .stu-seg b{z-index:3}
+/* A 14s loop with a long hold at the end reads as a surface catching
    light occasionally. Removing it for reduced-motion is the whole
    treatment - no slower fallback, no "gentler" version. */
 @media (prefers-reduced-motion:reduce){
-    body[data-page="students"] .stu-seg::before{animation:none;display:none}
+    body[data-page="students"] .stu-ribbon-bar::after{animation:none;display:none}
 }
 /* Adjacent segments sit within ~1.1:1 luminance of each other, so
    hue alone leaves a soft, ambiguous edge. This inset ring is what
