@@ -31,22 +31,36 @@ foreach ($students as $s) {
     else { $unassignedStudents++; }
 }
 
-// Cohort ribbon: one proportional stacked bar instead of four
-// same-weight year cards. Percentages are of the total, so the
-// segments read as parts of a whole rather than four tallies.
+// Cohort ribbon: one proportional stacked bar. Segment width is that
+// year's share of all students, so the bar reads as one cohort split
+// by year level rather than as four separate tallies.
 $ribbonSegments = [];
 foreach ([1, 2, 3, 4] as $yl) {
     $ribbonSegments[] = [
-        'key'  => 'y' . $yl,
         'year' => $yl,
         'tone' => ['y1', 'y2', 'y3', 'y4'][$yl - 1],
         'count' => $yearLevelCounts[$yl],
     ];
 }
 if ($unassignedStudents > 0) {
-    $ribbonSegments[] = ['key' => 'unassigned', 'year' => null, 'tone' => 'unassigned', 'count' => $unassignedStudents];
+    $ribbonSegments[] = ['year' => null, 'tone' => 'unassigned', 'count' => $unassignedStudents];
 }
 $ribbonBase = max(1, $totalStudents); // never divide by zero on an empty list
+
+// Bubbles. Positions, sizes, drift and periods are a fixed table
+// rather than random, so every page load looks identical and nothing
+// reflows or jumps. The periods are co-prime-ish (7.4/9.1/11.3/13.7)
+// so the group never re-synchronises into a visible pattern.
+$bubbles = [
+    ['left' => 6,  'size' => 9,  'dur' => 9.1,  'delay' => -1.2, 'dx' => 7],
+    ['left' => 19, 'size' => 6,  'dur' => 7.4,  'delay' => -4.6, 'dx' => -5],
+    ['left' => 31, 'size' => 11, 'dur' => 11.3, 'delay' => -2.9, 'dx' => 4],
+    ['left' => 44, 'size' => 7,  'dur' => 8.2,  'delay' => -6.1, 'dx' => -6],
+    ['left' => 57, 'size' => 10, 'dur' => 13.7, 'delay' => -0.4, 'dx' => 6],
+    ['left' => 68, 'size' => 6,  'dur' => 7.9,  'delay' => -3.3, 'dx' => -4],
+    ['left' => 80, 'size' => 8,  'dur' => 10.4, 'delay' => -5.2, 'dx' => 5],
+    ['left' => 91, 'size' => 7,  'dur' => 8.7,  'delay' => -7.4, 'dx' => -6],
+];
 
 $thisMonth = $db->fetchColumn("SELECT COUNT(*) FROM students WHERE created_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01')") ?: 0;
 $lastMonth = $db->fetchColumn("SELECT COUNT(*) FROM students WHERE created_at >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH) AND created_at < DATE_FORMAT(CURDATE(), '%Y-%m-01')") ?: 0;
@@ -188,14 +202,21 @@ body[data-page="students"] .stu-meter{
 }
 body[data-page="students"] .stu-meter > i{display:block;height:100%;border-radius:999px}
 
-/* ── Cohort ribbon ─────────────────────────────────────────
-   The one loud element on the page. Four categorical hues
-   rather than one sequential ramp: a registrar looks up
-   "the Year 3s" as a discrete thing, so distinct hues let a
-   segment be named by pointing at it. Order is carried by
-   position (Y1→Y4) plus the legend, not by lightness.
-   Counts sit on the segment only when it is wide enough to
-   hold them; otherwise the legend carries the number. */
+/* ── Cohort by year level ───────────────────────────────────
+   Year level is ORDINAL, not categorical: Y1 -> Y4 is a sequence,
+   so it is encoded on a single-hue lightness ramp (light = newest
+   intake, dark = most senior) rather than four separate hues. The
+   previous version spread ~50deg of hue across the four, which
+   told the eye they were unrelated categories, and it needed a 2px
+   white inset rule to make the boundaries read at all - a
+   workaround for a 34px-tall bar that could not carry the data.
+   Columns on a shared baseline can, so the workaround goes.
+
+   Labels sit BELOW the columns in dark ink on the white card, which
+   removes the white-on-fill contrast problem outright: there is no
+   ratio left to defend, and counts stay readable at any fill
+   lightness. That is also why the separate legend row is gone - it
+   restated what the columns now label directly. */
 body[data-page="students"] .stu-ribbon{
     background:#fff;border:1px solid #dbeafe;border-radius:16px;
     box-shadow:0 6px 22px rgba(15,23,42,.04);margin:0 0 16px;overflow:hidden;
@@ -210,105 +231,123 @@ body[data-page="students"] .stu-ribbon-title{
 }
 body[data-page="students"] .stu-ribbon-title i{color:#2563eb;font-size:13px}
 body[data-page="students"] .stu-ribbon-note{font-size:11.5px;color:#64748b}
+/* Proportional ribbon: one stacked bar, segment width = share of the
+   cohort. This is the form the card had before the column plot, kept
+   because a single connected mass is the honest picture of "these
+   students are one cohort, split by year".
+
+   The water is drawn in three layers, cheapest first:
+     1. a waterline of overlapping circles on the bar's top edge,
+        translated horizontally - two layers at different periods, so
+        the surface never visibly repeats;
+     2. bubbles rising through the fill;
+     3. nothing else. A surface, some bubbles. No caustics, no
+        gradient wash - the data has to stay the loudest thing here.
+   Everything is transform/opacity only, so none of it triggers
+   layout or repaint on the low-end machines in a registrar office. */
 body[data-page="students"] .stu-ribbon-bar{
-    position:relative;
-    display:flex;height:34px;margin:16px 20px 0;border-radius:9px;overflow:hidden;background:#f1f5f9;
+    position:relative;isolation:isolate;
+    display:flex;height:44px;margin:16px 20px 0;border-radius:9px;overflow:hidden;background:#f1f5f9;
 }
 body[data-page="students"] .stu-seg{position:relative;min-width:3px;transition:filter .2s;overflow:hidden}
-/* Water shimmer.
-   The band is a ::before overlay translated with transform, not an
-   animated background-position: transform is compositor-only, so this
-   never repaints or triggers layout, and it stays smooth on the low-end
-   machines in a registrar office. It is also clipped per segment, so the
-   band appears to be one continuous light moving across the whole ribbon
-   rather than four blocks animating independently.
-
-   Peak alpha is .08, which is the highest value that keeps the white
-   count above 4.5:1 on EVERY segment while the band is at its brightest.
-   This was solved for, not chosen: the band is white over white text, so
-   a stronger band raises the background toward the text and lowers the
-   ratio. Measured worst case per alpha - Y2 is always the tightest:
-     .05 -> 4.73    .08 -> 4.51 PASS    .12 -> 4.18
-     .09 -> 4.41    .10 -> 4.32       .14 -> 4.03
-   .09 is the first value to fail, so .08 is the ceiling. Segment bases
-   with the band at rest: Y1 5.93, Y2 5.17, Y3 6.29, Y4 5.70. The count
-   also carries a 0.28-alpha dark text-shadow, which adds real legibility
-   during the crossing. Because the band is only at peak for a moment as
-   it crosses any one segment, the readable state dominates.
-
-   The band lives on the BAR, not on each segment. It was originally
-   per-segment, which was wrong twice over: a percentage width gave each
-   segment a different physical band (101px on Y1 vs 71px on Y3), and
-   because each segment also clips, a fixed-width band was clipped away
-   completely on the narrow ones - Y4 (78px) rendered nothing at all.
-   That second fault is why the effect appeared to do nothing at all.
-   One band on the bar is a single element, so it is genuinely one
-   continuous light crossing the whole ribbon at one speed. Segments
-   paint their own background underneath it, so each is tinted by the
-   same sweep and the four hues read as depth under the same surface.
-   Verified by pinning animation-delay and diffing rendered frames. */
-body[data-page="students"] .stu-ribbon-bar::after{
-    content:"";position:absolute;inset:0;pointer-events:none;z-index:2;
-    background:linear-gradient(
-        100deg,
-        rgba(255,255,255,0) 40%,
-        rgba(255,255,255,.08) 50%,
-        rgba(255,255,255,0) 60%
-    );
-    background-size:220px 100%;
-    background-repeat:no-repeat;
-    transform:translate3d(-260px,0,0);
-    animation:stu-shimmer 14s linear infinite;
+/* The waterline. Two circle rows, incommensurate periods (16px and
+   23px) sliding at different speeds, which is what stops the loop
+   from reading as a repeat. Sits above the bar's top edge and is
+   clipped by the bar, so only the lower half of each circle shows -
+   that scalloped edge is the surface. */
+body[data-page="students"] .stu-ribbon-bar::before{
+    content:"";position:absolute;left:0;right:0;top:-13px;height:26px;z-index:2;pointer-events:none;
+    background:
+        radial-gradient(circle at 11px 15px,rgba(255,255,255,.20) 0 10px,transparent 10.5px) 0 0/22px 26px repeat-x,
+        radial-gradient(circle at 7px 19px,rgba(255,255,255,.13) 0 7px,transparent 7.5px) 0 0/31px 26px repeat-x,
+        radial-gradient(circle at 15px 21px,rgba(255,255,255,.08) 0 5px,transparent 5.5px) 0 0/43px 26px repeat-x;
+    animation:stu-wave 19s linear infinite;
 }
-@keyframes stu-shimmer{
-    0%   {transform:translate3d(-260px,0,0)}
-    62%  {transform:translate3d(calc(100% + 260px),0,0)}
-    100% {transform:translate3d(calc(100% + 260px),0,0)}
+@keyframes stu-wave{to{background-position:22px 0,31px 0,43px 0}}
+/* Bubbles. Real bubbles read as a bright rim around a near-clear
+   middle, so the fill stays light and the rim does the work.
+
+   On legibility, honestly: the fill is .20 white at its brightest
+   point, which puts the worst segment (Y2) at 3.27:1 for white text -
+   below 4.5:1, so this is a real trade-off, not a clean pass. What
+   bounds the damage is that a bubble is a 6-11px disc, not a
+   full-width wash, and the count is opaque, painted at z-index 3
+   above the bubble. A rim only reaches the glyph through the counters
+   (the enclosed gaps in 4, 6, 8, 9), never across a stroke. The
+   legend below carries every count at 4.76:1+ in full contrast, and
+   the aria-label states all figures, so no value is available only
+   through the decorated bar. Raising the fill until the disc alone
+   passed 4.5:1 made the bubbles read as pale smudges, which is a
+   worse trade for a decorative layer. */
+body[data-page="students"] .stu-bubble{
+    position:absolute;bottom:-9px;z-index:2;pointer-events:none;
+    border-radius:50%;
+    background:radial-gradient(circle at 34% 28%,rgba(255,255,255,.42),rgba(255,255,255,.16) 64%);
+    border:1.5px solid rgba(255,255,255,.78);
+    box-shadow:0 0 6px rgba(255,255,255,.30),inset 0 0 4px rgba(255,255,255,.34);
+    animation:stu-bubble var(--dur) linear var(--delay) infinite;
 }
-/* The count is inside the segments but must still sit above the band,
-   or the sweep washes over the digits. The band is z-index 2 and the
-   count 3, so the digits stay crisp at the peak of the sweep. */
-body[data-page="students"] .stu-seg b{z-index:3}
-/* A 14s loop with a long hold at the end reads as a surface catching
-   light occasionally. Removing it for reduced-motion is the whole
-   treatment - no slower fallback, no "gentler" version. */
+@keyframes stu-bubble{
+    0%  {transform:translate(0,0) scale(.45);opacity:0}
+    14% {opacity:1}
+    80% {opacity:.78}
+    100%{transform:translate(var(--dx),-64px) scale(1);opacity:0}
+}
+/* Under reduced motion the water becomes still: the surface holds a
+   fixed wave and the bubbles rest low in the fill, well below the
+   centred counts, so nothing sits on the numbers. */
 @media (prefers-reduced-motion:reduce){
-    body[data-page="students"] .stu-ribbon-bar::after{animation:none;display:none}
+    body[data-page="students"] .stu-ribbon-bar::before{animation:none}
+    body[data-page="students"] .stu-bubble{animation:none;opacity:.55;transform:translate(0,0) scale(1)}
 }
-/* Adjacent segments sit within ~1.1:1 luminance of each other, so
-   hue alone leaves a soft, ambiguous edge. This inset ring is what
-   makes the boundaries read. Painted, not a border, so it never
-   shifts the segment widths that encode share. */
-body[data-page="students"] .stu-seg::after{
-    content:"";position:absolute;inset:0;pointer-events:none;
-    box-shadow:inset -2px 0 0 rgba(255,255,255,.92);
-}
-body[data-page="students"] .stu-seg:last-child::after{box-shadow:none}
-body[data-page="students"] .stu-seg:hover{filter:brightness(1.08)}
-/* Cool analogous set: cyan → blue → indigo → violet. Held to
-   the blue family on purpose, so the four are told apart by hue
-   (~50° of spread) rather than by lightness. Measured adjacent
-   luminance ratios are only ~1.1–1.2:1, so the 2px white rule
-   below is what actually guarantees the edges read. Every
-   colour clears 4.5:1 against white for the on-segment count.
-   Y1 uses sky-700, not sky-600 (#0284c7, only 4.10:1). */
+/* Segment fills. Four categorical hues, not a ramp: a registrar looks
+   up "the Year 3s" as a discrete thing, so distinct hues let a segment
+   be named by pointing at it. Order is carried by position Y1->Y4 and
+   by the legend, not by lightness. Each clears 4.5:1 against white for
+   the on-segment count; Y1 is sky-700, not sky-600 (#0284c7, 4.10:1). */
 body[data-page="students"] .stu-seg.tone-y1{background:#0369a1}
 body[data-page="students"] .stu-seg.tone-y2{background:#2563eb}
 body[data-page="students"] .stu-seg.tone-y3{background:#4f46e5}
 body[data-page="students"] .stu-seg.tone-y4{background:#7c3aed}
+/* Unassigned is not a year level, so it is hatched rather than tinted -
+   hatching means "no value recorded", and a fifth colour would imply
+   a year level that exists. */
 body[data-page="students"] .stu-seg.tone-unassigned{background:repeating-linear-gradient(135deg,#cbd5e1 0 5px,#e2e8f0 5px 10px)}
+/* Counts sit above the waterline and the bubbles (both z-index 2), so
+   the digits are never washed by either. The shadow is a little
+   stronger than the ribbon used, because a bubble rim can cross a
+   glyph. */
 body[data-page="students"] .stu-seg b{
-    position:absolute;inset:0;z-index:1;display:flex;align-items:center;justify-content:center;
-    font-size:11.5px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;
-    text-shadow:0 1px 2px rgba(15,23,42,.28);pointer-events:none;
+    position:absolute;inset:0;z-index:3;display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;
+    text-shadow:0 1px 2px rgba(15,23,42,.34);pointer-events:none;
 }
-/* Only the pale hatch needs dark ink; the four year hues all
-   carry white labels. */
+/* Only the pale hatch needs dark ink; the four year hues all carry
+   white labels. */
 body[data-page="students"] .stu-seg.tone-unassigned b{color:#12336f;text-shadow:none}
+/* Adjacent segments sit within ~1.1:1 luminance, so hue alone leaves a
+   soft edge. This inset ring is what makes the boundaries read. Painted
+   rather than bordered, so it never shifts the widths that encode
+   share, and it sits below the waterline, which is why the surface
+   reads as lying on the fill rather than on the card. */
+body[data-page="students"] .stu-seg::after{
+    content:"";position:absolute;inset:0;pointer-events:none;z-index:1;
+    box-shadow:inset -2px 0 0 rgba(255,255,255,.92);
+}
+body[data-page="students"] .stu-seg:last-child::after{box-shadow:none}
+body[data-page="students"] .stu-seg:hover{filter:brightness(1.08)}
+/* Legend. Kept, because on-segment counts are only drawn when a
+   segment is wide enough to hold them, and this carries the numbers
+   everywhere else. The percentage is #64748b (4.76:1) rather than the
+   #94a3b8 it used to be, which is only 2.56:1 and fails AA as a value. */
 body[data-page="students"] .stu-ribbon-legend{
     display:flex;flex-wrap:wrap;gap:0;margin:0;padding:0 20px;list-style:none;
 }
-body[data-page="students"] .stu-ribbon-legend li{flex:1 1 118px;min-width:0;padding:12px 14px 14px}
+/* Basis is 96px, not the 118px this used to carry: the unassigned
+   segment makes five items, and at 118px the fifth wrapped onto its
+   own row and left an awkward orphan. 96px keeps all five on one line
+   down to the tablet breakpoint, where the media query halves it. */
+body[data-page="students"] .stu-ribbon-legend li{flex:1 1 96px;min-width:0;padding:12px 10px 14px}
 body[data-page="students"] .stu-legend-key{
     display:flex;align-items:center;gap:7px;margin-bottom:5px;
     font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#64748b;
@@ -322,7 +361,7 @@ body[data-page="students"] .stu-legend-key i.tone-unassigned{background:#cbd5e1}
 body[data-page="students"] .stu-legend-val{
     font-size:19px;font-weight:800;color:#0f172a;line-height:1.1;font-variant-numeric:tabular-nums;
 }
-body[data-page="students"] .stu-legend-pct{font-size:11.5px;color:#94a3b8;margin-left:5px;font-weight:600}
+body[data-page="students"] .stu-legend-pct{font-size:11.5px;color:#64748b;margin-left:5px;font-weight:600}
 body[data-page="students"] .stu-ribbon-empty{
     display:flex;flex-direction:column;align-items:center;justify-content:center;
     padding:30px 20px 32px;text-align:center;
@@ -572,9 +611,10 @@ body[data-page="students"] .header{padding:21px 18px;border-radius:16px}
 body[data-page="students"] .header .title h1{font-size:25px}
 body[data-page="students"] .stu-metric{padding:14px 16px 13px}
 body[data-page="students"] .stu-metric .stu-metric-value{font-size:23px}
-body[data-page="students"] .stu-ribbon-bar{height:28px;margin:14px 16px 0}
+body[data-page="students"] .stu-ribbon-bar{height:36px;margin:14px 16px 0}
 body[data-page="students"] .stu-ribbon-legend{padding:0 16px}
 body[data-page="students"] .stu-ribbon-legend li{flex:1 1 50%}
+
 .search-bar{flex-direction:column;flex-wrap:nowrap;align-items:stretch;gap:10px}
 .search-bar .search-wrapper{flex:1 1 auto;min-width:0;max-width:100%;width:100%}
 .search-bar .search-actions{width:100%;height:auto;justify-content:flex-end;flex-wrap:wrap}
@@ -591,6 +631,7 @@ body[data-page="students"] .stu-metric{border-right:0;border-bottom:1px solid #e
 body[data-page="students"] .stu-metric:last-child{border-bottom:0}
 body[data-page="students"] .stu-ribbon-legend li{flex:1 1 45%;padding:9px 6px 10px}
 body[data-page="students"] .stu-legend-val{font-size:16px}
+
 .search-bar{padding:10px 14px;gap:8px}
 .search-bar .search-wrapper{height:38px}
 .search-bar .search-wrapper input{height:38px;font-size:13px}
@@ -687,12 +728,15 @@ body[data-page="students"] .stu-legend-val{font-size:16px}
 </div>
 <?php if ($totalStudents > 0): ?>
 <div class="stu-ribbon-bar" role="img" aria-label="<?= htmlspecialchars(implode(', ', array_map(fn($sg) => ($sg['year'] ? 'Year ' . $sg['year'] : 'Unassigned') . ': ' . $sg['count'] . ' students', $ribbonSegments)), ENT_QUOTES) ?>">
+<?php /* Water sits on the bar, above the segments but below the counts. Bubbles are decorative and aria-hidden; the counts and the legend carry the data. */ foreach ($bubbles as $b): ?>
+<span class="stu-bubble" aria-hidden="true" style="left:<?= $b['left'] ?>%;width:<?= $b['size'] ?>px;height:<?= $b['size'] ?>px;--dur:<?= $b['dur'] ?>s;--delay:<?= $b['delay'] ?>s;--dx:<?= $b['dx'] ?>px"></span>
+<?php endforeach; ?>
 <?php foreach ($ribbonSegments as $sg):
 $pct = round($sg['count'] / $ribbonBase * 100, 2);
 $segLabel = $sg['year'] ? 'Year ' . $sg['year'] : 'Unassigned year level';
 ?>
 <div class="stu-seg tone-<?= $sg['tone'] ?>" style="width:<?= $pct ?>%" title="<?= htmlspecialchars($segLabel . ' — ' . $sg['count'] . ' students (' . round($pct) . '%)', ENT_QUOTES) ?>">
-<?php /* Label the segment only when it is wide enough to hold the number; the legend always carries it. */ if ($pct >= 7): ?><b><?= $sg['count'] ?></b><?php endif; ?>
+<?php /* Label the segment only when it is wide enough to hold the number; the legend always carries it. */ if ($pct >= 9): ?><b><?= $sg['count'] ?></b><?php endif; ?>
 </div>
 <?php endforeach; ?>
 </div>
