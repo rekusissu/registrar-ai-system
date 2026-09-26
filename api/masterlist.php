@@ -229,11 +229,17 @@ try {
 
             $result = autoAssignStudentSections($requestedMax);
 
+            $message = 'Sections assigned successfully.';
+            if ($result['skipped'] > 0) {
+                $message .= ' ' . $result['skipped'] . ' student(s) skipped because they have no year level set.';
+            }
+
             echo json_encode([
                 'success' => true,
-                'message' => 'Sections assigned successfully.',
+                'message' => $message,
                 'max_per_section' => $requestedMax,
                 'updated' => $result['updated'],
+                'skipped' => $result['skipped'],
                 'sections' => $result['sections'],
             ]);
             exit;

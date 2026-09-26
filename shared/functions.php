@@ -6,6 +6,7 @@
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/database.php';
+require_once __DIR__ . '/section_code.php';
 
 // ── Prevent direct access ──
 if (defined('FUNCTIONS_LOADED')) {
@@ -488,27 +489,6 @@ function getStudentInitials($student) {
 }
 
 /**
- * Semester digit for a semester label ('' → 1, '1st' → 1, '2nd' → 2, 'summer' → 3).
- */
-function semesterDigit(?string $semester): int {
-    $semester = strtolower(trim((string) $semester));
-    if ($semester === '2nd') return 2;
-    if ($semester === 'summer') return 3;
-    return 1; // '' or '1st'
-}
-
-/**
- * Section code for a year/semester/section-number combo, e.g. 11001 =
- * year 1, semester 1, section 1. Format: [year][sem][###] (5 digits).
- */
-function sectionCodeFromParts(int $year, ?string $semester, int $sectionNumber): string {
-    $yearDigit = max(1, min(9, $year));
-    $semDigit = semesterDigit($semester);
-    $num = max(1, min(999, $sectionNumber));
-    return $yearDigit . $semDigit . str_pad((string) $num, 3, '0', STR_PAD_LEFT);
-}
-
-/**
  * Next section number for a course+year+semester, mirroring autoAssignStudentSections.
  * Scoped by course + year + semester only (the code has no SY digit), consistent with
  * auto-assign's bucket key. Manual codes that aren't 5-digit numeric are ignored.
@@ -586,7 +566,7 @@ function getOfferedCourses(): array {
  * max N students per section. Section codes follow [year][sem][###],
  * e.g. 11001 (yr 1, sem 1, section 1), 12001 (yr 1, sem 2), 21001 (yr 2, sem 1).
  *
- * @return array{updated: int, sections: list<array{course: ?string, year_level: ?int, semester: ?string, section: string, count: int, max: int}>}
+ * @return array{updated: int, skipped: int, sections: list<array{course: ?string, year_level: int, semester: ?string, section: string, count: int, max: int}>}
  */
 function autoAssignStudentSections(?int $maxPerSection = null): array {
     $maxPerSection = $maxPerSection ?? (defined('MAX_STUDENTS_PER_SECTION') ? (int) MAX_STUDENTS_PER_SECTION : 50);
@@ -595,17 +575,30 @@ function autoAssignStudentSections(?int $maxPerSection = null): array {
     }
 
     $db = Database::getInstance();
+
+    // A section code is derived from the year level, so students without one
+    // cannot be placed. They are excluded here (rather than defaulted to
+    // year 0, which would render a misleading Year-1 code) and reported back
+    // as skipped so the registrar can see why they were left out.
+    $skippedRow = $db->fetchOne(
+        "SELECT COUNT(*) AS cnt FROM students
+         WHERE course IS NOT NULL AND TRIM(course) != ''
+           AND (year_level IS NULL OR TRIM(IFNULL(year_level, '')) = '')"
+    );
+    $skipped = (int) ($skippedRow['cnt'] ?? 0);
+
     $students = $db->fetchAll(
         "SELECT id, course, year_level, semester, section, last_name, first_name
          FROM students
          WHERE course IS NOT NULL AND TRIM(course) != ''
-         ORDER BY TRIM(course) ASC, COALESCE(year_level, 0) ASC, last_name ASC, first_name ASC, id ASC"
+           AND year_level IS NOT NULL AND TRIM(IFNULL(year_level, '')) != ''
+         ORDER BY TRIM(course) ASC, year_level ASC, last_name ASC, first_name ASC, id ASC"
     );
 
     $buckets = [];
     foreach ($students as $row) {
         $course = trim((string) $row['course']);
-        $year = $row['year_level'] !== null && $row['year_level'] !== '' ? (int) $row['year_level'] : 0;
+        $year = (int) $row['year_level'];
         $semester = ($row['semester'] ?? '') !== '' ? (string) $row['semester'] : null;
         $key = $course . "\0" . $year . "\0" . ($semester ?? '');
         if (!isset($buckets[$key])) {
@@ -685,7 +678,7 @@ function autoAssignStudentSections(?int $maxPerSection = null): array {
                 $existingCodes[$code] = count($toPlace);
                 $sections[] = [
                     'course' => $course,
-                    'year_level' => $year > 0 ? $year : null,
+                    'year_level' => $year,
                     'semester' => $semester,
                     'section' => $code,
                     'count' => count($toPlace),
@@ -695,17 +688,20 @@ function autoAssignStudentSections(?int $maxPerSection = null): array {
 
             // Record the filled existing sections in the result
             foreach ($existingCodes as $code => $cnt) {
-                // Skip codes we already added as newly-created (avoid duplicates in the report)
+                // Skip codes we already added as newly-created (avoid duplicates
+                // in the report). Cast to string: PHP turns numeric array keys
+                // like "11001" into ints, which would never match strictly.
+                $codeStr = (string) $code;
                 $isNew = false;
                 foreach ($sections as $s) {
-                    if ($s['section'] === $code) { $isNew = true; break; }
+                    if ($s['section'] === $codeStr) { $isNew = true; break; }
                 }
                 if (!$isNew) {
                     $sections[] = [
                         'course' => $course,
-                        'year_level' => $year > 0 ? $year : null,
+                        'year_level' => $year,
                         'semester' => $semester,
-                        'section' => $code,
+                        'section' => $codeStr,
                         'count' => $cnt,
                         'max' => $maxPerSection,
                     ];
@@ -718,7 +714,7 @@ function autoAssignStudentSections(?int $maxPerSection = null): array {
         throw $e;
     }
 
-    return ['updated' => $updated, 'sections' => $sections];
+    return ['updated' => $updated, 'skipped' => $skipped, 'sections' => $sections];
 }
 
 /**

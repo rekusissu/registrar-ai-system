@@ -592,7 +592,7 @@ try {
                 exit;
             }
 
-            $existing = $db->fetchOne("SELECT id FROM students WHERE id = ?", [$id]);
+            $existing = $db->fetchOne("SELECT id, year_level FROM students WHERE id = ?", [$id]);
             if (!$existing) {
                 echo json_encode(['success' => false, 'message' => 'Student not found.']);
                 exit;
@@ -626,6 +626,20 @@ try {
                     }
                     if ($field === 'adviser_id' && $value !== null) {
                         $value = (int)$value;
+                    }
+                    // A section code encodes the year level ([year][sem][###]),
+                    // so a section is meaningless without a year level. Reject
+                    // the combination rather than storing a misleading record.
+                    if ($field === 'section' && $value !== null && $value !== '') {
+                        // Fall back to the stored year level when a partial
+                        // update doesn't resend it.
+                        $effectiveYear = array_key_exists('year_level', $input)
+                            ? trim((string) ($input['year_level'] ?? ''))
+                            : trim((string) ($existing['year_level'] ?? ''));
+                        if ($effectiveYear === '' || (int) $effectiveYear < 1) {
+                            echo json_encode(['success' => false, 'message' => 'A section cannot be set without a year level. Set the year level first.']);
+                            exit;
+                        }
                     }
                     if ($field === 'lrn' && $value !== null && $value !== '') {
                         $value = strtoupper(preg_replace('/[^0-9]/', '', (string)$value));

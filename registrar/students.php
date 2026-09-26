@@ -918,7 +918,7 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-book"></i> Enrollment Details</div>
 <div class="form-row"><div class="form-group" style="flex:1 1 220px;min-width:150px;"><label>Course <span style="color:#dc2626;">*</span></label><div class="course-select-wrap"><select id="addCourse" class="form-control" required><option value="">Select course</option><?php foreach ($offeredCourses as $cname => $majors): ?><option value="<?= htmlspecialchars($cname) ?>"><?= htmlspecialchars($cname) ?></option><?php endforeach; ?></select><div class="course-select-list" style="display:none;"></div></div></div><div class="form-group" style="flex:0 0 150px;"><label>Year Level</label><select id="addYearLevel" class="form-control"><option value="">Select</option><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option></select></div><div class="form-group" id="addMajorGroup" style="display:none;flex:1 1 200px;"><label>Major</label><select id="addMajor" class="form-control"><option value="">Select major</option></select></div></div>
-<div class="form-row"><div class="form-group"><label>School Year</label><input type="text" id="addSchoolYear" class="form-control" placeholder="2026-2027" value="2026-2027"></div><div class="form-group"><label>Semester</label><select id="addSemester" class="form-control"><option value="">—</option><option value="1st">1st Semester</option><option value="2nd">2nd Semester</option><option value="summer">Summer</option></select></div><div class="form-group"><label>Section <button type="button" style="background:none;border:none;color:#2563eb;cursor:pointer;font-size:11px;padding:0;" onclick="suggestSection()"><i class="fas fa-magic"></i> Suggest</button></label><input type="text" id="addSection" class="form-control" placeholder="e.g. 11001"></div></div>
+<div class="form-row"><div class="form-group"><label>School Year</label><input type="text" id="addSchoolYear" class="form-control" placeholder="2026-2027" value="2026-2027"></div><div class="form-group"><label>Semester</label><select id="addSemester" class="form-control"><option value="">—</option><option value="1st">1st Semester</option><option value="2nd">2nd Semester</option><option value="summer">Summer</option></select></div><div class="form-group"><label>Section <button type="button" style="background:none;border:none;color:#2563eb;cursor:pointer;font-size:11px;padding:0;" onclick="suggestSection()"><i class="fas fa-magic"></i> Suggest</button></label><input type="text" id="addSection" class="form-control" placeholder="Set a year level first" disabled><small style="color:#64748b;font-size:11px;">A section is derived from the year level.</small></div></div>
 <hr style="border:none;border-top:1px solid #f1f5f9;margin:12px 0;">
 <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:8px;"><i class="fas fa-users"></i> Guardian / Parent</div>
 <div class="form-row"><div class="form-group"><label>Full Name <span style="color:#dc2626;">*</span></label><input type="text" id="addGuardianName" class="form-control" required></div><div class="form-group"><label>Relationship</label><select id="addGuardianRel" class="form-control"><option value="father">Father</option><option value="mother">Mother</option><option value="guardian">Guardian</option></select></div></div>
@@ -1618,6 +1618,8 @@ function applyPaste() {
         }
     }
     refreshMajorOptions('add');
+    // The year level may have been prefilled, which unlocks the section field.
+    syncSectionAvailability();
     closePasteModal();
     showToast('Form pre-filled from extracted data.', 'success');
 }
@@ -1665,6 +1667,20 @@ document.getElementById('addCourse').addEventListener('blur', standardizeCourse)
 // Data Quality review behavior is defined in js/student-data-quality.js.
 
 // ─── SECTION SUGGESTION ─────────────────────────────────────
+// A section code encodes the year level, so the field stays locked until a
+// year level is chosen. Clearing the year level clears the section too, so a
+// stale code can't be submitted against a blank year.
+function syncSectionAvailability() {
+    const year = document.getElementById('addYearLevel').value;
+    const section = document.getElementById('addSection');
+    section.disabled = !year;
+    if (!year) section.value = '';
+    section.placeholder = year ? 'e.g. ' + year + '1001' : 'Set a year level first';
+}
+document.getElementById('addYearLevel').addEventListener('change', syncSectionAvailability);
+document.getElementById('addForm').addEventListener('reset', syncSectionAvailability);
+syncSectionAvailability();
+
 function suggestSection() {
     const course = document.getElementById('addCourse').value;
     const year = document.getElementById('addYearLevel').value;
