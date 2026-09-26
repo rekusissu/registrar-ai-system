@@ -1026,6 +1026,27 @@ function createStudentFromInput(array $input, $db): array
         throw new InvalidArgumentException('Email is required and must be a valid address.');
     }
 
+    // Year level: required, and must be a real year. A section code is derived
+    // from it ([year][sem][###]), so a blank year would leave the student
+    // unplaceable in any section.
+    $yearLevelRaw = trim((string) ($input['year_level'] ?? ''));
+    if ($yearLevelRaw === '') {
+        throw new InvalidArgumentException('Year level is required.');
+    }
+    $yearLevel = (int) $yearLevelRaw;
+    if ($yearLevel < 1 || $yearLevel > 4) {
+        throw new InvalidArgumentException('Year level must be 1st, 2nd, 3rd, or 4th Year.');
+    }
+
+    // Semester: required, from the fixed set the section codes encode.
+    $semesterRaw = trim((string) ($input['semester'] ?? ''));
+    if ($semesterRaw === '') {
+        throw new InvalidArgumentException('Semester is required.');
+    }
+    if (!in_array($semesterRaw, ['1st', '2nd', 'summer'], true)) {
+        throw new InvalidArgumentException('Semester must be 1st, 2nd, or summer.');
+    }
+
     $data = [
         'student_number' => $studentNumber,
         'first_name' => $firstName,
@@ -1043,9 +1064,9 @@ function createStudentFromInput(array $input, $db): array
         'email' => $studentEmail,
         'course' => isset($input['course']) && trim($input['course']) !== '' ? courseStandardize(trim($input['course'])) : null,
         'major' => isset($input['major']) && trim($input['major']) !== '' ? trim($input['major']) : null,
-        'year_level' => isset($input['year_level']) && $input['year_level'] !== '' ? (int) $input['year_level'] : null,
+        'year_level' => $yearLevel,
         'school_year' => isset($input['school_year']) && trim($input['school_year']) !== '' ? trim($input['school_year']) : null,
-        'semester' => $input['semester'] ?? null,
+        'semester' => $semesterRaw,
         'section' => $input['section'] ?? null,
         'adviser_id' => isset($input['adviser_id']) && $input['adviser_id'] !== '' ? (int) $input['adviser_id'] : null,
         'status' => $input['status'] ?? 'active',

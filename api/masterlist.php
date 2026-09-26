@@ -125,6 +125,32 @@ try {
                 $fields['adviser_id'] = (int) $input['adviser_id'];
             }
 
+            // A section code is derived from the year level, so a student with
+            // no year level cannot hold a section. When this request does not
+            // stamp a year level, reject any selected student that lacks one
+            // rather than writing a section that contradicts their record.
+            if (!isset($fields['year_level'])) {
+                $placeholders = implode(',', array_fill(0, count($ids), '?'));
+                $yearless = $db->fetchAll(
+                    "SELECT id, first_name, last_name FROM students
+                     WHERE id IN ($placeholders)
+                       AND (year_level IS NULL OR TRIM(IFNULL(year_level, '')) = '')",
+                    $ids
+                );
+                if (!empty($yearless)) {
+                    $names = array_map(
+                        fn($r) => trim($r['first_name'] . ' ' . $r['last_name']),
+                        $yearless
+                    );
+                    echo json_encode([
+                        'success' => false,
+                        'message' => 'These students have no year level set and cannot be assigned to a section: '
+                            . implode(', ', $names) . '. Set their year level first.',
+                    ]);
+                    exit;
+                }
+            }
+
             $conn = $db->getConnection();
             $conn->beginTransaction();
             try {

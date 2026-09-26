@@ -99,10 +99,15 @@ $sectionSummaries = $db->fetchAll(
      ORDER BY TRIM(course), year_level, section"
 );
 
-// Lightweight candidate list for the assign-existing-students modal
+// Lightweight candidate list for the assign-existing-students modal.
+// A section code is derived from the year level ([year][sem][###]), so a
+// student with no year level cannot be placed in a section and must not be
+// offered as pickable. Set their year level first, then they become eligible.
 $assignableStudents = $db->fetchAll(
     "SELECT id, first_name, last_name, student_number, course, year_level, semester, section, status
-     FROM students ORDER BY last_name, first_name"
+     FROM students
+     WHERE year_level IS NOT NULL AND TRIM(IFNULL(year_level, '')) != ''
+     ORDER BY last_name, first_name"
 );
 
 // Offered courses (shared with students.php)
@@ -1023,7 +1028,7 @@ function renderAssignList() {
     if (!q && !includeAssigned && wsContext) {
         students = students.filter(s =>
             (!(s.course || '').trim() || (s.course || '') === wsContext.course) &&
-            (!s.year_level || String(s.year_level) === String(wsContext.year_level))
+            String(s.year_level) === String(wsContext.year_level)
         );
     }
     if (q) {
