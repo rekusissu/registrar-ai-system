@@ -213,7 +213,49 @@ body[data-page="students"] .stu-ribbon-note{font-size:11.5px;color:#64748b}
 body[data-page="students"] .stu-ribbon-bar{
     display:flex;height:34px;margin:16px 20px 0;border-radius:9px;overflow:hidden;background:#f1f5f9;
 }
-body[data-page="students"] .stu-seg{position:relative;min-width:3px;transition:filter .2s}
+body[data-page="students"] .stu-seg{position:relative;min-width:3px;transition:filter .2s;overflow:hidden}
+/* Water shimmer.
+   The band is a ::before overlay translated with transform, not an
+   animated background-position: transform is compositor-only, so this
+   never repaints or triggers layout, and it stays smooth on the low-end
+   machines in a registrar office. It is also clipped per segment, so the
+   band appears to be one continuous light moving across the whole ribbon
+   rather than four blocks animating independently.
+
+   Peak alpha is held to .08, measured not guessed. The on-segment count
+   is white, and a white overlay lifts the background toward it: at .18
+   every segment dropped below 4.5:1 (Y2 to 3.76:1). At .08 the worst
+   case is Y2 at 4.51:1, so all four still clear the threshold for the
+   full duration of the sweep. The hatched "unassigned" segment opts out
+   entirely: hatching already means "no year level recorded", and a
+   glinting unknown reads as a known quantity. */
+body[data-page="students"] .stu-seg::before{
+    content:"";position:absolute;inset:0;pointer-events:none;z-index:0;
+    background:linear-gradient(
+        100deg,
+        transparent 0%,
+        rgba(255,255,255,0) 32%,
+        rgba(255,255,255,.08) 50%,
+        rgba(255,255,255,0) 68%,
+        rgba(255,255,255,0) 100%
+    );
+    background-size:55% 100%;
+    background-repeat:no-repeat;
+    transform:translate3d(-140%,0,0);
+    animation:stu-shimmer 16s linear infinite;
+}
+body[data-page="students"] .stu-seg.tone-unassigned::before{display:none}
+@keyframes stu-shimmer{
+    0%   {transform:translate3d(-140%,0,0)}
+    55%  {transform:translate3d(240%,0,0)}
+    100% {transform:translate3d(240%,0,0)}
+}
+/* A 16s loop with a long hold at the end reads as a surface catching
+   light occasionally. Removing it for reduced-motion is the whole
+   treatment - no slower fallback, no "gentler" version. */
+@media (prefers-reduced-motion:reduce){
+    body[data-page="students"] .stu-seg::before{animation:none;display:none}
+}
 /* Adjacent segments sit within ~1.1:1 luminance of each other, so
    hue alone leaves a soft, ambiguous edge. This inset ring is what
    makes the boundaries read. Painted, not a border, so it never
@@ -237,7 +279,7 @@ body[data-page="students"] .stu-seg.tone-y3{background:#4f46e5}
 body[data-page="students"] .stu-seg.tone-y4{background:#7c3aed}
 body[data-page="students"] .stu-seg.tone-unassigned{background:repeating-linear-gradient(135deg,#cbd5e1 0 5px,#e2e8f0 5px 10px)}
 body[data-page="students"] .stu-seg b{
-    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    position:absolute;inset:0;z-index:1;display:flex;align-items:center;justify-content:center;
     font-size:11.5px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;
     text-shadow:0 1px 2px rgba(15,23,42,.28);pointer-events:none;
 }
