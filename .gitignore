@@ -85,3 +85,16 @@ insights_print.png
 insights_print_page1.png
 ah_design_*.png
 ah_print*.png
+
+# Same thing again, for the Status Tracker filter and dashboard probes. These
+# write to the repo root from wherever the command was invoked, and every run
+# produces a fresh set, so each probe needs its own prefix rather than a bare
+# *.png that would also swallow assets/images.
+stfilter_*.png
+dash.png
+st_render.html
+
+# Rendered copies of a page, written out so a probe can measure the markup a
+# browser actually built rather than what PHP emitted.
+ah_render.html
+ah_print_body.html

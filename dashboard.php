@@ -64,20 +64,6 @@ foreach ($monthlyData as $d) {
     if ($idx !== false) $monthCounts[$idx] = (int) $d['count'];
 }
 
-// Students added in the last 30 days. This is a real, computed
-// figure — the old stat cards carried hardcoded "12%" / "5%" /
-// "3%" / "8%" badges that never moved and meant nothing.
-$recentJoins = (int) $db->fetchColumn("
-    SELECT COUNT(*) FROM students
-    WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-");
-$prevJoins = (int) $db->fetchColumn("
-    SELECT COUNT(*) FROM students
-    WHERE created_at >= DATE_SUB(NOW(), INTERVAL 60 DAY)
-      AND created_at <  DATE_SUB(NOW(), INTERVAL 30 DAY)
-");
-$joinDelta = $prevJoins > 0 ? (int) round((($recentJoins - $prevJoins) / $prevJoins) * 100) : null;
-
 // Course distribution (top 5)
 $courseData = $db->fetchAll("
     SELECT course, COUNT(*) as count 
@@ -158,22 +144,16 @@ foreach ($DASH_STATUS_META as $key => $meta) {
 // The headline stat cards read from the same buckets, so the top strip and
 // this panel can never disagree.
 //
+// The four cards themselves are gone - the page is charts only now - but
+// "Active" and "Graduated" are not: they are the two rates the Key
+// Performance panel draws, so they still have to come from the same buckets
+// rather than from a second set of queries that could drift.
+//
 // "At risk" is no longer a status. It is an advisory now - surfaced on the
 // data-quality page and the Status Tracker queue - so there is no honest count
-// for it on an enrolment dashboard, and the card is driven from the same
-// five-bucket data rather than left pointing at a column that is gone.
+// for it on an enrolment dashboard, and nothing on this page asked for one.
 $activeStudents    = $statusData['enrolled'] + $statusData['active'];
-$atRiskStudents    = 0;
 $graduatedStudents = $statusData['graduate'];
-
-// Recent activity
-$recentActivity = $db->fetchAll("
-    SELECT st.*, CONCAT(s.first_name, ' ', s.last_name) AS student_name
-    FROM status_tracker st
-    LEFT JOIN students s ON st.student_id = s.id
-    ORDER BY st.created_at DESC
-    LIMIT 5
-");
 
 // ─── PAGE SETUP ───────────────────────────────────────────────────
 $page_title = 'Dashboard';
@@ -250,77 +230,7 @@ include 'includes/sidebar.php';
     }
     body[data-page="dashboard"] .dash-chip-plain{border-color:transparent;background:transparent;padding-left:0}
 
-    /* ── Stat strip ───────────────────────────────────────────
-       Same connected-strip treatment as registrar/students.php:
-       one unit, hairline-separated cells, no gaps between them, and
-       a tone-coloured bar along the bottom of each cell. The old
-       version here was four floating cards with an icon tile. */
-    body[data-page="dashboard"] .stats-grid{
-        display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
-        gap:0;margin:0 0 16px;background:#fff;border:1px solid #dbeafe;
-        border-radius:16px;box-shadow:0 6px 22px rgba(15,23,42,.04);overflow:hidden;
-    }
-    body[data-page="dashboard"] .stat-card{
-        position:relative;padding:16px 20px 15px;border-right:1px solid #e2e8f0;
-        border-radius:0;box-shadow:none;background:#fff;
-    }
-    body[data-page="dashboard"] .stat-card:last-child{border-right:0}
-    body[data-page="dashboard"] .stat-card::after{
-        content:"";position:absolute;left:20px;right:20px;bottom:0;height:3px;background:#dbeafe;
-    }
-    body[data-page="dashboard"] .stat-card.tone-blue::after  {background:#1d4ed8}
-    body[data-page="dashboard"] .stat-card.tone-green::after {background:#16a34a}
-    body[data-page="dashboard"] .stat-card.tone-amber::after {background:#d97706}
-    body[data-page="dashboard"] .stat-card.tone-violet::after{background:#7c3aed}
-
-    body[data-page="dashboard"] .stat-header{display:flex;align-items:center;justify-content:space-between;gap:8px}
-    body[data-page="dashboard"] .stat-icon{
-        width:34px;height:34px;border-radius:10px;font-size:14px;
-    }
-    body[data-page="dashboard"] .stat-label{
-        font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;
-        color:#64748b;line-height:1.3;margin:0 0 5px;
-    }
-    body[data-page="dashboard"] .stat-value{
-        font-size:27px;font-weight:800;line-height:1.1;color:#0f172a;
-        font-variant-numeric:tabular-nums;letter-spacing:-.5px;
-    }
-    body[data-page="dashboard"] .stat-foot{
-        display:flex;align-items:center;gap:6px;margin-top:9px;padding-top:8px;
-        border-top:1px solid #f1f5f9;font-size:11px;color:#64748b;line-height:1.4;
-    }
-    body[data-page="dashboard"] .stat-foot b{color:#0f172a;font-weight:800}
-
-    /* Inline meter, matching the students strip. display:inline-block
-       is required — as a bare <span> the width is ignored and it
-       renders as a full-width rule sitting on the accent bar. */
-    body[data-page="dashboard"] .stat-meter{
-        display:inline-block;width:46px;height:4px;border-radius:3px;
-        background:#e2e8f0;overflow:hidden;vertical-align:middle;flex:0 0 46px;
-    }
-    body[data-page="dashboard"] .stat-meter i{display:block;height:100%;border-radius:3px}
-
-    /* A real trend, shown only when there is history to compute one. */
-    body[data-page="dashboard"] .stat-trend{
-        display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;
-        font-size:10.5px;font-weight:700;line-height:1.5;white-space:nowrap;
-    }
-    body[data-page="dashboard"] .stat-trend i{font-size:9px}
-    body[data-page="dashboard"] .stat-trend.up{color:#15803d;background:#dcfce7}
-    body[data-page="dashboard"] .stat-trend.down{color:#b91c1c;background:#fee2e2}
-    body[data-page="dashboard"] .stat-trend.flat{color:#64748b;background:#f1f5f9}
-
-    @media (max-width: 1024px) {
-        body[data-page="dashboard"] .stats-grid{grid-template-columns:repeat(2,1fr)}
-        body[data-page="dashboard"] .stat-card:nth-child(2n){border-right:0}
-        body[data-page="dashboard"] .stat-card:nth-child(-n+2){border-bottom:1px solid #e2e8f0}
-    }
-    @media (max-width: 560px) {
-        body[data-page="dashboard"] .stats-grid{grid-template-columns:1fr}
-        body[data-page="dashboard"] .stat-card{border-right:0;border-bottom:1px solid #e2e8f0}
-        body[data-page="dashboard"] .stat-card:last-child{border-bottom:0}
-        body[data-page="dashboard"] .stat-card{padding:14px 16px 13px}
-        body[data-page="dashboard"] .stat-value{font-size:23px}
+        @media (max-width: 560px) {
         body[data-page="dashboard"] .dash-hero{padding:24px 20px;border-radius:16px}
         body[data-page="dashboard"] .dash-hero h1{font-size:24px}
         body[data-page="dashboard"] .dash-hero-in{align-items:flex-start}
@@ -345,63 +255,6 @@ include 'includes/sidebar.php';
             </div>
         </header>
 
-        <!-- Stats. Same connected strip as registrar/students.php:
-             one unit, hairline-separated cells. The trend badge is only
-             rendered when there is a prior 30-day window to compare
-             against, so it is never a made-up number. -->
-        <div class="stats-grid dashboard-section">
-            <div class="stat-card tone-blue">
-                <div class="stat-header">
-                    <div class="stat-icon blue"><i class="fas fa-user-graduate"></i></div>
-                    <?php if ($joinDelta !== null): ?>
-                    <span class="stat-trend <?= $joinDelta >= 0 ? 'up' : 'down' ?>">
-                        <i class="fas <?= $joinDelta >= 0 ? 'fa-arrow-up' : 'fa-arrow-down' ?>"></i> <?= abs($joinDelta) ?>%
-                    </span>
-                    <?php endif; ?>
-                </div>
-                <p class="stat-label">Total students</p>
-                <div class="stat-value"><?= number_format($totalStudents) ?></div>
-                <div class="stat-foot">
-                    <span><b><?= $recentJoins ?></b> joined in 30 days</span>
-                </div>
-            </div>
-            <div class="stat-card tone-green">
-                <div class="stat-header">
-                    <div class="stat-icon green"><i class="fas fa-user-check"></i></div>
-                </div>
-                <p class="stat-label">Active</p>
-                <div class="stat-value"><?= number_format($activeStudents) ?></div>
-                <div class="stat-foot">
-                    <span><?= $totalStudents > 0 ? round($activeStudents / $totalStudents * 100) : 0 ?>% of students</span>
-                    <span class="stat-meter"><i style="width:<?= $totalStudents > 0 ? round($activeStudents / $totalStudents * 100) : 0 ?>%;background:#16a34a"></i></span>
-                </div>
-            </div>
-            <div class="stat-card tone-amber">
-                <div class="stat-header">
-                    <div class="stat-icon yellow"><i class="fas fa-triangle-exclamation"></i></div>
-                </div>
-                <p class="stat-label">At risk or probation</p>
-                <div class="stat-value"><?= number_format($atRiskStudents) ?></div>
-                <div class="stat-foot">
-                    <?php if ($atRiskStudents > 0): ?>
-                    <span class="stat-trend down"><i class="fas fa-triangle-exclamation"></i>Needs follow-up</span>
-                    <?php else: ?>
-                    <span class="stat-trend up"><i class="fas fa-circle-check"></i>None flagged</span>
-                    <?php endif; ?>
-                </div>
-            </div>
-            <div class="stat-card tone-violet">
-                <div class="stat-header">
-                    <div class="stat-icon purple"><i class="fas fa-graduation-cap"></i></div>
-                </div>
-                <p class="stat-label">Graduated</p>
-                <div class="stat-value"><?= number_format($graduatedStudents) ?></div>
-                <div class="stat-foot">
-                    <span><?= $totalStudents > 0 ? round($graduatedStudents / $totalStudents * 100) : 0 ?>% of all records</span>
-                    <span class="stat-meter"><i style="width:<?= $totalStudents > 0 ? round($graduatedStudents / $totalStudents * 100) : 0 ?>%;background:#7c3aed"></i></span>
-                </div>
-            </div>
-        </div>
 
         <!-- Advanced Analytics Section -->
         <div class="chart-grid dashboard-section">
@@ -567,54 +420,6 @@ include 'includes/sidebar.php';
                     </div>
                 </div>
             </div>
-        </div>
-
-        <!-- Recent Activity -->
-        <div class="chart-card dashboard-section">
-            <div class="card-header">
-                <div class="card-title"><i class="fas fa-clock-rotate-left" style="color: #2563eb;"></i> Recent Activity</div>
-                <span class="card-badge">Latest Updates</span>
-            </div>
-            <?php if (empty($recentActivity)): ?>
-                <div class="empty-state">
-                    <i class="fas fa-inbox"></i>
-                    <p>No recent activity</p>
-                    <span>Status changes will appear here</span>
-                </div>
-            <?php else: ?>
-                <div class="activity-list">
-                    <?php foreach ($recentActivity as $activity):
-                        // The activity feed named 'at-risk' in three places to pick a
-                        // colour and an icon. That status no longer exists, so every
-                        // change other than 'active' fell through to the amber
-                        // "warning" treatment - a student moved to dropped looked
-                        // identical to one merely marked enrolled.
-                        //
-                        // It now reads the shared meta, so a change to any of the
-                        // five is coloured as that status, and an unrecognised value
-                        // reads as unknown rather than as a guess.
-                        $actMeta = studentStatusMeta($activity['current_status'] ?? '');
-                        $isDrop  = ($activity['current_status'] ?? '') === 'dropped';
-                        $statusClass = $isDrop ? 'risk' : ($actMeta['class'] === 'active' ? 'active' : 'warning');
-                        $statusIcon  = $isDrop ? 'fa-exclamation' : ($actMeta['class'] === 'active' ? 'fa-check' : 'fa-clock');
-                        $actColor   = $actMeta['color'] !== '' ? $actMeta['color'] : '#b45309';
-                    ?>
-                        <div class="activity-item">
-                            <div class="activity-left">
-                                <div class="activity-icon <?= $statusClass ?>"><i class="fas <?= $statusIcon ?>"></i></div>
-                                <div class="activity-info">
-                                    <div class="activity-name"><?= htmlspecialchars($activity['student_name'] ?? 'Unknown') ?></div>
-                                    <div class="activity-detail">
-                                        Status changed to <strong style="color: <?= htmlspecialchars($actColor) ?>;"><?= htmlspecialchars(studentStatusLabel($activity['current_status'] ?? '') ?: ucfirst((string)($activity['current_status'] ?? 'Unknown'))) ?></strong>
-                                        <?php if ($activity['reason']): ?> — <?= htmlspecialchars($activity['reason']) ?><?php endif; ?>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="activity-time"><?= date('M d, h:i A', strtotime($activity['created_at'])) ?></div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
-            <?php endif; ?>
         </div>
 
         <!-- Live Queue -->
