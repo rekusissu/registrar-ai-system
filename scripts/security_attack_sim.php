@@ -494,12 +494,15 @@ if ($code9b === 401 || stripos($body9b, 'Unauthorized') !== false) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// ATTACK 10 — CSRF on the clinic endpoints (A3)
+// ATTACK 10 — CSRF on a state-changing endpoint (A3)
 // ─────────────────────────────────────────────────────────────
-banner('ATTACK 10 — Cross-site write on a clinic endpoint with no token');
+// Attack 10 used to probe api/clinic-supplies.php. The clinic portal is
+// gone, so that endpoint no longer exists. api/mock/payment.php is the
+// remaining state-changing POST and it loads the same guard.
+banner('ATTACK 10 — Cross-site write on a state-changing endpoint with no token');
 
-echo "Creating a clinic supply record with NO CSRF token...\n";
-$ch10 = curl_init($baseUrl . '/api/clinic-supplies.php');
+echo "Creating a mock payment record with NO CSRF token...\n";
+$ch10 = curl_init($baseUrl . '/api/mock/payment.php');
 curl_setopt_array($ch10, [
     CURLOPT_POST => true,
     CURLOPT_POSTFIELDS => http_build_query(['name' => 'csrf-probe', 'quantity' => 1]),
@@ -510,10 +513,10 @@ $body10 = (string) curl_exec($ch10);
 curl_close($ch10);
 
 if (strpos($body10, 'Invalid or missing CSRF token') !== false) {
-    blockedIt('clinic-supplies refuses a request with no CSRF token',
+    blockedIt('mock/payment refuses a request with no CSRF token',
         'the guard runs before any handler code');
 } else {
-    noteIt('clinic-supplies answered without a CSRF error', substr($body10, 0, 120));
+    noteIt('mock/payment answered without a CSRF error', substr($body10, 0, 120));
 }
 
 // ── Summary ────────────────────────────────────────────────────

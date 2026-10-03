@@ -36,7 +36,7 @@ define('ANALYTICS_LOADED', true);
 // ─── Access ──────────────────────────────────────────────────
 /**
  * Roles allowed to see registrar analytics. Mirrors the sidebar
- * ("AI Tools" group is hidden for student / nurse accounts).
+ * ("AI Tools" group is hidden for student accounts).
  */
 function aiInsightRoles(): array {
     return ['admin', 'registrar', 'staff'];

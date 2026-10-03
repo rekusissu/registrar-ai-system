@@ -2,14 +2,14 @@
 // Screenshot a sibling registrar page through the same static harness, as
 // a control.
 //
-//   php tests/ah_shot_control.php registrar/health-records.php
+//   php tests/ah_shot_control.php registrar/students.php
 //
 // If the control renders correctly and academic-history does not, the fault
 // is in this page's CSS. If both overlap, the fault is in the harness and
 // the page was never the problem - which is the difference between fixing
 // the stylesheet and chasing a ghost.
 
-$page = $argv[1] ?? 'registrar/health-records.php';
+$page = $argv[1] ?? 'registrar/students.php';
 ini_set('session.use_strict_mode', '0');
 session_name('BCP_REGISTRAR_SESSION');
 require_once __DIR__ . '/../shared/config.php';

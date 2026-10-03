@@ -80,7 +80,6 @@ include '../includes/sidebar.php';
         <option value="">All roles</option>
         <option value="admin">Admin</option>
         <option value="registrar">Registrar</option>
-        <option value="nurse">Nurse</option>
             <option value="staff">Staff</option>
         </select>
     </div>
@@ -141,7 +140,7 @@ include '../includes/sidebar.php';
     <div class="form-group"><label for="addFullName">Full Name <span style="color:#dc2626;">*</span></label><input type="text" id="addFullName" class="form-control" autocomplete="name" required></div>
     <div class="form-group"><label for="addEmail">Email <span style="color:#dc2626;">*</span></label><input type="email" id="addEmail" class="form-control" autocomplete="email" required></div>
     <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-        <div class="form-group"><label for="addRole">Role</label><select id="addRole" class="form-control"><option value="staff">Staff</option><option value="registrar">Registrar</option><option value="nurse">Nurse</option><option value="admin">Admin</option></select></div>
+        <div class="form-group"><label for="addRole">Role</label><select id="addRole" class="form-control"><option value="staff">Staff</option><option value="registrar">Registrar</option><option value="admin">Admin</option></select></div>
         <div class="form-group"><label for="addPassword">Password <span style="color:#dc2626;">*</span></label><div class="password-field-shell"><input type="password" id="addPassword" class="form-control" autocomplete="new-password" required minlength="<?= $passwordMinLength ?>" aria-describedby="addPasswordMeter addPasswordError"><div class="password-tools"><button type="button" class="password-tool" data-password-toggle="addPassword" aria-label="Show password"><i class="fas fa-eye"></i></button><button type="button" class="password-tool" data-password-generate="addPassword" aria-label="Generate strong password" title="Generate strong password"><i class="fas fa-wand-magic-sparkles"></i></button></div></div></div>
     </div>
     <div class="password-meter" id="addPasswordMeter" data-password-meter="addPassword" data-min-length="<?= $passwordMinLength ?>"><div class="password-meter-head"><span>Password strength</span><span class="password-score" aria-live="polite">Not started</span></div><div class="password-track" aria-hidden="true"><span></span></div><div class="password-requirements">
@@ -157,7 +156,7 @@ include '../includes/sidebar.php';
 <form id="editForm"><input type="hidden" id="editId" value=""><div class="modal-body">
     <div class="form-group"><label>Full Name <span style="color:#dc2626;">*</span></label><input type="text" id="editFullName" class="form-control" required></div>
     <div class="form-group"><label>Email</label><input type="email" id="editEmail" class="form-control" disabled style="background:#f8fafc;font-size:12px;"></div>
-    <div class="form-group"><label>Role</label><select id="editRole" class="form-control"><option value="staff">Staff</option><option value="registrar">Registrar</option><option value="nurse">Nurse</option><option value="admin">Admin</option></select></div>
+    <div class="form-group"><label>Role</label><select id="editRole" class="form-control"><option value="staff">Staff</option><option value="registrar">Registrar</option><option value="admin">Admin</option></select></div>
 
 </div>
 <div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeModal('editModal')">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save</button></div></form></div></div>

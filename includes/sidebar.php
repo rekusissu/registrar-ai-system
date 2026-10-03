@@ -86,11 +86,6 @@ if ($USER_ROLE === 'student') {
             <span class="sidebar-text">Digital ID Cards</span>
         </a>
 
-        <a href="<?= $APP_ROOT ?>student/health-records.php" class="sidebar-item <?= $ACTIVE_NAV === 'student_health' ? 'active' : '' ?>">
-            <i class="fa-solid fa-heart-pulse"></i>
-            <span class="sidebar-text">Health Records</span>
-        </a>
-
         <a href="<?= $APP_ROOT ?>student/contacts.php" class="sidebar-item <?= $ACTIVE_NAV === 'student_contacts' ? 'active' : '' ?>">
             <i class="fa-solid fa-people-roof"></i>
             <span class="sidebar-text">Emergency &amp; Contacts</span>
@@ -112,63 +107,6 @@ if ($USER_ROLE === 'student') {
             <span class="sidebar-text">AI Registrar Assistant</span>
             <span class="sidebar-badge-ai">AI</span>
         </button>
-
-        <div class="sidebar-divider"></div>
-
-        <div class="sidebar-brand">
-            <div class="brand-title">Account</div>
-        </div>
-
-        <a href="<?= $APP_ROOT ?>settings.php" class="sidebar-item <?= $ACTIVE_NAV === 'settings' ? 'active' : '' ?>">
-            <i class="fa-solid fa-gear"></i>
-            <span class="sidebar-text">Account Settings</span>
-        </a>
-
-    </div><!-- end sidebar-nav -->
-
-    <div class="sidebar-footer">
-        <a href="<?= $APP_ROOT ?>logout.php" class="sidebar-item logout-link" id="logoutBtn" data-logout-url="<?= $APP_ROOT ?>logout.php">
-            <i class="fa-solid fa-right-from-bracket"></i>
-            <span class="sidebar-text">Logout</span>
-        </a>
-    </div>
-
-    <?php elseif ($USER_ROLE === 'nurse'): ?>
-
-        <!-- ══════════ CLINIC / NURSE PORTAL MENU ══════════ -->
-        <div class="sidebar-brand">
-            <div class="brand-title">Clinic</div>
-        </div>
-
-        <a href="<?= $APP_ROOT ?>nurse/dashboard.php" class="sidebar-item <?= $ACTIVE_NAV === 'nurse_dashboard' ? 'active' : '' ?>">
-            <i class="fa-solid fa-house-chimney"></i>
-            <span class="sidebar-text">Clinic Dashboard</span>
-        </a>
-
-        <a href="<?= $APP_ROOT ?>nurse/records.php" class="sidebar-item <?= $ACTIVE_NAV === 'nurse_records' ? 'active' : '' ?>">
-            <i class="fa-solid fa-heart-pulse"></i>
-            <span class="sidebar-text">Health Records</span>
-        </a>
-
-        <a href="<?= $APP_ROOT ?>nurse/student-lookup.php" class="sidebar-item <?= $ACTIVE_NAV === 'nurse_lookup' ? 'active' : '' ?>">
-            <i class="fa-solid fa-magnifying-glass"></i>
-            <span class="sidebar-text">Student Lookup</span>
-        </a>
-
-        <a href="<?= $APP_ROOT ?>nurse/statistics.php" class="sidebar-item <?= $ACTIVE_NAV === 'nurse_stats' ? 'active' : '' ?>">
-            <i class="fa-solid fa-chart-simple"></i>
-            <span class="sidebar-text">Visit Statistics</span>
-        </a>
-
-        <a href="<?= $APP_ROOT ?>nurse/supplies.php" class="sidebar-item <?= $ACTIVE_NAV === 'nurse_supplies' ? 'active' : '' ?>">
-            <i class="fa-solid fa-boxes-stacked"></i>
-            <span class="sidebar-text">Supplies</span>
-        </a>
-
-        <a href="<?= $APP_ROOT ?>nurse/incidents.php" class="sidebar-item <?= $ACTIVE_NAV === 'nurse_incidents' ? 'active' : '' ?>">
-            <i class="fa-solid fa-triangle-exclamation"></i>
-            <span class="sidebar-text">Incidents</span>
-        </a>
 
         <div class="sidebar-divider"></div>
 
@@ -253,11 +191,6 @@ if ($USER_ROLE === 'student') {
         <a href="<?= $APP_ROOT ?>registrar/status-tracker.php" class="sidebar-item <?= $ACTIVE_NAV === 'tracker' ? 'active' : '' ?>">
             <i class="fa-solid fa-arrows-rotate"></i>
             <span class="sidebar-text">Status Tracker</span>
-        </a>
-
-        <a href="<?= $APP_ROOT ?>registrar/health-records.php" class="sidebar-item <?= $ACTIVE_NAV === 'health' ? 'active' : '' ?>">
-            <i class="fa-solid fa-heartbeat"></i>
-            <span class="sidebar-text">Health Records</span>
         </a>
 
         <a href="<?= $APP_ROOT ?>registrar/academic-history.php" class="sidebar-item <?= $ACTIVE_NAV === 'academic' ? 'active' : '' ?>">

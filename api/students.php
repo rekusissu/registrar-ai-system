@@ -189,13 +189,6 @@ try {
         exit;
     }
 
-    // ─── GET HEALTH ────────────────────────────────────────────
-    if ($method === 'GET' && isset($_GET['action']) && $_GET['action'] === 'health' && isset($_GET['student_id'])) {
-        $data = $db->fetchOne("SELECT * FROM health_records WHERE student_id = ?", [intval($_GET['student_id'])]);
-        echo json_encode(['success' => true, 'data' => $data]);
-        exit;
-    }
-
     // ─── GET DOCUMENT REQUESTS ─────────────────────────────────
     // ─── GET STUDENT DOCUMENTS ───────────────────────────────────
     //
@@ -442,111 +435,6 @@ try {
             'message' => $imported > 0 ? 'Imported ' . $imported . ' previous-school record(s).' : 'No new records to import.',
             'data'    => ['imported' => $imported],
         ]);
-        exit;
-    }
-
-    // ─── SAVE HEALTH RECORD ────────────────────────────────────
-    if ($method === 'POST' && isset($_GET['action']) && $_GET['action'] === 'save-health') {
-        $input = json_decode(file_get_contents('php://input'), true);
-        $studentId = intval($input['student_id'] ?? 0);
-        if (!$studentId) {
-            echo json_encode(['success' => false, 'message' => 'Student ID is required.']);
-            exit;
-        }
-        $data = [
-            'blood_type'              => $input['blood_type'] ?? null,
-            'allergies'               => $input['allergies'] ?? null,
-            'pre_existing_conditions' => $input['pre_existing_conditions'] ?? null,
-            'immunization_records'    => $input['immunization_records'] ?? null,
-            'height'                  => ($input['height'] ?? '') !== '' ? (float) $input['height'] : null,
-            'weight'                  => ($input['weight'] ?? '') !== '' ? (float) $input['weight'] : null,
-            'notes'                   => $input['notes'] ?? null
-        ];
-        $existing = $db->fetchOne("SELECT id FROM health_records WHERE student_id = ?", [$studentId]);
-        if ($existing) {
-            $db->update('health_records', $data, 'student_id = ?', [$studentId]);
-            $recordId = $existing['id'];
-        } else {
-            $data['student_id'] = $studentId;
-            $recordId = $db->insert('health_records', $data);
-        }
-        echo json_encode(['success' => true, 'message' => 'Health record saved.', 'data' => ['id' => $recordId]]);
-        exit;
-    }
-
-    // ─── HEALTH RECORD ── include blood_pressure / dietary_restrictions
-    //     (columns added by registrar_upgrade.sql — guarded with branch)
-    if ($method === 'POST' && isset($_GET['action']) && $_GET['action'] === 'save-health-full') {
-        $input = json_decode(file_get_contents('php://input'), true);
-        $studentId = intval($input['student_id'] ?? 0);
-        if (!$studentId) { echo json_encode(['success' => false, 'message' => 'Student ID is required.']); exit; }
-        $data = [
-            'blood_type'              => $input['blood_type'] ?? null,
-            'allergies'               => $input['allergies'] ?? null,
-            'pre_existing_conditions' => $input['pre_existing_conditions'] ?? null,
-            'immunization_records'    => $input['immunization_records'] ?? null,
-            'height'                  => ($input['height'] ?? '') !== '' ? (float) $input['height'] : null,
-            'weight'                  => ($input['weight'] ?? '') !== '' ? (float) $input['weight'] : null,
-            'blood_pressure'          => $input['blood_pressure'] ?? null,
-            'dietary_restrictions'    => $input['dietary_restrictions'] ?? null,
-            'notes'                   => $input['notes'] ?? null
-        ];
-        $existing = $db->fetchOne("SELECT id FROM health_records WHERE student_id = ?", [$studentId]);
-        if ($existing) {
-            $db->update('health_records', $data, 'student_id = ?', [$studentId]);
-            $recordId = $existing['id'];
-        } else {
-            $data['student_id'] = $studentId;
-            $recordId = $db->insert('health_records', $data);
-        }
-        echo json_encode(['success' => true, 'message' => 'Health record saved.', 'data' => ['id' => $recordId]]);
-        exit;
-    }
-
-    // ─── HEALTH VISITS (Subsystem 4 — timeline) ────────────────
-    // GET ?action=visits&student_id=N   → list visits
-    // POST ?action=add-visit            → create a visit
-    // POST ?action=delete-visit         → remove a visit
-    $hasVisits = (int) $db->fetchColumn("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'health_visits'") === 1;
-    if ($method === 'GET' && isset($_GET['action']) && $_GET['action'] === 'visits' && isset($_GET['student_id'])) {
-        if (!$hasVisits) { echo json_encode(['success' => true, 'data' => []]); exit; }
-        $visits = $db->fetchAll(
-            "SELECT * FROM health_visits WHERE student_id = ? ORDER BY visit_date DESC, id DESC",
-            [intval($_GET['student_id'])]);
-        echo json_encode(['success' => true, 'data' => $visits]);
-        exit;
-    }
-
-    if ($method === 'POST' && isset($_GET['action']) && $_GET['action'] === 'add-visit') {
-        $input = json_decode(file_get_contents('php://input'), true);
-        $studentId = intval($input['student_id'] ?? 0);
-        if (!$studentId) { echo json_encode(['success' => false, 'message' => 'Student ID is required.']); exit; }
-        if (!$hasVisits) { echo json_encode(['success' => false, 'message' => 'Run registrar_upgrade.sql first (health_visits table missing).']); exit; }
-        $id = $db->insert('health_visits', [
-            'student_id'     => $studentId,
-            'visit_date'     => ($input['visit_date'] ?? '') !== '' ? $input['visit_date'] : date('Y-m-d'),
-            'complaint'      => $input['complaint'] ?? null,
-            'diagnosis'      => $input['diagnosis'] ?? null,
-            'temperature'    => ($input['temperature'] ?? '') !== '' ? (float) $input['temperature'] : null,
-            'blood_pressure' => $input['blood_pressure'] ?? null,
-            'treatment'      => $input['treatment'] ?? null,
-            'medication'     => $input['medication'] ?? null,
-            'physician'      => $input['physician'] ?? null,
-            'notes'          => $input['notes'] ?? null,
-            'created_at'     => date('Y-m-d H:i:s')
-        ]);
-        // bump clinic_visits counter
-        $db->getConnection()->exec("UPDATE health_records hr SET hr.clinic_visits = COALESCE(hr.clinic_visits,0) + 1 WHERE hr.student_id = " . intval($studentId));
-        echo json_encode(['success' => true, 'message' => 'Visit logged.', 'data' => ['id' => $id]]);
-        exit;
-    }
-
-    if ($method === 'POST' && isset($_GET['action']) && $_GET['action'] === 'delete-visit') {
-        $input = json_decode(file_get_contents('php://input'), true);
-        $id = intval($input['id'] ?? 0);
-        if (!$id) { echo json_encode(['success' => false, 'message' => 'Visit ID required.']); exit; }
-        $db->delete('health_visits', 'id = ?', [$id]);
-        echo json_encode(['success' => true, 'message' => 'Visit deleted.']);
         exit;
     }
 

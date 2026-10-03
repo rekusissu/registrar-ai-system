@@ -412,8 +412,5 @@ function signInSession(array $user): string {
     if ($role === 'student') {
         return 'student/dashboard.php';
     }
-    if ($role === 'nurse') {
-        return 'nurse/dashboard.php';
-    }
     return 'dashboard.php';
 }

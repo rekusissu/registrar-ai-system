@@ -30,8 +30,8 @@
 --
 -- TAKE THAT DUMP FIRST, EVERY TIME. There is no undo in SQL and no prompt.
 --
--- What you get afterwards: the correct schema, and three staff logins - one
--- admin, one registrar, one nurse - whose bcrypt hashes are in this repository
+-- What you get afterwards: the correct schema, and two staff logins - one
+-- admin, one registrar - whose bcrypt hashes are in this repository
 -- and therefore public. Change every password immediately after importing:
 --
 --   php create_admin.php
@@ -271,63 +271,6 @@ CREATE TABLE `staff_notification_reads` (
   `last_read_id` int(11) NOT NULL DEFAULT 0,
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-DROP TABLE IF EXISTS `clinic_incidents`;
-CREATE TABLE `clinic_incidents` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `student_id` int(11) DEFAULT NULL,
-  `incident_type` varchar(100) NOT NULL,
-  `description` text DEFAULT NULL,
-  `location` varchar(150) DEFAULT NULL,
-  `incident_date` date DEFAULT NULL,
-  `incident_time` time DEFAULT NULL,
-  `severity` enum('low','medium','high','critical') DEFAULT 'low',
-  `action_taken` text DEFAULT NULL,
-  `follow_up` text DEFAULT NULL,
-  `status` enum('open','in_progress','resolved','closed') DEFAULT 'open',
-  `reported_by` int(11) DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`),
-  KEY `idx_ci_student` (`student_id`),
-  KEY `idx_ci_status` (`status`),
-  KEY `idx_ci_date` (`incident_date`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-DROP TABLE IF EXISTS `clinic_supplies`;
-CREATE TABLE `clinic_supplies` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `name` varchar(150) NOT NULL,
-  `category` varchar(80) DEFAULT NULL,
-  `quantity` int(11) DEFAULT 0,
-  `unit` varchar(30) DEFAULT 'pcs',
-  `min_quantity` int(11) DEFAULT 5,
-  `description` text DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  PRIMARY KEY (`id`),
-  KEY `idx_cs_category` (`category`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-DROP TABLE IF EXISTS `clinic_supply_usage`;
-CREATE TABLE `clinic_supply_usage` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `supply_id` int(11) NOT NULL,
-  `quantity_used` int(11) NOT NULL DEFAULT 1,
-  `health_visit_id` int(11) DEFAULT NULL,
-  `used_by` int(11) DEFAULT NULL,
-  `notes` text DEFAULT NULL,
-  `used_at` datetime NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`),
-  KEY `idx_csu_supply` (`supply_id`),
-  KEY `idx_csu_visit` (`health_visit_id`),
-  CONSTRAINT `fk_csu_supply` FOREIGN KEY (`supply_id`) REFERENCES `clinic_supplies` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
@@ -731,79 +674,6 @@ CREATE TABLE `guardians` (
   KEY `idx_contact` (`contact_number`),
   CONSTRAINT `guardians_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-DROP TABLE IF EXISTS `health_records`;
-CREATE TABLE `health_records` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `student_id` int(11) NOT NULL,
-  `blood_type` varchar(5) DEFAULT NULL,
-  `allergies` text DEFAULT NULL,
-  `pre_existing_conditions` text DEFAULT NULL,
-  `immunization_records` text DEFAULT NULL,
-  `height` decimal(5,2) DEFAULT NULL,
-  `weight` decimal(5,2) DEFAULT NULL,
-  `clinic_visits` int(11) DEFAULT 0,
-  `notes` text DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `blood_pressure` varchar(12) DEFAULT NULL,
-  `dietary_restrictions` text DEFAULT NULL,
-  `medical_history` text DEFAULT NULL,
-  `surgical_history` text DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `idx_student_id` (`student_id`),
-  CONSTRAINT `health_records_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-DROP TABLE IF EXISTS `health_visits`;
-CREATE TABLE `health_visits` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `student_id` int(11) NOT NULL,
-  `visit_date` date DEFAULT NULL,
-  `complaint` varchar(255) DEFAULT NULL,
-  `diagnosis` varchar(255) DEFAULT NULL,
-  `temperature` decimal(4,1) DEFAULT NULL,
-  `blood_pressure` varchar(12) DEFAULT NULL,
-  `treatment` varchar(255) DEFAULT NULL,
-  `medication` text DEFAULT NULL,
-  `physician` varchar(100) DEFAULT NULL,
-  `notes` text DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `date_time` datetime DEFAULT NULL,
-  `reason_for_visit` varchar(255) DEFAULT NULL,
-  `assessment` varchar(255) DEFAULT NULL,
-  `action_taken` varchar(255) DEFAULT NULL,
-  `nurse_notes` text DEFAULT NULL,
-  `record_status` enum('Recorded','Draft','Pending','Cancelled') NOT NULL DEFAULT 'Recorded',
-  `recorded_by` int(11) DEFAULT NULL,
-  `blood_type` varchar(5) DEFAULT NULL,
-  `allergies` text DEFAULT NULL,
-  `height` decimal(5,2) DEFAULT NULL,
-  `weight` decimal(5,2) DEFAULT NULL,
-  `pre_existing_conditions` text DEFAULT NULL,
-  `immunization_records` text DEFAULT NULL,
-  `visit_type` varchar(32) DEFAULT NULL,
-  `onset_at` datetime DEFAULT NULL,
-  `incident_details` text DEFAULT NULL,
-  `symptoms` text DEFAULT NULL,
-  `pain_score` tinyint(3) DEFAULT NULL,
-  `red_flags` text DEFAULT NULL,
-  `pulse` smallint(6) DEFAULT NULL,
-  `respiratory_rate` smallint(6) DEFAULT NULL,
-  `oxygen_saturation` decimal(5,2) DEFAULT NULL,
-  `current_medications` text DEFAULT NULL,
-  `disposition` varchar(64) DEFAULT NULL,
-  `return_precautions` text DEFAULT NULL,
-  `follow_up_plan` text DEFAULT NULL,
-  PRIMARY KEY (`id`),
-  KEY `idx_student_id` (`student_id`),
-  KEY `idx_recorded_by` (`recorded_by`),
-  CONSTRAINT `fk_visit_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!40101 SET character_set_client = utf8 */;
@@ -1220,7 +1090,7 @@ CREATE TABLE `users` (
   `email` varchar(100) NOT NULL,
   `password_hash` varchar(255) NOT NULL,
   `full_name` varchar(100) NOT NULL,
-  `role` enum('admin','registrar','staff','teacher','student','nurse') NOT NULL DEFAULT 'staff',
+  `role` enum('admin','registrar','staff','teacher','student') NOT NULL DEFAULT 'staff',
   `rfid_uid` varchar(20) DEFAULT NULL,
   `is_active` tinyint(1) DEFAULT 1,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -1259,20 +1129,24 @@ CREATE TABLE `users` (
 -- ---------------------------------------------------------------------------
 -- Staff accounts.
 --
--- The three staff logins are seeded so a fresh install can be signed into:
--- ONE per role - admin, registrar, nurse. Change their passwords before the
+-- The two staff logins are seeded so a fresh install can be signed into:
+-- ONE per role - admin, registrar. Change their passwords before the
 -- host goes live, because the hashes below are in this repository and
 -- therefore known to anyone who has read it:
 --
 --   php create_admin.php
 --
--- THREE, not four. A second admin (roldantiu89@gmail.com, ADM-002) used to
+-- TWO, not three. A second admin (roldantiu89@gmail.com, ADM-002) used to
 -- be seeded here and was removed. Two admins sharing ONE password hash are
 -- two copies of a single credential, and that address had already caused a
 -- real incident - it was a student's own address, so the UNIQUE index on
 -- users.email made that student's portal-account creation fail and silently
 -- discard their address (see SECURITY-ROADMAP.md). One admin cannot collide
 -- with anyone, because you are about to change its password anyway.
+--
+-- A nurse login used to be seeded here too. The clinic portal and every
+-- health record were removed, so the account had nothing left to sign into
+-- and the role itself no longer exists in the users.role enum.
 --
 -- Create any additional staff from inside the application once you are in and
 -- can set a password nobody else has seen.
@@ -1293,8 +1167,7 @@ CREATE TABLE `users` (
 -- ---------------------------------------------------------------------------
 INSERT INTO `users` (`id`, `email`, `password_hash`, `full_name`, `role`, `rfid_uid`, `is_active`, `created_at`, `updated_at`, `student_id`, `username`, `login_attempts`, `locked_until`) VALUES
 (1,'admin@gmail.com','$2y$10$f9PmndF92hBFI/jeJAWxC.Pua3Osob3.zkWHn9GRSTQXSyPX8x0dK','System Administrator','admin',NULL,1,'2026-07-07 06:42:45','2026-09-23 12:57:09',NULL,'ADM-001',0,NULL),
-(2,'registrar@gmail.com','$2y$10$zj33OjRB93RcPZWd2/f4VudcEqzDCfZdLAajEcZQ7LABuuEKeqFyu','Registrar Staff','registrar',NULL,1,'2026-07-07 06:42:45','2026-09-23 12:57:10',NULL,'RGS-001',0,NULL),
-(7,'norse@gmail.com','$2y$10$mg/TmAFfYjwZNW34o6IGHedMnnZ04hUmYgm5iGy7OvGAxtDEoGWee','norse','nurse',NULL,1,'2026-09-02 18:16:15','2026-09-02 18:17:05',NULL,NULL,0,NULL);
+(2,'registrar@gmail.com','$2y$10$zj33OjRB93RcPZWd2/f4VudcEqzDCfZdLAajEcZQ7LABuuEKeqFyu','Registrar Staff','registrar',NULL,1,'2026-07-07 06:42:45','2026-09-23 12:57:10',NULL,'RGS-001',0,NULL);
 
 -- Explicit COMMIT. Every statement above commits on its own under the
 -- default autocommit, so this changes nothing in the normal case - but an

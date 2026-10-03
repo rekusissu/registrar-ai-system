@@ -21,7 +21,7 @@
 //    · requires a session (any authenticated role)
 //    · admin / registrar / staff → any file
 //    · student                   → only files on their own record
-//    · nurse / teacher           → refused (file storage is not theirs)
+//    · teacher                   → refused (file storage is not theirs)
 //    · forces Content-Disposition: attachment with a safe filename
 //    · sends nosniff + a neutral Content-Type, so a stored .txt or .svg
 //      can never execute in the app's origin (stored XSS)
@@ -150,7 +150,7 @@ if ($realAbs === false || $realRoot === false || strpos($realAbs, $realRoot) !==
 // ── 4. Authorisation ──────────────────────────────────────────
 if (!$isStaff && !$isReceipt) {
     if ($role !== 'student') {
-        // nurse, teacher, or anything else: file storage is not theirs.
+        // teacher, or anything else: file storage is not theirs.
         jsonFail(403, 'Forbidden.');
     }
     // A student may only fetch their own documents. The id comes from the

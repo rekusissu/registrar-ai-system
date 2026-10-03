@@ -31,7 +31,7 @@ $db = Database::getInstance();
 $id = isset($_GET['id']) ? intval($_GET['id']) : null;
 $input = json_decode(file_get_contents('php://input'), true) ?: [];
 
-$roles = ['admin', 'registrar', 'staff', 'nurse'];
+$roles = ['admin', 'registrar', 'staff'];
 
 // ─── LIST ─────────────────────────────────────────────────────
 if ($method === 'GET') {

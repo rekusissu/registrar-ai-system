@@ -25,7 +25,7 @@ require_once __DIR__ . '/../shared/config.php';
 require_once __DIR__ . '/../shared/database.php';
 require_once __DIR__ . '/../shared/analytics.php';
 
-// Registrar analytics is staff work — student and nurse accounts are
+// Registrar analytics is staff work — student accounts are
 // bounced the same way requireRole() does it, just with the extra roles
 // this page allows (admin, registrar, staff).
 if (!in_array(getCurrentUserRole(), aiInsightRoles(), true)) {

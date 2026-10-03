@@ -246,11 +246,11 @@ foreach ($need as list($t, $c)) {
 t('the walk-in document columns are present', count($absent) === 0, implode(', ', $absent));
 
 // -- 4. Seeded data is limited to the staff accounts. Two rules:
-//         - only users rows, and only for admin / registrar / nurse
+//         - only users rows, and only for admin / registrar
 //         - never a student, because a student login is personal data
 //       Everything else the dump touches would be someone else's data or
 //       someone else's business policy arriving on a new install.
-$allowed = array('admin', 'registrar', 'nurse');
+$allowed = array('admin', 'registrar');
 $seededTables = array();
 foreach ($fresh as $tbl) {
     $n = (int) $root->query("SELECT COUNT(*) FROM `$tmp`.`$tbl`")->fetchColumn();

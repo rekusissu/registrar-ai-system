@@ -109,7 +109,7 @@ $intents = [
     ],
     'health' => [
         ['health', 'medical', 'clinic', 'blood type', 'bmi'],
-        'Your health profile (blood type, height, weight, BMI, medical/surgical history) is under Health Records. Clinic visits are logged by the campus clinic.',
+        'This portal does not hold health records - the clinic portal and every health record were removed. Bring medical concerns to the school clinic directly.',
     ],
     'contact' => [
         ['contact', 'office', 'registrar', 'staff', 'where', 'address', 'phone'],

@@ -342,8 +342,6 @@ final class AuthHardeningTest extends TestCase
     public function testStateChangingEndpointsLoadCsrfGuard(): void
     {
         foreach ([
-            'api/clinic-incidents.php',
-            'api/clinic-supplies.php',
             'api/mock/payment.php',
             'api/mock/lalamove.php',
         ] as $file) {
@@ -573,7 +571,7 @@ final class AuthHardeningTest extends TestCase
     public function testNoSourceFileEmitsBytesBeforePhp(): void
     {
         $files = [];
-        foreach (['shared', 'api', 'registrar', 'student', 'nurse', 'queue'] as $dir) {
+        foreach (['shared', 'api', 'registrar', 'student', 'queue'] as $dir) {
             $path = dirname(__DIR__) . '/' . $dir;
             if (!is_dir($path)) {
                 continue;

@@ -1118,7 +1118,6 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 <button class="vtab active" onclick="switchVTab(this,'profile')" style="padding:8px 14px;border:none;background:none;font-size:12px;font-weight:600;color:#2563eb;cursor:pointer;border-bottom:2px solid #2563eb;font-family:inherit;"><i class="fas fa-user"></i> Profile</button>
 <button class="vtab" onclick="switchVTab(this,'documents')" style="padding:8px 14px;border:none;background:none;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;border-bottom:2px solid transparent;font-family:inherit;"><i class="fas fa-file"></i> Documents</button>
 <button class="vtab" onclick="switchVTab(this,'academic')" style="padding:8px 14px;border:none;background:none;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;border-bottom:2px solid transparent;font-family:inherit;"><i class="fas fa-school"></i> Academic</button>
-<button class="vtab" onclick="switchVTab(this,'health')" style="padding:8px 14px;border:none;background:none;font-size:12px;font-weight:600;color:#64748b;cursor:pointer;border-bottom:2px solid transparent;font-family:inherit;"><i class="fas fa-heartbeat"></i> Health</button>
 </div>
 <div class="modal-body">
 <!-- Tab: Profile -->
@@ -1245,8 +1244,6 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 <div class="vtab-content" id="tabDocuments" style="display:none;"><div id="vDocuments" style="padding:8px 0;"><p style="color:#94a3b8;font-size:13px;">Loading...</p></div></div>
 <!-- Tab: Academic -->
 <div class="vtab-content" id="tabAcademic" style="display:none;"><div id="vAcademic" style="padding:8px 0;"><p style="color:#94a3b8;font-size:13px;">Loading...</p></div></div>
-<!-- Tab: Health -->
-<div class="vtab-content" id="tabHealth" style="display:none;"><div id="vHealth" style="padding:8px 0;"><p style="color:#94a3b8;font-size:13px;">Loading...</p></div></div>
 </div>
 <div class="modal-footer"><button class="btn btn-secondary" onclick="resendWelcomeEmail()" id="resendWelcomeBtn"><i class="fas fa-envelope"></i> Resend Welcome Email</button> <button class="btn btn-primary" onclick="closeViewModal()"><i class="fas fa-times"></i> Close</button></div></div></div><!-- /#viewModal -->
 <!-- Three closing tags, and each has a job: the footer, the card, and the
@@ -1712,7 +1709,6 @@ document.getElementById('vYearLevel').textContent = s.year_level ? s.year_level 
         // Load other tabs
         loadDocuments(s.id);
         loadAcademic(s.id);
-        loadHealth(s.id);
         // AI profile summary — non-blocking, cached, graceful on slowness.
         const aiSum = document.getElementById('vAiSummary');
         aiSum.style.display = 'block';
@@ -1855,14 +1851,6 @@ function loadAcademic(sid) {
         const el=document.getElementById('vAcademic');
         if(!d.success||!d.data||!d.data.length){el.innerHTML='<p style="color:#94a3b8;font-size:13px;">No academic history found.</p>';return;}
         el.innerHTML='<table style="width:100%;font-size:12px;"><tr style="color:#64748b;font-weight:600;"><td>School</td><td>Year</td><td>GWA</td></tr>'+d.data.map(a=>'<tr style="border-bottom:1px solid #f1f5f9;"><td>'+a.school_name+'</td><td>'+(a.school_year||'')+'</td><td>'+(a.gwa||'—')+'</td></tr>').join('')+'</table>';
-    }).catch(()=>{});
-}
-function loadHealth(sid) {
-    fetch('../api/students.php?action=health&student_id='+sid).then(r=>r.json()).then(d=>{
-        const el=document.getElementById('vHealth');
-        if(!d.success||!d.data){el.innerHTML='<p style="color:#94a3b8;font-size:13px;">No health record.</p>';return;}
-        const h=d.data;
-        el.innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;"><div class="view-item"><div class="lbl">Blood Type</div><div class="val">'+(h.blood_type||'—')+'</div></div><div class="view-item"><div class="lbl">Height / Weight</div><div class="val">'+(h.height?h.height+'cm':'—')+' / '+(h.weight?h.weight+'kg':'—')+'</div></div><div class="view-item" style="grid-column:span 2;"><div class="lbl">Allergies</div><div class="val">'+(h.allergies||'None')+'</div></div><div class="view-item" style="grid-column:span 2;"><div class="lbl">Pre-existing Conditions</div><div class="val">'+(h.pre_existing_conditions||'None')+'</div></div></div>';
     }).catch(()=>{});
 }
 // The in-page "Change Photo" flow was removed with the upload control it backed.

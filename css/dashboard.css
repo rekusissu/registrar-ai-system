@@ -575,68 +575,6 @@
     font-weight: 500;
 }
 
-/* ── Activity List ── */
-.activity-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.activity-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 16px;
-    background: #f8fafc;
-    border-radius: 12px;
-    border: 1px solid #f1f5f9;
-    transition: all 0.2s ease;
-}
-
-.activity-item:hover {
-    background: #f1f5f9;
-    border-color: #e2e8f0;
-}
-
-.activity-item .activity-left {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.activity-item .activity-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 13px;
-    flex-shrink: 0;
-}
-
-.activity-icon.active { background: #dcfce7; color: #16a34a; }
-.activity-icon.risk { background: #fee2e2; color: #dc2626; }
-.activity-icon.warning { background: #fef3c7; color: #b45309; }
-
-.activity-item .activity-info .activity-name {
-    font-weight: 600;
-    font-size: 13px;
-    color: #0f172a;
-}
-
-.activity-item .activity-info .activity-detail {
-    font-size: 12px;
-    color: #64748b;
-    margin-top: 1px;
-}
-
-.activity-item .activity-time {
-    font-size: 11px;
-    color: #94a3b8;
-    flex-shrink: 0;
-}
-
 /* ── Empty State ── */
 .empty-state {
     display: flex;

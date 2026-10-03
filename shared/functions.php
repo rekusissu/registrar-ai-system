@@ -13,7 +13,8 @@ require_once __DIR__ . '/section_code.php';
 // HTML-escape a value for output in a text node or a quoted attribute.
 //
 // WHY THIS EXISTS: escaping was opt-in and manual — every page called
-// htmlspecialchars() by hand, and nurse/dashboard.php even defined its own
+// htmlspecialchars() by hand, and the (now removed) nurse portal even
+// defined its own
 // local h(). That makes escaping easy to forget, and one forgotten call is
 // a stored XSS: a student record with a name like `<img src=x
 // onerror=alert(1)>` renders as live script for every staff member who
