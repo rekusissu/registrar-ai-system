@@ -66,23 +66,49 @@ $pageNum      = max(1, (int) ($_GET['page'] ?? 1));
 // server-side paging, and a URL makes the view shareable and the back
 // button meaningful.
 //
-// year_level is validated as 1..4 before it reaches SQL. It is bound as
-// a parameter, so this is not an injection guard — it is there so a
-// nonsense value filters to nothing silently instead of showing an
-// empty directory that looks like lost records.
-$filterYear = isset($_GET['year']) ? trim((string) $_GET['year']) : '';
-if ($filterYear !== '' && (!ctype_digit($filterYear) || (int) $filterYear < 1 || (int) $filterYear > 4)) {
-    $filterYear = '';
-}
-$filterYear = $filterYear === '' ? '' : (string) (int) $filterYear;
-
-$filterProgram = isset($_GET['program']) ? trim((string) $_GET['program']) : '';
-// Longest program name in the roster, so the bound length below cannot
-// reject a real one.
+// Four facets, each one a SET rather than a single value, because the question
+// this panel answers is "show me these students", and that is rarely one value
+// of anything: a registrar chasing a section is looking at BSIT 2nd year
+// first semester, and then BSIT 3rd year first semester too.
+//
+// They arrive as name[] from the checkboxes, comma-separated from a shared URL,
+// and both are accepted so a filtered view can be pasted to a colleague.
+//
+// Every value is checked against what the roster actually holds before it
+// reaches SQL. The bind is already safe; this is so a stale link filters to
+// nothing rather than to a confusing subset.
 $MAX_PROGRAM = (int) $db->fetchColumn("SELECT COALESCE(MAX(CHAR_LENGTH(course)), 0) FROM students");
-if (mb_strlen($filterProgram) > $MAX_PROGRAM) {
-    $filterProgram = '';
-}
+
+$facetValues = static function (string $key, int $maxLen = 255) use ($MAX_PROGRAM): array {
+    $raw = $_GET[$key] ?? [];
+    if (is_string($raw)) {
+        $raw = explode(',', $raw);
+    }
+    if (!is_array($raw)) {
+        return [];
+    }
+    $out = [];
+    foreach ($raw as $v) {
+        $v = trim((string) $v);
+        if ($v === '') {
+            continue;
+        }
+        if (mb_strlen($v) > $maxLen) {
+            continue;
+        }
+        $out[$v] = $v;          // key => value, so a repeat collapses
+    }
+    return array_values($out);
+};
+
+// Ordinal suffix for the year labels: "1st year", not "Year 1". The array is
+// there because the set is fixed; "11th"-style generalisation is not needed.
+$ORDINAL = [1 => 'st', 2 => 'nd', 3 => 'rd', 4 => 'th'];
+
+$filterYear     = array_values(array_filter($facetValues('year'),      'ctype_digit'));
+$filterProgram  = $facetValues('program', $MAX_PROGRAM);
+$filterSemester = $facetValues('semester');
+$filterSection  = $facetValues('section');
 
 $counts = [];
 foreach ($STATUSES as $s) {
@@ -121,13 +147,22 @@ if ($filterStatus !== '' && in_array($filterStatus, $STATUSES, true)) {
     $where[] = 's.status = ?';
     $params[] = $filterStatus;
 }
-if ($filterYear !== '') {
-    $where[] = 's.year_level = ?';
-    $params[] = (int) $filterYear;
-}
-if ($filterProgram !== '') {
-    $where[] = 's.course = ?';
-    $params[] = $filterProgram;
+// Each facet becomes its own IN clause. Ticking values inside one facet
+// widens the result (1st OR 2nd year); ticking across facets narrows it
+// (BSIT AND 1st). That is the only combination people expect from a filter.
+$facetClauses = [
+    'year'      => [$filterYear,     's.year_level', true],
+    'program'   => [$filterProgram,  's.course',     false],
+    'semester'  => [$filterSemester, 's.semester',   false],
+    'section'   => [$filterSection,  's.section',    false],
+];
+foreach ($facetClauses as [$vals, $col, $isInt]) {
+    if (!$vals) {
+        continue;
+    }
+    $ph = implode(',', array_fill(0, count($vals), '?'));
+    $where[] = "$col IN ($ph)";
+    $params   = array_merge($params, $isInt ? array_map('intval', $vals) : $vals);
 }
 if ($search !== '') {
     $where[] = '(s.student_number LIKE ? OR s.first_name LIKE ? OR s.last_name LIKE ? OR CONCAT(s.first_name," ",s.last_name) LIKE ?)';
@@ -180,25 +215,57 @@ $sql = "SELECT s.id, s.student_number, s.first_name, s.middle_name, s.last_name,
         LIMIT $PER_PAGE OFFSET $offset";
 $students = $db->fetchAll($sql, $orderParams);
 
-// Counts for the two new filters. Read from the data rather than a fixed
-// 1..4 list, because a year level with nobody in it must still be offered
-// (a registrar filtering by year needs to see that year 4 is empty) while
-// a level the column has never held must not be invented.
-$yearCounts = [];
-foreach ($db->fetchAll(
-    "SELECT year_level, COUNT(*) AS c FROM students
-     WHERE year_level IS NOT NULL GROUP BY year_level ORDER BY year_level"
-) as $r) {
-    $yearCounts[(int) $r['year_level']] = (int) $r['c'];
+// What each facet can offer, and how many students sit behind each value.
+//
+// Counts are the whole-roster count per value, not the count within the other
+// three facets. A count that re-counts itself to zero as you tick is a filter
+// that appears broken: tick "1st year" and every other year shows 0, which
+// reads as "there are no 2nd years" rather than "no 2nd years match what you
+// have ticked so far". The number answers "how big is this cohort", which is
+// the question worth asking before ticking it.
+$facetOptions = [];
+
+$facetOptions['year'] = [];
+foreach ([1, 2, 3, 4] as $y) {
+    // Always offered, even at zero. A year with nobody in it must still be
+    // tickable so a registrar can confirm it is empty rather than wonder
+    // whether the option is missing.
+    $facetOptions['year'][(string) $y] = [
+        'label' => $y . $ORDINAL[$y] . ' year',
+        'count' => (int) $db->fetchColumn(
+            "SELECT COUNT(*) FROM students WHERE year_level = ?", [$y]
+        ),
+    ];
 }
 
-$programCounts = [];
+$facetOptions['program'] = [];
 foreach ($db->fetchAll(
     "SELECT course, COUNT(*) AS c FROM students
      WHERE course IS NOT NULL AND TRIM(course) <> ''
      GROUP BY course ORDER BY course"
 ) as $r) {
-    $programCounts[(string) $r['course']] = (int) $r['c'];
+    $facetOptions['program'][(string) $r['course']] = [
+        'label' => courseAcronym((string) $r['course']) ?: (string) $r['course'],
+        'title' => (string) $r['course'],
+        'count' => (int) $r['c'],
+    ];
+}
+
+// Semester and section are free text in the enrolment form, so they are read
+// from the data rather than from a list written here - which would drift the
+// first time somebody typed "First Sem" instead of "1st".
+foreach (['semester' => 'semester', 'section' => 'section'] as $key => $col) {
+    $facetOptions[$key] = [];
+    foreach ($db->fetchAll(
+        "SELECT `$col` AS v, COUNT(*) AS c FROM students
+         WHERE `$col` IS NOT NULL AND TRIM(`$col`) <> ''
+         GROUP BY `$col` ORDER BY `$col`"
+    ) as $r) {
+        $facetOptions[$key][(string) $r['v']] = [
+            'label' => (string) $r['v'],
+            'count' => (int) $r['c'],
+        ];
+    }
 }
 
 // The distribution, and the filter, collapsed into one list in the rail.
@@ -216,12 +283,14 @@ foreach ($queueRows as $qr) {
 }
 
 // Builds a directory URL that preserves every filter, not just two.
-// Without this, choosing a year level drops the status filter, the search
-// and the page number, so the view jumps back to the first page and loses
-// the reader's place.
-$dirUrl = static function (array $over = []) use ($filterStatus, $search, $pageNum, $filterYear, $filterProgram): string {
-    $p = ['status' => $filterStatus, 'q' => $search, 'page' => $pageNum,
-          'year' => $filterYear, 'program' => $filterProgram];
+// Without this, changing one facet drops the other three, the search and the
+// page number, so the view jumps back to the first page and loses the
+// reader's place.
+$dirUrl = static function (array $over = []) use ($filterStatus, $search, $pageNum, $facetValues): string {
+    $p = ['status' => $filterStatus, 'q' => $search, 'page' => $pageNum];
+    foreach (['year', 'program', 'semester', 'section'] as $k) {
+        $p[$k] = $facetValues($k);
+    }
     foreach ($over as $k => $v) {
         $p[$k] = ($v === null || $v === '') ? '' : $v;
     }
@@ -230,14 +299,26 @@ $dirUrl = static function (array $over = []) use ($filterStatus, $search, $pageN
     if (isset($p['page']) && (int) $p['page'] <= 1) {
         unset($p['page']);
     }
-    $p = array_filter($p, static fn($v) => $v !== '' && $v !== null);
+    // Empty facets drop out so a shared link is four parameters, not eight.
+    // The scalar arm matters as much as the array one: the override loop
+    // above turns a null into '', and a '' left in the query reads as a
+    // filter that is set to nothing rather than as no filter at all.
+    $p = array_filter($p, static fn($v) => is_array($v) ? $v !== [] : ($v !== '' && $v !== null));
     return $p ? '?' . http_build_query($p) : '';
 };
 
-// True when anything at all is narrowing the directory. Drives the Clear
-// link and the "no students match" copy, which would otherwise claim
-// nothing matches a status when the real cause is a year level.
-$hasAnyFilter = $search !== '' || $filterStatus !== '' || $filterYear !== '' || $filterProgram !== '';
+// Every ticked value across every facet. Drives the badge on the button and
+// the "no students match" copy, which would otherwise claim nothing matches a
+// status when the real cause is a section with nobody in it.
+$activeFacets = [];
+foreach (['year', 'program', 'semester', 'section'] as $k) {
+    foreach ($facetValues($k) as $v) {
+        $activeFacets[] = ['key' => $k, 'value' => $v];
+    }
+}
+
+// True when anything at all is narrowing the directory. Drives the Clear link.
+$hasAnyFilter = $search !== '' || $filterStatus !== '' || $activeFacets !== [];
 
 
 $page_title = 'Status Tracker';
@@ -468,99 +549,84 @@ include '../includes/sidebar.php';
       <?php if ($filterStatus !== ''): ?>
         <input type="hidden" name="status" value="<?= htmlspecialchars($filterStatus) ?>">
       <?php endif; ?>
-      <?php // Year survives a plain submit through a hidden field: the year
-            // control is a set of links, not an input. Program does NOT need
-            // one - it is a real <select name="program">, and a hidden field
-            // of the same name beside it would send the value twice. ?>
-      <input type="hidden" name="year" value="<?= htmlspecialchars($filterYear) ?>">
+
       <div class="st-search">
         <i class="fas fa-search"></i>
         <input type="search" name="q" placeholder="Search name or student ID"
                value="<?= htmlspecialchars($search) ?>" autocomplete="off">
       </div>
 
-      <!-- Year level. A segmented control rather than a <select>: it is four
-           options, and seeing every cohort size at once is the point.
+      <?php /* The filter. Four facets - year, program, semester, section - as
+             tick lists in one panel.
 
-           Two decisions worth stating, because both were the other way round
-           first time:
+             They were not always here. Year was a strip of four buttons above
+             the search and program was its own single-select beside it, which
+             is two controls for one question: "3rd year" only means anything
+             relative to a program, and picking 3rd year on its own returns half
+             of every program on the roster. One panel says the relationship
+             instead of making it be inferred from two unrelated widgets.
 
-           - Ordinals (1st, 2nd) rather than bare digits. "1st Year" is how the
-             school says it out loud; "Year 1" is a database value.
-           - The rule under each ordinal is proportional to that year's share
-             of the largest cohort, so the shape of the intake is legible
-             without reading four numbers. A fourth year sitting near-empty is
-             a retention signal a registrar wants to see, not a rounding
-             detail. Click targets stay a fixed height - sizing the box itself
-             by count would make the empty years unclickable.
+             A <details> element, so the disclosure, the open state and the
+             keyboard behaviour are the browser's rather than reimplemented.
+             Plain checkboxes in a GET form: the panel posts on Apply, no JS
+             required, and the four parameters are shareable as a URL.
 
-           Counts are the whole-roster count per year, not the count within the
-           current status/program filter. A filter that re-counts itself to
-           zero looks broken. -->
-      <div class="st-year" role="group" aria-label="Filter by year level">
-        <span class="st-year-cap">Year level</span>
-        <div class="st-year-set">
-          <?php
-            // Ordinal suffix for 1-4. Held in an array rather than computed:
-            // the set is fixed, and "11th"-style generalisation is not needed.
-            $ORDINAL = [1 => 'st', 2 => 'nd', 3 => 'rd', 4 => 'th'];
-            // Widest cohort, the denominator for the proportional rule below.
-            // Guarded because an empty roster would otherwise divide by zero
-            // and emit a NaN width into the style attribute.
-            $yearMax = max(1, max($yearCounts ?: [0]));
-            // Always offer 1-4. A year with nobody in it must still be
-            // selectable, so a registrar can confirm it is empty rather than
-            // wondering whether the option is missing.
+             Every facet is optional and they combine with AND. Ticking values
+             INSIDE one facet widens the result - 1st OR 2nd year - which is
+             why these are boxes and not radios. */
+      $facetMeta = [
+          'year'     => 'Year',
+          'program'  => 'Program',
+          'semester' => 'Semester',
+          'section'  => 'Section',
+      ]; ?>
+      <details class="st-facets" id="stFacets"<?= $activeFacets ? ' open' : '' ?>>
+        <summary class="st-facets-btn">
+          <i class="fas fa-sliders" aria-hidden="true"></i>
+          <span>Filters</span>
+          <?php if ($activeFacets): ?>
+            <span class="st-facets-badge"><?= count($activeFacets) ?></span>
+          <?php endif; ?>
+          <i class="fas fa-chevron-down st-facets-chev" aria-hidden="true"></i>
+        </summary>
+
+        <div class="st-facets-panel">
+          <?php foreach ($facetMeta as $fkey => $fcap):
+              $opts  = $facetOptions[$fkey] ?? [];
+              $picked = $facetValues($fkey);
           ?>
-          <?php foreach ([1, 2, 3, 4] as $y):
-              $yc  = $yearCounts[$y] ?? 0;
-              $on  = $filterYear === (string) $y;
-              $pct = $yc === 0 ? 0 : max(6, round(($yc / $yearMax) * 100));
-          ?>
-            <a class="st-year-b<?= $on ? ' on' : '' ?><?= $yc === 0 ? ' is-empty' : '' ?>"
-               href="<?= htmlspecialchars($dirUrl(['year' => $on ? null : $y, 'page' => 1])) ?>"
-               aria-pressed="<?= $on ? 'true' : 'false' ?>"
-               title="<?= $yc === 0
-                     ? $y . $ORDINAL[$y] . ' year — no students'
-                     : $y . $ORDINAL[$y] . ' year — ' . number_format($yc) . ' ' . ($yc === 1 ? 'student' : 'students') ?>">
-              <span class="st-ord"><?= $y ?><?= $ORDINAL[$y] ?></span>
-              <span class="st-year-n"><?= number_format($yc) ?></span>
-              <span class="st-year-rule" style="--w:<?= $pct ?>%"></span>
-            </a>
+            <fieldset class="st-facet">
+              <legend><?= htmlspecialchars($fcap) ?></legend>
+              <?php if (!$opts): ?>
+                <p class="st-facet-none">None recorded yet</p>
+              <?php else: ?>
+                <div class="st-facet-list">
+                  <?php foreach ($opts as $oval => $o): ?>
+                    <label class="st-facet-opt">
+                      <input type="checkbox" name="<?= $fkey ?>[]"
+                             value="<?= htmlspecialchars((string) $oval) ?>"
+                             <?= in_array((string) $oval, $picked, true) ? 'checked' : '' ?>>
+                      <span class="st-facet-lbl"
+                            <?= isset($o['title']) && $o['title'] !== $o['label']
+                               ? 'title="' . htmlspecialchars($o['title']) . '"' : '' ?>><?= htmlspecialchars($o['label']) ?></span>
+                      <span class="st-facet-n"><?= number_format($o['count']) ?></span>
+                    </label>
+                  <?php endforeach; ?>
+                </div>
+              <?php endif; ?>
+            </fieldset>
           <?php endforeach; ?>
+
+          <div class="st-facets-actions">
+            <button type="submit" class="st-facets-apply">Apply filters</button>
+            <?php if ($activeFacets): ?>
+              <a class="st-facets-reset" href="<?= htmlspecialchars($dirUrl([
+                    'year' => null, 'program' => null, 'semester' => null,
+                    'section' => null, 'page' => null])) ?>">Reset</a>
+            <?php endif; ?>
+          </div>
         </div>
-      </div>
-
-      <?php /* Program. Open-ended free text in the data, so a select built from
-             the distinct values in the roster beats typing one. Always
-             rendered, even with nothing to choose, so the form's field set
-             does not change shape with the data.
-
-             The native select stays the control of record - it carries the
-             name, posts the value, and is the whole control when JS is off. A
-             custom listbox is layered over it by js/st-program-listbox.js,
-             which hides the native element and keeps it in sync. Building the
-             visible control in markup instead would mean two sources of truth
-             for the selected value; enhancing one is what stops them drifting.
-
-             Note: no angle-bracketed tag names, and no literal closing-tag
-             sequence, in this comment. PHP's lexer scans for a closing tag
-             even inside a comment, so either one ends the block early and the
-             rest of the sentence is parsed as code. */ ?>
-      <div class="st-progsel">
-        <span class="st-progsel-cap" id="stProgLbl">Program</span>
-        <span class="st-progsel-wrap">
-          <select name="program" id="programSel" class="st-progsel-in"
-                  aria-labelledby="stProgLbl" onchange="this.form.requestSubmit()">
-            <option value="">All programs</option>
-            <?php foreach ($programCounts as $pc => $pcc): ?>
-              <option value="<?= htmlspecialchars((string) $pc) ?>"<?= $filterProgram === (string) $pc ? ' selected' : '' ?>>
-                <?= htmlspecialchars((string) $pc) ?> (<?= number_format($pcc) ?>)
-              </option>
-            <?php endforeach; ?>
-          </select>
-        </span>
-      </div>
+      </details>
 
       <button type="submit" class="st-dirbar-go">Search</button>
       <?php if ($hasAnyFilter): ?>
@@ -586,16 +652,24 @@ include '../includes/sidebar.php';
               <div class="st-empty">
                 <i class="fas fa-inbox"></i>
                 <strong>No students match</strong>
-                <span><?php // Name the filter that actually emptied the table.
-                      // This used to say only "No student has that status",
-                      // which was wrong the moment a year level or a program
-                      // could also be narrowing the list. ?>
-                  <?php if ($search !== ''): ?>
+                <span><?php // Name the filters that actually emptied the table. With four
+                      // facets the old two-branch guess (year? program?)
+                      // silently blamed whichever it checked first. The
+                      // sentence is built here rather than in the markup,
+                      // because four ticked values across four columns is
+                      // already too much punctuation to assemble inline. ?>
+                  <?php if ($activeFacets):
+                      $sentences = [];
+                      foreach ($activeFacets as $af) {
+                          $sentences[] = ($facetOptions[$af['key']][$af['value']]['label'] ?? $af['value'])
+                                       . ' (' . $facetMeta[$af['key']] . ')';
+                      }
+                      $list = count($sentences) === 1 ? $sentences[0]
+                             : implode(', ', array_slice($sentences, 0, -1)) . ' and ' . end($sentences);
+                  ?>
+                    No student matches <?= htmlspecialchars($list) ?>.
+                  <?php elseif ($search !== ''): ?>
                     Nothing found for &ldquo;<?= htmlspecialchars($search) ?>&rdquo;.
-                  <?php elseif ($filterYear !== ''): ?>
-                    No year <?= htmlspecialchars($filterYear) ?> student<?= $filterProgram !== '' ? ' in ' . htmlspecialchars($filterProgram) : '' ?>.
-                  <?php elseif ($filterProgram !== ''): ?>
-                    No students in <?= htmlspecialchars($filterProgram) ?>.
                   <?php else: ?>
                     No student has that status.
                   <?php endif; ?>
@@ -834,10 +908,29 @@ include '../includes/sidebar.php';
 <!-- Toast -->
 <div class="st-toast" id="toast"></div>
 
-<!-- Program listbox. Progressive enhancement over the native select, which
-     stays in the DOM as the control of record. Loaded after the page script
-     so it does not race the toolbar's own initialisation. -->
-<script src="../js/st-program-listbox.js"></script>
+<!-- The filter panel is a native <details>, so it opens, closes and takes the
+     keyboard with no help at all. The only thing a browser will not do is
+     close it when the pointer goes down somewhere else, which is why a person
+     ends up clicking a filter open and then having to click the button again
+     to shut it. Everything else is deliberately absent: no live filtering, no
+     auto-submit on tick. Ticking several boxes and then committing is the
+     point, and a filter that reloads on every click makes comparing two
+     combinations impossible. -->
+<script>
+(function(){
+    var box = document.getElementById('stFacets');
+    if (!box) return;
+    document.addEventListener('pointerdown', function (e) {
+        if (box.open && !box.contains(e.target)) box.open = false;
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && box.open) {
+            box.open = false;
+            box.querySelector('summary').focus();
+        }
+    });
+})();
+</script>
 
 <script>
 'use strict';
@@ -1132,7 +1225,11 @@ dot.title=risks[id].reason||level;
 const missedBtn=document.getElementById('btnAIMissed');
 if(missedBtn)missedBtn.addEventListener('click',function(){runAI('missed');});
 
-toggleWindowFields();
+// toggleWindowFields() is called at the end of this script, next to the
+// WINDOWED list it reads. It used to be called from the init block above,
+// which runs before that const is initialised - a temporal dead zone
+// ReferenceError on every page load, thrown before anything else in the init
+// sequence could run.
 loadRisks();
 
 /* --- Student Modal --- */
@@ -1347,6 +1444,9 @@ if(btn){btn.disabled=false;btn.textContent='Record change';}
 }
 }
 window.submitStatusChange=submitStatusChange;
+
+// Now that WINDOWED exists, run the field toggle the init block could not.
+toggleWindowFields();
 
 })();
 </script>

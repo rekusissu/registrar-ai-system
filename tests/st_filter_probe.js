@@ -1,14 +1,21 @@
-// Screenshots the status-tracker directory toolbar (year strip + program
-// select) at three widths, and reports the measured geometry of each year
-// button, so the control can be looked at rather than assumed.
+// Screenshots the Status Tracker toolbar and drives the four-facet filter:
+// Year, Program, Semester, Section.
 //
 //   node tests/st_filter_probe.js <port> <cookie> <outPrefix> [query]
 //
-// The optional query is a bare string, e.g. "year=1" - the "?" is added here.
+// The optional query is a bare string, e.g. "year[]=1&program[]=BSIT" - the
+// "?" is added here.
+//
+// It replaced a probe written against a strip of four year buttons and a
+// single-select program dropdown. Those are gone; the claim now is that one
+// panel offers four tick lists, that ticking survives a submit, and that a
+// second ticked value inside one facet WIDENS rather than replaces - which is
+// the whole reason these are checkboxes and not radios.
 //
 // Same CDP approach as modal_probe.js (no Playwright in this project).
-// Writes no database rows and touches no session: the page is loaded with
-// the caller's cookie, and the probe only reads the DOM.
+// Writes no database rows: the page is loaded with the caller's cookie and
+// the probe only reads the DOM and ticks boxes. Submitting is a GET.
+// ============================================================
 'use strict';
 const { spawn } = require('node:child_process');
 const os = require('node:os');
@@ -29,13 +36,7 @@ const CANDIDATES = [
 const browser = CANDIDATES.find((p) => fs.existsSync(p));
 if (!browser) { console.error('RESULT=NO_BROWSER'); process.exit(1); }
 
-const WIDTHS = [
-    // mode: 'stacked' means the controls below the strip take their own rows
-    // (phone), 'inline' means they share one row (desktop and narrow).
-    [1500, 1000, 'wide', 'inline'],
-    [1000, 900, 'narrow', 'inline'],
-    [560, 900, 'mobile', 'stacked'],
-];
+const WIDTHS = [[1500, 1000, 'wide'], [1000, 900, 'narrow'], [560, 900, 'mobile']];
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'dq-stfilter-'));
 const child = spawn(browser, ['--headless=new', '--disable-gpu', '--no-sandbox', '--no-first-run',
     `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, '--window-size=1500,1000', 'about:blank'],
@@ -47,12 +48,10 @@ function done(code) {
     try { fs.rmSync(profile, { recursive: true, force: true }); } catch (_) {}
     process.exit(code);
 }
+let failures = 0;
+function fail(msg) { console.log('  FAIL: ' + msg); failures++; }
 
 (async () => {
-    // Counts widths where the layout claim did not hold, so the exit code
-    // means something. Previously the probe printed numbers and always
-    // exited 0, which is how a broken layout kept reading as a pass.
-    let failures = 0;
     let target = null;
     for (let i = 0; i < 60 && !target; i++) {
         await sleep(200);
@@ -71,326 +70,185 @@ function done(code) {
         if (m.id && pending.has(m.id)) { const p = pending.get(m.id); pending.delete(m.id);
             m.error ? p.rej(new Error(JSON.stringify(m.error))) : p.res(m.result); } };
 
-    await send('Page.enable'); await send('Network.enable');
-    if (COOKIE) {
-        const kv = COOKIE.split(';')[0].split('=');
-        await send('Network.setCookie', { name: kv[0].trim(), value: kv[1], domain: 'localhost', path: '/' });
-    }
-
-    const ev = async (expr) => (await send('Runtime.evaluate',
-        { expression: expr, returnByValue: true, awaitPromise: true })).result.value;
-
-    // Collect page errors and failed requests. Without these, a script that
-    // 404s or throws looks exactly like a script that never existed - which
-    // is how a missing <script src> previously went unremarked.
-    const pageErrors = [];
+    await send('Page.enable'); await send('Network.enable'); await send('Runtime.enable');
+    const jsErrors = [];
     ws.addEventListener('message', (e) => {
         const m = JSON.parse(e.data);
         if (m.method === 'Runtime.exceptionThrown') {
             const d = m.params.exceptionDetails;
-            pageErrors.push('EXCEPTION: ' + (d.exception && d.exception.description || d.text));
-        } else if (m.method === 'Log.entryAdded' && m.params.entry.level === 'error') {
-            pageErrors.push('LOG: ' + m.params.entry.text);
-        } else if (m.method === 'Network.loadingFailed') {
-            pageErrors.push('NETFAIL: ' + m.params.errorText);
+            jsErrors.push((d.exception && (d.exception.description || d.exception.value)) || d.text);
         }
     });
-    await send('Runtime.enable');
-    await send('Log.enable');
+    if (COOKIE) {
+        const kv = COOKIE.split(';')[0].split('=');
+        await send('Network.setCookie', { name: kv[0].trim(), value: kv.slice(1).join('='),
+            domain: 'localhost', path: '/' });
+    }
 
-    for (const [w, h, name, mode] of WIDTHS) {
-        await send('Emulation.setDeviceMetricsOverride',
-            { width: w, height: h, deviceScaleFactor: 1, mobile: false });
-        // QUERY is a bare query string ("year=1"); the leading "?" belongs here
-        // so callers cannot get the URL wrong.
-        await send('Page.navigate', { url: BASE + (QUERY ? '?' + QUERY : '') });
-        // Wait for the year strip to actually exist rather than sleeping a
-        // fixed interval - the first navigation was being measured before the
-        // document arrived, which reported zero buttons and looked like a
-        // layout failure.
-        for (let i = 0; i < 40; i++) {
-            const n = await ev("document.querySelectorAll('.st-year-b').length");
-            if (Number(n) >= 4) break;
-            await sleep(250);
-        }
-        await sleep(400);
-
-        // Geometry of the year strip: every button's top edge should match,
-        // which is the actual claim being made - one row, not four stacked -
-        // plus the proportional rules, whose widths are the design claim.
-        const geo = await ev(`(function(){
-            var bs = Array.from(document.querySelectorAll('.st-year-b'));
-            var bar = document.querySelector('.st-dirbar');
-            var sel = document.querySelector('.st-progsel-in');
-            var chev = document.querySelector('.st-progsel-chev');
-            return {
-                count: bs.length,
-                tops: bs.map(function(b){ return Math.round(b.getBoundingClientRect().top); }),
-                w: bs.map(function(b){ return Math.round(b.getBoundingClientRect().width); }),
-                ords: bs.map(function(b){ var o=b.querySelector('.st-ord'); return o?o.textContent.trim():null; }),
-                nums: bs.map(function(b){ var o=b.querySelector('.st-year-n'); return o?o.textContent.trim():null; }),
-                ruleW: bs.map(function(b){
-                    var r=b.querySelector('.st-year-rule');
-                    return r?Math.round(r.getBoundingClientRect().width):null;
-                }),
-                onCount: document.querySelectorAll('.st-year-b.on').length,
-                barH: bar ? Math.round(bar.getBoundingClientRect().height) : -1,
-                overflowX: document.documentElement.scrollWidth > document.documentElement.clientWidth,
-                selW: sel ? Math.round(sel.getBoundingClientRect().width) : -1,
-                chevVisible: chev ? Math.round(chev.getBoundingClientRect().width) : -1,
-                dirbarWrap: bar ? getComputedStyle(bar).flexWrap : '?'
-            };
-        })()`);
-        // Which grid row each control landed on. The design claim is "the
-        // cohort strip gets its own full-width row" plus, below it, either
-        // one shared row (desktop) or a stack (phone).
-        const rows = await ev(`(function(){
-            function top(sel){
-                var e=document.querySelector(sel);
-                return e ? Math.round(e.getBoundingClientRect().top) : null;
-            }
-            return {
-                strip: top('.st-year'),
-                search: top('.st-search'),
-                program: top('.st-progsel'),
-                go: top('.st-dirbar-go'),
-                clear: top('.st-dirbar-clear'),
-                stripW: (function(){
-                    // .st-year is the grid item and legitimately spans the full
-                    // column. The instrument is .st-year-set inside it, so that
-                    // is what has to be measured - reading the parent reported
-                    // 809px and made a correct compact strip look stretched.
-                    var e=document.querySelector('.st-year-set');
-                    return e ? Math.round(e.getBoundingClientRect().width) : null;
-                })(),
-                barW: (function(){
-                    var e=document.querySelector('.st-dirbar');
-                    return e ? Math.round(e.getBoundingClientRect().width) : null;
-                })(),
-                display: (function(){
-                    var e=document.querySelector('.st-dirbar');
-                    return e ? getComputedStyle(e).display : null;
-                })()
-            };
-        })()`);
-        console.log(`${name} (${w}px): ` + JSON.stringify(geo));
-        console.log(`  rows: ${JSON.stringify(rows)}`);
-
-        // The claim under test, per width.
-        //  - the four segments share one row
-        //  - the strip sits on its own row, above the other controls
-        //  - the strip spans the toolbar's full width
-        //  - below it, controls share a row (inline) or each take their own
-        //    (stacked) - and in neither case do they overlap the strip
-        //
-        // Row membership is compared with a tolerance: align-items:center
-        // centres controls of different heights, so a select and a button on
-        // the same row report tops 1-2px apart. Exact equality reported that
-        // as a failure while the layout was in fact correct.
-        const TOL = 4;
-        const below = [rows.search, rows.program, rows.go, rows.clear]
-            .filter((v) => v !== null);
-        const spread = Math.max(...below) - Math.min(...below);
-        const segAligned = new Set(geo.tops).size === 1;
-        const stripOwnRow = rows.strip !== null && below.every((v) => v > rows.strip);
-        const controlsCorrect = mode === 'inline'
-            ? spread <= TOL
-            : spread > TOL;
-        // The strip must own its row, but must NOT stretch to fill it: an
-        // over-wide strip gave each segment 185px for three characters and
-        // read as four empty boxes. Cap it and assert it stays compact.
-        // The phone breakpoint is the one exception - there the strip is
-        // meant to fill the column - so the cap is checked per width.
-        const widestSeg = Math.max(0, ...geo.w.filter((n) => n > 0));
-        const cap = mode === 'stacked' ? 999 : 120;
-        const stripCap = mode === 'stacked' ? 999 : 520;
-        const stripCompact = widestSeg > 0 && widestSeg <= cap
-            && (rows.stripW === null || rows.stripW <= stripCap);
-        console.log(
-            `  segmentsOneRow=${segAligned} stripOwnRow=${stripOwnRow}`
-            + ` controlsCorrect(${mode})=${controlsCorrect} spread=${spread}px`
-            + ` stripW=${rows.stripW} widestSeg=${widestSeg}`
-            + ` stripCompact=${stripCompact} overflowX=${geo.overflowX}`
-        );
-        if (!segAligned || !stripOwnRow || !controlsCorrect
-            || !stripCompact || geo.overflowX) {
-            console.log('  FAIL: layout claim not met');
-            failures++;
-        }
-
+    async function ev(expr) {
+        const r = await send('Runtime.evaluate', { expression: expr, returnByValue: true, awaitPromise: true });
+        if (r.exceptionDetails) throw new Error(r.exceptionDetails.text);
+        return r.result.value;
+    }
+    async function shot(name) {
         const s = await send('Page.captureScreenshot', { format: 'png' });
         fs.writeFileSync(`${OUT}_${name}.png`, Buffer.from(s.data, 'base64'));
         console.log(`SHOT=${OUT}_${name}.png`);
-
-        // ── Program listbox ────────────────────────────────────
-        // Exercised only at the widest width: the claims are about behaviour
-        // and ARIA wiring, not layout, and doing it three times would triple
-        // the runtime to re-prove the same thing.
-        if (name === WIDTHS[0][2]) {
-            const lb = {};
-            lb.enhanced = await ev("!!document.querySelector('.st-lb-btn')");
-            // If the control is missing, say why before anything else: a 404
-            // on the script and a silent exception look identical from here.
-            if (!lb.enhanced) {
-                console.log('  listbox NOT enhanced. page errors: '
-                    + (pageErrors.length ? JSON.stringify(pageErrors) : '(none reported)'));
-                console.log('  script present in DOM: ' + await ev(
-                    "!!document.querySelector('script[src*=st-program-listbox]')"));
+    }
+    // Wait for the control rather than sleeping: this URL carries a
+    // 50-character degree title, so a fixed wait reads a half-built document
+    // and reports it as a missing control.
+    async function go(url, settle) {
+        // A falsy url means "wait for the current document": used after clicking
+        // something that navigates, where the reload is already in flight
+        // and there is no URL left to ask for.
+        if (url) await send('Page.navigate', { url });
+        const sel = settle || '.st-facets';
+        for (let i = 0; i < 60; i++) {
+            await sleep(150);
+            if (await ev(`document.readyState === 'complete' && !!document.querySelector('${sel}')`).catch(() => false)) {
+                await sleep(200);
+                return;
             }
-            lb.btnRole = await ev("(document.querySelector('.st-lb-btn')||{getAttribute:()=>null}).getAttribute('role')");
-            lb.expandedClosed = await ev("(document.querySelector('.st-lb-btn')||{getAttribute:()=>null}).getAttribute('aria-expanded')");
-            lb.nativeStillThere = await ev("!!document.querySelector('select[name=program]')");
-            lb.nativeNameOk = await ev("(document.querySelector('select[name=program]')||{}).name === 'program'");
-            lb.triggerLabel = await ev("(document.querySelector('.st-lb-val')||{}).textContent");
-
-            // Keyboard is driven by dispatching KeyboardEvents inside the page
-            // rather than through CDP Input. A headless target without OS-level
-            // focus silently drops raw input events, so the earlier version
-            // reported expandedOpen=false for a panel that had in fact opened
-            // and closed again - the arrow key never reached the button. The
-            // handlers under test are the same either way.
-            await ev("(function(){var b=document.querySelector('.st-lb-btn');b.focus();b.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true,cancelable:true}));})()");
-            await sleep(250);
-
-            lb.stateAfterOpen = await ev("(function(){var p=document.querySelector('.st-lb-panel');var b=document.querySelector('.st-lb-btn');return JSON.stringify({hidden:p.hidden,expanded:b.getAttribute('aria-expanded'),rows:document.querySelectorAll('.st-lb-row').length,val:b.querySelector('.st-lb-val').textContent});})()");
-
-            lb.expandedOpen = await ev("document.querySelector('.st-lb-btn').getAttribute('aria-expanded')");
-            lb.panelVisible = await ev("(function(){var p=document.querySelector('.st-lb-panel');return !!p && !p.hidden && p.getBoundingClientRect().height>0;})()");
-            lb.rowCount = await ev("document.querySelectorAll('.st-lb-row').length");
-            lb.panelRole = await ev("(document.querySelector('.st-lb-panel')||{getAttribute:()=>null}).getAttribute('role')");
-            lb.rowRoles = await ev("Array.from(document.querySelectorAll('.st-lb-row')).every(function(r){return r.getAttribute('role')==='option';})");
-            // Counts must be split into their own column, not glued to the tag.
-            // The "All programs" row is exempt: it is a reset, not a program,
-            // so it carries no roster count by design.
-            lb.countsSplit = await ev("Array.from(document.querySelectorAll('.st-lb-row')).filter(function(r){return !r.classList.contains('st-lb-all');}).every(function(r){var n=r.querySelector('.st-lb-n');return n && !/\\(\\d/.test(r.textContent.replace(/\\(\\d[\\d,]*\\)\\s*$/,''));})");
-            lb.activeRow = await ev("document.querySelectorAll('.st-lb-row.is-active').length");
-            // "All programs" must be reachable from inside the panel, or a
-            // chosen filter can only be undone via the toolbar's Clear link.
-            lb.hasAllRow = await ev("!!document.querySelector('.st-lb-all')");
-            lb.allRowFirst = await ev("(function(){var r=document.querySelectorAll('.st-lb-row');return r.length>0 && r[0].classList.contains('st-lb-all');})()");
-            // The panel must not run past the right edge of the viewport: the
-            // count column is the part that cannot be elided.
-            lb.fitsViewport = await ev("(function(){var p=document.querySelector('.st-lb-panel');if(!p||p.hidden)return 'n/a';var r=p.getBoundingClientRect();return Math.round(r.right)+'<='+window.innerWidth;})()");
-            lb.noHorizontalScroll = await ev("(function(){var p=document.querySelector('.st-lb-panel');return p.scrollWidth<=p.clientWidth+1;})()");
-            // The panel must not be clipped to the trigger width.
-            lb.panelW = await ev("(function(){var p=document.querySelector('.st-lb-panel');var b=document.querySelector('.st-lb-btn');return p&&b?Math.round(p.getBoundingClientRect().width)+'/'+Math.round(b.getBoundingClientRect().width):null;})()");
-
-            // Escape must close and return focus, not just hide the panel.
-            await ev("(function(){document.querySelector('.st-lb-btn').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}));})()");
-            await sleep(200);
-            lb.closedByEsc = await ev("(function(){var p=document.querySelector('.st-lb-panel');return !!p && p.hidden;})()");
-            lb.focusOnBtn = await ev("document.activeElement === document.querySelector('.st-lb-btn')");
-            console.log('  listbox: ' + JSON.stringify(lb));
-
-            // Any of these being false means a keyboard user cannot use the
-            // control at all, so they are hard failures rather than warnings.
-            const lbOk = lb.enhanced && lb.nativeStillThere && lb.nativeNameOk
-                && lb.btnRole === 'combobox' && lb.expandedClosed === 'false'
-                && lb.expandedOpen === 'true' && lb.panelVisible
-                && lb.panelRole === 'listbox' && lb.rowRoles
-                && lb.countsSplit && lb.activeRow === 1
-                && lb.hasAllRow && lb.allRowFirst
-                && lb.noHorizontalScroll
-                && lb.closedByEsc && lb.focusOnBtn;
-            if (!lbOk) { console.log('  FAIL: listbox claim not met'); failures++; }
-
-            // Round-trip: pick a real program and confirm the form actually
-            // submits with it. The whole design rests on the native select
-            // staying the control of record; if the value never reaches the
-            // URL the control is decorative, and no visual check would show it.
-            const rt = await ev(`(function(){
-                var sel = document.querySelector('select.st-progsel-in');
-                var opts = Array.from(sel.options).filter(function(o){ return o.value !== ''; });
-                if (!opts.length) return JSON.stringify({ skipped: 'no programs' });
-                var want = opts[0].value;
-                var fired = false;
-                sel.addEventListener('change', function(){ fired = true; }, { once: true });
-                sel.form.addEventListener('submit', function(e){ e.preventDefault(); }, { once: true });
-                document.querySelector('.st-lb-btn').click();
-                var row = document.querySelector('.st-lb-row[data-v="' + CSS.escape(want) + '"]');
-                if (!row) return JSON.stringify({ noRow: true });
-                row.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-                return JSON.stringify({
-                    valueSet: sel.value === want,
-                    changeFired: fired,
-                    triggerShows: document.querySelector('.st-lb-val').textContent,
-                    marked: document.querySelector('.st-lb-btn').classList.contains('has-val'),
-                    closed: document.querySelector('.st-lb-panel').hidden
-                });
-            })()`);
-            console.log('  round-trip: ' + rt);
-            if (rt.indexOf('"valueSet":true') === -1
-                || rt.indexOf('"changeFired":true') === -1
-                || rt.indexOf('"closed":true') === -1) {
-                console.log('  FAIL: picking a program did not round-trip');
-                failures++;
-            }
-
-            // ── Acronym tooltip ─────────────────────────────────
-            // The row shows the acronym; the full degree title appears on
-            // hover. These check the expansion actually appears, carries the
-            // full title (not the acronym), and is not clipped by the panel's
-            // overflow - which is why it lives on the body.
-            const tip = {};
-            tip.exists = await ev("document.querySelectorAll('.st-lb-tip').length === 1");
-            tip.onBody = await ev("!!document.querySelector('body > .st-lb-tip')");
-            tip.hiddenAtRest = await ev("document.querySelector('.st-lb-tip').hidden");
-            // Every acronym row must carry the expansion; rows without an
-            // acronym must not claim one.
-            tip.rowsHaveTip = await ev("Array.from(document.querySelectorAll('.st-lb-row[data-tip]')).every(function(r){return r.getAttribute('data-tip').length > 8;})");
-            tip.ariaLabelFull = await ev("Array.from(document.querySelectorAll('.st-lb-row[data-tip]')).every(function(r){var a=r.getAttribute('aria-label')||'';return a.length >= r.getAttribute('data-tip').length;})");
-            // The row must not print the full title inline any more.
-            tip.rowIsCompact = await ev("Array.from(document.querySelectorAll('.st-lb-row')).every(function(r){return !r.querySelector('.st-lb-lbl') || r.getAttribute('data-tip')===null;})");
-            lb.tip = tip;
-
-            // Hover a real acronym row and confirm the tip becomes visible
-            // with the full title and a sane on-screen box.
-            const tipState = await ev(`(function(){
-                var row = document.querySelector('.st-lb-row[data-tip]');
-                if (!row) return JSON.stringify({ skipped: 'no acronym rows' });
-                var tag = row.querySelector('.st-lb-tag');
-                tag.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
-                var t = document.querySelector('.st-lb-tip');
-                var b = t.getBoundingClientRect();
-                return JSON.stringify({
-                    hidden: t.hidden,
-                    text: t.textContent,
-                    expected: row.getAttribute('data-tip'),
-                    onScreen: b.width > 40 && b.height > 10
-                              && b.left >= 0 && b.top >= 0
-                              && b.right <= window.innerWidth + 1
-                              && b.bottom <= window.innerHeight + 1
-                });
-            })()`);
-            console.log('  tooltip hover: ' + tipState);
-            if (tipState.indexOf('"hidden":false') === -1
-                || tipState.indexOf('"onScreen":true') === -1) {
-                console.log('  FAIL: acronym tooltip did not appear on hover');
-                failures++;
-            }
-
-            // Leaving the row must take the tooltip with it.
-            const tipGone = await ev(`(function(){
-                var row = document.querySelector('.st-lb-row[data-tip]');
-                row.dispatchEvent(new PointerEvent('pointerout', { bubbles: true, relatedTarget: document.body }));
-                return document.querySelector('.st-lb-tip').hidden;
-            })()`);
-            console.log('  tooltip hides on leave: ' + tipGone);
-            if (!tipGone) { console.log('  FAIL: tooltip outlived its row'); failures++; }
-
-            // Open it again and photograph the panel, since the whole point of
-            // the change is what the panel looks like.
-            await ev("document.querySelector('.st-lb-btn').click()");
-            await sleep(300);
-            // Hover an acronym row so the screenshot captures the expansion -
-            // the panel on its own would not show what this change is about.
-            await ev("(function(){var r=document.querySelector('.st-lb-row[data-tip]');if(r)r.querySelector('.st-lb-tag').dispatchEvent(new PointerEvent('pointerover',{bubbles:true}));})()");
-            await sleep(300);
-            const s2 = await send('Page.captureScreenshot', { format: 'png' });
-            fs.writeFileSync(`${OUT}_listbox.png`, Buffer.from(s2.data, 'base64'));
-            console.log(`SHOT=${OUT}_listbox.png`);
         }
     }
-    console.log(failures ? `RESULT=FAIL (${failures} width(s))` : 'RESULT=PASS');
+
+    // ── The toolbar, at three widths ───────────────────────────
+    for (const [w, h, tag] of WIDTHS) {
+        await send('Emulation.setDeviceMetricsOverride',
+            { width: w, height: h, deviceScaleFactor: 1, mobile: w < 700 });
+        await go(BASE + (QUERY ? '?' + QUERY : ''));
+
+        const geo = JSON.parse(await ev(`(function(){
+            var bar = document.querySelector('.st-dirbar');
+            var r = bar.getBoundingClientRect();
+            var btn = document.querySelector('.st-facets-btn').getBoundingClientRect();
+            return JSON.stringify({
+                barH: Math.round(r.height),
+                filterRight: Math.round(btn.right),
+                viewport: window.innerWidth,
+                overflowX: document.documentElement.scrollWidth - window.innerWidth,
+                // The year strip and the program select are both supposed to be
+                // gone. Asserted rather than assumed - a leftover strip is
+                // invisible in a passing screenshot.
+                yearStrip: document.querySelectorAll('.st-year').length,
+                progsel: document.querySelectorAll('.st-progsel').length,
+                facets: document.querySelectorAll('.st-facets').length,
+            });
+        })()`));
+        console.log(`  ${tag} ${w}px: ` + JSON.stringify(geo));
+
+        if (geo.yearStrip !== 0) fail(`${tag}: the 1/2/3/4 year strip is still in the DOM`);
+        if (geo.progsel !== 0) fail(`${tag}: the old program select is still in the DOM`);
+        if (geo.facets !== 1) fail(`${tag}: expected one filter control, found ${geo.facets}`);
+        if (geo.overflowX > 1) fail(`${tag}: page overflows by ${geo.overflowX}px`);
+        if (geo.filterRight > geo.viewport + 1) fail(`${tag}: the filter runs past the viewport`);
+        await shot(tag);
+    }
+
+    // ── The panel ─────────────────────────────────────────────
+    await send('Emulation.setDeviceMetricsOverride',
+        { width: 1500, height: 1000, deviceScaleFactor: 1, mobile: false });
+    await go(BASE);
+
+    const shape = JSON.parse(await ev(`(function(){
+        var box = document.getElementById('stFacets');
+        box.open = true;
+        var sets = {};
+        Array.prototype.forEach.call(box.querySelectorAll('.st-facet'), function (f) {
+            sets[f.querySelector('legend').textContent.trim()] = f.querySelectorAll('input[type=checkbox]').length;
+        });
+        var p = document.querySelector('.st-facets-panel').getBoundingClientRect();
+        return JSON.stringify({
+            open: box.open,
+            facets: sets,
+            panelW: Math.round(p.width),
+            panelOnScreen: (function () {
+                var l = Math.round(p.left), r = Math.round(p.right), b = Math.round(p.bottom);
+                return { left: l, right: r, bottom: b, vw: window.innerWidth, vh: window.innerHeight };
+            })(),
+            // Every box must be inside a <form>, or Apply posts nothing.
+            inForm: !!box.closest('form'),
+            names: Array.prototype.map.call(box.querySelectorAll('input[type=checkbox]'), function (i) { return i.name; })
+                       .filter(function (v, i, a) { return a.indexOf(v) === i; }),
+        });
+    })()`));
+    console.log('  panel: ' + JSON.stringify(shape));
+    if (!shape.open) fail('the panel did not open');
+    if (!shape.inForm) fail('the filter panel is not inside the form, so Apply posts nothing');
+    const box = shape.panelOnScreen;
+    if (box.left < 0 || box.right > box.vw + 1 || box.bottom > box.vh + 1) {
+        fail(`the panel runs off screen: ${JSON.stringify(box)}`);
+    }
+    // Every facet must be PRESENT, with a caption, whatever the roster holds.
+    // "Section" having no options is a fact about the data, not a broken
+    // control - it renders "None recorded yet" and stays tickable the moment
+    // a section exists.
+    ['Year', 'Program', 'Semester', 'Section'].forEach((f) => {
+        if (!(f in shape.facets)) fail(`the ${f} facet is missing from the panel`);
+    });
+    await shot('panel');
+
+    // Tick two years. If these were radios the second click would clear the
+    // first, and the whole point of a facet is that 1st OR 2nd year is a
+    // question worth asking.
+    const before = await ev(`document.querySelectorAll('.st-facet-opt input:checked').length`);
+    const ticked = await ev(`(function(){
+        var boxes = document.querySelectorAll('input[name="year[]"]');
+        boxes[0].click(); boxes[1].click();
+        return Array.prototype.filter.call(boxes, function (b) { return b.checked; })
+            .map(function (b) { return b.value; }).join(',');
+    })()`);
+    const after = await ev(`document.querySelectorAll('.st-facet-opt input:checked').length`);
+    console.log('  ticked years: ' + ticked);
+    if (before !== 0) fail('the panel came up with boxes already ticked');
+    if (after !== 2) fail(`two years ticked left ${after} ticked - these behave like radios`);
+    // The badge is the only thing saying a filter is in force once the panel
+    // is closed. It only appears after a submit, which is correct: ticking is
+    // not filtering yet.
+    if (await ev(`!!document.querySelector('.st-facets-badge')`)) {
+        fail('the count badge appeared before anything was applied');
+    }
+    await shot('panel_ticked');
+
+    // Apply. This navigates, so it is the last thing done to this document.
+    await ev("document.querySelector('.st-facets-apply').click()");
+    await go(null, '.st-facets');   // wait for the reload to land
+
+    const applied = JSON.parse(await ev(`(function(){
+        return JSON.stringify({
+            url: location.search,
+            checked: Array.prototype.filter.call(
+                document.querySelectorAll('.st-facet-opt input'), function (i) { return i.checked; })
+                .map(function (i) { return i.name + '=' + i.value; }),
+            badge: (document.querySelector('.st-facets-badge') || {}).textContent,
+            open: document.getElementById('stFacets').open,
+            rows: document.querySelectorAll('.st-table-wrap tbody tr').length,
+            matched: (document.querySelector('.st-pager') || {}).textContent || '',
+        });
+    })()`));
+    console.log('  applied: ' + JSON.stringify(applied));
+    if (!/year/.test(decodeURIComponent(applied.url))) fail('the years did not reach the URL');
+    if (applied.checked.length !== 2) fail(`came back with ${applied.checked.length} boxes ticked, not 2`);
+    if (!applied.badge) fail('no count badge after applying, so the filter in force is invisible');
+    // The panel stays open on a filtered load, so the reader can see what is
+    // narrowing the table instead of having to reopen the control to find out.
+    if (!applied.open) fail('the panel closed itself on a filtered load');
+    await shot('applied');
+
+    // Reset is only rendered when something is ticked, and it must clear all
+    // four facets without dropping the search or the status filter.
+    const reset = await ev(`(function(){
+        var a = document.querySelector('.st-facets-reset');
+        return a ? a.getAttribute('href') : null;
+    })()`);
+    console.log('  reset href: ' + reset);
+    if (reset === null) fail('no Reset link on a filtered view');
+    else if (/year|program|semester|section/.test(reset)) fail(`Reset still carries facets: ${reset}`);
+
+    console.log(jsErrors.length ? '  JS ERRORS: ' + jsErrors.join(' | ') : '  js errors: none');
+    if (jsErrors.length) failures++;
+
+    console.log(failures ? `RESULT=FAIL (${failures})` : 'RESULT=PASS');
     done(failures ? 1 : 0);
 })().catch((e) => { console.error('RESULT=ERR ' + e.message); done(1); });
