@@ -93,8 +93,8 @@ final class AcademicHistoryReadOnlyTest extends TestCase
      * No form controls in the ledger or the record.
      *
      * This used to assert against #gradeModal. The redesign removed the
-     * dialog entirely — the record now expands in place under the row that
-     * was clicked — so there is no dialog left to scope the check to. The
+     * dialog entirely — the record moved out of the row and into the sheet —
+     * so there is no dialog left to scope the check to. The
      * assertion gets STRONGER in exchange: it covers the whole ledger and
      * the record markup, rather than one container.
      *
@@ -126,7 +126,7 @@ final class AcademicHistoryReadOnlyTest extends TestCase
         $ledger = $m[0][0];
 
         self::assertStringContainsString('class="ah-record"', $html,
-            'The inline record container is missing from the page.');
+            'The record container is missing from the page.');
 
         foreach (['<input', '<select', '<textarea', 'data-f='] as $tag) {
             self::assertStringNotContainsString($tag, $ledger,
@@ -135,10 +135,12 @@ final class AcademicHistoryReadOnlyTest extends TestCase
         }
 
         // The record is rendered by recordHtml() in JS, so the same rule
-        // has to hold there.
+        // has to hold there. The function that follows it changed name when the
+        // record moved out of the row and into the sheet — openRecord() replaced
+        // toggleRecord(), which expanded and collapsed in place.
         $js = self::source(self::PAGE);
         $start = strpos($js, 'function recordHtml(');
-        $end = strpos($js, 'function toggleRecord(');
+        $end = strpos($js, 'function openRecord(');
         self::assertNotFalse($start);
         self::assertNotFalse($end);
         $record = substr($js, $start, $end - $start);
@@ -149,12 +151,18 @@ final class AcademicHistoryReadOnlyTest extends TestCase
     }
 
     /**
-     * The only button in a row is the disclosure, plus print in the record.
+     * A row carries exactly one control, and it is not chrome.
      *
      * "Remove all the buttons" was a design instruction, but deleting the
-     * <button> element outright would break keyboard and screen-reader
-     * users. The rule enforced here is that a row carries no button CHROME:
-     * no .btn class, no icon font, no bordered control.
+     * <button> element outright would break keyboard and screen-reader users.
+     * The rule enforced here is that a row carries no button CHROME: no .btn
+     * class, no icon font, no bordered control from the bootstrap set.
+     *
+     * The control used to be a chevron on the student's name (.ah-open), which
+     * expanded the record in a row beneath. It is now a text View button
+     * (.ah-view) in its own column, and the record opens in a sheet. The rule is
+     * unchanged and still passes: .ah-view carries none of the chrome listed
+     * above, so the ledger reads as data with a step, not as a table of buttons.
      */
     public function testRowsCarryNoButtonChrome(): void
     {
@@ -183,9 +191,14 @@ final class AcademicHistoryReadOnlyTest extends TestCase
                 "The roster still carries button chrome ('{$chrome}').");
         }
 
-        // The disclosure is a plain button, styled by .ah-open with no
-        // border, background or padding of its own.
-        self::assertStringContainsString('class="ah-open"', $html);
+        // The forward step is a plain button, styled by .ah-view: a border, no
+        // bootstrap .btn class, no icon font, so it stays below the chrome list
+        // above even though the roster now shows a real control on each row.
+        self::assertStringContainsString('class="ah-view"', $html);
+        // And the record is no longer in a <tr>, so nothing in the page should
+        // still be trying to expand one.
+        self::assertStringNotContainsString('function toggleRecord(', $html);
+        self::assertStringNotContainsString('class="ah-open"', $html);
     }
 
     /** The replacement action is present, so the page is still useful. */

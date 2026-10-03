@@ -52,7 +52,7 @@ $csrfToken = csrfToken();
 // The term is chosen first and everything below is scoped to it, because
 // a term is the unit of work here. Grading one is not a per-student
 // action repeated 200 times; it is a single pass over a list.
-$years = array_map(
+$realYears = array_map(
     static fn($r) => (string) $r['school_year'],
     $db->fetchAll("
         SELECT DISTINCT school_year FROM academic_history
@@ -61,8 +61,21 @@ $years = array_map(
     ")
 );
 
-// Offer the coming years so the current term can be started before it
-// exists in the table.
+// Which years the box may offer, and which term it OPENS on, are two
+// different questions, and conflating them is why the page used to greet you
+// with an empty roster.
+//
+// The coming years are offered so a term can be started before it exists in
+// the table. That is correct. But they were then pushed into the same list and
+// rsort'd, so the synthetic 2026-2028 outranked every year that actually has
+// grades, and $sy = $years[0] opened the page on a term guaranteed to be
+// empty - the student listed, the row expandable, and "No grades received"
+// behind it. Sorted together, offering a year quietly became defaulting to it.
+//
+// So: offer both, default to the newest year that HAS records. A database with
+// no history at all still falls through to the synthetic list, so a fresh
+// install opens on the current year rather than on nothing.
+$years = $realYears;
 $thisYear = (int) date('Y');
 foreach ([$thisYear . '-' . $thisYear, $thisYear . '-' . ($thisYear + 1), $thisYear . '-' . ($thisYear + 2)] as $cand) {
     if (!in_array($cand, $years, true)) {
@@ -70,6 +83,7 @@ foreach ([$thisYear . '-' . $thisYear, $thisYear . '-' . ($thisYear + 1), $thisY
     }
 }
 rsort($years);
+rsort($realYears);
 
 // ── Which term ──────────────────────────────────────────────────
 // The term is typed, not chosen from a list. A registrar works in
@@ -97,7 +111,7 @@ $termProblem = '';
 
 if ($termQuery !== '') {
     // Pull the year out by pattern, the semester out by its own name.
-    if (preg_match('/(\d{4})\s*[-–—\/]\s*(\d{2,4})/', $termQuery, $m)) {
+    if (preg_match('/(\d{4})\s*[-\x{2013}\x{2014}\/]\s*(\d{2,4})/u', $termQuery, $m)) {
         $sy = $m[1] . '-' . $m[2];
     }
     foreach ($SEMESTERS as $candidate) {
@@ -119,7 +133,11 @@ if ($termQuery !== '') {
     }
 }
 
-if ($sy === '' && $years) {
+// Open on the newest year that actually has records, not merely the newest
+// year on offer. See the note where $realYears is built.
+if ($sy === '' && $realYears) {
+    $sy = $realYears[0];
+} elseif ($sy === '' && $years) {
     $sy = $years[0];
 }
 
@@ -392,6 +410,7 @@ function ah_initials(string $name): string
 $careerTerms    = [];
 $careerSubjects = [];
 $careerGwas     = [];
+$careerUnitsByStudent = [];
 
 if ($rows) {
     $ids = array_column($rows, 'id');
@@ -414,11 +433,6 @@ if ($rows) {
             'gwa_reported' => $t['gwa_reported'],
             'credits'      => $t['credits'],
         ];
-        // The last row in this ordering is the most recently graded term,
-        // so its stored GWA is the cumulative figure the rest of the system
-        // already shows. Kept rather than recomputed, so the template
-        // cannot print a number the screen disagrees with.
-        $careerGwas[$sid] = $t['gwa'];
     }
 
     // Keyed "SY|SEM" so the template can pair each heading with its rows.
@@ -445,6 +459,48 @@ if ($rows) {
             'instructor'   => (string) ($g['instructor'] ?? ''),
         ];
     }
+
+    // The printed GWA is COMPUTED here, from the ratings on file, rather than
+    // read from academic_history.gwa_computed.
+    //
+    // That column is never written by the application — it is only ever set by
+    // the one-time migration backfill, which copied the old hand-typed `gwa`
+    // into it. So printing it means printing a frozen copy of a number somebody
+    // typed, while the roster column beside it shows termGwa() computed live.
+    // The two can disagree, and on an OFFICIAL record the printed figure is
+    // the one that leaves the office. termGwa() is the single implementation
+    // the status rules and the audit already read, so the document and the
+    // screen now cannot tell different stories.
+    foreach ($careerTerms as $sid => $terms) {
+        foreach ($terms as $i => $t) {
+            $key = (string) ($t['school_year'] ?? '') . '|'
+                 . (string) ($t['semester'] ?? '');
+            $careerTerms[$sid][$i]['gwa_live'] = termGwa($careerSubjects[$sid][$key] ?? []);
+            $careerTerms[$sid][$i]['units_live'] = 0.0;
+            foreach ($careerSubjects[$sid][$key] ?? [] as $s) {
+                if (termRatingValid($s['final_rating'])) {
+                    $careerTerms[$sid][$i]['units_live'] += max(0.0, (float) $s['units']);
+                }
+            }
+        }
+        // Career GWA: one weighted pass over every rated subject on file, so
+        // the total units and the figure printed beside it come from the same
+        // sum. Previously this took the last term's stored `gwa` — the same
+        // frozen value described above.
+        // Read the units back off $careerTerms, NOT off $terms. foreach is
+        // by value, so $terms is the array as it was BEFORE the loop above
+        // added units_live - reading it here silently summed an empty column
+        // and printed "total units earned: 0" beside a real GWA.
+        $careerGwas[$sid] = careerGwa(array_map(
+            static fn($t) => ['subjects' => $careerSubjects[$sid]
+                [(string) ($t['school_year'] ?? '') . '|'
+                 . (string) ($t['semester'] ?? '')] ?? []],
+            $terms
+        ));
+        $careerUnitsByStudent[$sid] = array_sum(
+            array_column($careerTerms[$sid], 'units_live')
+        );
+    }
 }
 
 $payload = json_encode([
@@ -454,7 +510,16 @@ $payload = json_encode([
     // token is still needed by anything on the page that posts, and the
     // print action is the one remaining thing a registrar may trigger.
     'csrf'     => $csrfToken,
-    'logoUrl'  => '../assets/images/BCP_LOGO.png',
+    // Relative, and RELATIVE TO THE PAGE. printDocument() writes into an
+    // about:blank iframe where a relative src resolves against nothing, so the
+    // JS resolves this against window.location.href before handing it over -
+    // the same fix js/insights.js already makes for the AI Insight report.
+    //
+    // The leading ../ is load-bearing and is measured from registrar/ where
+    // this page lives, not from the repository root. Dropping it points at
+    // registrar/assets/images/... , which does not exist, and the letterhead
+    // prints with an empty box where the crest should be.
+'logoPath' => '../assets/images/BCP_LOGO.png',
     'school'   => 'College of Computer Studies',
     'printedOn'=> date('F j, Y'),
     // Initials are computed here rather than in JS so the dialog tile and
@@ -491,6 +556,11 @@ $payload = json_encode([
         // it is meant to be.
         'career'   => $careerTerms[(int) $r['id']] ?? [],
         'careerGwa' => $careerGwas[(int) $r['id']] ?? null,
+        // Total units across the whole record, from the same rated subjects
+        // the career GWA was computed from. A Certificate of Grades that
+        // prints a cumulative figure without the units behind it is asking
+        // the reader to trust it.
+        'careerUnits' => round((float) ($careerUnitsByStudent[(int) $r['id']] ?? 0), 2),
         'careerSubjects' => $careerSubjects[(int) $r['id']] ?? [],
     ], $rows),
 ], JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE);
@@ -671,6 +741,10 @@ include '../includes/sidebar.php';
                     <th scope="col" class="ah-col-sec" data-num>Subjects</th>
                     <th scope="col" data-num>Term GWA</th>
                     <th scope="col">Record</th>
+                    <?php // The sr-only text goes INSIDE the cell. Putting the
+                    // class on the <th> itself hides the header cell too and
+                    // leaves a grey block over the column with no label. ?>
+                    <th scope="col"><span class="ah-sr-only">Open</span></th>
                 </tr>
             </thead>
 <?php foreach ($rows as $r): ?>
@@ -697,15 +771,14 @@ include '../includes/sidebar.php';
 
                     <td>
                         <div class="ah-id-cell">
-                            <?php // The forward step. A real <button> so the row
-                            // is keyboard reachable and correctly announced,
-                            // with no chrome of its own — the whole row is
-                            // the target. ?>
-                            <button class="ah-open" type="button" aria-expanded="false"
-                                    aria-controls="rec-<?= (int) $r['id'] ?>">
-                                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
-                                <?= htmlspecialchars($r['name']) ?>
-                            </button>
+                            <?php // The name is now plain text. It used to be a
+                            // disclosure button that expanded the record in a
+                            // row beneath the student; the record opens in a
+                            // sheet instead, from the View button, so a name
+                            // that looks clickable but is not would be a lie.
+                            // It keeps the same weight and colour the button had,
+                            // so the row still scans the same way. ?>
+                            <span class="ah-name"><?= htmlspecialchars($r['name']) ?></span>
                             <span class="ah-num"><?= htmlspecialchars($r['number'] !== '' ? $r['number'] : 'No number on file') ?></span>
                         </div>
                     </td>
@@ -731,14 +804,11 @@ include '../includes/sidebar.php';
                             <span class="status-dot"></span><?= $stateLabel ?>
                         </span>
                     </td>
-                </tr>
-
-                <?php // The record. Hidden until its row is opened, filled by
-                // openRecord(), and printed from here rather than from a
-                // per-row button repeated on every line. ?>
-                <tr class="ah-detail" id="rec-<?= (int) $r['id'] ?>" data-ah-detail hidden>
-                    <td colspan="6">
-                        <div class="ah-record" data-ah-record></div>
+                    <td class="ah-act">
+                        <button class="ah-view" type="button" data-view="<?= (int) $r['id'] ?>"
+                                aria-label="Open the term record for <?= htmlspecialchars($r['name']) ?>">
+                            View
+                        </button>
                     </td>
                 </tr>
             <?php endforeach; ?>
@@ -747,7 +817,7 @@ include '../includes/sidebar.php';
     </div>
 
     <div class="ah-panel-foot">
-        Showing <?= count($visible) ?> of <?= count($visible) ?>
+        Showing <?= count($visible) ?> of <?= count($roster) ?>
         student<?= count($visible) === 1 ? '' : 's' ?> in
         <?= htmlspecialchars(termLabel($sy, $sem)) ?>.
     </div>
@@ -760,11 +830,51 @@ include '../includes/sidebar.php';
 <?php endif; ?>
 </section>
 
-<?php // The panel and the container close here, before the modal, which
+<?php // The panel and the container close here, before the sheet, which
 // lives outside the page flow so it is not announced until it is opened. ?>
 </div>
 </main>
-            <tbody>
+
+<?php // The record SHEET.
+//
+// A drawer down the right edge, not a centered dialog and not a row that
+// expands underneath.
+//
+// A centered dialog would cover the term, and reading one student's record
+// against the rest of the term is the reason this page works. An expanded row
+// was the previous answer, and it was wrong in a way that only shows with a
+// real roster: opening a record pushes every student below it down, so on a
+// hundred-row term the list jumps and the registrar loses their place in it.
+//
+// The sheet refuses both. It does not reflow the list behind it, and it leaves
+// the roster visible AND clickable on the left. There is no scrim and no dim:
+// a backdrop over the roster would hide the very context the sheet exists to
+// preserve, and it would swallow the clicks that make the sheet worth having.
+// View the next student without closing this one; the record just swaps.
+//
+// Two consequences of that decision, both deliberate:
+//   - aria-modal is NOT set. This is not a modal. The roster behind it stays
+//     live, and telling assistive technology otherwise would be the
+//     accessibility version of the same lie.
+//   - There is no click-outside-to-close, because there is no click-outside.
+//     The close button, Escape and opening another student are all the ways out.
+?>
+<div class="ah-sheet" id="recordSheet" role="complementary"
+     aria-labelledby="sheetTitle" hidden>
+    <div class="ah-sheet-panel" role="dialog" aria-modal="false" aria-labelledby="sheetTitle">
+        <div class="ah-sheet-head">
+            <div class="ah-sheet-who">
+                <div class="ah-sheet-kicker">Term record</div>
+                <h2 id="sheetTitle" tabindex="-1">&mdash;</h2>
+                <p class="ah-sheet-sub" id="sheetSub">&mdash;</p>
+            </div>
+            <button class="ah-sheet-close" type="button" data-sheet-close aria-label="Close the record">
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
+        </div>
+        <div class="ah-sheet-body" id="sheetBody"></div>
+    </div>
+</div>
 
 <?php
 // The pre-close audit. Read-only: it reports what is missing or
@@ -785,6 +895,65 @@ include '../includes/sidebar.php';
         </div>
 
         <div class="ah-dialog-body" id="auditBody"></div>
+    </div>
+</div>
+
+<?php
+// The print chooser. A dialog rather than a second and third button on every
+// row, because the panel would carry two actions describing overlapping
+// documents and the reader would have to work out which is which before
+// pressing either.
+//
+// Reuses the audit dialog's own classes and its openDialog/closeDialog, so
+// there is one dialog pattern on this page rather than two - but it is a
+// NARROWER dialog. The audit's content is a list of findings that needs the
+// width; three short options do not, and a full-width box with three lines
+// in it reads as an empty page that failed to load.
+//
+// It names the student. The dialog floats over a roster of however many rows,
+// and "Print which part of the record?" answers nothing about WHICH record -
+// a registrar working down a list needs that confirmed before they press
+// anything.
+?>
+<div class="modal-overlay ah-dialog" id="printModal" role="dialog" aria-modal="true" aria-labelledby="printModalTitle">
+    <div class="modal-content ah-print-modal">
+        <div class="ah-dialog-head">
+            <div>
+                <div class="ah-dialog-kicker">Official grades</div>
+                <h3 id="printModalTitle" tabindex="-1">Print grades for</h3>
+                <div class="ah-print-who" id="printWho">&mdash;</div>
+            </div>
+            <button class="modal-close" type="button" onclick="closePrintMenu()" aria-label="Close">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <div class="ah-dialog-body">
+            <p class="ah-print-lead">Each semester is one sheet.</p>
+            <div class="ah-print-choices">
+                <button class="ah-print-choice" type="button" data-print-scope="1st">
+                    <span class="ah-sheet-glyph" data-sheets="1" aria-hidden="true"><i></i><i></i></span>
+                    <span class="ah-choice-text">
+                        <b>1st semester</b>
+                        <small id="printCount1st">&mdash;</small>
+                    </span>
+                </button>
+                <button class="ah-print-choice" type="button" data-print-scope="2nd">
+                    <span class="ah-sheet-glyph" data-sheets="1" aria-hidden="true"><i></i><i></i></span>
+                    <span class="ah-choice-text">
+                        <b>2nd semester</b>
+                        <small id="printCount2nd">&mdash;</small>
+                    </span>
+                </button>
+                <button class="ah-print-choice" type="button" data-print-scope="all">
+                    <span class="ah-sheet-glyph" data-sheets="2" aria-hidden="true"><i></i><i></i></span>
+                    <span class="ah-choice-text">
+                        <b>All semesters</b>
+                        <small id="printCountAll">&mdash;</small>
+                    </span>
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 <script>
@@ -829,13 +998,18 @@ function ratingBand(v) {
 const na = v => (v === null || v === undefined || v === '') ? 'N/A' : v;
 
 // ── The record ────────────────────────────────────────────────
+// Which View button opened the sheet, so closing can put focus back on it.
+// A script-level variable rather than a property on the sheet element: the
+// sheet is part of the server-rendered page, and this is page state.
+let lastViewButton = null;
 // Built once per student, on first open, then cached on the element. It is
 // static data — nothing on this page changes a grade — so rebuilding it on
 // every toggle would be pure waste.
 function recordHtml(r) {
     if (!r.subjects.length) {
-        return '<p class="ah-empty-state" style="padding:1.5rem 0;border:0">'
-            + '<strong>No grades received from Faculty for this term.</strong></p>';
+        return '<div class="ah-record">'
+            + '<p class="ah-empty-state" style="padding:1.5rem 0;border:0">'
+            + '<strong>No grades received from Faculty for this term.</strong></p></div>';
     }
 
     const rows = r.subjects.map(s => {
@@ -843,17 +1017,17 @@ function recordHtml(r) {
             && s.final_rating !== '';
         return '<tr>'
             + '<td>' + esc(na(s.subject)) + '</td>'
-            + '<td class="ah-fig">' + esc(na(s.subject_code)) + '</td>'
+            + '<td class="ah-fig ah-col-code">' + esc(na(s.subject_code)) + '</td>'
             + '<td data-num class="ah-fig">' + esc(na(s.units)) + '</td>'
             + '<td data-num class="ah-fig">'
             + (rated ? Number(s.final_rating).toFixed(2) : '<span class="ah-muted">not rated</span>')
             + '</td>'
-            + '<td>' + esc(na(s.grade)) + '</td>'
             + '<td>' + esc(na(s.grade_status)) + '</td>'
             + '</tr>';
     }).join('');
 
     return ''
+        + '<div class="ah-record">'
         + '<div class="ah-record-head">'
         + '<p class="ah-record-title"><i class="fa-solid fa-book-open"></i>'
     + esc(AH.sem) + ' Semester &middot; ' + esc(AH.sy) + '</p>'
@@ -861,8 +1035,8 @@ function recordHtml(r) {
         + (r.subjects.length === 1 ? '' : 's') + '</span>'
         + '</div>'
         + '<table class="table"><thead><tr>'
-        + '<th>Subject</th><th>Code</th><th data-num>Units</th>'
-        + '<th data-num>Final rating</th><th>Grade</th><th>Result</th>'
+        + '<th>Subject</th><th class="ah-col-code">Code</th><th data-num>Units</th>'
+        + '<th data-num>Final rating</th><th>Result</th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table>'
         + '<div class="ah-record-foot">'
         // The class is what stands the pairs side by side as figures. A bare
@@ -872,34 +1046,86 @@ function recordHtml(r) {
         + '<div><dt>Term GWA</dt><dd>' + (r.gwa === null ? '—' : Number(r.gwa).toFixed(2)) + '</dd></div>'
         + '<div><dt>Units</dt><dd>' + (r.units > 0 ? r.units : '—') + '</dd></div>'
         + '</dl>'
-        + '<button class="ah-print-btn btn btn-light" type="button" data-print="' + r.id + '">'
-        + '<i class="fa-solid fa-print"></i> Print this record</button>'
+        // Says what it prints. This panel lists ONE term, and the button under
+        // it produced a document listing EVERY term - so the control was
+        // labelled with the artefact's name but sat directly under a single
+        // semester's rows, and reading the two together gave the impression
+        // that it printed that term alone. The count is here rather than
+        // hidden in the document so the scope is visible before the click.
+        + '<p class="ah-print-scope">'
+        + 'Prints the official grades. Choose one semester or the whole record.'
+        + '</p>'
+        + '<div class="ah-print-actions">'
+        // One button, not two. The two actions describe overlapping documents -
+        // a single term and the whole career - and side by side the reader has
+        // to work out which is which before pressing either. The chooser names
+        // them and counts what each will produce.
+        + '<button class="ah-print-btn btn btn-light" type="button" '
+        + 'data-print-menu="' + r.id + '">'
+        + '<i class="fa-solid fa-print"></i> Print official grades</button>'
+        + '</div>'
+        + '</div>'
         + '</div>';
 }
 
-/* Opens or closes the record under a row.
+/* Opens the record in the sheet.
 
-   Only one is open at a time. Two at once turns the ledger into a stack of
-   panels and you lose the thing you were comparing against, which is the
-   only reason to have a table. */
-function toggleRecord(studentId) {
-    const row = document.querySelector('tr[data-student="' + studentId + '"]');
-    if (!row) return;
-    const detail = document.getElementById('rec-' + studentId);
-    const btn = row.querySelector('.ah-open');
-    if (!detail || !btn) return;
+   The body of this function was previously the expand-in-place version, and it
+   was lost in an edit that replaced the block above it rather than its own.
+   Worth knowing because the symptom is subtle: the function parsed, so nothing
+   failed loudly, and the page simply stopped opening records.
 
-    const isOpen = btn.getAttribute('aria-expanded') === 'true';
-
-    if (isOpen) {
-        detail.hidden = true;
-        btn.setAttribute('aria-expanded', 'false');
-        return;
-    }
-
+   Focus moves into the sheet so a keyboard user lands on the heading, and
+   Escape closes it - both handled by the delegated listeners below rather than
+   per-element, because the roster behind the sheet stays interactive and can
+   replace the record at any time. */
+function openRecord(studentId) {
     const r = rowById(studentId);
-    if (!r) return;
-    const host = detail.querySelector('[data-ah-record]');
+    const sheet = document.getElementById('recordSheet');
+    if (!r || !sheet) return;
+
+    const title = document.getElementById('sheetTitle');
+    const sub = document.getElementById('sheetSub');
+    const body = document.getElementById('sheetBody');
+
+    if (title) title.textContent = r.name;
+    if (sub) {
+        // The full program name, not the short form the roster's narrow column
+        // uses. The PHP helper that abbreviates it does not exist in this
+        // script, and there is room for the real name in a 620px sheet anyway.
+        //
+        // year_level is stored as a bare integer, and a bare "1" here reads as
+        // a stray digit next to a course name. It is a year of study, so it is
+        // spelled as one. Anything unrecognised is dropped rather than shown:
+        // the subtitle carries identity, and a wrong number is worse than none.
+        const YEAR = ['', '1st year', '2nd year', '3rd year', '4th year', '5th year'];
+        const lvl = YEAR[Number(r.level)];
+        sub.textContent = [
+            r.number || 'No number on file',
+            r.program,
+            [lvl || '', r.section].filter(Boolean).join(' · '),
+        ].filter(Boolean).join('  ·  ');
+    }
+    if (body) body.innerHTML = recordHtml(r);
+
+    sheet.hidden = false;
+    // One orchestrated entrance, then stillness. The list behind does not
+    // animate - it did not move, and implying otherwise would be noise.
+    sheet.classList.add('is-open');
+    if (title) title.focus();
+}
+
+function closeRecord() {
+    const sheet = document.getElementById('recordSheet');
+    if (!sheet || sheet.hidden) return;
+    sheet.classList.remove('is-open');
+    sheet.hidden = true;
+    // Return focus to the View button that opened it. Without this a keyboard
+    // user is dropped at the top of the document, which on a hundred-row term
+    // is the one place they were not.
+    const last = lastViewButton;
+    if (last && document.contains(last)) last.focus();
+}
 // ── Term box: self-submitting ─────────────────────────────────
 // The page has no submit button anywhere, so this form commits itself.
 // Enter still works (it is a real form), and committing a term reloads the
@@ -956,10 +1182,11 @@ function toggleRecord(studentId) {
             const hit = terms.length === 0 || terms.some(t => hay.includes(t));
             row.hidden = !hit;
 
-            // The record belongs to its row. Hiding one without hiding the
-            // other leaves an expanded record with no name above it.
-            const detail = document.getElementById('rec-' + row.dataset.student);
-            if (detail && !hit) detail.hidden = true;
+            // Nothing to hide alongside the row any more. This used to also
+            // hide the expanded record under it, so a filtered-out student
+            // could not leave an orphaned record showing. The record is in a
+            // sheet now and the sheet follows whoever is open, not whoever is
+            // visible, so there is no pairing left to maintain.
 
             if (hit) shown++;
         });
@@ -988,31 +1215,14 @@ function toggleRecord(studentId) {
         e.preventDefault();
         const first = rows.find(r => !r.hidden);
         if (!first) return;
-        const btn = first.querySelector('.ah-open');
+        // The View button, not the name. The name is text now, so this is the
+        // first thing a keyboard user can actually act on in a matching row.
+        const btn = first.querySelector('.ah-view');
         if (btn) btn.focus();
     });
 
     apply();
 })();
-    if (host && !host.dataset.filled) {
-        host.innerHTML = recordHtml(r);
-        host.dataset.filled = '1';
-    }
-
-    detail.hidden = false;
-    btn.setAttribute('aria-expanded', 'true');
-
-    // Close whatever else is open, now that ours is.
-    document.querySelectorAll('tr[data-ah-row]').forEach(other => {
-        if (other === row) return;
-        const d = document.getElementById('rec-' + other.dataset.student);
-        if (d && !d.hidden) {
-            d.hidden = true;
-            const b = other.querySelector('.ah-open');
-            if (b) b.setAttribute('aria-expanded', 'false');
-        }
-    });
-}
 
 // ── The one dialog: the term audit ────────────────────────────
 // openDialog/closeDialog used to be called here but were defined nowhere in
@@ -1052,6 +1262,74 @@ function findingHtml(f, sev) {
         + '<p class="ah-finding-action">' + esc(f.action) + '</p>'
         + '</div>'
         + '</div>';
+}
+
+// The print chooser, alongside the audit dialog's own.
+//
+// It counts what each option will produce rather than describing it in
+// general terms. "Every 1st-semester term on file" tells the reader nothing
+// about THIS student; "2 terms" does, and it also means an option that would
+// print nothing is visibly empty instead of silently doing so.
+function openPrintMenu(studentId) {
+    const r = rowById(studentId);
+    if (!r) return;
+
+    const modal = document.getElementById('printModal');
+    if (!modal) return;
+    modal.dataset.studentId = String(studentId);
+
+    // Names the student. The dialog floats over a roster that may be a
+    // hundred rows, and without this it is impossible to tell whose record
+    // is about to be printed - the press is final and the sheet leaves the
+    // office.
+    const who = document.getElementById('printWho');
+    if (who) {
+        const num = r.number ? ' · ' + r.number : '';
+        who.textContent = (r.name || '') + num;
+    }
+
+    const terms = r.career || [];
+    const count = sem => terms.filter(
+        t => String(t.semester || '').toLowerCase().startsWith(sem)
+    ).length;
+
+    const say = (id, n, unit) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.textContent = n === 0
+            ? 'No ' + unit + ' terms on file.'
+            : n + ' term' + (n === 1 ? '' : 's') + ' on file.';
+    };
+    say('printCount1st', count('1st'), '1st-semester');
+    say('printCount2nd', count('2nd'), '2nd-semester');
+
+    const all = document.getElementById('printCountAll');
+    if (all) {
+        all.textContent = terms.length === 0
+            ? 'No terms on file.'
+            : terms.length + ' terms on file · one sheet per term.';
+    }
+
+    // The "all" glyph stacks one sheet per term, so the stack is the page count.
+    // It is set from the data rather than hard-coded to two: a student in their
+    // first year has one term on file, and a chooser showing them a stack of two
+    // would be promising paper that does not exist.
+    const allGlyph = modal.querySelector('[data-print-scope="all"] .ah-sheet-glyph');
+    if (allGlyph) allGlyph.dataset.sheets = terms.length > 1 ? '2' : '1';
+
+    // An option with nothing behind it is disabled rather than hidden: a
+    // missing button reads as a bug, and a greyed one reads as the answer.
+    modal.querySelectorAll('[data-print-scope]').forEach(btn => {
+        const scope = btn.dataset.printScope;
+        const n = scope === 'all' ? terms.length : count(scope);
+        btn.disabled = n === 0;
+    });
+
+    openDialog('printModal', '[data-print-scope]:not([disabled])');
+}
+
+function closePrintMenu() {
+    closeDialog('printModal');
 }
 
 function openAudit() {
@@ -1096,14 +1374,40 @@ function closeAudit() { closeDialog('auditModal'); }
 // constantly by the filter, so per-element listeners would have to be
 // re-bound after every keystroke.
 document.addEventListener('click', e => {
-    const open = e.target.closest('.ah-open');
-    if (open) {
-        toggleRecord(parseInt(open.closest('tr').dataset.student, 10));
+    // View on a roster row opens that student's record in the sheet.
+    const view = e.target.closest('.ah-view');
+    if (view) {
+        lastViewButton = view;
+        openRecord(parseInt(view.dataset.view, 10));
         return;
     }
-    const print = e.target.closest('[data-print]');
-    if (print) {
-        printGradeTemplate(parseInt(print.dataset.print, 10));
+    // The close button. Delegated because the roster behind the sheet stays
+    // live and can swap the record at any time, so the ways in and the ways
+    // out both belong in one place. There is no scrim to close on - the sheet
+    // does not dim the roster, by design.
+    const shut = e.target.closest('[data-sheet-close]');
+    if (shut) {
+        closeRecord();
+        return;
+    }
+    // Opens the chooser. The student's id is remembered on the dialog rather
+    // than read back off the button at choice time, because the button lives
+    // inside a row that the search filter can hide - and a chooser that
+    // silently loses its subject when a keystroke hides the row is worse than
+    // one extra property on the element.
+    const menu = e.target.closest('[data-print-menu]');
+    if (menu) {
+        openPrintMenu(parseInt(menu.dataset.printMenu, 10));
+        return;
+    }
+    const choice = e.target.closest('[data-print-scope]');
+    if (choice) {
+        const modal = document.getElementById('printModal');
+        const sid = modal ? parseInt(modal.dataset.studentId || '0', 10) : 0;
+        if (sid) {
+            printOfficial(sid, choice.dataset.printScope);
+        }
+        closePrintMenu();
         return;
     }
     const audit = e.target.closest('[data-audit]');
@@ -1112,32 +1416,94 @@ document.addEventListener('click', e => {
     if (closer) { closeDialog(closer.dataset.closeDialog); }
 });
 
-// Escape closes the dialog, and only when one is actually open.
+// Escape closes whichever dialog is open, and only when one is.
+//
+// The sheet is listed last and checked last. It is not a dialog - the roster
+// behind it is still live - so a real dialog that happened to be open must win
+// the key, and the sheet only closes once nothing else claims Escape.
 document.addEventListener('keydown', e => {
     if (e.key !== 'Escape') return;
     const audit = document.getElementById('auditModal');
-    if (audit && audit.classList.contains('active')) closeAudit();
+    if (audit && audit.classList.contains('active')) { closeAudit(); return; }
+    const print = document.getElementById('printModal');
+    if (print && print.classList.contains('active')) { closePrintMenu(); return; }
+    const sheet = document.getElementById('recordSheet');
+    if (sheet && !sheet.hidden) closeRecord();
 });
 
-// The printable grade template.
+// The printable OFFICIAL GRADES record.
 //
 // This is the artefact the Registrar still owns after grades moved to
-// Faculty: a formal career record on the BCP letterhead, read from
-// whatever has populated academic_grades.
+// Faculty: a formal career record on the BCP letterhead, listing every
+// subject on file for the student, across every term.
 //
-// GWA policy — the Registrar's own figure prints. gwa_computed is derived
-// from the ratings held here by shared/term_grades.php; gwa_reported is
-// Faculty's. The computed figure is what appears on the record, and a
-// disagreement is shown rather than silently resolved: a document that
-// quietly picks one of two conflicting numbers is the failure mode these
-// two columns exist to prevent.
+// GWA policy — the figure printed is the Registrar's own COMPUTATION,
+// termGwa()/careerGwa() over the ratings actually held, calculated server
+// side in the payload (gwa_live / careerGwa). It was printing
+// academic_history.gwa_computed, which nothing in the application ever
+// writes: only a one-time migration backfill ever set it, copying the old
+// hand-typed `gwa`. So the old document printed a frozen copy of a number
+// somebody typed, which could disagree with the roster column printed on the
+// same screen. Faculty's own figure (gwa_reported) is still carried, and a
+// disagreement between the two is stated on the record rather than silently
+// resolved — a document that quietly picks one of two conflicting numbers is
+// the failure mode those two columns exist to prevent.
 function printGradeTemplate(studentId) {
+    printOfficial(studentId, 'all');
+}
+
+// The three print scopes, and the one entry point for all of them.
+//
+// '1st' and '2nd' mean every term of that semester across EVERY year - the
+// student's 1st-semester terms, not merely the one on screen. Grouping by
+// semester rather than by school year is what makes "All semesters, one
+// semester per page" come out as asked: a reader asking for the 1st semester
+// wants that half of every year, so those terms make up page 1 and the
+// 2nd-semester terms start page 2.
+//
+// The terms are RE-SORTED rather than trusted to arrive in order, because the
+// pagination depends on same-semester terms being contiguous. The payload
+// orders by school year and then semester, which interleaves them
+// (2024-2025 1st, 2024-2025 2nd, 2025-2026 1st, ...) - so without this the
+// "two page" request produces three page breaks instead of one.
+function printOfficial(studentId, scope) {
     const r = rowById(studentId);
     if (!r) return;
 
+    const SEM_ORDER = {
+        '1st': 1, 'first': 1, '1': 1,
+        '2nd': 2, 'second': 2, '2': 2,
+        '3rd': 3, 'third': 3, '3': 3,
+        'summer': 4, 'midterm': 4,
+    };
+    const rank = s => SEM_ORDER[String(s || '').toLowerCase()] ?? 9;
+
+    // Semester is the PRIMARY sort key, school year the secondary one.
+    //
+    // Year-first is the obvious order to reach for and it is the wrong one
+    // here: it produces 2024-2025 1st, 2024-2025 2nd, 2025-2026 1st,
+    // 2025-2026 2nd - interleaved, which puts a page break between every
+    // pair and turns "one semester per page" into four pages. Semester-first
+    // groups them into 1st 2024-2025, 1st 2025-2026, then 2nd 2024-2025,
+    // 2nd 2025-2026, so exactly one break falls between the two halves.
+    const all = (r.career || []).slice().sort((a, b) => {
+        const rs = rank(a.semester) - rank(b.semester);
+        if (rs !== 0) return rs;
+        const ya = String(a.school_year || ''), yb = String(b.school_year || '');
+        return ya < yb ? -1 : (ya > yb ? 1 : 0);
+    });
+
+    const isPartial = scope !== 'all' && !!scope;
+    const wanted = isPartial ? all.filter(t => rank(t.semester) === rank(scope)) : all;
+    if (!wanted.length) { return; }
+
     const na = v => (v === null || v === undefined || v === '') ? 'N/A' : v;
+    const multiSem = rank(wanted[0].semester) !== rank(wanted[wanted.length - 1].semester);
 
     // ── Identity block ──────────────────────────────────────────
+    // Date issued belongs on the document rather than only in the footer,
+    // because "issued" and "printed" are different claims: a record printed
+    // from this system today may certify a term Faculty sent last year.
     let body = '<div class="doc-h2">Student</div>'
         + '<table class="gt-ident">'
         + '<tr><td class="gt-k">Student Number</td><td>' + esc(na(r.number)) + '</td>'
@@ -1145,29 +1511,47 @@ function printGradeTemplate(studentId) {
         + '<tr><td class="gt-k">Name</td><td>' + esc(na(r.name)) + '</td>'
         + '<td class="gt-k">Year / Section</td><td>' + esc(na(r.level))
         + (r.section ? ' · ' + esc(r.section) : '') + '</td></tr>'
+        + '<tr><td class="gt-k">Date Issued</td><td>' + esc(na(AH.printedOn)) + '</td>'
+        + '<td class="gt-k">Terms on file</td><td>'
+        + wanted.length + (isPartial ? ' of ' + all.length : '') + '</td></tr>'
         + '</table>';
 
     // ── Per-term grades ─────────────────────────────────────────
-    const career = r.career || [];
     const byTerm = r.careerSubjects || {};
 
-    if (!career.length) {
-        body += '<p class="gt-empty">No academic records have been received '
-            + 'from Faculty for this student yet.</p>';
-    } else {
-        career.forEach((t, i) => {
-            const key = (t.school_year || '') + '|' + (t.semester || '');
-            const subs = byTerm[key] || [];
+    wanted.forEach((t, i) => {
+        const key = (t.school_year || '') + '|' + (t.semester || '');
+        const subs = byTerm[key] || [];
 
-            body += '<div class="gt-term-head">' + esc(na(t.semester))
-                + ' Semester · ' + esc(na(t.school_year)) + '</div>';
+        // Page break when the semester changes, so "All semesters" lays out as
+        // one page per semester. Inline rather than a class so editing the
+        // print stylesheet cannot quietly drop it - this layout IS the ask.
+        const brk = (i > 0 && rank(t.semester) !== rank(wanted[i - 1].semester))
+            ? ' style="page-break-before:always"' : '';
 
-            if (!subs.length) {
+        // The heading is what carries the page break, so it must exist before
+        // anything else: it is the boundary the break attaches to, and a
+        // document whose term headings went missing is unreadable.
+        body += '<div class="gt-term-head"' + brk + '>'
+            + esc(na(t.semester)) + ' Semester · ' + esc(na(t.school_year)) + '</div>';
+
+        if (!subs.length) {
                 body += '<p class="gt-empty">No grades recorded for this term.</p>';
             } else {
                 body += '<table class="gt-grid">'
                     + '<thead><tr><th>Subject</th><th>Code</th><th class="gt-u">Units</th>'
-                    + '<th class="gt-n">Final Rating</th><th>Grade</th><th>Result</th>'
+                    // Final rating only - no letter column.
+                    //
+                    // The A / B+ / C / F letters were a SECOND grading scale
+                    // sitting beside the numeric one on the same row, and they
+                    // disagree: a subject can read "final rating 3.00, grade A".
+                    // An official record showing both asserts two answers to
+                    // one question. The numeric rating is the one termGwa()
+                    // averages and the one the GWA line is computed from, so it
+                    // is the one that prints. Result stays, because that is an
+                    // outcome rather than a second scale - it is what tells a
+                    // failed subject from an unrated one.
+                    + '<th class="gt-n">Final Rating</th><th>Result</th>'
                     + '<th>Instructor</th></tr></thead><tbody>';
                 subs.forEach(s => {
                     const rated = s.final_rating !== null && s.final_rating !== undefined
@@ -1178,26 +1562,28 @@ function printGradeTemplate(studentId) {
                         + '<td class="gt-u">' + esc(na(s.units)) + '</td>'
                         + '<td class="gt-n">'
                         + (rated ? Number(s.final_rating).toFixed(2) : 'Not rated') + '</td>'
-                        + '<td>' + esc(na(s.grade)) + '</td>'
                         + '<td>' + esc(na(s.grade_status)) + '</td>'
                         + '<td>' + esc(na(s.instructor)) + '</td>'
                         + '</tr>';
                 });
                 body += '</tbody></table>';
             }
-// Term summary: the computed figure is printed; a mismatch with
-            // Faculty's own number is stated, not quietly dropped.
-            const computed = t.gwa_computed !== null && t.gwa_computed !== undefined
-                ? Number(t.gwa_computed) : null;
+// Term summary: the COMPUTED figure is printed; a mismatch with
+        // Faculty's own reported number is stated, never quietly dropped.
+        // gwa_live is computed server-side from the ratings on file.
+            const computed = t.gwa_live !== null && t.gwa_live !== undefined
+                ? Number(t.gwa_live) : null;
             const reported = t.gwa_reported !== null && t.gwa_reported !== undefined
                 ? Number(t.gwa_reported) : null;
             const disagree = computed !== null && reported !== null
                 && Math.abs(computed - reported) > 0.005;
 
+            const termUnits = Number(t.units_live || 0);
             body += '<div class="gt-term-sum">'
                 + '<span>Term GWA</span><b>'
                 + (computed === null ? 'N/A' : computed.toFixed(2)) + '</b>'
-                + '<span>Credits</span><b>' + esc(na(t.credits)) + '</b>'
+                + '<span>Units</span><b>'
+                + (termUnits > 0 ? termUnits : 'N/A') + '</b>'
                 + '</div>';
             if (disagree) {
                 body += '<div class="gt-flag">Faculty reports a term GWA of '
@@ -1205,26 +1591,55 @@ function printGradeTemplate(studentId) {
                     + 'the recorded ratings is ' + computed.toFixed(2)
                     + '. Please confirm with Faculty before issuing this record.</div>';
             }
-            if (i < career.length - 1) body += '<div class="gt-rule"></div>';
+            if (i < wanted.length - 1) body += '<div class="gt-rule"></div>';
         });
 
-        body += '<div class="gt-career"><span>Cumulative GWA</span><b>'
+    // Cumulative block, on the whole record ONLY. A single-semester sheet with
+    // a career figure on it invites the reader to treat a term number as a
+    // lifetime one, so the partial print stops at the term.
+    if (isPartial) {
+        body += '<div class="gt-flag">This sheet covers '
+            + wanted.length + ' term' + (wanted.length === 1 ? '' : 's')
+            + ' only. It is not the student\'s complete academic record.</div>';
+    } else {
+        // Both figures come from the same weighted pass over every rated
+        // subject on file - careerGwa() and the unit total are computed
+        // together in PHP - so the number printed can never sit next to a
+        // total taken from a different set of rows.
+        const careerUnits = Number(r.careerUnits || 0);
+        body += '<div class="gt-career">'
+            + '<div><span>Cumulative GWA</span><b>'
             + (r.careerGwa === null || r.careerGwa === undefined
                 ? 'N/A' : Number(r.careerGwa).toFixed(2))
-            + '</b></div>';
+            + '</b></div>'
+            + '<div><span>Total units earned</span><b>'
+            + (careerUnits > 0 ? careerUnits : 'N/A')
+            + '</b></div>'
+            + '</div>';
     }
 
     body += '<div class="sig"><div class="box"><div class="line">Certified by:<br>Registrar</div></div>'
         + '<div class="box"><div class="line">Noted by:<br>School Head / President</div></div></div>'
         + '<div class="foot-note">Grade records are maintained by Faculty Management '
-        + 'and issued here for reference.<br>Printed ' + esc(AH.printedOn || '') + '.</div>';
+        + 'and issued here for reference. GWA shown is computed from the recorded '
+        + 'ratings as held on the date issued.<br>Printed ' + esc(AH.printedOn || '') + '.</div>';
+
+    // The crest must be an ABSOLUTE url. printDocument() writes into an
+    // about:blank iframe, so a relative src resolves against nothing and the
+    // letterhead prints with an empty box where the logo should be. This is
+    // the same bug js/insights.js already fixed for the AI Insight report by
+    // resolving against window.location.href — so the two consumers now do
+    // it the same way rather than one being right by accident.
+    const logo = AH.logoPath
+        ? new URL(AH.logoPath, window.location.href).href
+        : '';
 
     BCPPrint.printDocument({
-        title: 'GRADE RECORD',
+        title: 'OFFICIAL GRADES — ' + (r.name || ''),
         css: BCPPrint.letterheadCss() + GRADE_TEMPLATE_CSS,
         body: BCPPrint.headerHtml({
-            logoUrl: AH.logoUrl,
-            title: 'GRADE RECORD — ' + String(r.name || '').toUpperCase()
+            logoUrl: logo,
+            title: 'OFFICIAL GRADES'
         }) + body
     });
 }
@@ -1260,8 +1675,12 @@ const GRADE_TEMPLATE_CSS = [
     '.gt-flag { border:1px solid #000; padding:5px 7px; margin:6px 0;',
     '           font-size:9pt; line-height:1.4; }',
     '.gt-rule { border-top:1px solid #000; margin:10px 0 0; }',
-    '.gt-career { font-size:11pt; font-weight:700; text-align:center;',
-    '             margin:16px 0 0; padding-top:6px; border-top:2px solid #000; }'
+    // Two rows now: cumulative GWA, then total units. Row gap so the pair reads
+    // as two figures rather than one run-on line, and a hairline above the
+    // block so it separates from the last term's rows.
+'.gt-career { font-size:11pt; font-weight:700; text-align:center;',
+    '             margin:16px 0 0; padding-top:8px; border-top:2px solid #000; }',
+    '.gt-career > div { margin-bottom:3px; }'
 ].join('\n');
 </script>
 

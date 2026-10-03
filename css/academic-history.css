@@ -16,10 +16,17 @@
      .table        uppercase headers on #f8fafc, hairline row rules, rows
                    tinting to #eff6ff on hover
 
-   The one thing this page does that the others do not: a student's record
-   expands IN PLACE, in a row beneath them, rather than opening a dialog
-   over the roster. A registrar reads one record against the rest of the
-   term, and a dialog hides the term. That is the reason for the detail row.
+   The two things this page does that the others do not:
+
+     1. A student's record opens in a SHEET down the right edge, not over
+        the roster. An expanded row was the earlier answer, and it was wrong in
+        a way only a real roster exposes: opening a record pushed every student
+        below it down, so on a hundred-row term the list jumped and the
+        registrar lost their place in it.
+
+     2. Printing is a question about PAPER, so the chooser shows paper. Each
+        option's glyph stacks as many sheets as it will produce, which makes the
+        page count legible before the click rather than after it.
    ============================================================ */
 
 body[data-page="academic"] { background: #f5f7fb; color: #0f172a; }
@@ -205,11 +212,10 @@ body[data-page="academic"] .table tbody td {
 }
 body[data-page="academic"] .table tbody tr[data-ah-row] { cursor: pointer; }
 body[data-page="academic"] .table tbody tr[data-ah-row]:hover { background: #eff6ff; }
-/* The open row stays tinted, so it is still obvious which record is
-   showing after the cursor has moved on to the next student. */
-body[data-page="academic"] .table tbody tr[data-ah-row][aria-expanded="true"] {
-    background: #eff6ff;
-}
+/* There used to be a rule here that kept an expanded row tinted, so the open
+   record stayed identifiable after the cursor moved on. No row is expanded any
+   more - the record is in the sheet, which names the student in its own
+   header - so the rule had nothing to match. */
 .ah-num {
     color: #64748b;
     font-size: 11.5px;
@@ -219,49 +225,58 @@ body[data-page="academic"] .table tbody tr[data-ah-row][aria-expanded="true"] {
 .ah-muted { color: #64748b; }
 
 /* ── The row's forward step ─────────────────────────────────────
-   The system's row doctrine: one forward step per row, and it is the
-   thing the clerk came to do. Here that step is opening the record, so the
-   whole row is the target and there is no per-row button.
+   The system's row doctrine: one forward step per row, and it is the thing the
+   clerk came to do. That step used to be a chevron on the student's name that
+   expanded the record in a row beneath them.
 
-   The element is still a real <button> so the row stays keyboard reachable
-   and is announced correctly — the chrome is removed, not the semantics.
-   Deleting the element would break exactly the users who most need this
-   page to work.
+   The name is now text and the step is a real View button in its own column.
 
-   appearance:none and the explicit border reset are both needed: the UA
-   button border survives a background reset on its own, and leaves a
-   visible box around every name. */
-.ah-open {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    appearance: none;
-    -webkit-appearance: none;
-    background: none;
-    border: 0;
-    box-shadow: none;
-    padding: 0;
-    margin: 0;
-    cursor: pointer;
-    text-align: left;
-    font-family: inherit;
+   Two reasons, and the second is the one that decides it. The name-as-button
+   made every row look like a disclosure while the target was the whole row,
+   which is a promise about behaviour the element did not keep — the click
+   target was the name, not the row. And an expanded row is the one thing a
+   hundred-row term punishes hardest: every student below it moves down, so the
+   list jumps under the pointer and the registrar loses their place.
+
+   The name keeps the weight and colour the button had, so the row still scans
+   the same way. It is a span, not a button, because it does nothing. */
+.ah-name {
+    display: block;
     font-size: 13px;
     font-weight: 600;
     line-height: 1.35;
     color: #1e293b;
 }
-.ah-open:hover { color: #1d4ed8; }
-.ah-open:focus-visible {
+.ah-act { width: 1%; white-space: nowrap; text-align: right; }
+/* Quiet until wanted. The row carries six other columns of data, and a filled
+   button on every line would out-shout the numbers it sits beside. */
+.ah-view {
+    appearance: none;
+    -webkit-appearance: none;
+    background: #fff;
+    border: 1px solid #cbd5e1;
+    border-radius: 7px;
+    box-shadow: none;
+    padding: 5px 13px;
+    margin: 0;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: .01em;
+    line-height: 1.5;
+    color: #334155;
+    transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.ah-view:hover {
+    background: #eff6ff;
+    border-color: #93c5fd;
+    color: #1d4ed8;
+}
+.ah-view:focus-visible {
     outline: 2px solid #2563eb;
-    outline-offset: 3px;
-    border-radius: 4px;
+    outline-offset: 2px;
 }
-.ah-open i {
-    color: #94a3b8;
-    font-size: 10px;
-    transition: transform .15s ease;
-}
-tr[aria-expanded="true"] .ah-open i { transform: rotate(90deg); color: #2563eb; }
 .ah-id-cell { display: flex; flex-direction: column; gap: 1px; }
 
 /* ── Record status ─────────────────────────────────────────────
@@ -317,12 +332,113 @@ tr[aria-expanded="true"] .ah-open i { transform: rotate(90deg); color: #2563eb; 
     border: 0;
 }
 
-/* ── The expanded record ────────────────────────────────────── */
-.ah-detail > td { padding: 0 !important; background: #f8faff; }
-.ah-record {
-    padding: 16px 18px 18px;
-    border-top: 1px solid #dbeafe;
-    background: #f8faff;
+/* ── The record sheet ──────────────────────────────────────────
+   A drawer down the right edge. Not centered, and not a row that expands.
+
+   The panel is fixed and full height with its own scroll, which is what keeps
+   the roster behind it still: opening a record moves nothing.
+
+   The wrapper is a fixed, full-screen element that takes no pointer events, so
+   the roster stays clickable and View on the next student swaps the record in
+   place. Only the panel itself captures the pointer. There is no scrim - a dim
+   would cover the roster this sheet exists to sit beside. */
+.ah-sheet { position: fixed; inset: 0; z-index: 60; pointer-events: none; }
+.ah-sheet[hidden] { display: none; }
+
+.ah-sheet-panel {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(620px, 100vw);
+    /* border-box, because the panel's 1px left border is added to the width
+       otherwise: on a 390px phone, min(620px, 100vw) resolves to 390 and the
+       box measures 391, pushing it one pixel past the screen edge. */
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    pointer-events: auto;
+    background: #fff;
+    border-left: 1px solid #dbeafe;
+    box-shadow: -18px 0 48px rgba(15, 23, 42, .16);
+    transform: translateX(100%);
+    transition: transform .26s cubic-bezier(.32, .72, 0, 1);
+}
+.ah-sheet.is-open .ah-sheet-panel { transform: none; }
+
+.ah-sheet-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 22px 24px 18px;
+    border-bottom: 1px solid #e2e8f0;
+    /* The identity band. It is the one place the sheet uses the page's blue, so
+       the record reads as belonging to the row you came from. */
+    background: linear-gradient(120deg, #eff6ff, #fff 72%);
+}
+.ah-sheet-kicker {
+    margin-bottom: 5px;
+    color: #1d4ed8;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+.ah-sheet-head h2 {
+    margin: 0;
+    font-size: 20px;
+    line-height: 1.2;
+    letter-spacing: -.02em;
+    color: #172554;
+}
+.ah-sheet-head h2:focus { outline: none; }
+.ah-sheet-sub {
+    margin: 5px 0 0;
+    font-size: 12px;
+    line-height: 1.45;
+    color: #64748b;
+}
+.ah-sheet-close {
+    flex: none;
+    appearance: none;
+    -webkit-appearance: none;
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    background: #fff;
+    border: 1px solid #dbeafe;
+    border-radius: 8px;
+    box-shadow: none;
+    cursor: pointer;
+    font-size: 13px;
+    color: #64748b;
+    transition: background .15s ease, color .15s ease;
+}
+.ah-sheet-close:hover { background: #f1f5f9; color: #0f172a; }
+.ah-sheet-close:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+
+.ah-sheet-body {
+    flex: 1;
+    min-height: 0;
+    /* x as well as y. Dropping the subject code on a phone is the plan for
+       this table; the horizontal scroll is the safety net for anything that
+       does not fit anyway, so a longer subject name degrades into a scroll
+       rather than into a column nobody can reach. */
+    overflow: auto;
+    overscroll-behavior: contain;
+}
+/* The record body carries its own padding so the table can sit flush to the
+   panel edges and read as a sheet of paper rather than a card in a card. */
+.ah-sheet-body > .ah-record {
+    padding: 18px 24px 26px;
+    background: none;
+    border-top: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ah-sheet-panel { transition: none; }
 }
 .ah-record-head {
     display: flex;
@@ -379,6 +495,184 @@ tr[aria-expanded="true"] .ah-open i { transform: rotate(90deg); color: #2563eb; 
    own button rather than inventing a look of its own. */
 .ah-print-btn { font-size: 12px; min-height: 34px; }
 
+/* Says what the print action covers. The panel above it lists ONE term, so
+   without this the button reads as "print this semester" - which is the
+   opposite of what it does. Muted and small on purpose: it is a scope note,
+   not a call to action. Full width so it sits above the button rather than
+   competing with it for the same flex row as the figures. */
+.ah-print-scope {
+    flex: 1 0 100%;
+    margin: 0;
+    font-size: 11px;
+    line-height: 1.45;
+    color: #64748b;
+}
+
+/* The two print scopes sit side by side. The single-term one leads: it is the
+   commoner request, and reading them left to right goes from "this term" to
+   "everything", which is the order a reader expects the pair in. Wraps on a
+   narrow screen rather than letting either label truncate. */
+.ah-print-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+/* ── The dialogs: print chooser and term audit ─────────────────
+   These three classes carry both dialogs' headers and bodies and were never
+   given rules at all. Without them the header is a plain block: the kicker
+   renders as body text at body size, and the close button - an inline-flex
+   control - falls below the block beside it instead of sitting at the top
+   right, which is where every other close in this product is. */
+
+.ah-dialog-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 22px 24px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    background: linear-gradient(120deg, #eff6ff, #fff 72%);
+}
+.ah-dialog-kicker {
+    margin-bottom: 4px;
+    color: #1d4ed8;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+.ah-dialog-head h3 {
+    margin: 0;
+    font-size: 19px;
+    line-height: 1.2;
+    letter-spacing: -.02em;
+    color: #172554;
+}
+.ah-dialog-head h3:focus { outline: none; }
+.ah-dialog-body { padding: 18px 24px 22px; }
+
+/* ── The print chooser ──────────────────────────────────────── */
+
+/* Narrower than the audit dialog it shares a class with. The audit's content
+   is a list of findings that needs the width; three short options do not, and
+   a full-width box holding three lines reads as a page that failed to load. */
+.ah-print-modal { max-width: 460px; }
+
+/* Who the sheet is for. This is the one line that makes the dialog safe: it
+   floats over a roster of a hundred rows, the print is final, and the sheet
+   leaves the office. */
+.ah-print-who {
+    margin-top: 4px;
+    font-size: 15px;
+    font-weight: 700;
+    color: #0f172a;
+}
+.ah-print-lead {
+    margin: 0 0 12px;
+    font-size: 12.5px;
+    color: #64748b;
+}
+
+.ah-print-choices { display: flex; flex-direction: column; gap: 8px; }
+
+.ah-print-choice {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 12px 14px;
+    text-align: left;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: border-color .12s, background .12s;
+}
+.ah-print-choice:hover:not([disabled]) {
+    border-color: #1e40af;
+    background: #f8fafc;
+}
+.ah-print-choice:focus-visible {
+    outline: 2px solid #1e40af;
+    outline-offset: 2px;
+}
+
+/* The sheet glyph.
+
+   This is where the page spends its boldness, and it earns it: the choice in
+   this dialog is not which semester, it is HOW MUCH PAPER. A row of "1st" /
+   "2nd" / "all" badges says all three are the same size of decision, which is
+   false - one prints a sheet, the other prints two. Drawing the stack makes
+   that difference visible at a glance, before the click.
+
+   Two <i> per glyph so the markup does not change shape when the server knows
+   how many semesters exist. The second is hidden unless data-sheets says 2.
+   It sits offset up and to the left, behind the first, the way a second sheet
+   sits in a tray. */
+.ah-sheet-glyph {
+    position: relative;
+    flex: none;
+    width: 30px;
+    height: 38px;
+}
+/* Sheets are bottom-right anchored inside a box with headroom at the top left,
+   so the back sheet can sit up and to the left WITHOUT escaping the box. An
+   earlier version offset it from a sheet that filled the box, which pushed it
+   7px outside and moved the "All semesters" label 7px left of the two above
+   it - a misalignment in a column whose whole job is lining up. */
+.ah-sheet-glyph i {
+    position: absolute;
+    top: 6px;
+    right: 0;
+    bottom: 0;
+    width: 24px;
+    padding: 7px 4px;
+    background: #fff;
+    background-image: repeating-linear-gradient(
+        to bottom, rgba(148, 163, 184, .5) 0 1px, transparent 1px 5px);
+    /* The lines start inside the padding and stop at the edge. Without the
+       origin/clip pair they run under the border and the glyph reads as a
+       lined box rather than as a sheet with something written on it. */
+    background-origin: content-box;
+    background-clip: padding-box;
+    border: 1.5px solid #94a3b8;
+    border-radius: 3px;
+    transition: border-color .12s;
+}
+.ah-sheet-glyph i + i { display: none; }
+/* A lone sheet fills its box. Only the stacked pair needs the inset. */
+.ah-sheet-glyph[data-sheets="1"] i { width: 30px; top: 0; }
+.ah-sheet-glyph[data-sheets="2"] i + i {
+    display: block;
+    transform: translate(-6px, -6px);
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+}
+.ah-print-choice:hover:not([disabled]) .ah-sheet-glyph i { border-color: #1e40af; }
+.ah-print-choice:hover:not([disabled]) .ah-sheet-glyph[data-sheets="2"] i + i {
+    border-color: #93c5fd;
+}
+.ah-choice-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+.ah-choice-text b { font-size: 13.5px; color: #0f172a; }
+.ah-choice-text small { font-size: 11.5px; color: #64748b; }
+
+/* An option with no terms behind it stays visible and says so. A missing
+   button reads as a bug; a disabled one reads as the answer. */
+.ah-print-choice[disabled] {
+    cursor: not-allowed;
+    opacity: .5;
+    background: #f8fafc;
+}
+.ah-print-choice[disabled] .ah-sheet-glyph i {
+    background: #e2e8f0;
+}
+
 /* ── Empty states ───────────────────────────────────────────── */
 .ah-empty-state {
     display: flex;
@@ -426,8 +720,21 @@ tr[aria-expanded="true"] .ah-open i { transform: rotate(90deg); color: #2563eb; 
     .ah-head h1 { font-size: 22px; }
 }
 
+/* The record table on a phone.
+   At 390px the five columns overran the sheet by 41px and the last one -
+   Result, the pass/fail - was cut off past the panel's edge with no way to
+   reach it. Subject code is what goes: it is the one figure in the table that
+   can be read off the printed sheet afterwards, and Result cannot.
+
+   The x-scroll on the body is a safety net rather than the plan. It exists so
+   that a longer subject name or a sixth column degrades into a scroll instead
+   of silently hiding data. */
+@media (max-width: 520px) {
+    .ah-sheet-body .ah-col-code { display: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-    .ah-open i { transition: none; }
+    .ah-view { transition: none; }
 }
 
 /* ── Print ─────────────────────────────────────────────────────
@@ -450,5 +757,10 @@ tr[aria-expanded="true"] .ah-open i { transform: rotate(90deg); color: #2563eb; 
     }
     body[data-page="academic"] .table tbody td { border-bottom: 1px solid #cbd5e1; }
     body[data-page="academic"] .table tbody tr[data-ah-row] { break-inside: avoid; }
-    .ah-open i { display: none; }
+    /* The step is a step on screen. On paper it is nothing, and a column of
+       "View" buttons in a printed roster would be a column of dead words. */
+    .ah-act { display: none; }
+    /* The sheet is an overlay, but it is not one of the .modal-overlay the
+       other rule above already hides. Without this it can still reach paper. */
+    .ah-sheet { display: none !important; }
 }
