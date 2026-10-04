@@ -1355,6 +1355,110 @@ function syncFatherMotherGuardians(int $studentId, ?string $fatherName, ?string 
 }
 
 /**
+ * Mirror the PRIMARY guardian into the Email Recipients list.
+ *
+ * WHY THIS EXISTS
+ * ---------------
+ * A guardian and an email recipient are two different records that
+ * happen to be the same person, and they live in two different tables:
+ *
+ *   guardians          the people responsible for the student
+ *   contact_recipients where invoices, grades, transcripts and alerts go
+ *
+ * Enrolment only ever wrote the first, so a registrar who captured an
+ * email recipient on the Enroll New Student form found the Guardians
+ * tab populated and the Email Recipients tab empty, and had to re-type
+ * the same address into the Guardian & Parent module to be able to send
+ * anything at all. The address was already on file; it just was not in
+ * the list that decides who gets emailed.
+ *
+ * Only the PRIMARY guardian is mirrored, because that row is the one the
+ * form marks as the contact, and it is the one the recipient list
+ * expects to lead with.
+ *
+ * NOTHING IS SUBSCRIBED. The new row lands with verified = 0 and all
+ * three send_* flags at 0, which is exactly what "Add Email Recipient"
+ * creates by hand. This makes the address visible and selectable; it
+ * does not start sending mail to a parent on the strength of one form
+ * field. Turning the flags on stays a decision the registrar makes in
+ * the module, where the consequence is visible.
+ *
+ * Idempotent: re-running for the same student and address returns the
+ * existing row rather than adding a second recipient for one person.
+ *
+ * @return int|null The contact_recipients id, or null when there was
+ *                  nothing to mirror or the write did not happen.
+ */
+function syncPrimaryGuardianAsEmailRecipient(int $studentId): ?int
+{
+    if ($studentId <= 0) {
+        return null;
+    }
+    $db = Database::getInstance();
+
+    $g = $db->fetchOne(
+        'SELECT full_name, relationship, contact_number, email
+           FROM guardians
+          WHERE student_id = ? AND is_primary = 1
+          ORDER BY id ASC LIMIT 1',
+        [$studentId]
+    );
+    if (!$g) {
+        return null;
+    }
+
+    $email    = trim((string) ($g['email'] ?? ''));
+    $fullName = trim((string) ($g['full_name'] ?? ''));
+    if ($email === '' || $fullName === '') {
+        return null;
+    }
+    if (function_exists('isValidEmail') && !isValidEmail($email)) {
+        return null;
+    }
+    $email = strtolower($email);
+
+    // One recipient per address per student, matching the duplicate rule
+    // api/contacts.php enforces when a registrar adds one by hand.
+    $dup = $db->fetchOne(
+        'SELECT id FROM contact_recipients WHERE student_id = ? AND email = ?',
+        [$studentId, $email]
+    );
+    if ($dup) {
+        return (int) $dup['id'];
+    }
+
+    $phone     = trim((string) ($g['contact_number'] ?? ''));
+    $relStored = trim((string) ($g['relationship'] ?? ''));
+    $now       = date('Y-m-d H:i:s');
+
+    try {
+        // created_at / updated_at are NOT NULL with no default and the
+        // Database layer adds nothing, so they are written here. Relying
+        // on a zero-date to slip past strict mode is how this ends up as
+        // 0000-00-00 in a list someone is about to email from.
+        return (int) $db->insert('contact_recipients', [
+            'student_id'    => $studentId,
+            'full_name'     => $fullName,
+            'relationship'  => $relStored !== '' ? $relStored : 'parent',
+            'email'         => $email,
+            'phone'         => $phone !== '' ? $phone : null,
+            'verified'      => 0,
+            'send_billing'  => 0,
+            'send_grades'   => 0,
+            'send_emergency'=> 0,
+            'created_at'    => $now,
+            'updated_at'    => $now,
+        ]);
+    } catch (Exception $e) {
+        // Same rule as the guardian insert above: the student is already
+        // on file, so a recipient that will not save is logged and
+        // skipped rather than taking the enrolment down with it.
+        error_log('[syncPrimaryGuardianAsEmailRecipient] skipped: ' . $e->getMessage());
+        return null;
+    }
+}
+
+/**
  * Link documents that were staged under an enrollment number to a
  * student record. Used by the enrollment intake once a student is
  * accepted or re-enrolled. Returns how many documents were linked.
@@ -1608,6 +1712,14 @@ function createStudentFromInput(array $input, $db): array
             $input['mother_name'] ?? null,
             $firstGuardianForSync ?? []
         );
+    }
+
+    // The Email recipient captured on the enrolment form belongs in the
+    // Email Recipients list too, or the Guardian & Parent module shows a
+    // populated Guardians tab and an empty Email Recipients tab for a
+    // student whose address is already on file.
+    if (function_exists('syncPrimaryGuardianAsEmailRecipient')) {
+        syncPrimaryGuardianAsEmailRecipient($newId);
     }
 
     // ── Previous school → academic_history ─────────────────────

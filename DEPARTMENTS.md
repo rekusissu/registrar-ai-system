@@ -78,7 +78,7 @@ So the split is by surface, not by field:
 | Surface | Treatment |
 |---|---|
 | **Masterlist** | ✅ **In scope.** Auto-assign, Create Section, a Section column, a section filter, section chips on each block heading, and Section on the printed sheet and both exports. |
-| Add Student modal | No section field. A dashed row reads *"Section — assigned from the Masterlist"* and prints `N/A`. |
+| Add Student modal | No section field, and no note standing in for one. A section is assigned in batches from the Masterlist, so a per-student field would invite a clerk to set codes one at a time — the exact work auto-assign exists to remove. It was previously shown as a dashed *"Section — assigned from the Masterlist"* row printing `N/A`; that was removed on 2026-10-04. The "show it rather than hide it" convention below still stands for the **printed sheet**, where a missing section has to be distinguishable from a rendering failure. |
 | Student list | No section column, no section filter. |
 | Quality score | `section` stays out of the weights; its 5 points went to `course`. |
 

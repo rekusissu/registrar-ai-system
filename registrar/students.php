@@ -151,10 +151,13 @@ include '../includes/sidebar.php';
    'no data' message is shown, so a registrar can distinguish a
    genuinely empty record from a rendering failure." A field that
    simply vanished would read as data loss. */
-.rs-outscope{display:flex;align-items:center;gap:10px;margin-top:2px;padding:10px 12px;border:1px dashed #cbd5e1;border-radius:10px;background:#f8fafc;font-size:12px;color:#64748b}
-.rs-outscope b{color:#475569;font-weight:700}
-.rs-outscope i{color:#94a3b8}
-.rs-outscope .rs-na{margin-left:auto;font-weight:800;color:#94a3b8;letter-spacing:.05em}
+/* REMOVED 2026-10-04: the out-of-scope Section note on the add-student
+   form. The convention quoted above still stands for the PRINTED sheet; it
+   does not extend to this form. Section was shown here as a dashed row
+   reading "assigned from the Masterlist", which told a clerk nothing they
+   did not already know and pushed the Course / Year level fields out of
+   line with their neighbours. Its .rs-outscope rules went with it rather
+   than being left behind as dead CSS for the next button to inherit. */
 
 /* Completeness ledger — the one deliberately loud element. */
 .rs-ledger{display:flex;align-items:center;gap:14px;width:100%;margin-right:auto;min-width:0}
@@ -1290,7 +1293,7 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 </div>
 
 <!-- Add Modal (inline, with guardian) -->
-<div class="modal-overlay" id="addModal"><div class="modal-content modal-frame" style="max-width:860px;">><div class="modal-header"><h2><i class="fas fa-user-plus"></i> Enroll New Student</h2><div style="display:flex;gap:8px;align-items:center;"><button class="btn btn-secondary" style="padding:6px 12px;font-size:12px;" onclick="openPasteModal()"><i class="fas fa-magic"></i> Paste to Fill</button><button class="modal-close" onclick="closeAddModal()"><i class="fas fa-times"></i></button></div></div><form id="addForm"><div class="modal-body">
+<div class="modal-overlay" id="addModal"><div class="modal-content modal-frame" style="max-width:860px;"><div class="modal-header"><h2><i class="fas fa-user-plus"></i> Enroll New Student</h2><div style="display:flex;gap:8px;align-items:center;"><button class="btn btn-secondary" style="padding:6px 12px;font-size:12px;" onclick="openPasteModal()"><i class="fas fa-magic"></i> Paste to Fill</button><button class="modal-close" onclick="closeAddModal()"><i class="fas fa-times"></i></button></div></div><form id="addForm"><div class="modal-body">
 
 <!-- ── IDENTITY ─────────────────────────────────────────────── -->
 <div class="rs-block">
@@ -1349,19 +1352,6 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
       <div class="form-group"><label for="addSchoolYear">School year <span class="required">*</span></label><input type="text" id="addSchoolYear" class="form-control" placeholder="2026-2027" value="2026-2027" required pattern="\d{4}-\d{4}" title="Format: 2026-2027"></div>
       <div class="form-group"><label for="addSemester">Semester <span class="required">*</span></label><select id="addSemester" class="form-control" required><option value="">—</option><option value="1st">1st Semester</option><option value="2nd">2nd Semester</option><option value="summer">Summer</option></select></div>
     </div>
-
-    <!-- Section, deliberately present and deliberately not editable.
-         It is assigned in batches from the Masterlist, so a per-student
-         field here would invite a clerk to set codes one at a time - the
-         exact work auto-assign exists to remove. It is shown rather than
-         removed so that its absence reads as a decision rather than as lost
-         data, which is the same reason DEPARTMENTS.md forbids hiding a
-         section on a printed document. -->
-    <div class="rs-outscope">
-      <i class="fas fa-building-columns"></i>
-      <span><b>Section</b> &mdash; assigned from the Masterlist, not per student.</span>
-      <span class="rs-na">N/A</span>
-    </div>
   </div>
 </div>
 <!-- ── GUARDIANS & PARENTS ──────────────────────────────────── -->
@@ -1387,7 +1377,7 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
           <div class="form-group"><label for="addGuardianContact">Mobile number <span class="required">*</span></label><input type="text" id="addGuardianContact" class="form-control gd-contact" placeholder="0917 123 4567" inputmode="tel" required pattern="09[0-9]{9}" title="11-digit mobile number starting 09"></div>
         </div>
         <div class="form-row form-row-3">
-          <div class="form-group"><label for="addGuardianEmail">Email</label><input type="email" id="addGuardianEmail" class="form-control gd-email"><div class="form-hint">Optional. Used for record notices only.</div></div>
+          <div class="form-group"><label for="addGuardianEmail">Email recipient <span class="required">*</span></label><input type="email" id="addGuardianEmail" class="form-control gd-email" required><div class="form-hint">Where record notices are sent. Required on the primary contact.</div></div>
           <div class="form-group"><label for="addGuardianAddress">Address</label><input type="text" id="addGuardianAddress" class="form-control gd-address" placeholder="House no., street, barangay, city" autocomplete="street-address"><div class="form-hint">Optional. Where this person can be reached.</div></div>
         </div>
       </div>
@@ -2673,6 +2663,13 @@ function guardianRowsError() {
         if (!name) return who + ' needs a full name.';
         if (!contact) return who + ' needs a mobile number.';
         if (!ph11(contact)) return who + "'s mobile number must be 11 digits starting with 09 (e.g. 09171234567).";
+        // The PRIMARY contact's email is required: it is the address record
+        // notices are sent to, and an enrolment that captures a guardian but
+        // no way to reach them has quietly created the problem this form
+        // exists to prevent. Only row 1 - added rows have `required` stripped
+        // when they are cloned, because a second parent may genuinely have
+        // no address of their own.
+        if (i === 0 && !email) return who + ' needs an email recipient - that is where record notices are sent.';
         if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return who + "'s email address is not valid.";
     }
     return '';
