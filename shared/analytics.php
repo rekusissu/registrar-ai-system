@@ -169,12 +169,28 @@ function aiInsightDocBucket(?string $sku, ?string $name, ?string $type): string 
     return 'Others';
 }
 
-/** Workflow statuses collapsed into the stacked series of the document chart. */
+/**
+ * Workflow statuses collapsed into the stacked series of the document chart.
+ *
+ * Must cover EVERY value of document_requests.document_status (the 8-value
+ * v2 enum in registrar_ai.sql / migrations/document_online_lifecycle.sql).
+ * aiInsightDocStatusGroup() falls back to 'Processing' for anything
+ * unmapped, so a status missing from this map is not dropped — it is
+ * silently charted in the WRONG segment, and the overview reports the
+ * workflow the system used to have instead of the one it has. That is
+ * exactly how Awaiting_Payment and Shipped were misfiled as Processing
+ * for as long as they have existed. tests/DocStatusGroupsTest.php pins
+ * the contract.
+ *
+ * 8 enum values → 5 series, matching the KPI card's own cut:
+ *   Pending = Filed, Pending_Clearance, Awaiting_Payment (not yet worked)
+ *   Ready   = Ready, Shipped  (done, not yet in the student's hands)
+ */
 function aiInsightDocStatusGroups(): array {
     return [
-        'Pending'    => ['Filed', 'Pending_Clearance'],
+        'Pending'    => ['Filed', 'Pending_Clearance', 'Awaiting_Payment'],
         'Processing' => ['Processing'],
-        'Ready'      => ['Ready'],
+        'Ready'      => ['Ready', 'Shipped'],
         'Claimed'    => ['Claimed'],
         'Rejected'   => ['Rejected'],
     ];
@@ -391,10 +407,14 @@ function aiInsightDocumentMetrics(array $period): array {
 
     $total       = (int) $db->fetchColumn("SELECT COUNT(*) FROM document_requests WHERE request_date >= ? AND request_date < ?", [$s, $e]);
     $previous    = (int) $db->fetchColumn("SELECT COUNT(*) FROM document_requests WHERE request_date >= ? AND request_date < ?", [$ps, $pe]);
+    // Filed is "not yet ready" like the rest: a counter-paid request sits
+    // at Filed until the clerk starts work. Including it makes
+    // pending + completed + rejected partition the period total instead
+    // of letting Filed requests leak out of all three counts.
     $pending     = (int) $db->fetchColumn(
         "SELECT COUNT(*) FROM document_requests
           WHERE request_date >= ? AND request_date < ?
-            AND document_status IN ('Pending_Clearance','Awaiting_Payment','Processing')",
+            AND document_status IN ('Filed','Pending_Clearance','Awaiting_Payment','Processing')",
         [$s, $e]
     );
     $completed   = (int) $db->fetchColumn(

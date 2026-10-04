@@ -195,6 +195,19 @@ if ($view === 'folders' || $view === 'explore') {
     $folderTree  = mlf_build_tree($allStudents);
     $folderTotal = count($allStudents);
 
+    // THE CATALOGUE IS THE SHAPE; THE ROWS FILL IT IN. Same rule as the
+    // Academic History board: every OFFERED program gets a folder and
+    // every program gets all four year levels, whatever the rows say.
+    // Otherwise "where is BSCpE?" and "does BSCpE have no Year 3?" print
+    // the same empty screen - and the second is the question a registrar
+    // asks while chasing a missing cohort.
+    //
+    // Seeding adds FOLDERS, never rows, so it cannot invent a student.
+    // Both folder surfaces get it: the browser and the table are two
+    // presentations of one tree, and a folder one of them cannot see is
+    // a folder that does not exist as far as the reader is concerned.
+    $folderTree = mlf_seed_catalogue($folderTree, array_keys(getOfferedCourses()));
+
     // The BROWSER stands at one folder; the TABLE flattens the whole
     // tree into rows. Both read the same tree, so the two views can
     // never disagree about who is filed where.
@@ -970,7 +983,7 @@ body[data-page="masterlist"] .masterlist-table{min-width:1390px}
         // is re-resolved here and the programs are shown for real.
         $nodeMissing = !$node['exists'];
         if ($nodeMissing) {
-            $node = mlf_resolve(mlf_build_tree($allStudents), '');
+            $node = mlf_resolve($folderTree, '');
         }
         $crumbs  = $node['breadcrumbs'];
         $lastCrumb = array_key_last($crumbs);
@@ -1083,6 +1096,17 @@ body[data-page="masterlist"] .masterlist-table{min-width:1390px}
                         <a class="btn btn-secondary btn-sm" href="<?= $toFolder((string) $node['parent']) ?>">
                             <i class="fas fa-arrow-left"></i> Up one level
                         </a>
+                        <?php if ((string) $node['parent'] !== ''): ?>
+                            <?php // The reset. Only offered where there is more than
+                                 // one level between here and the top: inside a
+                                 // program folder "All programs" IS the way up, so a
+                                 // second button would be the same link twice. Two
+                                 // controls rather than one, because they are not the
+                                 // same trip - a step is not a reset. ?>
+                            <a class="btn btn-secondary btn-sm" href="<?= $toFolder('') ?>">
+                                <i class="fas fa-hard-drive"></i> All programs
+                            </a>
+                        <?php endif; ?>
                     <?php endif; ?>
                     <?php if ((int) $node['count'] > 0): ?>
                         <!-- The whole subtree, not just what is on screen. -->
@@ -1141,6 +1165,23 @@ body[data-page="masterlist"] .masterlist-table{min-width:1390px}
                             <i class="fas fa-chevron-right mlx-tile-go" aria-hidden="true"></i>
                         </a>
                     <?php endforeach; ?>
+                </div>
+            <?php elseif (!$isLeaf): ?>
+                <?php // A folder with nothing in it says so. The catalogue seeds
+                     // every program and every year level, so this screen IS
+                     // reachable with no sections under it - and a head with a
+                     // count and no body reads as a broken query rather than as
+                     // the fact it is. Same wording as Academic History's
+                     // empty year, so the two pages answer "is there anything
+                     // here?" identically.
+                     //
+                     // Not a leaf: a section folder with no students already
+                     // says so in its own table ("This folder is empty"), and
+                     // saying it twice in two voices is noise. ?>
+                <div class="mlx-emptyfolder">
+                    <i class="fas fa-folder-open" aria-hidden="true"></i>
+                    <p><strong>No sections yet in <?= htmlspecialchars((string) $node['name']) ?>.</strong></p>
+                    <p>The folder exists because the program is offered; nothing is filed under it yet.</p>
                 </div>
             <?php endif; ?>
 
@@ -3081,6 +3122,13 @@ async function sendList() {
 .mlx-missing { padding:34px 20px; text-align:center; color:#64748b; }
 .mlx-missing i { font-size:30px; color:#cbd5e1; display:block; margin-bottom:12px; }
 .mlx-missing p { margin:0 0 5px; font-size:13.5px; }
+
+/* A seeded folder with nothing filed under it. Same shape as the missing
+   folder block above - it is the same fact from a different cause, so it
+   reads the same way. */
+.mlx-emptyfolder { padding:34px 20px; text-align:center; color:#64748b; }
+.mlx-emptyfolder i { font-size:30px; color:#cbd5e1; display:block; margin-bottom:12px; }
+.mlx-emptyfolder p { margin:0 0 5px; font-size:13.5px; }
 
 /* The roster inside a section folder.
    This is its own table (.mlx-table), NOT the printable List's

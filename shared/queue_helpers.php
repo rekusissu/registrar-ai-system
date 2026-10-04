@@ -83,6 +83,7 @@ function queueDefaultDaySettings(): array {
         'cutoff_forced_by'  => null,
         'max_taps_student'  => 0,
         'max_taps_priority' => 0,
+        'max_daily_taps'    => 0,
     ];
 }
 
@@ -174,6 +175,37 @@ function queueTapsToday($db, string $date, int $studentId): int {
         "SELECT COUNT(*) FROM queue_tickets WHERE queue_date = ? AND student_id = ?",
         [$date, $studentId]
     );
+}
+
+// How many numbers have been issued for the whole day, every student.
+//
+// THIS IS NOT THE SAME NUMBER AS queueTapsToday(). That one answers "has
+// this person already used theirs"; this one answers "is the counter still
+// inside the day's capacity", which is the question the office actually
+// plans against - roughly 500-600 people across an eight-hour day.
+//
+// Counts every status for the same reason as above: a number that was
+// issued and then cancelled still consumed a number off the board, and the
+// day's throughput is what the cap is protecting.
+function queueNumbersIssuedToday($db, string $date): int {
+    return (int) $db->fetchColumn(
+        "SELECT COUNT(*) FROM queue_tickets WHERE queue_date = ?",
+        [$date]
+    );
+}
+
+// The day's capacity. 0 means unlimited, like every other cap in this table.
+function queueDailyTapLimit(array $settings): int {
+    return (int) ($settings['max_daily_taps'] ?? 0);
+}
+
+// Has the office issued today's capacity? Deliberately a strict >=: once
+// the 600th number is out, the 601st student is the one who must be turned
+// away, so "the day is full" is true the moment the count REACHES the
+// limit, not one tap later.
+function queueDailyTapLimitReached(array $settings, int $issued): bool {
+    $limit = queueDailyTapLimit($settings);
+    return $limit > 0 && $issued >= $limit;
 }
 
 // The daily cap for a lane. 0 means unlimited.

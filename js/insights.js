@@ -3,8 +3,9 @@
 //  Intelligent Analytics and Reports
 //    · Chart.js rendering for the 4 registrar charts
 //    · Reporting Period switching (cards + charts refetch)
-//    · Generate AI Insight → 3-section AI ANALYSIS REPORT
-//    · Print + Export (PDF / CSV / TXT)
+//    · Generate AI Insight → 7-section AI ANALYSIS REPORT
+//    · Print + Export (PDF / TXT); the print document is ONE file:
+//      title (letterhead) → body (sections 1-6) → Conclusion (section 7)
 //
 //  Reads the first paint from
 //  <script type="application/json" id="insightsData">.
@@ -31,7 +32,6 @@
         charts: payload.charts,
         report: null,
         source: null,
-        facts:  null,
         stale:  false
     };
 
@@ -71,7 +71,6 @@
         exportBtn:  document.getElementById('exportBtn'),
         exportMenu: document.getElementById('exportMenu'),
         exportPdf:  document.getElementById('exportPdf'),
-        exportCsv:  document.getElementById('exportCsv'),
         exportTxt:  document.getElementById('exportTxt')
     };
 
@@ -740,7 +739,51 @@
     }
 
     /**
-     * The printable rendering of the report: plain headings, paragraphs and
+     * Split the report Markdown into its printable parts.
+     *
+     * The endpoint CONTRACTS seven numbered sections, and the seventh is the
+     * conclusion by design — cross-module findings plus recommended actions
+     * (api/ai-insights-report.php requires '## 7.' before it will serve a
+     * report at all). The print document honours that structure: sections
+     * 1-6 print as the body, section 7 prints under its own "Conclusion"
+     * heading. So the Markdown is parsed into section records here rather
+     * than flattened straight to HTML, and openPrintView() decides where
+     * each part goes.
+     *
+     * A section is { num, title, lines }. Lines before the first heading
+     * (the endpoint forbids any) are dropped rather than printed naked.
+     */
+    function splitReportSections(report) {
+        var body = [];
+        var conclusion = null;
+        var current = null;
+
+        String(report).split('\n').forEach(function (line) {
+            // "## 1. Title" keeps its number: the model contract guarantees
+            // seven numbered sections, and a formal report cites them by
+            // number. "## Title" (no number) is used as-is, with num 0.
+            var numbered = /^##\s+(\d+)\.\s*(.+)$/.exec(line);
+            var heading  = /^##\s+(.+)$/.exec(line);
+
+            if (numbered || heading) {
+                current = numbered
+                    ? { num: parseInt(numbered[1], 10), title: numbered[2].trim(), lines: [] }
+                    : { num: 0, title: heading[1].trim(), lines: [] };
+                if (current.num === 7) {
+                    conclusion = current;
+                } else {
+                    body.push(current);
+                }
+            } else if (current) {
+                current.lines.push(line);
+            }
+        });
+
+        return { body: body, conclusion: conclusion };
+    }
+
+    /**
+     * The printable rendering of one section's lines: plain paragraphs and
      * bullets, with no card, badge or border wrappers.
      *
      * markdownToHtml() cannot be reused here. It is shared with the on-screen
@@ -751,8 +794,7 @@
      * printout. Parsing the same small Markdown subset directly keeps the two
      * renderings independent.
      */
-    function reportBodyHtml(report) {
-        var lines = String(report).split('\n');
+    function sectionLinesHtml(lines) {
         var html = '';
         var inList = false;
 
@@ -761,21 +803,8 @@
         }
 
         lines.forEach(function (line) {
-            // "## 1. Title" keeps its number: the model contract guarantees
-            // seven numbered sections, and a formal report cites them by
-            // number. "## Title" (no number) is used as-is.
-            var numbered = /^##\s+(\d+)\.\s*(.+)$/.exec(line);
-            var heading  = /^##\s+(.+)$/.exec(line);
-            var bullet   = /^\s*[-*]\s+(.+)$/.exec(line);
-
-            if (numbered) {
-                closeList();
-                html += '<h2 class="doc-h">' + numbered[1] + '. '
-                    + inlineFormat(escapeHtml(numbered[2].trim())) + '</h2>';
-            } else if (heading) {
-                closeList();
-                html += '<h2 class="doc-h">' + inlineFormat(escapeHtml(heading[1].trim())) + '</h2>';
-            } else if (bullet) {
+            var bullet = /^\s*[-*]\s+(.+)$/.exec(line);
+            if (bullet) {
                 if (!inList) { html += '<ul>'; inList = true; }
                 html += '<li>' + inlineFormat(escapeHtml(bullet[1])) + '</li>';
             } else if (line.trim() === '') {
@@ -787,6 +816,17 @@
         });
         closeList();
         return html;
+    }
+
+    /** The body of the printout: each section's numbered heading, then its
+     *  lines. The conclusion is NOT included — openPrintView() prints it as
+     *  its own block after this. */
+    function reportBodyHtml(sections) {
+        return sections.map(function (s) {
+            var title = s.num ? s.num + '. ' + s.title : s.title;
+            return '<h2 class="doc-h">' + inlineFormat(escapeHtml(title)) + '</h2>'
+                + sectionLinesHtml(s.lines);
+        }).join('');
     }
 
     function showLoading() {
@@ -830,7 +870,6 @@
     function renderReport(report, meta) {
         state.report = report;
         state.source = meta.source || 'ai';
-        if (meta.facts)  state.facts  = meta.facts;
         if (meta.cards)  state.cards  = meta.cards;
         state.stale = false;
 
@@ -1069,8 +1108,28 @@
 
     // ─── Printable executive report ─────────────────────────────
     /**
-     * Prints the report: BCP letterhead, the AI analysis as plain prose,
-     * and the signature block. "Export PDF" reuses this (print → save as PDF).
+     * Prints the report as ONE file with three parts, in this order:
+     *
+     *   1. Title    — the BCP letterhead and the reporting-period line.
+     *   2. Body     — sections 1-6 of the analysis, under their numbered
+     *                 headings.
+     *   3. Conclusion — section 7 (cross-module findings and recommended
+     *                 actions), lifted out of the body and printed under
+     *                 its own "Conclusion" heading, so the end of the
+     *                 document reads as conclusions rather than as one
+     *                 more section that happened to come last.
+     *
+     * Section 7 is the conclusion BY CONTRACT, not by keyword search: the
+     * endpoint requires exactly seven numbered headings and names the
+     * seventh "Cross-Module Findings and Recommended Actions". If a stored
+     * report somehow has no section 7, the conclusion block is omitted
+     * rather than invented.
+     *
+     * "Export PDF" reuses this (print → save as PDF). There is deliberately
+     * no CSV export of the analysis: the figures behind it live in the data
+     * endpoint and in the on-screen figures block, and a flat CSV invites
+     * reading counts as analysis — the exact mistake those blocks exist to
+     * prevent.
      *
      * The report is written into a hidden <iframe> rather than a pop-up
      * window. window.open() is the convention elsewhere in this project
@@ -1095,19 +1154,28 @@
         // operating the screen, and it made the printout look like an error
         // on an official document. The source badge on screen still reports
         // it, so nothing is hidden from the user who needs to know.
+        var parts = splitReportSections(state.report);
+
         var body = ''
             + BCPPrint.headerHtml({
                 logoUrl: logo,
                 title: 'AI INSIGHT REPORT — ' + String(periodLabel).toUpperCase()
             })
+            // Part 1 closes here; the period line is the bridge to the body.
             + '<div class="meta">Reporting period: ' + escapeHtml(periodLabel)
             + ' (compared with ' + escapeHtml(state.period.prev_label || '—')
             + ') · Generated: ' + escapeHtml(generated)
             + '</div>'
-            // The report is the document. No KPI tiles and no chart
-            // snapshots — those are a screen view; the printout is the
-            // written analysis.
-            + '<div class="doc-body">' + reportBodyHtml(state.report) + '</div>'
+            // Part 2 — the body. No KPI tiles and no chart snapshots —
+            // those are a screen view; the printout is the written analysis.
+            + '<div class="doc-body">' + reportBodyHtml(parts.body) + '</div>'
+            // Part 3 — the conclusion: its own block, its own heading,
+            // rendered from the same lines section 7 would have printed as
+            // inside the body, so nothing is lost by lifting it out.
+            + (parts.conclusion
+                ? '<div class="doc-body doc-conclusion"><h2 class="doc-h">Conclusion</h2>'
+                    + sectionLinesHtml(parts.conclusion.lines) + '</div>'
+                : '')
             + '<div class="sig"><div class="box"><div class="line">Prepared by:<br>Registrar</div></div>'
             + '<div class="box"><div class="line">Noted by:<br>School Head / President</div></div></div>'
             + '<div class="foot-note">Generated by: Registrar Information System<br>'
@@ -1151,72 +1219,6 @@
         downloadBlob(text, 'ai-insights-' + periodSlug() + '.txt', 'text/plain;charset=utf-8');
     }
 
-    /** Every figure that fed the analysis, as a flat CSV (auditable). */
-    function exportCsv() {
-        if (!state.facts) return;
-        var f = state.facts;
-        var rows = [['Metric', 'Value']];
-        function add(metric, value) { rows.push([metric, value]); }
-
-        add('Reporting period', f.period.label);
-        add('Period start', f.period.start);
-        add('Period end', f.period.end);
-        add('Comparison period', f.period.prev_label);
-        add('Report source', state.source === 'ai' ? 'AI-generated' : 'No AI analysis (gateway unavailable)');
-
-        add('Total students', f.students.total);
-        add('Active or enrolled', f.students.active_enrolled);
-        add('New registrations in period', f.students.new_in_period);
-        add('New registrations previous period', f.students.new_in_previous);
-        Object.keys(f.students.by_status || {}).forEach(function (k) {
-            add('Students — ' + k, f.students.by_status[k]);
-        });
-
-        add('Document requests in period', f.documents.total_in_period);
-        add('Document requests previous period', f.documents.total_previous);
-        add('Documents pending', f.documents.pending);
-        add('Documents completed', f.documents.completed);
-        add('Documents rejected', f.documents.rejected);
-        Object.keys(f.documents.by_type || {}).forEach(function (k) {
-            add('Document type — ' + k, f.documents.by_type[k]);
-        });
-        Object.keys(f.documents.by_stage || {}).forEach(function (k) {
-            add('Workflow stage — ' + k, f.documents.by_stage[k]);
-        });
-
-        add('RFID cards total', f.rfid.total_cards);
-        add('RFID cards active', f.rfid.active);
-        add('RFID cards expired', f.rfid.expired);
-        add('RFID cards lost', f.rfid.lost);
-        add('RFID cards inactive', f.rfid.inactive);
-        add('RFID issued in period', f.rfid.issued_in_period);
-        add('RFID activity source', f.rfid.activity_source);
-        add('Kiosk taps (12 months)', f.rfid.kiosk_taps_total);
-
-        add('Queue students in period', f.queue.students_in_period);
-        add('Queue students previous period', f.queue.students_previous);
-        add('Queue tickets in period', f.queue.tickets_in_period);
-        add('Queue tickets previous period', f.queue.tickets_previous);
-        add('Queue completed', f.queue.served);
-        add('Queue cancelled / no-show', f.queue.cancelled_or_no_show);
-        add('Queue walk-ins without student record', f.queue.walk_ins);
-        add('Queue tickets today', f.queue.tickets_today);
-        add('Busiest queue day', f.queue.busiest_day || '');
-        add('Busiest day tickets', f.queue.busiest_day_tickets);
-
-        (f.programs.top || []).forEach(function (p) {
-            add('Program — ' + p.course, p.students + ' (' + p.new_in_period + ' new)');
-        });
-
-        var csv = rows.map(function (row) {
-            return row.map(function (cell) {
-                return '"' + String(cell == null ? '' : cell).replace(/"/g, '""') + '"';
-            }).join(',');
-        }).join('\r\n');
-
-        downloadBlob('\uFEFF' + csv, 'ai-insights-' + periodSlug() + '.csv', 'text/csv;charset=utf-8;');
-    }
-
     // ─── Wiring ─────────────────────────────────────────────────
     function closeExportMenu() {
         if (el.exportMenu) el.exportMenu.classList.remove('is-open');
@@ -1236,7 +1238,6 @@
 
     if (el.printBtn)  el.printBtn.addEventListener('click', openPrintView);
     if (el.exportPdf) el.exportPdf.addEventListener('click', function (e) { e.preventDefault(); closeExportMenu(); openPrintView(); });
-    if (el.exportCsv) el.exportCsv.addEventListener('click', function (e) { e.preventDefault(); closeExportMenu(); exportCsv(); });
     if (el.exportTxt) el.exportTxt.addEventListener('click', function (e) { e.preventDefault(); closeExportMenu(); exportTxt(); });
 
     if (el.exportBtn) {

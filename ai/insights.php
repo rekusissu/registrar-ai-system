@@ -331,7 +331,22 @@ body[data-page="insights"] .ai-source-badge{
     background:#ecfdf5;color:#047857;
 }
 body[data-page="insights"] .ai-source-badge.is-fallback{background:#fef3c7;color:#b45309}
-body[data-page="insights"] .ai-report-output{font-size:14px;line-height:1.7;color:#1e293b}
+// The whole report is ONE centred column of text, not seven independently
+   // capped ones. The previous version capped each paragraph and bullet list
+   // at 70ch, which is correct for reading but wrong in a wide dashboard
+   // card: the text hugged the left edge and left a large void down the
+   // right, so the card looked broken rather than typeset.
+   //
+   // Constraining the column instead - and centring it - gives the same
+   // readable measure with balanced gutters on both sides, so the whitespace
+   // reads as margin rather than as something missing.
+   //
+   // max-width:min() so a narrow window wins on its own and the column never
+   // needs a breakpoint to stop overflowing.
+   body[data-page="insights"] .ai-report-output{
+    max-width:min(76ch, 100%);margin-inline:auto;
+    font-size:14px;line-height:1.7;color:#1e293b;
+}
 body[data-page="insights"] .ai-report-output .ai-report-title{
     font-size:15px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
     color:#0f172a;margin:0 0 14px;display:flex;align-items:center;gap:9px;
@@ -352,8 +367,8 @@ body[data-page="insights"] .ai-report-output .ai-report-title i{color:#7c3aed}
    different kind of section from section 5.
    Bullets are custom-dotted rather than the default disc so long
    recommendation lists keep a consistent optical weight.
-   Measure is capped at 70ch - this is prose meant to be read, not a
-   dashboard column scanned. */
+   Measure is capped at 76ch on the column itself - prose meant to be read,
+   not a dashboard column scanned. */
 body[data-page="insights"] .report-section{
     background:none;border:0;border-radius:0;
     padding:20px 0 6px;margin:0;border-top:1px solid #e2e8f0;
@@ -380,10 +395,10 @@ body[data-page="insights"] .report-section h2{
     letter-spacing:-.01em;line-height:1.35;
 }
 body[data-page="insights"] .report-section p{
-    margin:0 0 11px;max-width:70ch;
+    margin:0 0 11px;
 }
 body[data-page="insights"] .report-section ul{
-    margin:0 0 6px;padding:0;max-width:70ch;list-style:none;
+    margin:0 0 6px;padding:0;list-style:none;
 }
 body[data-page="insights"] .report-section li{
     margin-bottom:8px;padding-left:15px;position:relative;
@@ -581,7 +596,6 @@ body[data-page="insights"] .ai-export-menu.is-open{display:block}
                         </button>
                         <div class="ai-export-menu" id="exportMenu">
                             <a href="#" id="exportPdf"><i class="fas fa-file-pdf"></i> Export PDF</a>
-                            <a href="#" id="exportCsv"><i class="fas fa-file-csv"></i> Export CSV</a>
                             <a href="#" id="exportTxt"><i class="fas fa-file-lines"></i> Export TXT</a>
                         </div>
                     </div>

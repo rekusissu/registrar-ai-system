@@ -495,4 +495,209 @@ final class QueueWindowingTest extends TestCase
             'Window slots still read the short keys, which the per-window map never sets.'
         );
     }
+
+    /**
+     * THE DAY'S CAPACITY IS A TOTAL, NOT A PER-PERSON COUNT.
+     *
+     * The two existing caps answer "has this person used theirs". This one
+     * answers "is the counter still inside today's capacity", which is the
+     * number the office actually plans against - roughly 500-600 people
+     * across an eight-hour day.
+     *
+     * The boundary matters more than the middle. At exactly the limit the
+     * kiosk must refuse, because the NEXT number is the one that would
+     * exceed it.
+     */
+    public function testDailyCapacityIsCheckedAtTheBoundary(): void
+    {
+        require_once __DIR__ . '/../shared/queue_helpers.php';
+
+        self::assertTrue(
+            queueDailyTapLimitReached(['max_daily_taps' => 600], 600),
+            'At exactly the cap the day is full. Using > instead would let 601 out.'
+        );
+        self::assertFalse(queueDailyTapLimitReached(['max_daily_taps' => 600], 599));
+
+        self::assertFalse(
+            queueDailyTapLimitReached(['max_daily_taps' => 0], 99999),
+            'A cap of 0 is unlimited in this table, matching every other cap here.'
+        );
+        self::assertFalse(
+            queueDailyTapLimitReached([], 500),
+            'A pre-migration database returns no key at all. Degrading to '
+            . 'unlimited keeps the queue working; degrading to "always full" '
+            . 'would shut the kiosk entirely.'
+        );
+    }
+
+    public function testDailyCapacityIsIndependentOfThePerPersonCaps(): void
+    {
+        require_once __DIR__ . '/../shared/queue_helpers.php';
+
+        // A student well inside their personal allowance is still refused
+        // once the office is full. This is the case the feature exists for:
+        // personal taps are fine, the day has run out.
+        $settings = [
+            'max_daily_taps'   => 600,
+            'max_taps_student' => 5,
+        ];
+
+        self::assertFalse(queueTapLimitReached($settings, 1, 'student'),
+            'One tap is nowhere near the personal cap.');
+        self::assertTrue(queueDailyTapLimitReached($settings, 600),
+            'But the office being full is a separate fact and closes the door.');
+
+        $roomy = ['max_daily_taps' => 600, 'max_taps_student' => 2];
+        self::assertTrue(queueTapLimitReached($roomy, 2, 'student'));
+        self::assertFalse(queueDailyTapLimitReached($roomy, 2));
+    }
+
+    /**
+     * The cap is only real if it survives a save. A column added to the
+     * schema but left out of the INSERT would read back as 0 - unlimited -
+     * every time the registrar touched the form, so the cap would silently
+     * switch itself off on first use.
+     */
+    public function testDailyCapacityIsSavedAndEnforcedBeforeThePersonalCaps(): void
+    {
+        $save = (string) file_get_contents(__DIR__ . '/../api/queue.php');
+        self::assertStringContainsString('max_daily_taps', $save,
+            'The day capacity is not persisted at all.');
+        self::assertStringContainsString('max_daily_taps = VALUES(max_daily_taps)', $save,
+            'The upsert does not carry the new column, so it reads back as 0 '
+            . '(unlimited) after any save.');
+
+        $public = (string) file_get_contents(__DIR__ . '/../api/queue-public.php');
+        self::assertStringContainsString('queueDailyTapLimitReached(', $public,
+            'The join path never checks the day capacity, so the cap cannot be '
+            . 'enforced no matter what the registrar sets.');
+        self::assertLessThan(
+            strpos($public, 'queueTapLimitReached('),
+            strpos($public, 'queueDailyTapLimitReached('),
+            'The day capacity must be checked BEFORE the per-person caps: a full '
+            . 'office outranks any individual allowance.'
+        );
+    }
+
+    /**
+     * A STUDENT MUST NEVER BE STUCK MID-JOIN.
+     *
+     * Two separate defects, both a dead end on a public kiosk:
+     *
+     *  - No way out. The back control was hidden on the first question,
+     *    because there was no earlier step to return to. But no ticket
+     *    exists until the join is submitted, so a student who tapped their
+     *    card by mistake had no exit at all except taking a number for a
+     *    transaction they did not want and standing in it.
+     *
+     *  - No time to think. refreshClosed() is called from a 15-second poll.
+     *    Its reopen branch was unconditional, so on every tick where the
+     *    queue was merely OPEN it sent the kiosk back to the tap prompt -
+     *    including while the student was still on the picker. Deciding
+     *    between Service and Claim took longer than 15 seconds, so the
+     *    screen reset, losing the card read and the half-made choice.
+     *
+     * The second is the one worth pinning: it presents as a timeout, and
+     * would be "fixed" by raising a timeout constant that does not exist.
+     */
+    public function testPickerIsNotResetByTheStatusPollAndAlwaysOffersAnExit(): void
+    {
+        $js = (string) file_get_contents(__DIR__ . '/../js/queue.js');
+
+        self::assertStringContainsString('function laneCancel(', $js,
+            'There is no way to abandon a join, so a mis-tap cannot be undone.');
+        self::assertDoesNotMatchRegularExpression(
+            '/back\.style\.display\s*=\s*[\'"]none[\'"]/',
+            $js,
+            'The back/cancel control is hidden somewhere. It must always be '
+            . 'available: the card has been read and the student owns that state.'
+        );
+
+        self::assertMatchesRegularExpression(
+            '/if\s*\(\s*wasClosed\s*\)\s*\{[^}]*activeScreen\s*===\s*[\'"]pick[\'"]/s',
+            $js,
+            'The reopen branch must run only when the queue has actually just '
+            . 'reopened. Un-gated, a 15-second status poll throws the student '
+            . 'off the picker mid-decision, which is the reported symptom.'
+        );
+
+        self::assertStringContainsString("'Cancel'", $js,
+            'On the first question, going back abandons the join. Labelling '
+            . 'that "Back" promises navigation that does not exist.');
+    }
+
+    /**
+     * THE OPTION MUST NEVER OUTRANK THE QUESTION, AND THE DESCRIPTION MUST
+     * NOT BE WELDED TO ITS TITLE.
+     *
+     * The crowding was a dead rule, not a taste call. .lane-title and
+     * .lane-meta are <span>s, and vertical margins do not apply to
+     * non-replaced inline elements - so `margin-top: 5px` never rendered,
+     * and the real gap was whatever line-height left behind. On a 32px
+     * title at line-height 1.1 that was about 1.6px below the baseline, so
+     * the description sat on the title's descenders and the two read as one
+     * block.
+     *
+     * Compounding it, the title was 32px against a 30px screen question -
+     * the option was louder than the prompt asking you to choose it.
+     *
+     * Both are pinned because "make the cards pop" is exactly the change
+     * that reintroduces this.
+     */
+    public function testKioskChoiceTitleOutranksNeitherTheQuestionNorItsOwnCaption(): void
+    {
+        $css = (string) file_get_contents(__DIR__ . '/../css/queue.css');
+
+        // The gap only exists if the children are block-level.
+        foreach (['lane-title', 'lane-meta'] as $cls) {
+            self::assertMatchesRegularExpression(
+                '/\.' . preg_quote($cls, '/') . '\s*\{[^}]*display:\s*block/s',
+                $css,
+                ".{$cls} must be display:block. It is a <span>, and vertical "
+                . 'margins do not apply to non-replaced inline elements, so '
+                . 'the gap below the title never rendered at all.'
+            );
+        }
+
+        // And the gap must actually be a gap.
+        self::assertMatchesRegularExpression(
+            '/\.lane-meta\s*\{[^}]*margin-top:\s*[1-9]/s',
+            $css,
+            '.lane-meta needs a positive margin-top. That distance is what '
+            . 'makes a caption read as a caption instead of a tail on the '
+            . 'headline.'
+        );
+
+        // Every place the question is sized, the option is sized too, and
+        // stays below it. Both selectors are declared once at base and once
+        // inside @media (max-width: 640px), in that order, so the two lists
+        // pair by index.
+        $sizes = static function (string $pattern) use ($css): array {
+            $out = [];
+            if (preg_match_all($pattern, $css, $m)) {
+                $out = array_map('floatval', $m[1]);
+            }
+            return $out;
+        };
+
+        $questions = $sizes('/\.lane-head\s+h2\s*\{[^}]*font-size:\s*([\d.]+)px/s');
+        $titles    = $sizes('/\.lane-title\s*\{[^}]*font-size:\s*([\d.]+)px/s');
+
+        self::assertNotEmpty($questions,
+            'The question rule must exist to compare the option against.');
+        self::assertCount(count($questions), $titles,
+            'Every scale that sizes the question must size the option too, '
+            . 'or the inversion returns at that viewport.');
+
+        foreach ($titles as $i => $title) {
+            self::assertLessThan(
+                $questions[$i],
+                $title,
+                'At this scale the option (' . $title . 'px) is not smaller '
+                . 'than the question (' . $questions[$i] . 'px). A card label '
+                . 'that outranks the prompt asking you to choose it is a '
+                . 'hierarchy inversion, and it is what crowded the caption.'
+            );
+        }
+    }
 }
