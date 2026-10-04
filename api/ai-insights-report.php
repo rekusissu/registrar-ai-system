@@ -111,11 +111,13 @@ try {
         . "\nWrite the three-section analysis for this reporting period.";
 
     $aiText = aiGenerate($systemPrompt, $userPrompt, [
-        'max_tokens'   => 2600,   // was 1200. Seven sections at 700-1000 words
-                                 // will not fit in 1200 tokens, and a truncated
-                                 // reply is a report that stops mid-sentence in
-                                 // the last section - the one holding the
-                                 // recommended actions.
+        // Sized for the ANSWER, not the budget. The primary model
+        // (stealth/space-bunny-alpha) reasons MANDATORILY and reasoning tokens
+        // come out of the same max_tokens allowance, so this is set well above
+        // the 700-1000 words the prompt asks for: enough room for the reasoning
+        // pass to run first and still leave the whole report written. The model
+        // allows 524288, so there is no reason to be stingy here.
+        'max_tokens'   => 8000,
         'temperature'  => 0.3,
         'forceRefresh' => $force,
     ]);

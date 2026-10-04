@@ -246,6 +246,14 @@ define('KIOSK_ACCESS_TOKEN', secretFromEnvOrLocal('KIOSK_ACCESS_TOKEN', 'kiosk-t
 //   OPENROUTER_API_KEY or AI_API_KEY - your OpenRouter API key
 //     (or paste the key into the git-ignored shared/ai_key.local file)
 //
+//   ┌─ ON A HOSTING PANEL, SET EXACTLY ONE OF THESE TWO ────────────────────┐
+//   │                                                                        │
+//   │   OPENROUTER_API_KEY   <- use this one                                   │
+//   │   AI_API_KEY           <- accepted as an alias, same value              │
+//   │                                                                        │
+//   │ The value is the raw key, e.g. sk-or-v1-xxxxxxxx. No prefix, no quotes. │
+//   └────────────────────────────────────────────────────────────────────────┘
+//
 //   LOCAL SETUP - the key is NOT in this repository and never will be.
 //
 //     Create shared/ai_key.local containing ONE line: the bare key, with no
@@ -255,11 +263,6 @@ define('KIOSK_ACCESS_TOKEN', secretFromEnvOrLocal('KIOSK_ACCESS_TOKEN', 'kiosk-t
 //         -------------------------------
 //         sk-or-v1-xxxxxxxxxxxxxxxx
 //
-//     Or export it in the environment instead, which is the better choice on a
-//     real host because it never touches disk:
-//
-//         export OPENROUTER_API_KEY=sk-or-v1-xxxxxxxx
-//
 //     Then confirm it took, BEFORE assuming the gateway is at fault:
 //
 //         php -r "require 'shared/config.php';
@@ -268,14 +271,15 @@ define('KIOSK_ACCESS_TOKEN', secretFromEnvOrLocal('KIOSK_ACCESS_TOKEN', 'kiosk-t
 //     A missing key does not produce an obvious error. The gateway comes back
 //     401 "No cookie auth credentials found", which reads like a proxy or URL
 //     problem and sends you looking at the endpoint instead of the credential.
-//   AI_MODEL - model to use (default: qwen/qwen3.8-27b:free; NO "openrouter/" prefix)
+//   AI_MODEL - model to use (default: stealth/space-bunny-alpha;
+//     NO "openrouter/" prefix - the gateway 400s those)
 //   AI_API_URL - override URL if needed (default: https://openrouter.ai/api/v1/chat/completions)
 
 $aiProvider    = env('AI_PROVIDER') ?: 'openrouter';
 $aiApiUrl      = env('AI_API_URL') ?: 'https://openrouter.ai/api/v1/chat/completions';
 $aiApiKey      = '';
 $aiGeminiModel = env('GEMINI_MODEL') ?: env('AI_GEMINI_MODEL') ?: 'gemini-2.0-flash';
-$aiModel       = env('AI_MODEL') ?: ($aiProvider === 'gemini' ? $aiGeminiModel : 'qwen/qwen3.8-27b:free');
+$aiModel       = env('AI_MODEL') ?: ($aiProvider === 'gemini' ? $aiGeminiModel : 'stealth/space-bunny-alpha');
 $aiCacheTtl    = (int) (env('AI_CACHE_TTL') ?: 3600);   // seconds
 
 // Optional OpenRouter (or gateway) failover chain, comma-separated:
@@ -291,9 +295,28 @@ if ($aiModelsEnv !== '') {
     }
 }
 if (empty($aiModels)) {
-    // ponytail: env AI_MODELS overrides this list entirely.
+    // The failover chain, in order.
+    //
+    // 1. stealth/space-bunny-alpha - free, 1M context, and the office's
+    //    first choice. It is reasoning-first, so it is given the largest
+    //    budget on the Insights report.
+    // 2. xiaomi/mimo-v2.5 - the backup. NOT free: it bills at roughly
+    //    0.14 per million prompt tokens and 0.28 per million completion
+    //    tokens. That is cheap, but it is a real charge, and it only runs
+    //    when the primary is unavailable - which on a free model is most
+    //    of the time under load. If the account must not spend anything,
+    //    set AI_MODELS to the free models only.
+    //
+    // "oc/mimo-v2.5-free" was asked for by name and does not exist on this
+    // gateway: the catalogue has no opencode/ or oc/ namespace at all, and
+    // no free MiMo. That string is a picker label from another tool, not an
+    // OpenRouter model id, so xiaomi/mimo-v2.5 stands in for it.
+    //
+    // The remaining entries are free, and are there so a paid outage does not
+    // also take the report down.
     $aiModels = [
         $aiModel,
+        'xiaomi/mimo-v2.5',
         'nvidia/nemotron-3-ultra-550b-a55b:free',
         'z-ai/glm-5.2:free',
         'google/gemma-4-31b-it:free',

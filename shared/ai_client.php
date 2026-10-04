@@ -108,6 +108,29 @@ function aiGenerate($systemPrompt, $userPrompt, array $opts = []) {
         }
 
         $text = trim((string) ($response['choices'][0]['message']['content'] ?? ''));
+
+        // TRUNCATED REPLY = FAILURE, not a shorter answer.
+        //
+        // finish_reason 'length' means the model hit max_tokens and stopped
+        // mid-sentence. This matters more now than it used to: the current
+        // primary, stealth/space-bunny-alpha, has MANDATORY reasoning, and
+        // reasoning tokens are drawn from the same max_tokens budget as the
+        // answer. So a budget sized for the report can be partly consumed
+        // before the model starts writing it, and the caller gets a report
+        // that stops halfway with no indication that it did.
+        //
+        // Shipping that is the same class of bug this codebase has been
+        // removing all session: output that looks complete and is not. It
+        // fails over to the next model instead, and says so in the log.
+        $finish = (string) ($response['choices'][0]['finish_reason'] ?? '');
+        if ($finish === 'length') {
+            error_log(sprintf(
+                'ai_client: model "%s" truncated at max_tokens=%d; trying next model.',
+                $model, $maxTok
+            ));
+            continue;
+        }
+
         if ($text === '') {
             error_log('ai_client: model "' . $model . '" returned empty content, trying next.');
             continue;
