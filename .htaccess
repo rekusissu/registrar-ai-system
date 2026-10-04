@@ -22,6 +22,24 @@
     </FilesMatch>
 </IfModule>
 
+# ── storage/ — never served over HTTP ──────────────────────────
+# Generated AI reports are cached here as JSON. Denied at the server
+# level rather than by a check inside the endpoint: these files are
+# fetched directly by URL, so an application-level check protects
+# nothing if someone simply asks for the .json by name.
+<IfModule mod_authz_core.c>
+    <FilesMatch "\.(json|tmp)$">
+        Require all denied
+    </FilesMatch>
+</IfModule>
+<IfModule !mod_authz_core.c>
+    <FilesMatch "\.(json|tmp)$">
+        Order deny,allow
+        Deny from all
+    </FilesMatch>
+</IfModule>
+
+
 # ── Expires headers (requires mod_expires to be enabled) ─────
 # If you enable mod_expires in httpd.conf, this takes over.
 <IfModule mod_expires.c>

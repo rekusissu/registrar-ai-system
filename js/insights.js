@@ -762,7 +762,7 @@
 
         lines.forEach(function (line) {
             // "## 1. Title" keeps its number: the model contract guarantees
-            // three numbered sections, and a formal report cites them by
+            // seven numbered sections, and a formal report cites them by
             // number. "## Title" (no number) is used as-is.
             var numbered = /^##\s+(\d+)\.\s*(.+)$/.exec(line);
             var heading  = /^##\s+(.+)$/.exec(line);
@@ -887,7 +887,17 @@
         }
         if (el.reportMetaText) {
             var text = (meta.period && meta.period.label) ? meta.period.label : state.period.label;
-            text += ' · generated ' + new Date().toLocaleString();
+            // The time the analysis was WRITTEN, not the time this page was
+            // opened. The server sends that deliberately: a "generated" clock
+            // that resets every reload makes a month-old analysis look
+            // like it was just produced.
+            text += ' · generated ' + new Date(meta.generated_at || Date.now()).toLocaleString();
+            if (meta.cached) {
+                // Say why it appeared instantly. A report that renders in a
+                // second after the last one took a minute reads as a broken
+                // button unless it is explained.
+                text += ' · reused — the figures had not changed';
+            }
             el.reportMetaText.textContent = text;
         }
         el.reportMeta.style.display = 'flex';
@@ -902,11 +912,24 @@
     function generateReport(force) {
         showLoading();
         var started = Date.now();
-        var slowTimer = window.setInterval(function () {
-            if (Date.now() - started > 20000) {
-                var t = document.getElementById('reportLoadingText');
-                if (t) t.textContent = 'Contacting the AI model — this can take a moment…';
-                window.clearInterval(slowTimer);
+
+        // A bare spinner over a 40-70 second call is indistinguishable from
+        // a hung request, so the user clicks again and pays for a second
+        // identical call. Show the clock instead: it is the one thing that
+        // tells them this is working and roughly how much is left.
+        var loadingText = document.getElementById('reportLoadingText');
+        var tick = window.setInterval(function () {
+            if (!loadingText) return;
+            var secs = Math.round((Date.now() - started) / 1000);
+            if (secs < 15) {
+                loadingText.textContent = 'Analysing registrar data…';
+            } else if (secs < 45) {
+                loadingText.textContent = 'Writing the full seven-section analysis… ' + secs + 's';
+            } else {
+                // Past the measured 40-65s window. Say the honest thing:
+                // still writing, still expected. A message that admits the
+                // wait is long is far less alarming than silence at 50s.
+                loadingText.textContent = 'Still writing — a full report takes up to a minute. ' + secs + 's';
             }
         }, 1000);
 
@@ -944,7 +967,7 @@
                 });
             })
             .then(function (r) {
-                window.clearInterval(slowTimer);
+                window.clearInterval(tick);
                 hideLoading();
                 var t = document.getElementById('reportLoadingText');
                 if (t) t.textContent = 'Analysing registrar data…';
@@ -979,7 +1002,7 @@
                 }
             })
             .catch(function (err) {
-                window.clearInterval(slowTimer);
+                window.clearInterval(tick);
                 hideLoading();
                 showReportError('Could not reach the server: ' + err.message);
                 el.reportEmpty.style.display = 'block';

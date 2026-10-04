@@ -311,11 +311,111 @@ final class AcademicHistoryReadOnlyTest extends TestCase
     public function testPrintStylingSuppressesBrowserFurniture(): void
     {
         $js = self::source(self::LETTER);
+
         // Browsers draw their own date/URL/page-number header only into the
-        // page margin, so @page margin:0 leaves them nowhere to go.
-        self::assertStringContainsString(
-            '@page { size: A4 portrait; margin: 0; }', $js);
+        // page margin, so a zero margin on top/left/right leaves them nowhere
+        // to go. The BOTTOM is deliberately NOT zero - see below.
+        self::assertStringContainsString('@page { size: A4 portrait; margin: 0 0', $js);
         self::assertStringContainsString('position:fixed', $js,
             'The footer must be position:fixed to repeat on every page.');
+    }
+
+    /**
+     * The footer is fixed, so something must reserve space beneath the text
+     * on every page — not just the last one.
+     *
+     * This regressed silently. The stylesheet used to be `margin: 0` all
+     * round, relying on the body's padding-bottom to keep the last page's
+     * footer clear. That works on the final page and nowhere else: padding
+     * reserves room once, at the end of the flow, while every intermediate
+     * page fills its box and the fixed footer sits on top of the text.
+     *
+     * It went unnoticed because these documents used to be one page. The AI
+     * Insight report is seven sections of 700-1000 words, so it is two or
+     * three, and body text then ran through the footer on pages 2 and 3.
+     */
+    public function testFixedFooterHasReservedSpaceOnEveryPage(): void
+    {
+        $js = self::source(self::LETTER);
+
+        // A fixed element is only safe if the page box stops above it.
+        preg_match('/@page\s*\{[^}]*margin:\s*([^;}]+)/', $js, $m);
+        self::assertNotEmpty($m, 'No @page margin found in the letterhead styles.');
+
+        $sides = preg_split('/\s+/', trim($m[1]));
+        self::assertCount(
+            4,
+            $sides,
+            'The @page margin must give all four sides explicitly. A two- or '
+            . 'three-value shorthand reuses the top value for the sides it '
+            . 'omits, which would move the browser header back in.'
+        );
+
+        // CSS shorthand order is top / right / bottom / LEFT, so the bottom
+        // band is index 2. Indexing 3 here checks the left margin, which is
+        // legitimately 0 and would flag a correct stylesheet as broken.
+        self::assertNotSame(
+            '0',
+            $sides[2],
+            'The bottom @page margin is 0 again, so the fixed footer will '
+            . 'overlap the body text on every page after the first. Reserve '
+            . 'the band here; body padding-bottom only ever covers the last page.'
+        );
+        self::assertGreaterThan(0.0, (float) $sides[2],
+            'The reserved footer band must be a real length.');
+
+        // And the footer must actually sit inside that reserved band.
+        self::assertMatchesRegularExpression(
+            '/\.footer\s*\{[^}]*position:fixed[^}]*bottom:\s*(\d+)mm/',
+            $js,
+            'The footer must be position:fixed with an explicit bottom offset '
+            . 'in mm so it can be checked against the reserved band.'
+        );
+        preg_match('/\.footer\s*\{[^}]*bottom:\s*(\d+)mm/', $js, $f);
+        $footerBottom = (float) ($f[1] ?? 0);
+        $reservedMm   = (float) rtrim($sides[2], 'mmpx');
+
+        self::assertGreaterThan(
+            $footerBottom,
+            $reservedMm,
+            'The reserved @page bottom band (' . $reservedMm . 'mm) must be '
+            . 'DEEPER than the footer\'s offset from the page edge ('
+            . $footerBottom . 'mm), otherwise the band does not clear the '
+            . 'footer and the collision returns.'
+        );
+
+        // Clearance has to be measured against the footer's HEIGHT, not just
+        // its offset. A band of 12mm against a footer sitting 10mm up but
+        // 5mm tall still overlaps: the text would land inside it. Comparing
+        // offset to offset passes that case, so the geometry is computed here.
+        preg_match('/\.footer\s*\{[^}]*font-size:\s*([\d.]+)pt/', $js, $fs);
+        preg_match('/\.footer\s*\{[^}]*line-height:\s*([\d.]+)/', $js, $lh);
+
+        $fontPt  = (float) ($fs[1] ?? 0);
+        $lineMul = (float) ($lh[1] ?? 0);
+
+        if ($fontPt > 0 && $lineMul > 0) {
+            // 1pt = 25.4/72 mm. One line is the worst case; the footer is a
+            // single centred line of text.
+            $footerHeightMm = ($fontPt * $lineMul) * (25.4 / 72);
+            $occupiesToMm   = $footerBottom + $footerHeightMm;
+
+            self::assertGreaterThan(
+                $occupiesToMm,
+                $reservedMm,
+                'The footer occupies the last ' . round($occupiesToMm, 1)
+                . 'mm of the page (' . $footerBottom . 'mm offset + '
+                . round($footerHeightMm, 1) . 'mm line), but only '
+                . $reservedMm . 'mm is reserved. The last '
+                . round($occupiesToMm - $reservedMm, 1) . 'mm of every page '
+                . 'will run underneath the footer.'
+            );
+        } else {
+            self::fail(
+                'Could not read the footer font-size/line-height, so the '
+                . 'reserved band cannot be checked against its height. Give '
+                . '.footer an explicit font-size in pt and a numeric line-height.'
+            );
+        }
     }
 }

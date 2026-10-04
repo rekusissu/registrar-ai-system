@@ -25,18 +25,43 @@ define('AI_CLIENT_LOADED', true);
 /**
  * Normalize a model name for the configured gateway before it is sent.
  *
- * OpenRouter model IDs never carry an "openrouter/" prefix. A stale or
- * hand-typed AI_MODEL like "openrouter/inclusionai/ling-3.0-flash-vl:free"
- * is rejected by the gateway with HTTP 400 ("is not a valid model ID"),
- * which makes every AI call fail. Strip it defensively whenever the API
- * URL points at OpenRouter.
+ * THE SAME MODEL HAS TWO NAMES, DEPENDING ON WHO IS SERVING IT.
+ *
+ * OpenCode Zen's HTTP API takes BARE ids - "mimo-v2.5-free", with no prefix.
+ * But that string is also the OpenCode CONFIG form's tail, and aggregators
+ * namespace every model by the provider serving it: 9Router, for one, uses
+ * "openai/gpt-5" and "cc/claude-opus-4-7", so its OpenCode provider is very
+ * likely "oc/mimo-v2.5-free".
+ *
+ * So an operator configuring this app has to type one value that may have to
+ * be spelled two different ways depending on AI_API_URL, and picking wrong
+ * fails with a 404 or a 400 from the gateway that reads like a broken model
+ * rather than a naming mismatch.
+ *
+ * Hence: strip the prefix ONLY when talking to OpenCode directly, and leave
+ * it alone when an aggregator is in front. Both spellings then work against
+ * whichever gateway is actually configured, and the same AI_MODELS value can
+ * be moved between the two without editing.
+ *
+ * OpenRouter is handled the same way for the same reason, and predates this:
+ * "openrouter/inclusionai/ling-3.0-flash-vl:free" is rejected with HTTP 400.
  */
 function aiNormalizeModel(string $model): string {
     $model = trim($model);
-    $host  = strtolower((string) parse_url(AI_API_URL, PHP_URL_HOST) ?: '');
+    if ($model === '') {
+        return '';
+    }
+
+    $host = strtolower((string) (parse_url(AI_API_URL, PHP_URL_HOST) ?: ''));
+
     if ($host === 'openrouter.ai' || strpos($host, '.openrouter.ai') !== false) {
         $model = preg_replace('#^openrouter/+#i', '', $model);
+    } elseif ($host === 'opencode.ai' || strpos($host, '.opencode.ai') !== false) {
+        // Bare ids only on this host. Guarded to the start of the string so a
+        // model legitimately containing "opencode" later in its name is safe.
+        $model = preg_replace('#^(?:oc|opencode)/+#i', '', $model);
     }
+
     return $model;
 }
 
@@ -289,6 +314,73 @@ function aiLastError(): string {
 }
 
 /**
+ * Turns a recognisable gateway refusal into something an operator can act on.
+ *
+ * THE CASE THIS EXISTS FOR.
+ *
+ * Every model in the default chain ends in "-free". OpenCode serves its
+ * anonymous free tier ONLY to requests carrying the OpenCode client's own
+ * User-Agent, so any third-party HTTP client - including this one - is
+ * refused with 403 FreeTierError / 429 FreeUsageLimitError.
+ *
+ * Two things make the raw response actively unhelpful:
+ *
+ *  1. The body is JSON, so the banner showed a wall of
+ *     {"type":"error",...} to a registrar who cannot read it, naming
+ *     neither the cause nor the remedy.
+ *  2. The obvious remedy is WRONG. The first thing almost everyone does
+ *     is add an API key, because "not authenticated" is the reflex
+ *     reading of a 403 - and a key does not help here. The gate is the
+ *     User-Agent, not the credential: the tier is granted to the
+ *     OpenCode app regardless of whether a key is presented. Hours get
+ *     spent re-entering the key in the hosting panel before someone
+ *     checks what the message actually says.
+ *
+ * The fix is to use a PAID model, which the API key does unlock. Saying
+ * so, in the failure itself, is the whole point of this function.
+ *
+ * Returns '' for anything unrecognised, so the caller keeps its generic
+ * HTTP message and no detail is lost.
+ */
+function aiExplainGatewayError(int $status, string $body): string
+{
+    $isFreeTierGate = stripos($body, 'FreeTierError') !== false
+        || stripos($body, 'FreeUsageLimitError') !== false
+        || stripos($body, 'free tier can only be used from within OpenCode') !== false;
+
+    if (!$isFreeTierGate) {
+        return '';
+    }
+
+    // Only the free-tier ids are affected. If the office has since moved to
+    // paid models and still sees this, the real problem is different - most
+    // likely no credits on the account - and claiming otherwise would send
+    // them chasing the wrong fix.
+    $chain = defined('AI_MODELS') ? (array) AI_MODELS : [];
+    $onlyFree = true;
+    foreach ($chain as $m) {
+        if (stripos((string) $m, '-free') === false) {
+            $onlyFree = false;
+            break;
+        }
+    }
+
+    if (!$onlyFree) {
+        return 'The gateway refused the request as out-of-free-tier access (HTTP '
+            . $status . '). Check that the OpenCode Zen account has credits and '
+            . 'that OPENCODE_API_KEY is the key for that account.';
+    }
+
+    return 'Every configured model is a free-tier model (HTTP ' . $status . '). '
+        . 'OpenCode serves its free tier only to its own app, so these cannot be '
+        . 'called from outside OpenCode - and adding an API key does NOT change '
+        . 'that, because the gate is the client, not the credential. To get an '
+        . 'analysis, add credits to the OpenCode Zen account, set OPENCODE_API_KEY, '
+        . 'and point AI_MODELS at paid models such as gemini-3.5-flash-lite, '
+        . 'qwen3.8-flash or claude-haiku-4-5.';
+}
+
+/**
  * Low-level HTTP call to the AI provider. Returns decoded JSON array, or null
  * on failure. Logs the failure to error_log and remembers it for the UI.
  *
@@ -352,12 +444,17 @@ function aiHttpChat(array $payload) {
         error_log('ai_client: curl error: ' . $err);
         aiClientNote('Could not reach the AI gateway: ' . $err);
         return null;
+
+
     }
 
     if ($status < 200 || $status >= 300) {
         error_log('ai_client: HTTP ' . $status . ' from gateway: ' . mb_substr($buffer, 0, 500));
         $detail = trim(mb_substr($buffer, 0, 200));
-        aiClientNote('AI gateway returned HTTP ' . $status . ($detail !== '' ? ' — ' . $detail : ''));
+        $explain = aiExplainGatewayError($status, $buffer);
+        aiClientNote($explain !== ''
+            ? $explain
+            : 'AI gateway returned HTTP ' . $status . ($detail !== '' ? ' — ' . $detail : ''));
         return null;
     }
 
@@ -388,9 +485,59 @@ function aiIsGeminiProvider(): bool {
 
 /**
  * Check if a model name indicates Gemini.
+ *
+ * AN EXPLICIT AI_PROVIDER ALWAYS WINS OVER THE NAME.
+ *
+ * This is a substring test, so `gemini-3-flash` "looks like" Gemini. That
+ * was harmless when the only OpenAI-compatible gateway was Zen, which
+ * hosted no Gemini models. It stops being harmless the moment the office
+ * routes through an aggregator - 9Router, OpenRouter, or anything else
+ * that fronts many providers behind one URL - because the model name
+ * reaches us namespaced by whatever the aggregator calls it, and a
+ * perfectly good `gemini-3-flash` served by that aggregator would be
+ * torn out of the chain and sent to Google's API instead, with no key,
+ * for no stated reason.
+ *
+ * So the heuristic only runs when nobody has said which provider they
+ * meant. Setting AI_PROVIDER=openai (or '9router', 'aggregator', or
+ * anything that is not 'gemini') pins every request to the
+ * OpenAI-compatible path, which is what an aggregator expects.
  */
 function aiIsGeminiModel(string $model): bool {
-    return $model !== '' && stripos($model, 'gemini') !== false;
+    if ($model === '' || stripos($model, 'gemini') === false) {
+        return false;
+    }
+
+    // Asked for Gemini directly: honour it.
+    if (aiIsGeminiProvider()) {
+        return true;
+    }
+
+    // An explicit non-Gemini provider settles it. This matters once the
+    // office routes through an aggregator - 9Router, OpenRouter, anything
+    // that fronts many providers behind one URL - because model ids there
+    // arrive namespaced by whoever serves them, and a perfectly good
+    // `gemini/gemini-3-flash` served by that aggregator would otherwise be
+    // torn out of the chain and sent to Google's API with no key, for no
+    // stated reason.
+    $provider = strtolower(trim((string) (defined('AI_PROVIDER') ? AI_PROVIDER : '')));
+    if ($provider !== '' && $provider !== 'zen') {
+        return false;
+    }
+
+    // Still undecided, so fall back to the name. But only when the
+    // configured endpoint can actually serve Gemini: if AI_API_URL points
+    // anywhere else, that URL is the single source of truth about who we
+    // are talking to, and it outranks a substring in the model name.
+    $host = strtolower((string) (parse_url((string) AI_API_URL, PHP_URL_HOST) ?: ''));
+    if ($host !== '') {
+        $geminiHosts = ['opencode.ai', 'generativelanguage.googleapis.com'];
+        if (!in_array($host, $geminiHosts, true)) {
+            return false;
+        }
+    }
+
+    return true;
 }
 
 /**

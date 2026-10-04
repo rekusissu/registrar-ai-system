@@ -29,6 +29,7 @@ require_once __DIR__ . '/../shared/database.php';
 require_once __DIR__ . '/../shared/functions.php';
 require_once __DIR__ . '/../shared/analytics.php';
 require_once __DIR__ . '/../shared/ai_client.php';
+require_once __DIR__ . '/../shared/ai_report_cache.php';
 
 header('Content-Type: application/json');
 
@@ -78,6 +79,27 @@ try {
     $build = aiInsightBuild($period);
     $facts = $build['facts'];
 
+    // ── Reuse a report already written from these exact figures ──────
+    //
+    // The call below costs 40-65 seconds, and the office was paying it
+    // every time even when nothing had changed - reopening a report
+    // already read, showing the same month to a colleague, clicking
+    // again because the first one felt slow.
+    //
+    // The key fingerprints $facts, not the period. A period-keyed cache
+    // could serve last month's reading of this month's data, and a
+    // registrar acting on a stale analysis is worse off than one with no
+    // analysis. Because the key is derived from the figures themselves,
+    // any change to any of them produces a different key - so a hit can
+    // only be a report built from exactly the numbers on screen now.
+    //
+    // $force is the deliberate "regenerate anyway", for when the wording
+    // needs re-rolling.
+    $cacheKey = $force ? '' : aiReportCacheKey($period, $facts);
+    $cached   = $cacheKey === '' ? null : aiReportCacheGet($cacheKey);
+    $modelUsed   = AI_MODEL;
+    $generatedAt = '';
+
     // ── Prompt contract: one section per module, supplied facts only ──
     //
     // The previous contract asked for three sections and capped the reply at 320
@@ -124,19 +146,40 @@ try {
         . "- Aim for 700 to 1000 words. Be specific; do not pad to reach the length.";
 
     $userPrompt = aiInsightFactSheetText($facts)
-        . "\nWrite the three-section analysis for this reporting period.";
+        . "\nWrite the full seven-section analysis for this reporting period.";
 
-    $aiText = aiGenerate($systemPrompt, $userPrompt, [
-        // Sized for the ANSWER, not the budget. The primary model
-        // (stealth/space-bunny-alpha) reasons MANDATORILY and reasoning tokens
-        // come out of the same max_tokens allowance, so this is set well above
-        // the 700-1000 words the prompt asks for: enough room for the reasoning
-        // pass to run first and still leave the whole report written. The model
-        // allows 524288, so there is no reason to be stingy here.
-        'max_tokens'   => 8000,
-        'temperature'  => 0.3,
-        'forceRefresh' => $force,
-    ]);
+    if ($cached !== null) {
+        // Already paid for this exact analysis. The shape check below still
+        // runs on it, so a stored report that somehow lost its headings is
+        // rejected exactly like a fresh one.
+        $aiText      = (string) $cached['report'];
+        $modelUsed   = (string) ($cached['model'] ?? AI_MODEL);
+        // Keep the time the analysis was WRITTEN, not the time it was
+        // served. On screen this sits under the source badge, and a
+        // timestamp that jumps forward every time someone reopens the page
+        // would read as "this is up to date with now".
+        $generatedAt = (string) ($cached['generated_at'] ?? '');
+    } else {
+        $aiText = aiGenerate($systemPrompt, $userPrompt, [
+            // Sized for the ANSWER, not the budget. The primary model
+            // (stealth/space-bunny-alpha) reasons MANDATORILY and reasoning tokens
+            // come out of the same max_tokens allowance, so this is set well above
+            // the 700-1000 words the prompt asks for: enough room for the reasoning
+            // pass to run first and still leave the whole report written. The model
+            // allows 524288, so there is no reason to be stingy here.
+            'max_tokens'   => 8000,
+            'temperature'  => 0.3,
+            'forceRefresh' => $force,
+        ]);
+        $modelUsed = AI_MODEL;
+        // Stamped AFTER the call returns, not before it starts. This one
+        // takes 40-65 seconds, so a timestamp taken up front would tell the
+        // registrar their analysis was written a minute before it existed.
+        $generatedAt = date('Y-m-d H:i:s');
+    }
+    if ($generatedAt === '') {
+        $generatedAt = date('Y-m-d H:i:s');
+    }
 
     $source  = 'ai';
     $aiError = '';
@@ -168,6 +211,22 @@ try {
         $source  = 'fallback';
     }
 
+    // ── Store the completed report ──────────────────────────────────
+    //
+    // Only after the shape check passed, so a truncated or malformed
+    // reply is never kept. Storing a failure would be the worst possible
+    // behaviour here: the user has already waited a minute, and the one
+    // thing they most want is to be able to try again.
+    if ($source === 'ai' && $cached === null) {
+        aiReportCacheSet($cacheKey, [
+            'report'       => $aiText,
+            'source'       => $source,
+            'model'        => $modelUsed,
+            'generated_at' => $generatedAt,
+            'period'       => $period['label'],
+        ]);
+    }
+
 
     // ── Audit trail (same convention as api/generate-document-pdf.php) ──
     try {
@@ -191,8 +250,13 @@ try {
             'figures'     => aiInsightFiguresMarkdown($facts),
             'source'      => $source,          // 'ai' | 'fallback'
             'ai_error'    => $aiError,         // shown as a banner when fallback
-            'model'        => $source === 'ai' ? AI_MODEL : null,
-            'generated_at' => date('Y-m-d H:i:s'),
+            'model'        => $source === 'ai' ? $modelUsed : null,
+            'generated_at' => $generatedAt,
+            // true when this analysis was reused rather than newly written.
+            // The UI says so out loud instead of quietly pretending the
+            // minute-long call happened again: a report that appears
+            // instantly is worth explaining, or the user reads it as a bug.
+            'cached'       => $cached !== null,
             'period'       => [
                 'month'      => $period['month'],
                 'year'       => $period['year'],

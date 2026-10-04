@@ -299,6 +299,57 @@ define('KIOSK_ACCESS_TOKEN', secretFromEnvOrLocal('KIOSK_ACCESS_TOKEN', 'kiosk-t
 //
 //  THE DEFAULT GATEWAY IS OPENCODE ZEN, NOT OPENROUTER.
 //
+//  ROUTING THROUGH AN AGGREGATOR (9Router, OpenRouter, LiteLLM, ...)
+//
+//  This needs nothing from the code - the three settings below are the
+//  whole integration - but two things are easy to get wrong.
+//
+//  1. AI_API_URL is the FULL completions endpoint, including /v1. It is
+//     not a base URL. For 9Router that is:
+//
+//        AI_API_URL=https://your-tunnel.example/v1/chat/completions
+//
+//  2. 9Router model ids are NAMESPACED by whoever serves them, not bare.
+//     Discover them rather than guessing - the ids are also how 9Router
+//     knows which provider to bill and which to fall back from:
+//
+//        curl "$NINEROUTER_URL/v1/models" | jq '.data[].id'
+//
+//     A combo (several providers chained into one) appears with
+//     owned_by="combo" and is used as the model name directly.
+//
+//  9Router runs as a local Node service on port 20128, so "localhost" from
+//  a hosted PHP app is the WEB SERVER, not the office laptop. Either run it
+//  on a VPS, or publish it with a tunnel - 9Router ships a Cloudflare edge
+//  tunnel for this - and put the public URL in AI_API_URL. Give the tunnel a
+//  URL nobody has to guess: it fronts every provider credential in the
+//  router. Start 9Router with requireApiKey=true and set NINEROUTER_KEY to
+//  the key from Dashboard -> Keys; with auth disabled, leave it blank.
+//
+//  WORKED EXAMPLE (a published 9Router):
+//
+//     AI_PROVIDER=9router
+//     AI_API_URL=https://your-tunnel.example/v1/chat/completions
+//     NINEROUTER_KEY=sk-...
+//     AI_MODEL=minimax/minimax-m2.7
+//     AI_MODELS=minimax/minimax-m2.7,glm-coding,qwen3.8-flash
+//
+//  Two details that cost an hour each if missed. AI_API_URL is the FULL
+//  completions endpoint including /v1 and must NOT end in a slash - the
+//  router 308-redirects a trailing slash. And model ids are namespaced by
+//  whoever serves them, so discover them rather than guessing:
+//
+//     curl -H "Authorization: Bearer $NINEROUTER_KEY" \
+//          "$NINEROUTER_URL/v1/models" | jq '.data[].id'
+//
+//  A combo (several providers chained into one) appears with
+//  owned_by="combo" and is used as the model name directly.
+//
+//  Set AI_PROVIDER to anything other than "zen" (e.g. "9router"). That pins
+//  every request to the OpenAI-compatible path. Without it, a model id that
+//  happens to contain "gemini" would be hijacked into Google's native API,
+//  bypassing the router entirely - see aiIsGeminiModel().
+//
 //  This was OpenRouter until the office moved to Zen. The two are not
 //  interchangeable, and mixing them fails confusingly:
 //
@@ -308,8 +359,12 @@ define('KIOSK_ACCESS_TOKEN', secretFromEnvOrLocal('KIOSK_ACCESS_TOKEN', 'kiosk-t
 //      every free model in the chain below is on chat/completions.
 //    * Zen model ids are BARE: space-bunny-free, mimo-v2.5-free. OpenRouter
 //      ids carry a provider prefix and 404 here. The "oc/" and "opencode/"
-//      forms are OpenCode CONFIG names, not API model ids - which is why
-//      "oc/mimo-v2.5-free" is not an id to send over HTTP.
+//      forms are OpenCode CONFIG names - which is also exactly what an
+//      aggregator calls them, because a router namespaces every model by
+//      the provider serving it. So the prefix is right for 9Router and wrong
+//      for Zen directly, and the same string cannot satisfy both.
+//      aiNormalizeModel() strips "oc/" when the URL is opencode.ai and keeps
+//      it otherwise, so one configured value works against either gateway.
 //    * Auth is still `Authorization: Bearer <key>`, so the header is unchanged.
 //
 //  To go back to OpenRouter: set AI_API_URL to
@@ -321,7 +376,14 @@ $aiProvider    = env('AI_PROVIDER') ?: 'zen';
 $aiApiUrl      = env('AI_API_URL') ?: 'https://opencode.ai/zen/v1/chat/completions';
 $aiApiKey      = '';
 $aiGeminiModel = env('GEMINI_MODEL') ?: env('AI_GEMINI_MODEL') ?: 'gemini-2.0-flash';
-$aiModel       = env('AI_MODEL') ?: ($aiProvider === 'gemini' ? $aiGeminiModel : 'space-bunny-free');
+//  DEFAULT MODEL: oc/mimo-v2.5-free, as chosen by the office.
+//
+//  It is written with the "oc/" prefix so the same value is correct through
+//  9Router, where a model is addressed by provider. Against OpenCode Zen
+//  directly the prefix is stripped before sending - see aiNormalizeModel() -
+//  so this default works either way and does not have to be edited when the
+//  gateway changes.
+$aiModel       = env('AI_MODEL') ?: ($aiProvider === 'gemini' ? $aiGeminiModel : 'oc/mimo-v2.5-free');
 $aiCacheTtl    = (int) (env('AI_CACHE_TTL') ?: 3600);   // seconds
 
 // Optional OpenRouter (or gateway) failover chain, comma-separated:
@@ -341,32 +403,37 @@ if (empty($aiModels)) {
     // moves on when a model errors, so an entry that does not resolve costs one
     // wasted call per generation and nothing else.
     //
-    // EVERY id below was read live off https://opencode.ai/zen/v1/models, and
-    // every one ends in "-free", so nothing here can spend money. They are BARE
-    // ids - no "opencode/" prefix, because that is the OpenCode config form, not
-    // the HTTP form.
+    // Written with the "oc/" prefix throughout: every one of these is served
+    // by OpenCode Zen, and an aggregator addresses them by that provider. Set
+    // AI_MODELS from your router's real /v1/models output to override this, and
+    // run tests/ai_preflight.php to catch ids the gateway does not serve.
     //
-    //   1. space-bunny-free        the office's first choice. A stealth model
-    //      whose provider keeps zero retention and does not train on the data -
-    //      which matters here, because this system sends registrar records.
-    //   2. mimo-v2.5-free          the requested backup.
-    //   3. mimo-v2.6-flash-free    its newer sibling.
+    //   1. oc/mimo-v2.5-free          the office's choice, and the default.
+    //   2. oc/space-bunny-free        a stealth model whose provider keeps
+    //      zero retention and does not train on the data.
+    //   3. oc/mimo-v2.6-flash-free    its newer sibling.
     //   4+. more free models, so one provider being down does not take the
     //      Insights report with it.
     //
-    // Two of these (MiMo 2.5 and 2.6 Flash) are documented as using collected
-    // data to improve the model during their free period. They are fallbacks
-    // only - the primary is the zero-retention one - but if that matters to the
-    // office, delete them and the chain still has five entries left.
+    // DATA RETENTION - READ BEFORE CHANGING THIS.
+    //
+    // MiMo 2.5 and 2.6 Flash are documented as using collected data to improve
+    // the model during their free period. That used to be a footnote because
+    // they were fallbacks and space-bunny-free was primary; making MiMo the
+    // DEFAULT moves that caveat onto every report this system produces, and
+    // this system sends registrar records. It is now a policy decision rather
+    // than a technical one. If the office wants zero retention on the primary,
+    // put oc/space-bunny-free first in AI_MODELS - the chain order is the
+    // policy, and nothing else needs to change.
     $aiModels = [
         $aiModel,
-        'mimo-v2.5-free',
-        'mimo-v2.6-flash-free',
-        'ling-3.1-flash-free',
-        'nemotron-3-ultra-free',
-        'deepseek-v4-flash-free',
-        'fledge-alpha-free',
-        'longcat-2.5-preview-free',
+        'oc/space-bunny-free',
+        'oc/mimo-v2.6-flash-free',
+        'oc/ling-3.1-flash-free',
+        'oc/nemotron-3-ultra-free',
+        'oc/deepseek-v4-flash-free',
+        'oc/fledge-alpha-free',
+        'oc/longcat-2.5-preview-free',
     ];
 }
 if (!in_array($aiModel, $aiModels, true)) {
@@ -384,7 +451,15 @@ if (!in_array($aiModel, $aiModels, true)) {
 //
 // AI_API_KEY and shared/ai_key.local remain as provider-agnostic fallbacks, so
 // nothing breaks for anyone already set up the old way.
-$aiApiKey = env('OPENCODE_API_KEY')
+//
+// NINEROUTER_KEY is 9Router's own name for the key to the router itself, and it
+// is looked up FIRST. Without it the operator has only two options when they
+// route through 9Router: paste a 9Router key into a variable called
+// OPENCODE_API_KEY, which misdescribes what is in it and will mislead the next
+// person to read the config, or use AI_API_KEY, which shadows every other
+// gateway's key. Reading the router's own name keeps the value honest.
+$aiApiKey = env('NINEROUTER_KEY')
+        ?: env('OPENCODE_API_KEY')
         ?: env('OPENROUTER_API_KEY')
         ?: env('AI_API_KEY')
         ?: '';

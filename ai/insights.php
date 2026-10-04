@@ -294,8 +294,12 @@ body[data-page="insights"] .ai-report-unavailable code{
    language with the narrative, a reader cannot tell which one a model wrote -
    which is the entire mistake this block was split out to prevent. */
 body[data-page="insights"] .ai-report-figures{
-    display:none;margin-top:4px;border:1px solid #e2e8f0;border-radius:12px;
+    display:none;margin-top:30px;border:1px solid #e2e8f0;border-radius:12px;
     background:#f8fafc;overflow:hidden;
+    /* An appendix is not the next paragraph. The 6px solid cap over the
+       hairline is the visual full stop between the model's argument and
+       the numbers it was derived from. */
+    border-top:6px solid #0f172a;
 }
 body[data-page="insights"] .ai-report-figures-head{
     display:flex;align-items:center;gap:9px;padding:11px 16px;
@@ -308,6 +312,10 @@ body[data-page="insights"] .ai-report-figures-body{
     padding:14px 16px;font-size:12.5px;line-height:1.75;color:#334155;
     font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
     white-space:pre-wrap;word-break:break-word;
+    /* The ledger can be 40+ lines. Pinned to a readable measure so the
+       monospace columns still line up for comparison instead of running
+       the full dashboard width. */
+    max-width:78ch;
 }
 body[data-page="insights"] .ai-report-meta{
     display:none;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;
@@ -324,23 +332,61 @@ body[data-page="insights"] .ai-report-output .ai-report-title{
     color:#0f172a;margin:0 0 14px;display:flex;align-items:center;gap:9px;
 }
 body[data-page="insights"] .ai-report-output .ai-report-title i{color:#7c3aed}
+/* ── The seven sections ──────────────────────────────────────────
+   These were seven bordered cards stacked on each other. At the old
+   length that read fine. The report is now 700-1000 words across seven
+   sections, and seven identical boxes became a wall: the eye took in
+   chrome instead of argument, and every section looked equally
+   important, which is exactly what a sequential argument is not.
+
+   So they flow as one continuous brief with a hairline between them.
+   The numeral is a LOCATOR - "go back to section 3" - so it is set
+   in the mono face at low contrast and every numeral is the same
+   colour. The old design cycled blue/teal/purple across the numbers,
+   which implies a category that does not exist: section 4 is not a
+   different kind of section from section 5.
+   Bullets are custom-dotted rather than the default disc so long
+   recommendation lists keep a consistent optical weight.
+   Measure is capped at 70ch - this is prose meant to be read, not a
+   dashboard column scanned. */
 body[data-page="insights"] .report-section{
-    background:#fff;border:1px solid #e2e8f0;border-radius:14px;
-    padding:14px 18px 12px;margin-bottom:12px;
+    background:none;border:0;border-radius:0;
+    padding:20px 0 6px;margin:0;border-top:1px solid #e2e8f0;
 }
-body[data-page="insights"] .report-section-head{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+/* The first section follows the .ai-report-title block, so it is NOT the
+   first child of #reportOutput. Using :first-child here silently did
+   nothing and left a stray rule 14px below the title, which read as a
+   double separator. The adjacent-sibling selector is what actually
+   matches. */
+body[data-page="insights"] .ai-report-title + .report-section{
+    border-top:0;padding-top:4px;
+}
+body[data-page="insights"] .report-section-head{
+    display:flex;align-items:baseline;gap:12px;margin-bottom:10px;
+}
 body[data-page="insights"] .report-section-num{
-    width:24px;height:24px;flex:0 0 24px;border-radius:7px;background:#2563eb;
-    color:#fff;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;
+    flex:0 0 auto;background:none;color:#2563eb;
+    font-family:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:11.5px;font-weight:700;letter-spacing:.02em;
+    min-width:16px;
 }
-body[data-page="insights"] .report-section-2 .report-section-num{background:#0d9488}
-body[data-page="insights"] .report-section-3 .report-section-num{background:#7c3aed}
 body[data-page="insights"] .report-section h2{
-    font-size:13px;font-weight:700;color:#0f172a;margin:0;text-transform:uppercase;letter-spacing:.3px;
+    font-size:15px;font-weight:700;color:#0f172a;margin:0;
+    letter-spacing:-.01em;line-height:1.35;
 }
-body[data-page="insights"] .report-section ul{margin:4px 0 2px;padding-left:18px}
-body[data-page="insights"] .report-section li{margin-bottom:6px}
-body[data-page="insights"] .report-section p{margin:6px 0 2px}
+body[data-page="insights"] .report-section p{
+    margin:0 0 11px;max-width:70ch;
+}
+body[data-page="insights"] .report-section ul{
+    margin:0 0 6px;padding:0;max-width:70ch;list-style:none;
+}
+body[data-page="insights"] .report-section li{
+    margin-bottom:8px;padding-left:15px;position:relative;
+}
+body[data-page="insights"] .report-section li::before{
+    content:"";position:absolute;left:1px;top:.66em;
+    width:5px;height:5px;border-radius:50%;background:#cbd5e1;
+}
 body[data-page="insights"] .report-section strong{color:#0f172a}
 body[data-page="insights"] .ai-report-footer{
     display:none;font-size:11px;color:#94a3b8;text-align:center;

@@ -25,20 +25,39 @@ var BCPPrint = (function () {
     }
 
     // ── Styles ────────────────────────────────────────────────────
-    // @page margin:0 is deliberate. Browsers draw their own print header
-    // and footer ("10/2/26, 11:44 AM Title" / "about:blank 2/2") only into
-    // the page margin area, so with no margin they have nowhere to go and
-    // are omitted. The body padding replaces the margin and is where our
-    // own centred header and footer sit.
+    // @page margin:0 on three sides is deliberate. Browsers draw their own
+    // print header and footer ("10/2/26, 11:44 AM Title" / "about:blank 2/2")
+    // only into the page margin area, so with no margin they have nowhere to
+    // go and are omitted. The body padding is where our own centred header
+    // and the first page's footer sit.
+    //
+    // THE BOTTOM PAGE MARGIN IS NOT OPTIONAL, AND IT IS NOT THE SAME THING AS
+    // THE BODY PADDING.
+    //
+    // This used to be margin:0 all round, with the footer's space reserved by
+    // the body's padding-bottom. That works on the LAST page and nowhere else:
+    // padding-bottom reserves room once, at the end of the document flow. Every
+    // intermediate page fills its whole box, so a fixed footer pinned at
+    // bottom:10mm sits ON TOP of the text.
+    //
+    // It stayed invisible while these documents were one page. The Insight
+    // report is seven sections of 700-1000 words, so it is two or three, and
+    // the collision appeared exactly then: body text running through the
+    // footer on pages 2 and 3.
+    //
+    // A @page bottom margin reserves the band on EVERY page, which is the only
+    // thing that can. Top, left and right stay 0 so the browser's own header
+    // and footer are still suppressed - we are claiming the bottom strip, not
+    // inviting the browser back in.
     //
     // Every colour is #000. The screen's slate greys (#64748b, #334155)
     // are tuned for a white UI background and print as washed-out,
     // low-contrast ink that reads as blurred on paper.
     function letterheadCss() {
         return [
-            '@page { size: A4 portrait; margin: 0; }',
+            '@page { size: A4 portrait; margin: 0 0 22mm 0; }',
             'body { font-family: Calibri, "Segoe UI", Arial, sans-serif; font-size: 11pt;',
-            '       line-height: 1.6; color: #000; margin: 0; padding: 14mm 16mm 24mm;',
+            '       line-height: 1.6; color: #000; margin: 0; padding: 14mm 16mm 4mm;',
             '       -webkit-print-color-adjust: exact; }',
 
             '.letterhead { text-align:center; border-bottom:1px solid #1a2d4a;',
@@ -77,14 +96,28 @@ var BCPPrint = (function () {
             '          line-height:1.4; color:#000; }',
 
             'h2.doc-h { font-size:12pt; font-weight:700; letter-spacing:.4px; margin:22px 0 8px;',
-            '           text-align:center; color:#000; page-break-after:avoid; }',
+            '           text-align:center; color:#000; page-break-after:avoid; break-after:avoid-page; }',
             '.doc-body p { margin:0 0 12px; text-align:justify; color:#000; }',
             '.doc-body ul { margin:0 0 12px; padding-left:24px; color:#000; }',
             '.doc-body li { margin-bottom:6px; }',
             '.doc-body strong { font-weight:700; }',
             '.meta { font-size:10pt; color:#000; margin-bottom:20px; text-align:center; }',
 
-            '.sig { display:flex; gap:48px; margin-top:34px; page-break-inside:avoid; }',
+            // PAGE BREAKS for a document that is now routinely two or three
+            // pages, which a one-page memo never had to think about.
+            //
+            // widows/orphans stop a heading landing as the last line of a page
+            // with its text overleaf, which reads as a printing fault rather
+            // than a long document.
+            'p, li { orphans:2; widows:2; }',
+            // Keep a short list whole. Breaking a three-bullet recommendation
+            // across a page boundary separates an action from the finding it
+            // answers, which is the one break that changes what the document
+            // MEANS rather than just where it falls.
+            '.doc-body ul { page-break-inside:avoid; break-inside:avoid-page; }',
+            'h2.doc-h + p, h2.doc-h + ul { page-break-before:avoid; break-before:avoid-page; }',
+            '.sig { display:flex; gap:48px; margin-top:34px;',
+            '       page-break-inside:avoid; break-inside:avoid-page; }',
             '.sig .box { flex:1; }',
             '.sig .line { border-top:1px solid #000; padding-top:4px; font-size:10pt; color:#000; }',
             '.foot-note { margin-top:26px; font-size:9pt; color:#000; line-height:1.4;',
