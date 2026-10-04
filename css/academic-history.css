@@ -741,7 +741,160 @@ body[data-page="academic"] .table tbody tr[data-ah-row]:hover { background: #eff
    Ctrl+P on this page prints the roster itself: no dialog, no template.
    The head and the toolbar drop out; the table keeps its rules, because on
    paper the ruling is what makes it readable as a list. */
-/* ── The acceptance board ─────────────────────────────────────────
+/* ── The browse shell ─────────────────────────────────────────────
+
+   Borrowed from the Masterlist folder browser (masterlist.php, view=explore,
+   commit f124bfa) on purpose: two pages that both browse program -> year ->
+   section should not look like two different portals, and the reader who has
+   learned one has already learned the other. The crumbs, the tile grid and the
+   blue folder icon are the same shapes with the same numbers.
+
+   What is NOT borrowed is the tile's meta line. See .ahb-tile-meta below. */
+
+.ahb-crumbs {
+    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+    padding: 11px 16px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+    font-size: 13px;
+}
+.ahb-crumb {
+    color: #475569; text-decoration: none; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 7px; border-radius: 7px;
+}
+.ahb-crumb:hover { background: #e0ecff; color: #1d4ed8; }
+.ahb-crumb-root { color: #1a3a8c; }
+.ahb-crumb-sep { color: #cbd5e1; font-size: 10px; }
+/* Where you ARE, as opposed to where you can go. Not a link, so it is
+   visibly not clickable rather than silently doing nothing. */
+.ahb-crumb-here { color: #0f172a; font-weight: 700; background: #e2e8f0; cursor: default; }
+.ahb-crumb-here:hover { background: #e2e8f0; color: #0f172a; }
+
+.ahb-missing { padding: 30px 20px; text-align: center; color: #64748b; }
+.ahb-missing i { font-size: 30px; color: #cbd5e1; display: block; margin-bottom: 12px; }
+.ahb-missing p { margin: 0 0 5px; font-size: 13.5px; }
+
+.ahb-head {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    gap: 14px; flex-wrap: wrap; padding: 18px 20px 14px;
+}
+.ahb-title { display: flex; align-items: center; gap: 10px; font-size: 19px; font-weight: 700; color: #0f172a; }
+.ahb-title i { color: #2563eb; font-size: 17px; }
+.ahb-sub { margin-top: 5px; font-size: 12.5px; color: #64748b; }
+
+/* The standing chip at folder size. Bigger than the row chip so it reads from
+   the head of the panel rather than needing to be found in a column. */
+.ahb-chip-lg { font-size: 13px; padding: 6px 12px; background: #f1f5f9; border-radius: 8px; }
+
+/* The head's right side: the standing, and the ways out of this folder.
+   One group so they stack together on a narrow screen instead of the chip
+   drifting away from the buttons that belong with it. */
+.ahb-head-aside {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+
+/* ── The two ways back ───────────────────────────────────────────
+
+   Anchors, not <button> elements. They navigate: the location is the URL, so
+   they must be links to be openable in a new tab, printable, and reachable by
+   the browser's own history. A button with a JS click handler gives up all
+   three for nothing.
+
+   They are NOT .btn. That class is the portal's action weight - solid, primary,
+   "do this thing to the data" - and a back arrow is not a decision about
+   anyone's grades. These borrow its geometry (height, radius, padding, the
+   focus ring) and none of its colour. */
+
+.ahb-back { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ahb-back-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    /* The same height and radius as .btn, so the row does not read as two
+       different control families sitting next to each other. */
+    height: 34px; padding: 0 13px;
+    font-size: 13px; font-weight: 600; line-height: 1;
+    text-decoration: none; white-space: nowrap;
+    color: #334155; background: #fff;
+    border: 1px solid #cbd5e1; border-radius: 8px;
+    transition: border-color .12s, background .12s, color .12s;
+}
+.ahb-back-btn:hover { border-color: #93c5fd; background: #f8fbff; color: #1d4ed8; }
+.ahb-back-btn:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.ahb-back-btn i { font-size: 11px; color: #64748b; }
+.ahb-back-btn:hover i { color: #2563eb; }
+
+/* The reset. Quieter than the step up, because jumping three folders at once
+   is the rarer move and the more abandonable one. A dashed edge marks it as the
+   less certain of the two without greying it into uselessness. */
+.ahb-back-btn.is-root {
+    color: #475569; background: #f8fafc; border-style: dashed;
+}
+.ahb-back-btn.is-root:hover { background: #fff; }
+
+/* A folder with nothing in it. It is still a folder - a program with no
+   sections this term is a FACT, not a missing page - so it keeps its shape and
+   stays clickable, and steps back in weight rather than disappearing.
+
+   The folder icon greys for the same reason the Masterlist's "Unassigned"
+   tile goes amber: here the absence is worth noticing, and colour is how it
+   says so. Everything else about the tile is untouched, because a link that
+   looks broken does not get clicked to check. */
+.ahb-tile.is-empty { background: #fcfdfe; }
+.ahb-tile.is-empty .ahb-tile-icon { color: #94a3b8; }
+.ahb-tile.is-empty .ahb-tile-name { color: #475569; font-weight: 600; }
+.ahb-tile.is-empty:hover { border-color: #93c5fd; background: #f8fbff; }
+.ahb-tile.is-empty:hover .ahb-tile-icon { color: #2563eb; }
+
+/* The standing chip's third state. 'none' is not a warning and not a success -
+   it is the absence of either, so it is neutral grey rather than borrowing the
+   amber that means "waiting on someone". Painting an empty folder amber is how
+   a registrar ends up chasing a section that was never opened. */
+.ahb-chip[data-state="none"],
+.status-badge[data-state="none"] { color: #64748b; background: #f1f5f9; }
+.ahb-chip[data-state="none"] .status-dot,
+.status-badge[data-state="none"] .status-dot { background: #94a3b8; }
+
+@media (max-width: 640px) {
+    /* Full width each, because two half-width buttons on a phone is two
+       targets a thumb will miss rather than hit. */
+    .ahb-back { width: 100%; }
+    .ahb-back-btn { flex: 1 1 100%; justify-content: center; }
+}
+
+.ahb-folders {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(258px, 1fr));
+    gap: 12px; padding: 6px 20px 20px;
+}
+.ahb-tile {
+    display: flex; align-items: center; gap: 12px; text-decoration: none;
+    padding: 14px 15px; border: 1px solid #e2e8f0; border-radius: 12px;
+    background: #fff;
+    transition: border-color .12s, background .12s, box-shadow .12s;
+}
+.ahb-tile:hover { border-color: #93c5fd; background: #f8fbff; box-shadow: 0 2px 8px rgba(30, 64, 175, .08); }
+/* Blue, not the usual amber folder: the Masterlist browser and this board are
+   the same tree in the same portal, so a yellow folder here next to a blue one
+   there would read as two different things. */
+.ahb-tile-icon { font-size: 26px; color: #2563eb; flex: none; }
+.ahb-tile-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.ahb-tile-name {
+    font-size: 14.5px; font-weight: 700; color: #1e293b;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Standing first, counts second. The Masterlist reads "3 students - 2 folders
+   inside" because the count IS its fact. Here the fact is what is blocked, so
+   the meta leads with it and a registrar can see the waitlist from the root
+   without opening anything. */
+.ahb-tile-meta { font-size: 12px; color: #64748b; }
+.ahb-tile .ahb-meter { width: 100%; }
+.ahb-tile-go { color: #cbd5e1; font-size: 12px; flex: none; }
+.ahb-tile:hover .ahb-tile-go { color: #2563eb; }
+.ahb-tile:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+
+@media (max-width: 640px) {
+    .ahb-folders { grid-template-columns: 1fr; padding: 6px 14px 16px; }
+    .ahb-head { padding: 14px 14px 12px; }
+}
+
+/* ── The acceptance table ──────────────────────────────────────────
 
    One row per section, because one section is what a registrar accepts.
    The decision sits on the same line as the count that justifies it, so
@@ -811,11 +964,6 @@ body[data-page="academic"] .table tbody tr[data-ah-row]:hover { background: #eff
    turns the reason into a block, and this line is not a reason - it is the
    term the whole board is about. */
 .ahb-caption { margin: 0; padding: 9px 14px; border-bottom: 1px solid #f1f5f9; }
-.ahb-expand { float: right; display: inline-flex; gap: 12px; }
-.ahb-link { font: inherit; font-size: 11.5px; color: #2563eb; background: none;
-            border: 0; padding: 0; cursor: pointer; text-decoration: underline; }
-.ahb-link:hover { color: #1a3a8c; }
-.ahb-link:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
 
 /* The caret. Sized and positioned so the section code stays on a fixed
    left edge whether it is open or shut - otherwise the codes shuffle sideways
@@ -827,34 +975,25 @@ body[data-page="academic"] .table tbody tr[data-ah-row]:hover { background: #eff
 .ahb-caret:hover { color: #2563eb; }
 .ahb-caret[aria-expanded="true"] { transform: rotate(90deg); color: #1a3a8c; }
 .ahb-caret:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
-.ahb-code { vertical-align: middle; }
-.ahb-label { vertical-align: middle; font-weight: 700; }
+/* The section code is monospaced, exactly as it is on the printed sheet: 11001
+   and 11011 are hard to tell apart in a proportional face, and this board
+   exists to make the difference between them. */
+.ahb-code { vertical-align: middle;
+            font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+            font-size: 13px; color: #334155; }
 .ahb-sname { display: block; color: #1e293b; }
 
-/* The three folder levels. Depth is an INDENT on one cell, not three nested
-   tables, so every level shares the same column widths and a folder's figures
-   line up with its sections'.
+/* Depth is now ONE level, not three.
 
-   The indents are deliberately uneven (24 / 48 / 72). Even steps read as a
-   list; uneven ones read as a tree, because the eye measures the jump rather
-   than counting boxes.
-
-   Weight carries the hierarchy too: a program is boldest, a year medium, a
-   section plain. Colour alone would not survive the print stylesheet. */
+   The program and year folders are links in the path bar and tiles in a grid;
+   only the section row is a row. So the three-level indent ladder that used to
+   sit here (24 / 48 / 72, uneven so it read as a tree) is gone, and the
+   section row starts at one indent. Keeping the old rule would have pushed the
+   code 62px right for no hierarchy to be under. */
 .ahb-name { white-space: nowrap; }
-.ahb-folder[data-level="1"] td { background: #eef2f7; }
-.ahb-folder[data-level="1"] td:first-child { padding-left: 14px; box-shadow: inset 4px 0 0 #1a3a8c; }
-.ahb-folder[data-level="1"] .ahb-label { font-weight: 800; color: #0f172a; font-size: 13.5px; }
-.ahb-folder[data-level="1"] .ahb-folder-icon { color: #1a3a8c; }
-
-.ahb-folder[data-level="2"] td { background: #f5f7fa; }
-.ahb-folder[data-level="2"] td:first-child { padding-left: 38px; }
-.ahb-folder[data-level="2"] .ahb-label { font-weight: 700; color: #1e293b; }
-.ahb-folder[data-level="2"] .ahb-folder-icon { color: #64748b; font-size: 11px; }
-
-.ahb-leaf td:first-child { padding-left: 62px; }
-.ahb-folder-icon { margin-right: 7px; font-size: 12px; vertical-align: middle; }
-.ahb-folder .ahb-why { color: #475569; }
+.ahb-leaf td:first-child { padding-left: 14px; }
+.ahb-folder-icon { margin-right: 7px; font-size: 12px; vertical-align: middle; color: #2563eb; }
+.ahb-leaf .ahb-why { color: #475569; }
 
 /* The nested students. Inset on the left and lighter than the section row, so
    the hierarchy reads without a tree-drawing character per level - the section
@@ -923,6 +1062,18 @@ body[data-page="academic"] .table tbody tr[data-ah-row]:hover { background: #eff
     /* The step is a step on screen. On paper it is nothing, and a column of
        "View" buttons in a printed roster would be a column of dead words. */
     .ah-act { display: none; }
+/* The browse chrome stays on paper. At the year level the crumbs and the head
+   ARE the document's title block - they say which program, which year and
+   which term the printed sheets below belong to - and a printed pile of
+   section tables with no such header is how two folders' sheets get filed
+   together. Only the way BACK is dropped: a chevron is a dead control on
+   paper. */
+.ahb-tile-go, .ahb-crumb-sep { display: none; }
+/* So are the back controls. They are navigation, and a printed page cannot be
+   navigated - a row of arrows on paper reads as a column of dead words, which is
+   the same reasoning that hides the View buttons. The CRUMBS stay, because they
+   are the title block rather than a control. */
+.ahb-back { display: none !important; }
     /* The sheet is an overlay, but it is not one of the .modal-overlay the
        other rule above already hides. Without this it can still reach paper. */
     .ah-sheet { display: none !important; }

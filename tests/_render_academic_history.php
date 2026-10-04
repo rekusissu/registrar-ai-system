@@ -26,6 +26,9 @@ session_name('BCP_REGISTRAR_SESSION');
 if (isset($argv[1])) $_GET['term']    = $argv[1];
 if (isset($argv[2])) $_GET['program'] = $argv[2];
 if (isset($argv[3])) $_GET['section'] = $argv[3];
+// The browse path. The page now navigates by ?at=, so the harness has to be
+// able to render a program folder and a year folder, not just the root.
+if (isset($argv[4])) $_GET['at'] = $argv[4];
 
 require_once __DIR__ . '/../shared/config.php';
 require_once __DIR__ . '/../shared/database.php';
@@ -164,49 +167,167 @@ if ($filteredOut) {
         printf("  FAIL  empty view offers no way out\n");
     }
 } elseif (strpos($html, '<table class="ahb">') !== false
-       || strpos($html, 'No sections to accept yet') !== false) {
-    // The board replaced the standalone roster. Two things are accepted here:
-    // a rendered board, OR the empty state - this harness renders the LIVE
-    // database, which on this host holds no sectioned students at all, and the
-    // empty state is the correct reading of that, not a missing board.
+       || strpos($html, 'class="ahb-folders"') !== false
+       || strpos($html, 'No sections in ') !== false) {
+    // The board replaced the standalone roster, and then became a BROWSE: tiles
+    // at the folder levels, the acceptance table at the year. Both count as a
+    // rendered board here - this harness renders the LIVE database, and the
+    // folder level is now the DEFAULT landing page, so a run that only looked
+    // for a table would report the page as having no board at all.
+    //
+    // The old "No sections to accept yet" state is deliberately NOT in this
+    // list any more: the catalogue is browsable whether or not a term has
+    // sections, so that state must no longer be reachable at all.
     //
     // What must be true either way is that students remain REACHABLE. A page
     // that only listed sections, with no way to open one and read a record,
     // would have dropped the roster's only real job without replacing it.
     printf("  ok    section board present\n");
     $reachable = (int) substr_count($html, 'data-student=');
+
+    // ── THE BROWSE, NOT THE TREE ──────────────────────────────────
+    //
+    // The board used to be one table with three indent levels. It is now a
+    // drive: crumbs and a tile grid down to the year, and the acceptance table
+    // only at the leaf. These assertions are about that shape, and about the
+    // one property the shape has to keep - the location is the URL, so the
+    // folders are real links.
     structure(
-        'the board reaches students, or says there are none',
-        $reachable > 0
-            ? substr_count($html, 'class="ahb-group"') === substr_count($html, 'data-level="3"')
-            : strpos($html, 'No sections to accept yet') !== false,
-        $reachable > 0
-            ? $reachable . ' students reachable under their sections'
-            : 'no sections on this database - empty state shown'
+        'the path bar is present',
+        strpos($html, 'class="ahb-crumbs"') !== false,
+        'crumbs rendered'
     );
-    // The folders. Program → year → section, and every level's children must
-    // point back at it by path, or closing a folder leaves orphans on screen.
-    if (strpos($html, 'ahb-folder') !== false) {
+
+    $isYear = strpos($html, 'class="ahb"') !== false;
+
+    // The level, read from what the page actually rendered rather than guessed.
+    //
+    //   $isEmptyYear - a year folder with no sections: a "here" crumb, no table,
+    //                  and the empty-folder message. It is neither the root nor a
+    //                  program folder, and treating it as one is how a level test
+    //                  silently starts asserting the wrong things.
+    //   $isYear      - a year folder holding sections: the table is present.
+    //   $isRoot      - no "here" crumb at all, because the root has no ancestors.
+    $isEmptyYear = !$isYear && strpos($html, 'No sections in ') !== false;
+    $isRoot      = !$isYear && !$isEmptyYear && strpos($html, 'ahb-crumb-here') === false;
+
+    // ── The two ways back ────────────────────────────────────────
+    //
+    // A step up, and a jump straight to the programs. These are anchors, not
+    // buttons: the location is the URL, so they must be links to be openable in
+    // a new tab and to be reachable by the browser's own history.
+    //
+    // Read AFTER the level is known, because what a folder may offer depends on
+    // how deep it is. An EMPTY year folder is still a year folder, and still
+    // gets both controls - it is a real place in the tree.
+    $backCount = (int) substr_count($html, 'class="ahb-back-btn');
+    $rootJump  = (int) substr_count($html, 'class="ahb-back-btn is-root"');
+    if ($isYear || $isEmptyYear) {
         structure(
-            'the board nests program, then year, then section',
-            substr_count($html, 'data-level="1"') > 0
-            && substr_count($html, 'data-level="2"') > 0
-            && substr_count($html, 'data-level="3"') > 0,
-            substr_count($html, 'data-level="1"') . ' program(s), '
-            . substr_count($html, 'data-level="2"') . ' year(s), '
-            . substr_count($html, 'data-level="3"') . ' section(s)'
+            'a year folder offers a way up and a way to the programs',
+            $backCount === 2 && $rootJump === 1,
+            'step up + reset'
         );
         structure(
-            'every folder has a caret that names the level it opens',
-            // Counted on class="ahb-caret" rather than data-caret=, because the
-            // script below also contains the literal 'data-caret="' in its
-            // selectors, and matching markup against the script's own source
-            // counts rows that were never rendered.
-            substr_count($html, 'class="ahb-caret"')
-                === substr_count($html, 'data-level="1"')
-                 + substr_count($html, 'data-level="2"')
-                 + substr_count($html, 'data-level="3"'),
+            'the step up keeps the term and drops only the year',
+            // Not a hardcoded "BSIT": the board's program folder is keyed by
+            // the CATALOGUE name, which is the full degree title, so a test that
+            // assumes the acronym here is testing a URL the page never emits.
+            // What matters is that the link carries the term and stops one
+            // segment short of where we are.
+            strpos($html, 'href="academic-history.php?term=2026-2027%201st&amp;at=') !== false
+            && substr_count($html, 'href="academic-history.php?term=2026-2027%201st&amp;at=') === 2,
+            'step up and reset both carry the term'
+        );
+    } elseif (!$isRoot) {
+        // A program folder. Its ONE way back is already "All programs", so the
+        // separate reset is omitted there - two buttons with the same
+        // destination is a control that appears broken.
+        structure(
+            'a program folder offers one way back, since that is the top',
+            $backCount === 1 && $rootJump === 0,
+            $backCount . ' control(s), no duplicate reset'
+        );
+    } else {
+        // At the ROOT there is nowhere above, so a back control could only
+        // fail. That the controls are ABSENT is the assertion.
+        structure(
+            'the root offers no way back, because there is nowhere above it',
+            $backCount === 0,
+            $backCount === 0 ? 'no back controls at the top' : $backCount . ' stray control(s)'
+        );
+    }
+
+    if ($isYear) {
+        $leafRows = (int) substr_count($html, 'class="ahb-leaf"');
+        // REACHABILITY. Students must stay reachable: a page that only listed
+        // sections, with no way to open one and read a record, would have
+        // dropped the roster's only real job without replacing it.
+        structure(
+            'the board reaches students, or says there are none',
+            $reachable > 0
+                ? substr_count($html, 'class="ahb-group"') === $leafRows
+                : strpos($html, 'No sections in ') !== false,
+            $reachable > 0
+                ? $reachable . ' students reachable under ' . $leafRows . ' section(s)'
+                : 'this year holds no sections - the empty folder says so'
+        );
+        structure(
+            'standing in a year: the acceptance table, and no tile grid',
+            $leafRows > 0 && strpos($html, 'class="ahb-folders"') === false,
+            $leafRows . ' section row(s)'
+        );
+        structure(
+            'the last crumb is plain text, not a link back to this page',
+            substr_count($html, 'class="ahb-crumb ahb-crumb-here"') === 1,
+            'one "here" crumb'
+        );
+        // Every caret is a SECTION's students now, and every one of them must
+        // have a group to open. Counted on class="ahb-caret" rather than
+        // data-caret=, because the script block below contains the literal
+        // 'data-caret="' in its selectors and matching markup against the
+        // script's own source would count rows that were never rendered.
+        structure(
+            'every section has a caret and the students it opens',
+            substr_count($html, 'class="ahb-caret"') === substr_count($html, 'class="ahb-group"'),
             substr_count($html, 'class="ahb-caret"') . ' carets'
+        );
+        structure(
+            'sections still carry the decision controls',
+            substr_count($html, 'data-accept=') === $leafRows
+            || substr_count($html, 'data-reopen=') === $leafRows,
+            substr_count($html, 'data-accept=') . ' accept, '
+            . substr_count($html, 'data-reopen=') . ' reopen'
+        );
+    } elseif (!$isEmptyYear) {
+        // A folder level: the root or a program folder. NOT an empty year -
+        // that has no tiles to assert about and is a year, not a folder of
+        // years.
+        structure(
+            'standing in a folder: tiles, and no acceptance table',
+            strpos($html, 'class="ahb-folders"') !== false,
+            substr_count($html, 'class="ahb-tile"') . ' tile(s)'
+        );
+
+        // The catalogue IS the shape now. Every OFFERED program is a folder
+        // whether or not it has sections this term, because a registrar asking
+        // "does BSCpE have sections?" has to be able to go and LOOK rather than
+        // infer the answer from a program that failed to appear.
+        $tileCount = (int) substr_count($html, 'class="ahb-tile');
+        structure(
+            'every offered program is a folder, section or no section',
+            $tileCount >= 16,
+            $tileCount . ' folder(s) listed'
+        );
+        structure(
+            'an empty folder says so rather than reading as a waitlist',
+            strpos($html, 'No sections yet') !== false,
+            'empty folders are labelled'
+        );
+        structure(
+            'the whole-page empty state is gone; the catalogue is always browsable',
+            strpos($html, 'No sections to accept yet') === false,
+            'no section-less dead end'
         );
     }
 } else {
