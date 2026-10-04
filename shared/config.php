@@ -236,11 +236,16 @@ define('JWT_SECRET', secretFromEnvOrLocal('JWT_SECRET', 'your-super-secret-key-c
 define('KIOSK_ACCESS_TOKEN', secretFromEnvOrLocal('KIOSK_ACCESS_TOKEN', 'kiosk-tap-2024'));
 
 // ── AI Configuration ───────────────────────────────────────────────────────────
-// Default: OpenRouter (OpenAI-compatible API gateway)
-//   - Get your API key from https://openrouter.ai/keys
-//   - Key format: sk-or-v1-...
-//   - Models use provider prefix: openai/gpt-4o, anthropic/claude-3-opus, etc.
-//     Do NOT also prefix "openrouter/" — the API rejects that form (400).
+// Default gateway: OpenCode Zen, an OpenAI-compatible API gateway.
+//   - Get your API key from https://opencode.ai/auth
+//   - Endpoint: https://opencode.ai/zen/v1/chat/completions
+//   - Model ids are BARE - space-bunny-free, mimo-v2.5-free. No provider
+//     prefix. The "opencode/x" form is the OpenCode CONFIG name, not the API one.
+//
+// OpenRouter is still supported and needs no code change if you prefer it:
+// set AI_API_URL, AI_MODEL and OPENROUTER_API_KEY. Its ids carry a provider
+// prefix (openai/gpt-4o, stealth/space-bunny-alpha) and it rejects a doubled
+// "openrouter/" prefix - aiNormalizeModel() strips that defensively.
 //
 // Environment variables:
 //   OPENCODE_API_KEY  - the key for OpenCode Zen, the default gateway below
