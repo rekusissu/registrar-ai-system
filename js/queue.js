@@ -957,9 +957,7 @@ function renderOpenState(d) {
         sub.textContent = 'Taking numbers ' + hours + '.'
             + (s.max_daily_taps
                 ? ' ' + s.issued_today + ' of ' + s.max_daily_taps + ' issued today.'
-                : '')
-            + (s.max_taps_student ? ' Student limit ' + s.max_taps_student + '/day.' : '')
-            + (s.max_taps_priority ? ' Priority limit ' + s.max_taps_priority + '/day.' : '');
+                : '');
         btnOff.style.display = '';
         btnOn.style.display = 'none';
     }
@@ -973,8 +971,6 @@ function openDayPanel() {
     var hhmm = function (t) { return t ? String(t).slice(0, 5) : ''; };
     set('dayOpens', hhmm(s.opens_time) || '08:00');
     set('dayCloses', hhmm(s.closes_time) || '17:00');
-    set('dayMaxStudent', s.max_taps_student != null ? s.max_taps_student : 0);
-    set('dayMaxPriority', s.max_taps_priority != null ? s.max_taps_priority : 0);
     set('dayMaxDaily', s.max_daily_taps != null ? s.max_daily_taps : 0);
     // How much of today's capacity is already gone, stated where the number
     // is edited rather than only on the open-bar summary. Deciding whether to
@@ -1005,8 +1001,10 @@ function saveDaySettings() {
         opens_time: document.getElementById('dayOpens').value,
         closes_time: document.getElementById('dayCloses').value,
         cutoff_enabled: document.getElementById('dayEnabled').checked,
-        max_taps_student: document.getElementById('dayMaxStudent').value,
-        max_taps_priority: document.getElementById('dayMaxPriority').value,
+        // max_taps_student / max_taps_priority are deliberately NOT sent.
+        // Their inputs are gone from the day-settings panel, and the API
+        // treats an absent key as "leave the stored value alone" rather
+        // than "zero it", so anything already configured is preserved.
         max_daily_taps: document.getElementById('dayMaxDaily').value
     }).then(function (d) {
         if (d.success) { showToast(d.message, 'success'); closeDay(); loadState(); }

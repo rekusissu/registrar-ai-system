@@ -342,20 +342,6 @@ body[data-page="console"] td.empty-state{display:table-cell;height:300px;padding
                 How many numbers the counter can issue in one day, all students together.
                 When this is reached the kiosk stops issuing numbers to everyone until tomorrow.
             </p>
-
-            <div class="day-rule"><span>Per-person tap limit</span></div>
-
-            <div class="day-grid">
-                <div class="form-group">
-                    <label for="dayMaxStudent">Students per day</label>
-                    <input type="number" id="dayMaxStudent" class="form-control" min="0" step="1" value="0" placeholder="0 = unlimited">
-                </div>
-                <div class="form-group">
-                    <label for="dayMaxPriority">Priority per day</label>
-                    <input type="number" id="dayMaxPriority" class="form-control" min="0" step="1" value="0" placeholder="0 = unlimited">
-                </div>
-            </div>
-            <p class="day-note">0 means no limit. A student who reaches the limit is told at the kiosk and sent to the registrar.</p>
         </div>
         <div class="modal-footer">
             <button class="btn btn-light" onclick="window.queueCloseDay()">Cancel</button>
