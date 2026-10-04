@@ -741,6 +741,169 @@ body[data-page="academic"] .table tbody tr[data-ah-row]:hover { background: #eff
    Ctrl+P on this page prints the roster itself: no dialog, no template.
    The head and the toolbar drop out; the table keeps its rules, because on
    paper the ruling is what makes it readable as a list. */
+/* ── The acceptance board ─────────────────────────────────────────
+
+   One row per section, because one section is what a registrar accepts.
+   The decision sits on the same line as the count that justifies it, so
+   nobody has to pair a verdict column up against a figures column by hand.
+
+   Three choices worth naming:
+
+   1. The verdict is a WORD, not a colour. A registrar scanning for the one
+      blocked section must not have to tell amber from red, and the print
+      stylesheet drops colour entirely. The dot beside the word is
+      reinforcement, never the carrier.
+
+   2. Accept is disabled on a blocked row rather than hidden. Someone
+      waiting on Faculty needs to see that accepting exists and is
+      unavailable, with the reason on hover - a missing button reads as a
+      missing feature.
+
+   3. The rule under the section code is the only drawn shape on the page.
+      "4 of 5 accepted" is a quantity, and a bar reads as one without being
+      counted. Everything else prints a figure. */
+.ahb { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ahb thead th {
+    background: #f8fafc; color: #475569; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .04em; text-align: left;
+    padding: 9px 14px; border-bottom: 1px solid #e2e8f0; white-space: nowrap;
+}
+.ahb td { padding: 10px 14px; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: middle; }
+.ahb tbody tr:last-child td { border-bottom: none; }
+.ahb tbody tr:hover { background: #f8fbff; }
+.ahb tbody tr[data-gate="waiting"] { box-shadow: inset 3px 0 0 #d97706; }
+.ahb tbody tr[data-gate="accepted"] { box-shadow: inset 3px 0 0 #16a34a; }
+
+.ahb-sec { font-weight: 700; color: #1e293b; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ahb-sub { display: block; font-size: 11px; font-weight: 400; color: #64748b; margin-top: 1px; }
+.ahb-count { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+.ahb-meter { display: block; width: 76px; height: 4px; margin-top: 6px; background: #e2e8f0; border-radius: 2px; overflow: hidden; }
+.ahb-meter i { display: block; height: 100%; background: #1a3a8c; }
+.ahb-meter.is-full i { background: #16a34a; }
+
+.ahb-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; white-space: nowrap; }
+.ahb-chip .status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: 0 0 auto; }
+/* The verdict and its reason are one cell, so they get a column each rather
+   than sharing a line. Run together as "Waitlist 3 to resolve: No final
+   rating" the reader has to work out where the status ends and the
+   explanation begins - the same run-on the term summary already had to be
+   rescued from. */
+.ahb-chip { display: flex; align-items: center; }
+.ahb-chip[data-state="accepted"] { color: #15803d; }
+.ahb-chip[data-state="ready"]    { color: #1d4ed8; }
+.ahb-chip[data-state="waiting"]  { color: #b45309; }
+.ahb-chip[data-state="empty"]    { color: #64748b; }
+
+/* The verdict and its reason share a cell, so the reason takes its own line.
+   Run together as "Waitlist3 to resolve: No final rating" the reader has to
+   work out where the status ends and the explanation begins - the same
+   run-on the term summary already had to be rescued from.
+
+   Scoped to a cell, because the same class is the toolbar's caption, where
+   it must stay inline next to the panel title. */
+.ahb-why { font-size: 11.5px; color: #64748b; }
+.ahb td .ahb-why { display: block; margin-top: 3px; }
+.ahb-why b { color: #334155; font-weight: 700; }
+.ahb-num { display: block; }
+
+/* The caption under the toolbar. Its own class because .ahb td .ahb-why
+   turns the reason into a block, and this line is not a reason - it is the
+   term the whole board is about. */
+.ahb-caption { margin: 0; padding: 9px 14px; border-bottom: 1px solid #f1f5f9; }
+.ahb-expand { float: right; display: inline-flex; gap: 12px; }
+.ahb-link { font: inherit; font-size: 11.5px; color: #2563eb; background: none;
+            border: 0; padding: 0; cursor: pointer; text-decoration: underline; }
+.ahb-link:hover { color: #1a3a8c; }
+.ahb-link:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+
+/* The caret. Sized and positioned so the section code stays on a fixed
+   left edge whether it is open or shut - otherwise the codes shuffle sideways
+   every time one is expanded, and a column of figures is unreadable while it
+   moves. */
+.ahb-caret { width: 18px; height: 18px; margin-right: 6px; padding: 0;
+             border: 0; background: none; color: #64748b; cursor: pointer;
+             font-size: 10px; vertical-align: middle; transition: transform .12s; }
+.ahb-caret:hover { color: #2563eb; }
+.ahb-caret[aria-expanded="true"] { transform: rotate(90deg); color: #1a3a8c; }
+.ahb-caret:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+.ahb-code { vertical-align: middle; }
+.ahb-label { vertical-align: middle; font-weight: 700; }
+.ahb-sname { display: block; color: #1e293b; }
+
+/* The three folder levels. Depth is an INDENT on one cell, not three nested
+   tables, so every level shares the same column widths and a folder's figures
+   line up with its sections'.
+
+   The indents are deliberately uneven (24 / 48 / 72). Even steps read as a
+   list; uneven ones read as a tree, because the eye measures the jump rather
+   than counting boxes.
+
+   Weight carries the hierarchy too: a program is boldest, a year medium, a
+   section plain. Colour alone would not survive the print stylesheet. */
+.ahb-name { white-space: nowrap; }
+.ahb-folder[data-level="1"] td { background: #eef2f7; }
+.ahb-folder[data-level="1"] td:first-child { padding-left: 14px; box-shadow: inset 4px 0 0 #1a3a8c; }
+.ahb-folder[data-level="1"] .ahb-label { font-weight: 800; color: #0f172a; font-size: 13.5px; }
+.ahb-folder[data-level="1"] .ahb-folder-icon { color: #1a3a8c; }
+
+.ahb-folder[data-level="2"] td { background: #f5f7fa; }
+.ahb-folder[data-level="2"] td:first-child { padding-left: 38px; }
+.ahb-folder[data-level="2"] .ahb-label { font-weight: 700; color: #1e293b; }
+.ahb-folder[data-level="2"] .ahb-folder-icon { color: #64748b; font-size: 11px; }
+
+.ahb-leaf td:first-child { padding-left: 62px; }
+.ahb-folder-icon { margin-right: 7px; font-size: 12px; vertical-align: middle; }
+.ahb-folder .ahb-why { color: #475569; }
+
+/* The nested students. Inset on the left and lighter than the section row, so
+   the hierarchy reads without a tree-drawing character per level - the section
+   code above it already says what level this is. */
+.ahb-group > td { padding: 0; background: #f8fafc; }
+.ahb-students { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.ahb-students thead th { background: #f1f5f9; color: #64748b; font-size: 10px;
+                         font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+                         text-align: left; padding: 6px 14px; white-space: nowrap; }
+.ahb-students td { padding: 7px 14px; border-bottom: 1px solid #eef2f6; color: #334155; }
+.ahb-students tbody tr:last-child td { border-bottom: none; }
+.ahb-students tbody tr:hover { background: #f0f7ff; }
+.ahb-students .ah-view { font-size: 11.5px; padding: 3px 10px; }
+
+.ahb-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; }
+.ahb-btn {
+    font: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+    border-radius: 6px; padding: 6px 12px; white-space: nowrap;
+    border: 1px solid transparent;
+}
+.ahb-btn-accept { background: #1a3a8c; color: #fff; }
+.ahb-btn-accept:hover:not(:disabled) { background: #15317a; }
+.ahb-btn-reopen { background: #fff; color: #475569; border-color: #cbd5e1; }
+.ahb-btn-reopen:hover:not(:disabled) { background: #f8fafc; color: #1e293b; }
+.ahb-btn-ai { background: #fff; color: #6d28d9; border-color: #ddd6fe; }
+.ahb-btn-ai:hover:not(:disabled) { background: #f5f3ff; color: #5b21b6; }
+.ahb-btn:disabled { opacity: .45; cursor: not-allowed; }
+.ahb-btn:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+
+/* Where the assistant's note lands. Lavender rather than the board's navy,
+   because it is the one voice on this page that is not the system talking -
+   it is the system explaining itself. */
+.ahb-ai-out { margin-top: 12px; padding: 12px 14px; background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 8px; }
+.ahb-ai-out h4 { margin: 0 0 6px; font-size: 11px; color: #5b21b6; text-transform: uppercase; letter-spacing: .04em; }
+.ahb-ai-out p { margin: 0 0 10px; font-size: 13px; color: #3b0764; line-height: 1.5; }
+.ahb-ai-out pre { margin: 0; font: inherit; font-size: 13px; color: #1e293b; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+.ahb-ai-out[data-busy="true"] { color: #6d28d9; }
+
+@media (max-width: 860px) {
+    .ahb-actions { justify-content: flex-start; flex-wrap: wrap; }
+    .ahb tbody tr[data-gate] { box-shadow: none; }
+    .ahb tbody tr[data-gate="waiting"] td:first-child { box-shadow: inset 3px 0 0 #d97706; }
+}
+
+/* ── Print ────────────────────────────────────────────────────────
+
+   Ctrl+P on this page prints the roster itself: no dialog, no template.
+   The head and the toolbar drop out; the table keeps its rules, because on
+   paper the ruling is what makes it readable as a list. */
 @media print {
     body[data-page="academic"] { background: #fff; }
     body[data-page="academic"] .dashboard-main { padding: 0; }

@@ -214,6 +214,15 @@ CREATE TABLE `academic_history` (
   -- gwa_agreement_check.php) keeps working untouched.
   `gwa_reported` decimal(5,2) DEFAULT NULL,
   `gwa_computed` decimal(5,2) DEFAULT NULL,
+  -- ── Acceptance (migrations/grade_acceptance.sql) ─────────────────
+  -- When the Registrar accepted this term for the section, and who. A
+  -- null accepted_at IS the waitlist - a term nobody has accepted reads
+  -- as outstanding - so there is no separate boolean to drift out of sync.
+  -- Deliberately on the term row, not on academic_grades.term_status:
+  -- that column describes a subject, and one per-subject copy of a term
+  -- fact could disagree with itself.
+  `accepted_at` timestamp NULL DEFAULT NULL,
+  `accepted_by` int(11)   DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_student_id` (`student_id`),
   CONSTRAINT `academic_history_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
