@@ -420,10 +420,15 @@ $courses = $db->fetchAll(
 $years = $db->fetchAll(
     "SELECT DISTINCT year_level FROM students WHERE year_level IS NOT NULL ORDER BY year_level"
 );
-$schoolYears = $db->fetchAll(
-    "SELECT DISTINCT school_year FROM students WHERE school_year IS NOT NULL AND school_year != '' ORDER BY school_year DESC"
-);
-$statusOptions = ['enrolled', 'active', 'probation', 'at-risk', 'loa', 'graduated', 'transferred', 'dropped'];
+// REMOVED 2026-10-04: the School Year and Status filters. $schoolYears (a
+// DISTINCT query on students) and $statusOptions existed only to populate
+// those two dropdowns, so they went with them rather than being left to run
+// a query whose result nothing reads.
+//
+// The ?school_year= and ?status= QUERY parameters still work - see the
+// filter parsing at the top of this file. A bookmark or a link from another
+// module that carries either one keeps filtering as it always did; it is
+// only the way to SET them from this page that is gone.
 
 // RFID lookup for the list column and the profile modal (student_id → card).
 //
@@ -1777,28 +1782,12 @@ body[data-page="masterlist"] .masterlist-table{min-width:1390px}
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <div class="form-group"><label>School Year</label>
-                        <select name="school_year" id="filterSchoolYear" class="form-control">
-                            <option value="">All</option>
-                            <?php foreach ($schoolYears as $row): ?>
-                                <option value="<?= htmlspecialchars($row['school_year']) ?>" <?= $filterSchoolYear === $row['school_year'] ? 'selected' : '' ?>><?= htmlspecialchars($row['school_year']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
                     <div class="form-group"><label>Semester</label>
                         <select name="semester" id="filterSemester" class="form-control">
                             <option value="">All</option>
                             <option value="1st" <?= $filterSemester === '1st' ? 'selected' : '' ?>>1st Sem</option>
                             <option value="2nd" <?= $filterSemester === '2nd' ? 'selected' : '' ?>>2nd Sem</option>
                             <option value="summer" <?= $filterSemester === 'summer' ? 'selected' : '' ?>>Summer</option>
-                        </select>
-                    </div>
-                    <div class="form-group"><label>Status</label>
-                        <select name="status" id="filterStatus" class="form-control">
-                            <option value="">All statuses</option>
-                            <?php foreach ($statusOptions as $st): ?>
-                                <option value="<?= $st ?>" <?= $filterStatus === $st ? 'selected' : '' ?>><?= ucfirst($st) ?></option>
-                            <?php endforeach; ?>
                         </select>
                     </div>
                     <div class="form-group"><label>Section</label>
@@ -3218,8 +3207,10 @@ async function sendList() {
 }
 
 .bulk-bar a { text-decoration: none; }
-/* Filter dropdowns should look clickable */
-#filterCourse, #filterYear, #filterSchoolYear, #filterSemester, #filterStatus, #filterSection,
+/* Filter dropdowns should look clickable. #filterSchoolYear and
+   #filterStatus are gone with their controls; the generic rule below
+   covers every select on the page anyway. */
+#filterCourse, #filterYear, #filterSemester, #filterSection,
 select.form-control { cursor: pointer !important; }
 
 /* Masterlist table styling */
