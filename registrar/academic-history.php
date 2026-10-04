@@ -332,9 +332,248 @@ if (defined('AH_SHOT_ROWS')) {
         ];
     }
     $visible = array_map(static fn($r) => ['id' => $r['id']], $rows);
+
+    // The acceptance board is built from $visible below, and the sample rows
+    // carry their section in $r['section'] rather than on the roster query.
+    // Without this the screenshot would show an empty board above a full
+    // roster, which is the one combination that cannot happen in production
+    // and would send whoever looked at it chasing a bug that is not there.
+    $sectionsByCode = [];
+    foreach ($rows as $r) {
+        $code = trim((string) ($r['section'] ?? ''));
+        if ($code === '') {
+            continue;
+        }
+        $sectionsByCode[$code][] = [
+            'name'     => $r['name'],
+            'number'   => $r['number'],
+            'gwa'      => $r['stored'],
+            'subjects' => $r['subjects'],
+        ];
+    }
 }
 
 $audit = termAudit($sy, $sem, $rosterForAudit);
+
+// ── Per-section acceptance gates ────────────────────────────────
+//
+// One section is the unit a registrar actually accepts. The gate itself is
+// sectionAcceptance() over that section's slice of the roster ALREADY BUILT
+// for the audit above - the same rows, the same termAudit(), so the Accept
+// button and the "Check this term" dialog cannot give opposite answers
+// about the same student.
+//
+// Acceptance stamps academic_history.accepted_at, which lives on the term
+// row, so "is this section done" is answered by one grouped query rather
+// than by re-deriving anything from the roster.
+if (!isset($sectionsByCode)) {
+    $sectionsByCode = [];
+    foreach ($visible as $v) {
+        $code = trim((string) ($v['section'] ?? ''));
+        if ($code === '') {
+            continue;
+        }
+        // program + NUL + code. The separator cannot appear in either half, and
+        // the key never reaches the browser except as this folder path, so
+        // there is nothing to escape.
+        $key = trim((string) ($v['program'] ?? '')) . "\0" . $code;
+        if (!isset($sectionsByCode[$key])) {
+            $sectionsByCode[$key] = [];
+        }
+        $sectionsByCode[$key][] = [
+            'section' => $code,
+            'program' => trim((string) ($v['program'] ?? '')),
+            // The roster query selects s.year_level UNALIASED, so the key here is
+            // year_level and not level. Reading 'level' returned null for every
+            // student, which put the whole board under one "Unassigned Year"
+            // folder - the tree rendered, and was silently lying about where
+            // these sections sat.
+            'level'   => trim((string) ($v['year_level'] ?? '')),
+            'name'     => trim($v['first_name'] . ' ' . $v['last_name']),
+            'number'   => (string) $v['student_number'],
+            'gwa'      => $termRecords[(int) $v['id']]['gwa'] ?? null,
+            'subjects' => (function ($sid) use ($termRecords, $termGrades) {
+                $rid = (int) ($termRecords[$sid]['id'] ?? 0);
+                $out = [];
+                foreach ($rid ? ($termGrades[$rid] ?? []) : [] as $g) {
+                    $out[] = [
+                        'units'        => (float) ($g['units'] ?? 0),
+                        'final_rating' => $g['final_rating'],
+                        'grade_status' => (string) ($g['grade_status'] ?? ''),
+                    ];
+                }
+                return $out;
+            })((int) $v['id']),
+        ];
+    }
+}
+
+$acceptedSections = [];
+if ($sectionsByCode && $sy !== '') {
+    // Grouped by program as well as section. Grouping by section alone summed
+    // BSIT's and BSCS's acceptances into one number, which is the same merge
+    // one level up, and it would have reported a section fully accepted while
+    // half of it was not.
+    foreach ($db->fetchAll(
+        "SELECT s.course, s.section, COUNT(*) AS stamped
+           FROM academic_history ah
+           JOIN students s ON s.id = ah.student_id
+          WHERE ah.school_year = ? AND ah.semester = ? AND ah.accepted_at IS NOT NULL
+          GROUP BY s.course, s.section",
+        [$sy, $sem]
+    ) as $a) {
+        $acceptedSections[trim((string) $a['course']) . "\0" . trim((string) $a['section'])] = (int) $a['stamped'];
+    }
+}
+
+// ── The board tree: program → year → section ─────────────────
+//
+// A SECTION CODE IS NOT AN IDENTITY. It is scoped by program + year level +
+// term (DEPARTMENTS.md), so BSCS 11001 and BSIT 11001 are two different
+// sections that happen to share five characters. Keying the board on the bare
+// code merged them: one row, four students, two cohorts, and one Accept click
+// that would have accepted both.
+//
+// So the key is program + code throughout, and the TREE is what makes that
+// visible rather than a hidden detail of a query: a folder per program, a
+// folder per year inside it, and the sections inside that. Two folders can
+// hold the same label at the same depth without colliding, which is exactly
+// the case the nesting was needed for.
+//
+// The gate itself is still per SECTION. Program and year folders are
+// navigation, not decisions - they carry counts and roll up their children's
+// standing, and they have no Accept button, because accepting a program is not
+// a thing this office does.
+$sectionGates = [];
+foreach ($sectionsByCode as $key => $members) {
+    $code    = $members[0]['section'];
+    $gate    = sectionAcceptance($sy, $sem, $members);
+    $stamped = $acceptedSections[$key] ?? 0;
+
+    // The students of this section, as the ledger rows the sheet and the
+    // printer already read. They live INSIDE the section row rather than in
+    // a roster of their own, so there is one table on the page and one place
+    // to look. The row is the section because the section is what gets
+    // accepted; the students are what it is accepted over.
+    //
+    // Matched on program AND code. Matching on the code alone pulled BSCS's
+    // 11001 students into BSIT's 11001 row.
+    $students = [];
+    foreach ($rows as $r) {
+        if (trim((string) ($r['section'] ?? '')) !== $code
+            || trim((string) ($r['program'] ?? '')) !== $members[0]['program']) {
+            continue;
+        }
+        $students[] = $r;
+    }
+    usort($students, static fn($a, $b) => strcasecmp($a['name'], $b['name']));
+
+    $sectionGates[$key] = [
+        'key'         => $key,
+        'code'        => $code,
+        'program'     => $members[0]['program'],
+        'year'        => (int) $members[0]['level'],
+        'label'       => ahProgramShort($members[0]['program']),
+        'roster'      => count($members),
+        'stamped'     => $stamped,
+        'can_accept'  => $gate['can_accept'],
+        'state'       => $stamped > 0 ? 'accepted' : $gate['state'],
+        'summary'     => $gate['summary'],
+        'blocking'    => $gate['blocking'],
+        'advisory'    => $gate['advisory'],
+        'students'    => $students,
+        // Students with no term row at all. Named, because "4 of 5" does not
+        // tell a registrar who to chase, and a roster student with no record
+        // is the one case the grade checker will never report.
+        'no_term_row' => array_values(array_map(
+            static fn($m) => $m['name'],
+            array_filter($members, static fn($m) => !$m['subjects'])
+        )),
+    ];
+}
+
+// ── The folders ───────────────────────────────────────────────
+//
+// program → year → section, three levels, built by nesting rather than by a
+// tree walk at render time. Every level is a ROLL-UP of the level below it, so
+// a folder's figures are its children's own and cannot disagree with them.
+//
+// The roll-up standing is the one worth stating. A folder is 'accepted' only
+// when every section inside it is accepted, and 'waiting' as soon as one is.
+// The weaker state wins: a program whose Year 1 is done and Year 2 is not is
+// not done, and printing it green because most of it is green would be the
+// board reassuring the wrong person.
+$boardTree = [];
+// NOT $program. The page already has a $program - the roster FILTER from
+// ?program= - and it is read further down at "In view / All programs". A
+// loop over $program and an unset($program) at the end destroyed the filter,
+// so the summary strip rendered "All programs" on every load and logged a
+// warning. The loop uses its own names and the reference is broken with [].
+foreach ($sectionGates as $gate) {
+    $progKey = $gate['program'] !== '' ? $gate['program'] : 'Unassigned Program';
+    $yearKey = $gate['year'] >= 1 ? 'Year ' . $gate['year'] : 'Unassigned Year';
+
+    if (!isset($boardTree[$progKey])) {
+        $boardTree[$progKey] = ['name' => $progKey, 'label' => ahProgramShort($progKey), 'years' => []];
+    }
+    if (!isset($boardTree[$progKey]['years'][$yearKey])) {
+        $boardTree[$progKey]['years'][$yearKey] = ['name' => $yearKey, 'sections' => []];
+    }
+    $boardTree[$progKey]['years'][$yearKey]['sections'][] = $gate;
+}
+
+/**
+ * One folder's counts and standing, from its sections.
+ *
+ * @param  array $sections Section gates.
+ * @return array
+ */
+function ah_folder_rollup(array $sections): array
+{
+    $roster  = array_sum(array_column($sections, 'roster'));
+    $stamped = array_sum(array_column($sections, 'stamped'));
+    $waiting = array_filter($sections, static fn($s) => $s['state'] !== 'accepted');
+
+    // 'ready' on a folder would invite someone to look for an Accept button
+    // that does not exist, so a folder that is not fully accepted says
+    // 'waiting' whatever the mix. Only the SECTION carries 'ready'.
+    $state = $stamped > 0 && !$waiting ? 'accepted' : 'waiting';
+    if ($sections && !array_filter($sections, static fn($s) => $s['roster'] > 0)) {
+        $state = 'empty';
+    }
+
+    return [
+        'sections' => count($sections),
+        'roster'   => $roster,
+        'stamped'  => $stamped,
+        'state'    => $state,
+        // The count of sections still blocking, which is the number a
+        // registrar can act on from a closed folder.
+        'waiting'  => $waiting ? count($waiting) : 0,
+    ];
+}
+
+ksort($boardTree);
+// Broken with [] rather than unset($name): PHP's foreach-by-reference leaves
+// the loop variable pointing at the last element, and a plain unset() of a
+// name the page already uses elsewhere is how the $program filter above was
+// destroyed once already.
+foreach ($boardTree as &$treeProgram) {
+    ksort($treeProgram['years']);
+    $allSections = [];
+    foreach ($treeProgram['years'] as &$treeYear) {
+        // Sections sorted by CODE. They arrived in the roster's ORDER BY, which
+        // is by student name, so a year read as 21001, 11001, 11002 - the tree
+        // looked shuffled and the codes are the only order a reader can predict.
+        usort($treeYear['sections'], static fn($a, $b) => strcmp($a['code'], $b['code']));
+        $treeYear['roll'] = ah_folder_rollup($treeYear['sections']);
+        $allSections = array_merge($allSections, $treeYear['sections']);
+    }
+    unset($treeYear);
+    $treeProgram['roll'] = ah_folder_rollup($allSections);
+}
+unset($treeProgram);
+
 
 // Career GWA across every term on file for the filtered roster, so the
 // figure someone remembers can be checked against what is actually held.
@@ -662,173 +901,355 @@ include '../includes/sidebar.php';
     </p>
 <?php endif; ?>
 
-<?php // The roster panel. The term and the find box live in its toolbar,
-        // where the other registrar pages put their filters.
-//
-// The form carries NO submit button. It commits itself when a value is
-// committed (change, or Enter), which removes a control without removing
-// the ability to change term — two separate problems, one of which needed
-// a control. ?>
-<section class="panel">
-    <form class="panel-toolbar" method="get" action="academic-history.php" id="termForm">
-        <div class="panel-title">
-            <i class="fa-solid fa-list-check" aria-hidden="true"></i>
-            Roster
-        </div>
+<?php // The ACCEPTANCE BOARD. This is the whole page.
+        //
+        // There was a roster table here before, one row per student, with the
+        // sections nowhere on it. It is gone, and its students now hang off the
+        // section rows below. Two reasons, and the second is the real one:
+        //
+        //   1. A section is what gets accepted, so a page that listed students
+        //      made the user count students to work out sections.
+        //   2. The same students in two tables is the same facts in two places,
+        //      free to disagree - and the count above would have had to be
+        //      reconciled against the list under it.
+        //
+        // So: one table, section rows, students nested. Opening a section is
+        // how you see who is in it.
+        //
+        // The gate on each row is computed server-side by sectionAcceptance()
+        // over the same roster the audit uses. Nothing here decides anything -
+        // api/grade-acceptance.php recomputes the identical gate before it
+        // stamps anything, so a stale page cannot accept a section that has
+        // since lost a grade.
+        //
+        // The term box and the find box are HERE rather than in a toolbar of
+        // their own, because there is no second panel to own them any more.
+        // The form carries no submit button; it commits on change or Enter.
+        ?>
+        <section class="panel" aria-labelledby="boardTitle">
+            <form class="panel-toolbar" method="get" action="academic-history.php" id="termForm">
+                <div class="panel-title" id="boardTitle">
+                    <i class="fa-solid fa-stamp" aria-hidden="true"></i>
+                    Sections
+                </div>
 
-        <div class="header-actions">
-            <div class="form-group" style="margin:0">
-                <label class="ah-sr-only" for="fltTerm">Term</label>
-                <input
-                    class="form-control"
-                    type="text"
-                    id="fltTerm"
-                    name="term"
-                    value="<?= htmlspecialchars($termCanonical) ?>"
-                    placeholder="2026-2028 1st"
-                    autocomplete="off"
-                    spellcheck="false"
-                    style="width:190px"
-                    aria-describedby="termHelp"
-                >
-            </div>
-            <span class="ah-sr-only" id="termHelp">
-                School year and semester, in any order. For example 2026-2028 1st.
-            </span>
-
-            <div class="form-group" style="margin:0;position:relative">
-                <label class="ah-sr-only" for="rosterSearch">Find in this term</label>
-                <input
-                    class="form-control"
-                    type="search"
-                    id="rosterSearch"
-                    placeholder="Search by name, number, program…"
-                    autocomplete="off"
-                    spellcheck="false"
-                    style="width:260px"
-                >
-            </div>
-        </div>
-    </form>
-
-<?php if (!$visible): ?>
-        <div class="table-responsive">
-            <table class="table">
-                <tbody>
-                <tr><td>
-                    <div class="ah-empty-state">
-                        <i class="fa-solid fa-folder-open" aria-hidden="true"></i>
-                        <?php if ($program !== '' || $section !== ''): ?>
-                            <p>No students match these filters</p>
-                            <span>The program and section together match nobody.</span>
-                        <?php else: ?>
-                            <p>No active students in this term</p>
-                            <span>Archived students are left out of this page on purpose.</span>
-                        <?php endif; ?>
+                <div class="header-actions">
+                    <div class="form-group" style="margin:0">
+                        <label class="ah-sr-only" for="fltTerm">Term</label>
+                        <input
+                            class="form-control"
+                            type="text"
+                            id="fltTerm"
+                            name="term"
+                            value="<?= htmlspecialchars($termCanonical) ?>"
+                            placeholder="2026-2028 1st"
+                            autocomplete="off"
+                            spellcheck="false"
+                            style="width:190px"
+                            aria-describedby="termHelp"
+                        >
                     </div>
-                </td></tr>
-                </tbody>
-            </table>
-        </div>
-<?php else: ?>
-    <div class="table-responsive">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th scope="col">Student</th>
-                    <th scope="col" class="ah-col-opt">Program</th>
-                    <th scope="col" class="ah-col-sec" data-num>Units</th>
-                    <th scope="col" class="ah-col-sec" data-num>Subjects</th>
-                    <th scope="col" data-num>Term GWA</th>
-                    <th scope="col">Record</th>
-                    <?php // The sr-only text goes INSIDE the cell. Putting the
-                    // class on the <th> itself hides the header cell too and
-                    // leaves a grey block over the column with no label. ?>
-                    <th scope="col"><span class="ah-sr-only">Open</span></th>
-                </tr>
-            </thead>
-<?php foreach ($rows as $r): ?>
-                <?php
-                // Lower is better on this scale, so the bands run the
-                // opposite way round from a school average.
-                $band = 'none';
-                if ($r['gwa'] !== null) {
-                    $band = $r['gwa'] < GWA_AT_RISK - 0.5 ? 'good'
-                          : ($r['gwa'] < GWA_AT_RISK ? 'warn' : 'poor');
-                }
-                $stateLabel = [
-                    'complete' => 'Complete',
-                    'partial'  => $r['missing'] . ' missing',
-                    'none'     => 'Not received',
-                ][$r['state']];
-                ?>
-                <tr data-ah-row
-                    data-student="<?= (int) $r['id'] ?>"
-                    data-search="<?= htmlspecialchars(strtolower(implode(' ', [
-                        $r['name'], $r['number'], $r['program'],
-                        $r['level'], $r['section'],
-                    ]))) ?>">
+                    <span class="ah-sr-only" id="termHelp">
+                        School year and semester, in any order. For example 2026-2028 1st.
+                    </span>
 
-                    <td>
-                        <div class="ah-id-cell">
-                            <?php // The name is now plain text. It used to be a
-                            // disclosure button that expanded the record in a
-                            // row beneath the student; the record opens in a
-                            // sheet instead, from the View button, so a name
-                            // that looks clickable but is not would be a lie.
-                            // It keeps the same weight and colour the button had,
-                            // so the row still scans the same way. ?>
-                            <span class="ah-name"><?= htmlspecialchars($r['name']) ?></span>
-                            <span class="ah-num"><?= htmlspecialchars($r['number'] !== '' ? $r['number'] : 'No number on file') ?></span>
-                        </div>
-                    </td>
+                    <div class="form-group" style="margin:0;position:relative">
+                        <label class="ah-sr-only" for="rosterSearch">Find in this term</label>
+                        <input
+                            class="form-control"
+                            type="search"
+                            id="rosterSearch"
+                            placeholder="Search students…"
+                            autocomplete="off"
+                            spellcheck="false"
+                            style="width:230px"
+                        >
+                    </div>
+                </div>
+            </form>
 
-                    <td class="ah-muted ah-col-opt">
-                        <?= htmlspecialchars(ahProgramShort($r['program']) ?: '—') ?>
-                    </td>
-                    <td data-num class="ah-fig ah-col-sec">
-                        <?= $r['units'] > 0
-                            ? rtrim(rtrim(number_format($r['units'], 2), '0'), '.')
-                            : '—' ?>
-                    </td>
-                    <td data-num class="ah-fig ah-col-sec">
-                        <?= count($r['subjects']) ?: '—' ?>
-                    </td>
-                    <td data-num>
-                        <span class="ah-gwa" data-band="<?= $band ?>">
-                            <?= $r['gwa'] === null ? '—' : number_format($r['gwa'], 2) ?>
-                        </span>
-                    </td>
-                    <td>
-                        <span class="status-badge ah-state" data-state="<?= $r['state'] ?>">
-                            <span class="status-dot"></span><?= $stateLabel ?>
-                        </span>
-                    </td>
-                    <td class="ah-act">
-                        <button class="ah-view" type="button" data-view="<?= (int) $r['id'] ?>"
-                                aria-label="Open the term record for <?= htmlspecialchars($r['name']) ?>">
-                            View
+            <p class="ahb-why ahb-caption">
+                <?= htmlspecialchars(termLabel($sy, $sem)) ?> &middot;
+                a section accepts once every student has a grade for every
+                subject on their record
+                <span class="ahb-expand">
+                    <button class="ahb-link" type="button" data-expand-all>Expand all</button>
+                    <button class="ahb-link" type="button" data-collapse-all>Collapse all</button>
+                </span>
+            </p>
+
+            <?php if (!$sectionGates): ?>
+                <div class="ah-empty-state">
+                    <i class="fa-solid fa-folder-open" aria-hidden="true"></i>
+                    <p>No sections to accept yet</p>
+                    <span>
+                        Sections are assigned from the Masterlist. Students with no
+                        section are not in any section, so nothing here can be accepted.
+                    </span>
+                </div>
+            <?php else: ?>
+            <div class="table-responsive">
+                <table class="ahb">
+                    <thead>
+                        <tr>
+                            <th scope="col">Section</th>
+                            <th scope="col">Students</th>
+                            <th scope="col">Accepted</th>
+                            <th scope="col">Standing</th>
+                            <th scope="col"><span class="ah-sr-only">Actions</span></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+<?php // Three levels, ONE table. The depth is carried by a class rather than
+        // by nesting tables, so every level shares one set of column widths -
+        // nested tables would give each its own, and a folder's figures would
+        // not line up with its sections'.
+        //
+        // The two folder levels carry NO Accept button. Acceptance is per
+        // section; "accept the whole program" is not an act this office
+        // performs, and a button there would be a promise the API does not keep.
+        foreach ($boardTree as $program):
+            $pPath = 'p|' . $program['name'];
+            $pRoll = $program['roll'];
+            $pPct  = $pRoll['roster'] > 0 ? (int) round(100 * $pRoll['stamped'] / $pRoll['roster']) : 0;
+        ?>
+            <tr class="ahb-folder" data-level="1" data-folder="<?= htmlspecialchars($pPath) ?>">
+                <td class="ahb-name">
+                    <button class="ahb-caret" type="button" data-caret="<?= htmlspecialchars($pPath) ?>"
+                            aria-expanded="true" aria-controls="<?= htmlspecialchars(md5($pPath)) ?>"
+                            title="Hide this program">
+                        <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                        <span class="ah-sr-only">Hide <?= htmlspecialchars($program['label']) ?></span>
+                    </button>
+                    <i class="fa-solid fa-folder ahb-folder-icon" aria-hidden="true"></i>
+                    <span class="ahb-label"><?= htmlspecialchars($program['label']) ?></span>
+                    <span class="ahb-sub"><?= $pRoll['sections'] ?> section<?= $pRoll['sections'] === 1 ? '' : 's' ?></span>
+                </td>
+                <td class="ahb-count"><?= $pRoll['roster'] ?></td>
+                <td class="ahb-count">
+                    <span class="ahb-num"><?= $pRoll['stamped'] ?> / <?= $pRoll['roster'] ?></span>
+                    <span class="ahb-meter<?= $pPct >= 100 ? ' is-full' : '' ?>" role="img"
+                          aria-label="<?= $pRoll['stamped'] ?> of <?= $pRoll['roster'] ?> accepted">
+                        <i style="width:<?= $pPct ?>%"></i>
+                    </span>
+                </td>
+                <td>
+                    <span class="ahb-chip" data-state="<?= $pRoll['state'] ?>">
+                        <span class="status-dot" aria-hidden="true"></span><?= $pRoll['state'] === 'accepted' ? 'All accepted' : 'Waitlist' ?>
+                    </span>
+                    <span class="ahb-why"><?= $pRoll['waiting'] === 0
+                        ? 'Every section accepted.'
+                        : $pRoll['waiting'] . ' section' . ($pRoll['waiting'] === 1 ? '' : 's') . ' still waiting' ?></span>
+                </td>
+                <td></td>
+            </tr>
+
+            <?php foreach ($program['years'] as $year):
+                $yPath = $pPath . '/y|' . $year['name'];
+                $yRoll = $year['roll'];
+                $yPct  = $yRoll['roster'] > 0 ? (int) round(100 * $yRoll['stamped'] / $yRoll['roster']) : 0;
+            ?>
+                <tr class="ahb-folder" data-level="2" data-folder="<?= htmlspecialchars($yPath) ?>"
+                    data-parent="<?= htmlspecialchars($pPath) ?>">
+                    <td class="ahb-name">
+                        <button class="ahb-caret" type="button" data-caret="<?= htmlspecialchars($yPath) ?>"
+                                aria-expanded="true" aria-controls="<?= htmlspecialchars(md5($yPath)) ?>"
+                                title="Hide this year">
+                            <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                            <span class="ah-sr-only">Hide <?= htmlspecialchars($year['name']) ?></span>
                         </button>
+                        <i class="fa-solid fa-folder ahb-folder-icon" aria-hidden="true"></i>
+                        <span class="ahb-label"><?= htmlspecialchars($year['name']) ?></span>
+                        <span class="ahb-sub"><?= $yRoll['sections'] ?> section<?= $yRoll['sections'] === 1 ? '' : 's' ?></span>
                     </td>
+                    <td class="ahb-count"><?= $yRoll['roster'] ?></td>
+                    <td class="ahb-count">
+                        <span class="ahb-num"><?= $yRoll['stamped'] ?> / <?= $yRoll['roster'] ?></span>
+                        <span class="ahb-meter<?= $yPct >= 100 ? ' is-full' : '' ?>" role="img"
+                              aria-label="<?= $yRoll['stamped'] ?> of <?= $yRoll['roster'] ?> accepted">
+                            <i style="width:<?= $yPct ?>%"></i>
+                        </span>
+                    </td>
+                    <td>
+                        <span class="ahb-chip" data-state="<?= $yRoll['state'] ?>">
+                            <span class="status-dot" aria-hidden="true"></span><?= $yRoll['state'] === 'accepted' ? 'All accepted' : 'Waitlist' ?>
+                        </span>
+                        <span class="ahb-why"><?= $yRoll['waiting'] === 0
+                            ? 'Every section accepted.'
+                            : $yRoll['waiting'] . ' section' . ($yRoll['waiting'] === 1 ? '' : 's') . ' still waiting' ?></span>
+                    </td>
+                    <td></td>
                 </tr>
+
+                <?php foreach ($year['sections'] as $g):
+                    $sPath = $yPath . '/s|' . $g['key'];
+                    $pct   = $g['roster'] > 0 ? (int) round(100 * $g['stamped'] / $g['roster']) : 0;
+                    $standing = [
+                        'accepted' => 'Accepted',
+                        'ready'    => 'Ready to accept',
+                        'waiting'  => 'Waitlist',
+                        'empty'    => 'Nothing received',
+                    ][$g['state']];
+                    // The waitlist reason, in the registrar's words. A bare count
+                    // ("3 issues") would send someone to the audit dialog to find
+                    // out what they actually are.
+                    $why = $g['state'] === 'waiting'
+                        ? sprintf('%d to resolve: %s', count($g['blocking']),
+                                   htmlspecialchars((string) ($g['blocking'][0]['title'] ?? '')))
+                        : ($g['state'] === 'empty'
+                            ? 'No subjects recorded'
+                            : htmlspecialchars($g['summary']));
+                ?>
+                    <tr class="ahb-leaf" data-level="3" data-gate="<?= $g['state'] ?>"
+                        data-section="<?= htmlspecialchars($g['key']) ?>"
+                        data-program="<?= htmlspecialchars($g['program']) ?>"
+                        data-code="<?= htmlspecialchars($g['code']) ?>"
+                        data-parent="<?= htmlspecialchars($yPath) ?>">
+                        <td class="ahb-name">
+                            <button class="ahb-caret" type="button" data-caret="<?= htmlspecialchars($sPath) ?>"
+                                    aria-expanded="false" aria-controls="<?= htmlspecialchars(md5($sPath)) ?>"
+                                    title="Show this section's students">
+                                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+                                <span class="ah-sr-only">Show students in <?= htmlspecialchars($g['code']) ?></span>
+                            </button>
+                            <span class="ahb-code"><?= htmlspecialchars($g['code']) ?></span>
+                            <span class="ahb-sub"><?= $g['roster'] ?> student<?= $g['roster'] === 1 ? '' : 's' ?></span>
+                        </td>
+                        <td class="ahb-count"><?= $g['roster'] ?></td>
+                        <td class="ahb-count">
+                            <span class="ahb-num"><?= $g['stamped'] ?> / <?= $g['roster'] ?></span>
+                            <span class="ahb-meter<?= $pct >= 100 ? ' is-full' : '' ?>" role="img"
+                                  aria-label="<?= $g['stamped'] ?> of <?= $g['roster'] ?> accepted">
+                                <i style="width:<?= $pct ?>%"></i>
+                            </span>
+                        </td>
+                        <td>
+                            <span class="ahb-chip" data-state="<?= $g['state'] ?>">
+                                <span class="status-dot" aria-hidden="true"></span><?= $standing ?>
+                            </span>
+                            <span class="ahb-why"><?= $why ?></span>
+                        </td>
+                        <td>
+                            <div class="ahb-actions">
+                                <button class="ahb-btn ahb-btn-ai" type="button"
+                                        data-ai="<?= htmlspecialchars($g['key']) ?>"
+                                        <?= $g['state'] === 'waiting' ? '' : 'hidden' ?>>
+                                    <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+                                    Draft a chaser
+                                </button>
+                                <?php if ($g['state'] === 'accepted'): ?>
+                                    <button class="ahb-btn ahb-btn-reopen" type="button"
+                                            data-reopen="<?= htmlspecialchars($g['key']) ?>">
+                                        Reopen
+                                    </button>
+                                <?php else: ?>
+                                    <?php // Disabled, not hidden, and titled with the
+                                    // reason. See .ahb-btn in the stylesheet. ?>
+                                    <button class="ahb-btn ahb-btn-accept" type="button"
+                                            data-accept="<?= htmlspecialchars($g['key']) ?>"
+                                            <?= $g['can_accept'] ? '' : 'disabled' ?>
+                                            title="<?= $g['can_accept']
+                                                ? 'Accept this section for ' . htmlspecialchars(termLabel($sy, $sem))
+                                                : 'Not ready: ' . htmlspecialchars($g['summary']) ?>">
+                                        Accept section
+                                    </button>
+                                <?php endif; ?>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <?php // The section's students, one collapsible group per
+                    // section. This is where the standalone roster went: one
+                    // table on the page, and opening a section is how you see
+                    // who is in it.
+                    //
+                    // data-search carries the section code and program too, so
+                    // typing a code finds the students under it. Before the
+                    // folders the row carried them; the haystack is what
+                    // remembers. ?>
+                    <tr class="ahb-group" id="<?= htmlspecialchars(md5($sPath)) ?>"
+                        data-parent="<?= htmlspecialchars($sPath) ?>" hidden>
+                        <td colspan="5">
+                            <table class="ahb-students">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Student</th>
+                                        <th scope="col" class="ah-col-sec" data-num>Units</th>
+                                        <th scope="col" class="ah-col-sec" data-num>Subjects</th>
+                                        <th scope="col" data-num>Term GWA</th>
+                                        <th scope="col">Record</th>
+                                        <th scope="col"><span class="ah-sr-only">Open</span></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                <?php foreach ($g['students'] as $sr):
+                                    $sBand = 'none';
+                                    if ($sr['gwa'] !== null) {
+                                        $sBand = $sr['gwa'] < GWA_AT_RISK - 0.5 ? 'good'
+                                               : ($sr['gwa'] < GWA_AT_RISK ? 'warn' : 'poor');
+                                    }
+                                    $sLabel = [
+                                        'complete' => 'Complete',
+                                        'partial'  => $sr['missing'] . ' missing',
+                                        'none'     => 'Not received',
+                                    ][$sr['state']];
+                                ?>
+                                    <tr data-ah-row data-student="<?= (int) $sr['id'] ?>"
+                                        data-search="<?= htmlspecialchars(strtolower($sr['name'] . ' ' . $sr['number'] . ' ' . $g['code'] . ' ' . $g['program'])) ?>">
+                                        <td>
+                                            <span class="ahb-sname"><?= htmlspecialchars($sr['name']) ?></span>
+                                            <span class="ahb-sub"><?= htmlspecialchars($sr['number'] ?: 'No number on file') ?></span>
+                                        </td>
+                                        <td class="ahb-count"><?= $sr['units'] > 0 ? $sr['units'] : '&mdash;' ?></td>
+                                        <td class="ahb-count"><?= count($sr['subjects']) ?: '&mdash;' ?></td>
+                                        <td class="ahb-count">
+                                            <span class="ah-gwa" data-band="<?= $sBand ?>">
+                                                <?= $sr['gwa'] === null ? '&mdash;' : number_format($sr['gwa'], 2) ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="status-badge ah-state" data-state="<?= $sr['state'] ?>">
+                                                <span class="status-dot"></span><?= $sLabel ?>
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <button class="ah-view" type="button" data-view="<?= (int) $sr['id'] ?>"
+                                                    aria-label="Open the term record for <?= htmlspecialchars($sr['name']) ?>">
+                                                View
+                                            </button>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
             <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
+        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
 
-    <div class="ah-panel-foot">
-        Showing <?= count($visible) ?> of <?= count($roster) ?>
-        student<?= count($visible) === 1 ? '' : 's' ?> in
-        <?= htmlspecialchars(termLabel($sy, $sem)) ?>.
-    </div>
+            <?php // Where the assistant's note lands. Populated per section on
+            // demand; empty until a registrar asks for one. ?>
+            <div class="ahb-ai-out" id="ahbAiOut" hidden>
+                <h4>For the College of Computer Studies</h4>
+                <p id="ahbAiNote"></p>
+                <pre id="ahbAiMsg"></pre>
+            </div>
 
-    <div class="ah-empty-state" data-ah-nomatch hidden>
-        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
-        <p>No student matches that</p>
-        <span></span>
-    </div>
-<?php endif; ?>
-</section>
+            <?php // The no-match state. It lives here rather than beside the
+            // search box because the sections it did not match are still on
+            // screen and still decidable: a search that hid the board would
+            // take the acceptance decision away with it. ?>
+            <div class="ah-empty-state" data-ah-nomatch hidden>
+                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                <p>No student matches that</p>
+                <span></span>
+            </div>
+            <?php endif; ?>
+        </section>
 
 <?php // The panel and the container close here, before the sheet, which
 // lives outside the page flow so it is not announced until it is opened. ?>
@@ -1154,42 +1575,70 @@ function closeRecord() {
 
 // ── Search within the term ────────────────────────────────────
 // Program and section used to be dropdowns that reloaded the page on every
-// change. Searching the roster in place is faster for the way this screen is
-// actually used: a registrar is looking for one student in a term they are
-// already on, not browsing a taxonomy.
+// change. Searching in place is faster for the way this screen is actually
+// used: a registrar is looking for one student in a term they are already
+// on, not browsing a taxonomy.
 //
 // Words are OR'd rather than AND'd, so "bsit a" finds every BSIT student in
 // section A. AND-ing is what people expect from a file dialog and never what
 // they expect from a name box, where "mendoza" alone must work.
+//
+// THE FOLDERS ARE NOT OPTIONAL HERE. The students live three levels down, so
+// a match inside a collapsed program is a match nobody can see. A search
+// therefore opens every ANCESTOR of every hit - the year, the program, and the
+// section - and clears the box to hand the board back as it was.
+//
+// It does not hide the folders themselves. Sections that did not match stay on
+// screen and stay decidable; hiding the board would take the acceptance
+// decision away with it.
 (function () {
     const input = document.getElementById('rosterSearch');
     const nomatch = document.querySelector('[data-ah-nomatch]');
-    const table = document.querySelector('.table');
-    if (!input || !table) return;
+    const board = document.querySelector('.ahb');
+    if (!input || !board) return;
 
-    const rows = Array.from(table.querySelectorAll('tr[data-ah-row]'));
+    const groups = Array.from(board.querySelectorAll('tr.ahb-group'));
+    const rows = groups.flatMap(g => Array.from(g.querySelectorAll('tr[data-ah-row]')));
     const total = rows.length;
+    const carets = Array.from(board.querySelectorAll('.ahb-caret'));
+
+    // The shape a section was before a search touched it, so the tree can go
+    // back. Captured once, on load: re-capturing on every keystroke would
+    // record the search's own state and the box could never be undone.
+    const remembered = new Map();
+    carets.forEach(c => remembered.set(c.dataset.caret, c.getAttribute('aria-expanded') === 'true'));
 
     function apply() {
         const terms = input.value.toLowerCase().split(/\s+/).filter(Boolean);
         let shown = 0;
 
-        rows.forEach(row => {
-            // The haystack is precomputed server-side, so this stays off the
-            // row's own text - which would break the moment a cell contained
-            // markup.
-            const hay = row.dataset.search || '';
-            const hit = terms.length === 0 || terms.some(t => hay.includes(t));
-            row.hidden = !hit;
-
-            // Nothing to hide alongside the row any more. This used to also
-            // hide the expanded record under it, so a filtered-out student
-            // could not leave an orphaned record showing. The record is in a
-            // sheet now and the sheet follows whoever is open, not whoever is
-            // visible, so there is no pairing left to maintain.
-
-            if (hit) shown++;
+        groups.forEach(grp => {
+            grp.querySelectorAll('tr[data-ah-row]').forEach(row => {
+                // The haystack is precomputed server-side, so this stays off the
+                // row's own text - which would break the moment a cell contained
+                // markup. It carries the section code and program too, so typing
+                // either finds the students under it.
+                const hay = row.dataset.search || '';
+                const hit = terms.length === 0 || terms.some(t => hay.includes(t));
+                row.hidden = !hit;
+                if (hit) shown++;
+            });
         });
+
+        if (terms.length === 0) {
+            // Back to how the registrar left it.
+            carets.forEach(c => ahbSetOpen(c.dataset.caret, remembered.get(c.dataset.caret) === true));
+        } else {
+            // Open the ancestors of every hit, and leave the rest shut.
+            const hits = new Set();
+            groups.forEach(grp => {
+                if (grp.querySelector('tr[data-ah-row]:not([hidden])')) {
+                    let p = grp.dataset.parent;
+                    while (p) { hits.add(p); const cut = p.lastIndexOf('/'); p = cut === -1 ? '' : p.slice(0, cut); }
+                }
+            });
+            carets.forEach(c => ahbSetOpen(c.dataset.caret, hits.has(c.dataset.caret)));
+        }
 
         if (nomatch) {
             nomatch.hidden = shown !== 0;
@@ -1369,6 +1818,300 @@ function openAudit() {
 
 function closeAudit() { closeDialog('auditModal'); }
 
+// ── The acceptance board ───────────────────────────────────────
+//
+// Three actions, one fetch helper. The gate is never consulted in the
+// browser: the row was rendered server-side from the same termAudit() the
+// API uses, and a client-side recheck would only ever agree with a stale
+// page. The API recomputes and refuses with 409 if the section has since
+// stopped being acceptable, and that refusal is rendered as-is.
+const ahb = {
+    busy: null,
+
+    async call(action, section, program) {
+        if (this.busy) return;
+        this.busy = action + ':' + program + ':' + section;
+        try {
+            const res = await fetch('../api/grade-acceptance.php?action=' + action, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': AH.csrf,
+                },
+                // program is REQUIRED, not a nicety. The section code alone does
+                // not identify a section - BSIT 11001 and BSCS 11001 are two
+                // sections - so an accept without it would stamp both cohorts.
+                body: JSON.stringify({
+                    action: action, sy: AH.sy, sem: AH.sem,
+                    section: section, program: program,
+                }),
+            });
+            return { ok: res.ok, data: await res.json() };
+        } finally {
+            this.busy = null;
+        }
+    },
+};
+
+// A section row re-rendered from the server's own answer. Reloading the page
+// is deliberately NOT what happens here: a registrar accepting six sections
+// would lose the term they had selected six times, and the board is the one
+// page where staying put matters.
+//
+// The row is found by section AND program. Matching on the code alone picked
+// whichever of the two 11001 rows came first in the DOM, so accepting BSCS's
+// section would have repainted BSIT's.
+function ahbRepaintRow(section, program, data) {
+    const tr = document.querySelector(
+        '.ahb tbody tr[data-section="' + CSS.escape(section) + '"]'
+        + '[data-program="' + CSS.escape(program) + '"]');
+    if (!tr) return;
+
+    const state = data.state || 'waiting';
+    tr.dataset.gate = state;
+
+    const chip = tr.querySelector('.ahb-chip');
+    if (chip) {
+        chip.dataset.state = state;
+        chip.innerHTML = '<span class="status-dot" aria-hidden="true"></span>'
+            + ({ accepted: 'Accepted', ready: 'Ready to accept',
+                 waiting: 'Waitlist', empty: 'Nothing received' }[state] || state);
+    }
+
+    const why = tr.querySelector('.ahb-why');
+    if (why) {
+        why.textContent = data.summary
+            || (state === 'waiting'
+                ? ((data.blocking || []).length + ' to resolve')
+                : '');
+    }
+
+    const cells = tr.querySelectorAll('.ahb-count');
+    const stamped = cells.length > 1 && cells[1];
+    const roster  = cells.length > 0 && cells[0];
+    if (stamped && roster && typeof data.roster === 'number') {
+        // The figure lives in its own span so it can be replaced as text.
+        // Patching childNodes[0] worked only while the markup kept its exact
+        // whitespace, which is not a thing worth relying on.
+        const num = stamped.querySelector('.ahb-num');
+        if (num) num.textContent = data.stamped + ' / ' + data.roster;
+        const meter = stamped.querySelector('.ahb-meter');
+        const bar = meter ? meter.querySelector('i') : null;
+        if (meter && bar) {
+            const pct = data.roster > 0 ? Math.round(100 * data.stamped / data.roster) : 0;
+            bar.style.width = pct + '%';
+            meter.classList.toggle('is-full', pct >= 100);
+            meter.setAttribute('aria-label', data.stamped + ' of ' + data.roster + ' accepted');
+        }
+    }
+
+    // Swap Reopen for Accept rather than toggling: an accepted section's
+    // Accept button would be a no-op that still stamps timestamps.
+    const actions = tr.querySelector('.ahb-actions');
+    if (!actions) return;
+    const label = document.createElement('span');
+    label.className = 'ah-sr-only';
+    label.textContent = state === 'accepted'
+        ? 'Accepted. Reopen to put this section back on the waitlist.'
+        : 'Accept this section.';
+
+    if (state === 'accepted') {
+        actions.innerHTML = '';
+        actions.appendChild(ahbButton('Reopen', 'ahb-btn-reopen', 'data-reopen', section, program));
+        actions.appendChild(label);
+    } else {
+        actions.innerHTML = '';
+        const btn = ahbButton('Accept section', 'ahb-btn-accept', 'data-accept', section, program);
+        if (data.can_accept !== true) {
+            btn.disabled = true;
+            btn.title = 'Not ready: ' + (data.summary || 'grades are missing');
+        }
+        actions.appendChild(btn);
+        actions.appendChild(label);
+    }
+}
+
+function ahbButton(text, cls, attr, value, program) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ahb-btn ' + cls;
+    b.setAttribute(attr, value);
+    b.dataset.program = program;
+    b.textContent = text;
+    return b;
+}
+
+// One sentence saying what happened, and where the gaps are. Never a bare
+// "done": accepting 4 of 5 because one student has no record is the case a
+// registrar most needs spelled out after the click.
+function ahbSay(msg) {
+    let el = document.getElementById('ahbSay');
+    if (!el) {
+        el = document.createElement('p');
+        el.id = 'ahbSay';
+        el.className = 'ah-notice';
+        el.setAttribute('role', 'status');
+        const board = document.querySelector('.ahb');
+        if (board && board.parentNode) board.parentNode.insertBefore(el, board.nextSibling);
+    }
+    el.innerHTML = '<i class="fa-solid fa-circle-info" aria-hidden="true"></i> ' + esc(msg);
+}
+
+// Accept. The button is disabled while in flight rather than removed, so the
+// row does not jump and a double-click cannot stamp the same section twice.
+async function ahbAccept(section, program, btn) {
+    if (btn.disabled) return;
+    const label = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Accepting…';
+
+    const r = await ahb.call('accept', section, program);
+    btn.textContent = label;
+
+    if (!r) return;                       // a call was already in flight
+    if (!r.ok) {
+        // 409 means the section stopped being acceptable between this page
+        // rendering and the click - a grade was withdrawn, or a student was
+        // added to the section. Repaint from the server's verdict rather than
+        // showing a stale "ready" row that would let the click be repeated.
+        ahbRepaintRow(section, program, r.data);
+        ahbSay(r.data.message || 'This section could not be accepted.');
+        return;
+    }
+
+    ahbRepaintRow(section, program, {
+        state: 'accepted',
+        can_accept: false,
+        summary: r.data.summary,
+        stamped: r.data.stamped,
+        roster: r.data.roster,
+        blocking: [],
+    });
+
+    const gaps = r.data.no_term_row || [];
+    ahbSay(gaps.length
+        ? r.data.summary + ' No record on file yet for ' + gaps.join(', ') + '.'
+        : r.data.summary);
+    ahbRollUp();
+}
+
+async function ahbReopen(section, program, btn) {
+    btn.disabled = true;
+    const r = await ahb.call('reopen', section, program);
+    btn.disabled = false;
+    if (!r) return;
+    if (!r.ok) { ahbSay(r.data.message || 'That section could not be reopened.'); return; }
+
+    ahbRepaintRow(section, program, {
+        state: r.data.state,
+        can_accept: r.data.can_accept,
+        summary: r.data.summary,
+        blocking: r.data.blocking || [],
+    });
+    ahbSay(r.data.summary);
+    ahbRollUp();
+}
+
+// The folder counts above a section change when that section is accepted or
+// reopened. Recomputed here from the rows on screen rather than by patching
+// numbers, so a folder cannot drift from the sections it is a roll-up of.
+//
+// The standing is the WEAKER state: a folder whose sections are all accepted
+// is accepted, and one waiting anywhere is waiting. That matches
+// ah_folder_rollup() on the server, and the two would otherwise print
+// different words for the same folder.
+function ahbRollUp() {
+    document.querySelectorAll('.ahb-folder').forEach(folder => {
+        const path = folder.dataset.folder;
+        const depth = parseInt(folder.dataset.level, 10);
+        const leaves = Array.from(document.querySelectorAll(
+            '.ahb tbody tr[data-parent="' + CSS.escape(path) + '"]'))
+            .filter(tr => tr.classList.contains('ahb-leaf') || tr.dataset.level === String(depth + 1));
+
+        if (!leaves.length) return;
+
+        const roster  = leaves.reduce((n, tr) => n + parseInt(tr.children[1].textContent.trim(), 10), 0);
+        const stamped = leaves.reduce((n, tr) => {
+            const m = tr.querySelector('.ahb-num');
+            return n + (m ? parseInt(m.textContent.trim().split('/')[0], 10) : 0);
+        }, 0);
+        const waiting = leaves.filter(tr => tr.dataset.gate !== 'accepted').length;
+
+        const num = folder.querySelector('.ahb-num');
+        if (num) num.textContent = stamped + ' / ' + roster;
+        const meter = folder.querySelector('.ahb-meter');
+        const bar = meter ? meter.querySelector('i') : null;
+        if (meter && bar) {
+            const pct = roster > 0 ? Math.round(100 * stamped / roster) : 0;
+            bar.style.width = pct + '%';
+            meter.classList.toggle('is-full', pct >= 100);
+            meter.setAttribute('aria-label', stamped + ' of ' + roster + ' accepted');
+        }
+        const cells = folder.querySelectorAll('.ahb-count');
+        if (cells.length) cells[0].textContent = roster;
+
+        const chip = folder.querySelector('.ahb-chip');
+        const why  = folder.querySelector('.ahb-why');
+        const state = waiting === 0 ? 'accepted' : 'waiting';
+        if (chip) {
+            chip.dataset.state = state;
+            chip.innerHTML = '<span class="status-dot" aria-hidden="true"></span>'
+                + (state === 'accepted' ? 'All accepted' : 'Waitlist');
+        }
+        if (why) {
+            why.textContent = waiting === 0
+                ? 'Every section accepted.'
+                : waiting + ' section' + (waiting === 1 ? '' : 's') + ' still waiting';
+        }
+    });
+}
+
+// The assistant explains the findings; it never clears them.
+//
+// A failure here leaves the deterministic findings on the row untouched, which
+// is the whole reason the gate does not live behind this button. The message
+// says which happened, because an empty panel with no error reads as a bug.
+async function ahbDraft(section, btn) {
+    const out  = document.getElementById('ahbAiOut');
+    const note = document.getElementById('ahbAiNote');
+    const msg  = document.getElementById('ahbAiMsg');
+    if (!out || !note || !msg) return;
+
+    btn.disabled = true;
+    out.hidden = false;
+    out.dataset.busy = 'true';
+    note.textContent = 'Reading section ' + section + '…';
+    msg.textContent = '';
+    out.scrollIntoView({ block: 'nearest' });
+
+    try {
+        const res = await fetch('../api/grade-chaser-ai.php?action=explain', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': AH.csrf,
+            },
+            body: JSON.stringify({ sy: AH.sy, sem: AH.sem, section: section }),
+        });
+        const d = await res.json();
+
+        if (!d.success && !d.note) {
+            note.textContent = d.message || 'The assistant is unavailable right now.';
+            msg.textContent = (d.blocking || []).map(b => '• ' + b.title + ' — ' + b.detail).join('\n');
+            return;
+        }
+        note.textContent = d.note || '';
+        msg.textContent = d.message || '';
+    } catch (err) {
+        note.textContent = 'The assistant could not be reached. The findings on the row are the real check.';
+        msg.textContent = '';
+    } finally {
+        out.dataset.busy = 'false';
+        btn.disabled = false;
+    }
+}
+
+
 // ── Wiring ────────────────────────────────────────────────────
 // One delegated listener for the whole page. Rows are created and hidden
 // constantly by the filter, so per-element listeners would have to be
@@ -1412,9 +2155,98 @@ document.addEventListener('click', e => {
     }
     const audit = e.target.closest('[data-audit]');
     if (audit) { openAudit(); return; }
+
+    // ── Acceptance board ─────────────────────────────────────────
+    // Delegated with the rest of the page so a repainted row - whose buttons
+    // are built in JS - is wired without re-binding anything.
+    const accept = e.target.closest('[data-accept]');
+    if (accept) { ahbAccept(accept.dataset.accept, accept.dataset.program, accept); return; }
+
+    const reopen = e.target.closest('[data-reopen]');
+    if (reopen) { ahbReopen(reopen.dataset.reopen, reopen.dataset.program, reopen); return; }
+
+    const draft = e.target.closest('[data-ai]');
+    if (draft) { ahbDraft(draft.dataset.ai, draft); return; }
+
+    // The caret opens or closes ONE row's children. A program folder's children
+    // are its year rows; a year's are its section rows; a section's are its
+    // students. Hiding is by ANCESTOR, not by direct parent, so closing a
+    // program hides every year, section and student beneath it rather than
+    // leaving the section rows visible with nothing above them.
+    const caret = e.target.closest('[data-caret]');
+    if (caret) {
+        ahbSetOpen(caret.dataset.caret, !ahbIsOpen(caret.dataset.caret));
+        return;
+    }
+
+    // Expand all / Collapse all. Two controls rather than one toggle, because
+    // "the other state" is not something a reader has to guess at.
+    const all = e.target.closest('[data-expand-all]');
+    if (all) { ahbSetOpen(null, true); return; }
+    const none = e.target.closest('[data-collapse-all]');
+    if (none) { ahbSetOpen(null, false); return; }
+
     const closer = e.target.closest('[data-close-dialog]');
     if (closer) { closeDialog(closer.dataset.closeDialog); }
 });
+
+// Is this path currently open? Read off the DOM rather than kept in a map, so
+// the state a caret announces cannot disagree with what is on screen.
+function ahbIsOpen(path) {
+    const caret = document.querySelector('.ahb-caret[data-caret="' + CSS.escape(path) + '"]');
+    return !!caret && caret.getAttribute('aria-expanded') === 'true';
+}
+
+// Open or close one folder, or every folder when path is null.
+//
+// Remembered on each row as data-was-open so a search that opened things can
+// hand the board back the way it found it. Without that, searching and then
+// clearing would leave the tree somewhere the registrar never put it.
+function ahbSetOpen(path, open) {
+    const board = document.querySelector('.ahb');
+    if (!board) return;
+
+    if (path === null) {
+        board.querySelectorAll('.ahb-caret').forEach(c => {
+            ahbApplyCaret(c, open);
+            ahbHideDescendants(c.dataset.caret, open);
+        });
+        return;
+    }
+
+    const caret = document.querySelector('.ahb-caret[data-caret="' + CSS.escape(path) + '"]');
+    if (!caret) return;
+    ahbApplyCaret(caret, open);
+    ahbHideDescendants(path, open);
+}
+
+function ahbApplyCaret(caret, open) {
+    caret.setAttribute('aria-expanded', open ? 'true' : 'false');
+    const verb = open ? 'Hide' : 'Show';
+    caret.title = verb + (caret.closest('.ahb-leaf') ? " this section's students"
+                       : caret.dataset.level === '1' ? ' this program' : ' this year');
+}
+
+// Every row under this path, at any depth.
+function ahbHideDescendants(path, open) {
+    document.querySelectorAll('.ahb [data-parent]').forEach(row => {
+        let p = row.dataset.parent;
+        // data-parent is a slash-separated path, so a prefix test on the
+        // separator is what keeps a program from hiding a DIFFERENT program's
+        // year whose name happens to start the same way.
+        while (p) {
+            if (p === path) {
+                row.hidden = !open;
+                if (row.classList.contains('ahb-group')) {
+                    row.dataset.wasOpen = open ? '1' : '0';
+                }
+                return;
+            }
+            const cut = p.lastIndexOf('/');
+            p = cut === -1 ? '' : p.slice(0, cut);
+        }
+    });
+}
 
 // Escape closes whichever dialog is open, and only when one is.
 //
@@ -1649,9 +2481,18 @@ function printOfficial(studentId, scope) {
 const GRADE_TEMPLATE_CSS = [
     '.doc-h2 { font-size:11pt; font-weight:700; letter-spacing:.5px;',
     '           margin:16px 0 6px; text-align:center; }',
-    '.gt-ident { width:100%; border-collapse:collapse; margin-bottom:6px; }',
+    // The identity block is a 4-column table (label/value/label/value). Left
+    // on auto layout, the program string in the last cell claims 308px of the
+    // 700px page and starves the middle value column to 84px — "October 4,
+    // 2026" and the student's name wrap onto two lines and jam against the
+    // next label, which reads as "Terms on file1 of 2" with no gap. Fixed
+    // layout plus explicit widths give both value columns the same 28%, so
+    // every value sits on one line no matter how long the program name is.
+    '.gt-ident { width:100%; border-collapse:collapse; margin-bottom:6px;',
+    '             table-layout:fixed; }',
     '.gt-ident td { padding:3px 6px; font-size:10pt; vertical-align:top; }',
     '.gt-k { font-weight:700; width:22%; white-space:nowrap; }',
+    '.gt-ident td:nth-child(2), .gt-ident td:nth-child(4) { width:28%; }',
     '.gt-term-head { font-size:10.5pt; font-weight:700; text-align:center;',
     '                margin:14px 0 5px; padding:3px 0;',
     '                border-top:1px solid #000; border-bottom:1px solid #000; }',

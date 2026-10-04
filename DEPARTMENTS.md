@@ -33,6 +33,7 @@ have not moved and nothing was dropped; what changed is which office may
 | `academic_grades` (subjects, units, ratings, status) | Faculty #296 | Read-only |
 | `academic_history` (term, semester, school year) | Faculty #296 | Read-only |
 | Computed GWA | Registrar | **Computed here, from the recorded ratings** |
+| **Accepting a section's term** | **Registrar** | **Decided here, after reading** |
 | Printable grade record / template | Registrar | Produced here |
 
 Concretely, in this repository:
@@ -47,6 +48,57 @@ Concretely, in this repository:
 - `js/bcp-letterhead.js` is the shared letterhead used by both the AI Insight
   report and the printable grade record.
 
+### Section acceptance — the Registrar accepts, Faculty sends
+
+**Settled 2026-10-04.** Faculty owns the grades; the Registrar owns the
+decision to accept a section's term. The two are separate acts and the
+boundary runs between them, not through them.
+
+A section accepts only when **every student on its roster has a grade for
+every subject recorded against them** for that term. One blank rating
+blocks the whole section. That is deliberate: a partially graded term is
+not a term with a gap in it, it is a document that would be issued while
+part of the cohort is missing from it.
+
+| | |
+|---|---|
+| Sending grades | Faculty #296 |
+| Accepting a section's term | **Registrar #292** |
+| Deciding the gate | Deterministic — `termAudit()` |
+| Reopening an acceptance | Registrar, unconditionally |
+
+**The gate is not a second opinion.** `sectionAcceptance()` in
+`shared/term_grades.php` returns `termAudit()`'s own blocking list rather
+than recomputing completeness, so the Accept button and the "Check this
+term" dialog cannot give opposite answers about the same student. Two
+functions deciding "is this term finished" could disagree, and the one that
+is wrong would be the one gating a signature.
+
+**Advisory findings do not block.** A term GWA of 3.00 is a fact about a
+student's performance; a missing rating is a hole in the record. Only the
+second makes the document unsafe to sign, and refusing to accept a
+complete but poor term would be this office making a decision about a
+student that is not its own.
+
+**Where the flag lives, and why.** `academic_history.accepted_at` and
+`accepted_by`, from `migrations/grade_acceptance.sql`. Not the existing
+`academic_grades.term_status`: that column describes a **subject** row,
+while acceptance is a fact about a **term** shared by every subject under
+it. A per-subject copy of a term fact could disagree with itself, which is
+the same failure `gwa_reported`/`gwa_computed` exists to prevent. A null
+`accepted_at` *is* the waitlist, so there is no boolean to drift.
+
+**The gate is recomputed on every accept call.** `api/grade-acceptance.php`
+never trusts a verdict from the request body, so a section that lost a grade
+since the page rendered answers **409** rather than accepting on a stale
+page.
+
+**The AI feature explains; it never decides.** `api/grade-chaser-ai.php`
+is handed the findings `termAudit()` already produced and asked to explain
+them and draft a note to faculty. It cannot move the gate, writes nothing,
+and its `can_accept` echo is server-recomputed on every accept. A model's
+opinion is not a registrar's signature.
+
 **Why computed GWA stays ours.** Once Faculty owns the grades, a number typed
 in two places is a number that can disagree. `academic_history` therefore
 carries `gwa_reported` (Faculty's) and `gwa_computed` (ours, from
@@ -59,6 +111,13 @@ that admits there are two.
 read path is source-agnostic (`source_system` / `source_ref` / `faculty_id` /
 `received_at`, see `migrations/grades_faculty_source.sql`) so that an API sync
 or a file import can be attached later without changing the pages above.
+
+**Still true after section acceptance was added.** There is no faculty-facing
+portal and no importer; `academic_grades` rows exist on a real database only
+because `tests/seed_official_grades.php` put them there. The acceptance board
+therefore renders its empty state on a fresh install, and that is the correct
+reading of it: there is no sender yet. The read path and the gate above were
+both built to take the data without changing when it arrives.
 
 ### Note on "Section" — RESOLVED: the Masterlist assigns sections
 
@@ -432,6 +491,77 @@ See `SYSTEM_FLOW.md` §5 and
 `clearances` — zero code references, and a **different table** from the
 now-also-removed `exit_clearances`. Dropped by an earlier migration. Backed up
 first.
+
+## A section is program + code, not code
+
+**Settled 2026-10-04.** A section code is scoped by **program + year level +
+term**, so `BSIT 11001` and `BSCS 11001` are two different sections that share
+five characters. Everything keyed on a section keys on **both**:
+
+| Where | Keyed on |
+|---|---|
+| Board row, gate, accept/reopen | `program` + `section` |
+| `grade_acceptance_roster()` | `s.course = ?` AND `s.section = ?` |
+| The accept / reopen `UPDATE` | same subquery, both columns |
+| The chaser endpoint | splits the board's `program\0code` key |
+| Accepted-count query | `GROUP BY s.course, s.section` |
+
+This was a live bug, not a theoretical one. Keyed on the code alone, the board
+merged BSIT 11001 and BSCS 11001 into one row of five students across two
+cohorts — and one Accept click would have stamped `accepted_at` on both
+programs' term rows. The seed
+(`php tests/seed_section_acceptance.php --execute`) plants that exact collision
+so the case is exercised rather than assumed, and `tests/term_grades_check.php`
+asserts the cohorts narrow to `2 in BSCS + 3 in BSIT = 5`.
+
+**The NUL separator.** The board keys a section as `program\0code` internally.
+PHP's `trim()` strips NUL **by default** — its character list starts
+`" \t\n\r\0\x0B"` — so a `trim()` on the raw value turns `BSIT\011001` into
+`BSIT011001`, which matches nothing. Both endpoints read the raw value, split
+first, and trim the halves.
+
+## Academic History is a section board, not a roster
+
+**Changed 2026-10-04.** The page nests **program → year → section**, and each
+section's students open underneath it. There is no standalone roster table.
+
+The section is the unit this office accepts, so a page that listed students
+made a registrar count students to work out which block they were looking
+at. More importantly, the same students in two tables is the same facts in
+two places — and the count in the summary strip would have had to be
+reconciled against the list under it.
+
+Four rules, recorded here because they are the ones a later change could
+quietly undo:
+
+1. **Program and year are navigation, not decisions.** They carry rolled-up
+   counts and a standing, and they have **no Accept button**. Acceptance is per
+   section; "accept the whole program" is not an act this office performs.
+2. **A folder's standing is the WEAKER state inside it.** A program is
+   accepted only when every section under it is. A program with Year 1 done
+   and Year 2 waiting reads as waiting — printing it green because most of it
+   is green would reassure the wrong person. `ah_folder_rollup()` computes it
+   server-side and `ahbRollUp()` recomputes it in the browser from the rows on
+   screen; the two must not be allowed to disagree.
+3. **Three levels, ONE table.** Depth is an indent class, not nested tables,
+   so every level shares one set of column widths and a folder's figures line
+   up with its sections'.
+4. **Closing a folder hides its whole subtree**, by ancestor path rather than
+   by direct parent — otherwise closing a program left its year and section
+   rows visible with nothing above them.
+
+Consequences of removing the roster table:
+
+- **Students are reachable, not removed.** Each section row carries a caret
+  that opens its students, with the same Units / Subjects / GWA / Record
+  columns and the same `View` button into the record sheet and the printable
+  record. Removing the roster table did not remove any of that.
+- **Search opens what it finds.** A search match inside a collapsed section
+  is a match nobody can see, so searching *opens* every section holding a hit
+  and re-closes them when the box is cleared.
+- **A search does not hide the sections.** Sections that did not match stay
+  on screen and stay decidable. Hiding the board would take the acceptance
+  decision away with it.
 
 ## Print convention
 

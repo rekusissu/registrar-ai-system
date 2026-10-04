@@ -567,3 +567,58 @@ function termAudit(string $sy, string $sem, array $students, array $opts = []): 
         ],
     ];
 }
+
+/**
+ * Whether the Registrar may accept this section's term, and if not, why not.
+ *
+ * The gate is termAudit()'s own blocking list, not a second opinion about
+ * completeness. Two functions deciding "is this term finished" could
+ * disagree, and the one that is wrong would be the one gating a signature.
+ *
+ * ADVISORY FINDINGS DO NOT BLOCK. A term GWA of 3.00 is a fact about a
+ * student's performance; a missing rating is a hole in the record. Only
+ * the second one makes the document unsafe to sign.
+ *
+ * @param  string $sy       School year being accepted.
+ * @param  string $sem      Semester being accepted.
+ * @param  array  $students Roster rows, same shape termAudit() takes.
+ * @param  array  $opts     Forwarded to termAudit() (['min_units' => float]).
+ * @return array            [
+ *                              'can_accept'  => bool,
+ *                              'state'       => 'ready'|'waiting'|'empty',
+ *                              'summary'     => string,
+ *                              'blocking'    => array,
+ *                              'advisory'    => array,
+ *                              'stats'       => array,
+ *                          ]
+ */
+function sectionAcceptance(string $sy, string $sem, array $students, array $opts = []): array
+{
+    $audit    = termAudit($sy, $sem, $students, $opts);
+    $blocking = $audit['blocking'];
+
+    // 'empty' is called out separately from 'waiting' because the response
+    // is different: an empty section needs a subject list built before
+    // anyone can be chased, where a waiting section needs a grade chased.
+    if (!$students) {
+        $state   = 'empty';
+        $summary = 'No students on this section for ' . termLabel($sy, $sem) . '.';
+    } elseif ($blocking) {
+        $state   = 'waiting';
+        $summary = count($blocking) . ' thing'
+                 . (count($blocking) === 1 ? '' : 's')
+                 . ' to resolve before this section can be accepted.';
+    } else {
+        $state   = 'ready';
+        $summary = $audit['summary'];
+    }
+
+    return [
+        'can_accept'  => $blocking === [] && $students !== [],
+        'state'       => $state,
+        'summary'     => $summary,
+        'blocking'    => $blocking,
+        'advisory'    => $audit['advisory'],
+        'stats'       => $audit['stats'],
+    ];
+}

@@ -163,11 +163,55 @@ if ($filteredOut) {
         $fail++;
         printf("  FAIL  empty view offers no way out\n");
     }
-} elseif (strpos($html, '<table class="table">') !== false) {
-    printf("  ok    roster table present\n");
+} elseif (strpos($html, '<table class="ahb">') !== false
+       || strpos($html, 'No sections to accept yet') !== false) {
+    // The board replaced the standalone roster. Two things are accepted here:
+    // a rendered board, OR the empty state - this harness renders the LIVE
+    // database, which on this host holds no sectioned students at all, and the
+    // empty state is the correct reading of that, not a missing board.
+    //
+    // What must be true either way is that students remain REACHABLE. A page
+    // that only listed sections, with no way to open one and read a record,
+    // would have dropped the roster's only real job without replacing it.
+    printf("  ok    section board present\n");
+    $reachable = (int) substr_count($html, 'data-student=');
+    structure(
+        'the board reaches students, or says there are none',
+        $reachable > 0
+            ? substr_count($html, 'class="ahb-group"') === substr_count($html, 'data-level="3"')
+            : strpos($html, 'No sections to accept yet') !== false,
+        $reachable > 0
+            ? $reachable . ' students reachable under their sections'
+            : 'no sections on this database - empty state shown'
+    );
+    // The folders. Program → year → section, and every level's children must
+    // point back at it by path, or closing a folder leaves orphans on screen.
+    if (strpos($html, 'ahb-folder') !== false) {
+        structure(
+            'the board nests program, then year, then section',
+            substr_count($html, 'data-level="1"') > 0
+            && substr_count($html, 'data-level="2"') > 0
+            && substr_count($html, 'data-level="3"') > 0,
+            substr_count($html, 'data-level="1"') . ' program(s), '
+            . substr_count($html, 'data-level="2"') . ' year(s), '
+            . substr_count($html, 'data-level="3"') . ' section(s)'
+        );
+        structure(
+            'every folder has a caret that names the level it opens',
+            // Counted on class="ahb-caret" rather than data-caret=, because the
+            // script below also contains the literal 'data-caret="' in its
+            // selectors, and matching markup against the script's own source
+            // counts rows that were never rendered.
+            substr_count($html, 'class="ahb-caret"')
+                === substr_count($html, 'data-level="1"')
+                 + substr_count($html, 'data-level="2"')
+                 + substr_count($html, 'data-level="3"'),
+            substr_count($html, 'class="ahb-caret"') . ' carets'
+        );
+    }
 } else {
     $fail++;
-    printf("  FAIL  roster table missing\n");
+    printf("  FAIL  neither the roster, the board, nor its empty state is present\n");
 }
 
 // The GWA must not be editable anywhere. It is computed; a field for it
@@ -233,18 +277,38 @@ $fetchCalls = [];
 if (preg_match_all('/fetch\(\s*[\'"]([^\'"]+)/', $pageScript, $m)) {
     $fetchCalls = $m[1];
 }
+
+// The rule this page is built on: it may not WRITE A GRADE. Grades belong to
+// Faculty Management #296, so no call from here may reach a grade-writing
+// action. Two write endpoints are legitimately allowed and neither touches a
+// grade: api/grade-acceptance.php stamps the fact that a registrar accepted a
+// TERM (academic_history.accepted_at), and api/grade-chaser-ai.php only reads.
+// Both are named explicitly so a NEW endpoint cannot slip through on the
+// strength of being one of "the allowed ones".
+$ALLOWED_WRITES = [
+    '../api/grade-acceptance.php?action=',
+    '../api/grade-chaser-ai.php?action=explain',
+];
 $offenders = array_values(array_filter(
     $fetchCalls,
-    static fn($u) => !str_contains($u, 'action=save-academic')
+    static fn($u) => !in_array($u, $ALLOWED_WRITES, true)
+        && !str_contains($u, 'action=save-academic')
 ));
-if ($offenders) {
+$gradeWrites = array_values(array_filter(
+    $fetchCalls,
+    static fn($u) => str_contains($u, 'save-academic') || str_contains($u, 'delete-academic')
+));
+if ($gradeWrites) {
+    $fail++;
+    printf("  FAIL  the page writes a grade: %s\n", implode(', ', $gradeWrites));
+} elseif ($offenders) {
     $fail++;
     printf("  FAIL  the page calls another endpoint: %s\n", implode(', ', $offenders));
 } elseif (count($fetchCalls) === 0) {
     $fail++;
     printf("  FAIL  no fetch call found; the assertion is not testing anything\n");
 } else {
-    printf("  ok    the only write call is save-academic\n");
+    printf("  ok    the only writes are the acceptance gate and the chaser; no grade is written\n");
 }
 
 // The audit drawer in particular must not reach the network at all: it
