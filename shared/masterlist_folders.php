@@ -62,6 +62,17 @@
 //     email to a department, and reached by Back. A tree that
 //     only exists in a JS variable has none of those.
 //
+// Plus one rule added later, which the four above do not cover:
+//
+//  5. THE CATALOGUE IS THE SHAPE; THE DATA FILLS IT IN.
+//     mlf_seed_catalogue() gives every OFFERED program a folder and
+//     every program all four year levels, whatever the rows say.
+//     Without it a folder only appears once it holds something, and
+//     "where is BSCpE?" and "does BSCpE have no Year 3?" print the
+//     same empty screen - and the second question is the one a
+//     registrar actually asks while chasing a missing cohort.
+//     Seeding adds FOLDERS, never rows, so rule 1 still holds.
+//
 //  Pure functions. The database stays in the page and the API,
 //  so this file is unit tested without one — the grouping rules
 //  are the part worth pinning.
@@ -197,13 +208,24 @@ function mlf_build_tree(array $students): array
         $tree[$program]['years'][$year]['sections'][$section]['students'][] = $student;
     }
 
-    // Sort every level so the tree reads the same way twice. The
-    // "Unassigned" folders sort last regardless of their names:
-    // they are the work queue, not part of the cohort order, and
-    // "Unassigned Section" sitting between 11001 and 11002 is
-    // noise. Sorting by name alone cannot express that, so the key
-    // is partitioned first and only the real folders are sorted
-    // among themselves.
+    return mlf_sort_tree($tree);
+}
+
+/**
+ * Sort every level of a folder tree, so it reads the same way twice.
+ *
+ * The "Unassigned" folders sort last regardless of their names: they
+ * are the work queue, not part of the cohort order, and "Unassigned
+ * Section" sitting between 11001 and 11002 is noise. Sorting by name
+ * alone cannot express that, so the key is partitioned first and only
+ * the real folders are sorted among themselves.
+ *
+ * Extracted from mlf_build_tree() because mlf_seed_catalogue() adds
+ * folders AFTER the tree is built, and those have to end up in the
+ * same order. One ordering rule, not two that drift apart.
+ */
+function mlf_sort_tree(array $tree): array
+{
     $orderKeys = static function (array $keys): array {
         $isMissing = static fn($k) => strpos((string) $k, 'Unassigned') === 0;
         $real = array_values(array_filter($keys, static fn($k) => !$isMissing($k)));
@@ -247,7 +269,118 @@ function mlf_build_tree(array $students): array
     ksort($tree);
     return $reorder($tree);
 }
-    /**
+/**
+ * Give every offered program a folder, and every program all four
+ * year levels.
+ *
+ * The catalogue is the shape and the rows are what fills it in, so a
+ * program nobody has enrolled yet is still navigable and still
+ * reports zero rather than being missing. Years are named 'Year 1'..
+ * 'Year 4' to match mlf_path_segments(), so a seeded folder and a
+ * folder built from a row resolve to the SAME path - otherwise
+ * 'BSIT/Year 3' would 404 on the way to an empty year.
+ *
+ * An acronym typed into `students.course` ("BSIT") is folded onto the
+ * catalogue entry that owns it ("BACHELOR OF SCIENCE IN INFORMATION
+ * TECHNOLOGY (BSIT)"), so the root lists one BSIT rather than a
+ * catalogue BSIT beside a data BSIT - the same fold Academic History
+ * does, and the reason it is worth doing here too.
+ *
+ * A program that is NOT in the catalogue still keeps its own folder:
+ * renaming a course does not delete its students, and a row whose
+ * program cannot be recognised must not become unreachable.
+ *
+ * @param  array  $tree     From mlf_build_tree().
+ * @param  array  $programs Catalogue program names (getOfferedCourses()).
+ * @return array  The same tree shape, with folders added. Counts are
+ *                never invented: a seeded folder carries 0.
+ */
+function mlf_seed_catalogue(array $tree, array $programs): array
+{
+    // Acronym → catalogue name. First entry to claim one wins; no two
+    // catalogue entries share an acronym, so a collision is a catalogue
+    // problem rather than something to resolve silently here.
+    $byAcronym = [];
+    foreach ($programs as $program) {
+        $program = (string) $program;
+        $acro    = mlf_acronym($program);
+        if ($acro !== $program && !isset($byAcronym[$acro])) {
+            $byAcronym[$acro] = $program;
+        }
+    }
+
+    // Fold a data folder filed under an acronym onto its catalogue
+    // owner, merging counts and years rather than leaving two folders.
+    foreach (array_keys($tree) as $key) {
+        $owner = $byAcronym[(string) $key] ?? null;
+        if ($owner === null || $owner === (string) $key || !isset($tree[$owner])) {
+            continue;
+        }
+        $tree[$owner]['count'] += (int) $tree[$key]['count'];
+        foreach ($tree[$key]['years'] as $year => $yearNode) {
+            if (!isset($tree[$owner]['years'][$year])) {
+                $tree[$owner]['years'][$year] = $yearNode;
+                continue;
+            }
+            $tree[$owner]['years'][$year]['count'] += (int) $yearNode['count'];
+            foreach ($yearNode['sections'] as $section => $sectionNode) {
+                if (isset($tree[$owner]['years'][$year]['sections'][$section])) {
+                    $tree[$owner]['years'][$year]['sections'][$section]['count'] += (int) $sectionNode['count'];
+                    $tree[$owner]['years'][$year]['sections'][$section]['students'] =
+                        array_merge(
+                            $tree[$owner]['years'][$year]['sections'][$section]['students'],
+                            $sectionNode['students']
+                        );
+                    continue;
+                }
+                $tree[$owner]['years'][$year]['sections'][$section] = $sectionNode;
+            }
+        }
+        unset($tree[$key]);
+    }
+
+    // Every OFFERED program gets a folder...
+    foreach ($programs as $program) {
+        $program = (string) $program;
+        if (!isset($tree[$program])) {
+            $tree[$program] = ['name' => $program, 'count' => 0, 'years' => []];
+        }
+    }
+
+    // And ALL FOUR YEAR LEVELS inside every program, not just the
+    // offered ones. A year folder that only appears once it holds
+    // something is a folder the reader cannot navigate past, and a
+    // renamed program asks "does it have a Year 3?" exactly as an
+    // offered one does. Each starts with no sections, so a year with
+    // nothing in it reports zero rather than being absent.
+    foreach (array_keys($tree) as $existing) {
+        for ($y = 1; $y <= 4; $y++) {
+            $year = 'Year ' . $y;
+            if (!isset($tree[$existing]['years'][$year])) {
+                $tree[$existing]['years'][$year] = ['name' => $year, 'count' => 0, 'sections' => []];
+            }
+        }
+    }
+
+    // Re-sort, because a catalogue added out of order would otherwise
+    // leave the root reading however the array happened to be built.
+    return mlf_sort_tree($tree);
+}
+
+/** The acronym in brackets at the end of a degree title, or '' if there is none. */
+function mlf_acronym(string $program): string
+{
+    $program = trim($program);
+    if ($program === '') {
+        return '';
+    }
+    if (preg_match('/\(([A-Za-z0-9]{2,10})\)\s*$/', $program, $m)) {
+        return strtoupper($m[1]);
+    }
+    return $program;
+}
+
+/**
  * Walk to one folder and describe what is inside it.
  *
  * This is the whole of the navigation. The page is a browser, not

@@ -125,6 +125,12 @@ function mlf_request_filters(): array
     $filters  = mlf_request_filters();
     $students = mlf_load_students($filters);
     $tree     = mlf_build_tree($students);
+
+    // The same catalogue seeding the Masterlist page applies, so a path
+    // that resolves on screen resolves here too. See the page for why
+    // the catalogue is the shape rather than the rows.
+    $tree = mlf_seed_catalogue($tree, array_keys(getOfferedCourses()));
+
     $path     = isset($_GET['path']) ? trim((string) $_GET['path']) : '';
 
     // ─── TREE ─────────────────────────────────────────────

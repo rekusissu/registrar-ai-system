@@ -193,4 +193,171 @@ final class MasterlistFoldersDataTest extends TestCase
         self::assertSame([], mlf_sections_under([], ''));
         self::assertSame([], mlf_resolve([], '')['folders']);
     }
+
+    /**
+     * THE CATALOGUE IS THE SHAPE; THE ROWS FILL IT IN.
+     *
+     * A folder that only exists once it holds something is a folder the
+     * reader cannot navigate past: "where is BSCpE?" and "does BSCpE
+     * have no Year 3?" would print the same empty screen, and only the
+     * second question is one a registrar actually asks. Academic
+     * History's board is built this way, and a masterlist that cannot
+     * show a missing cohort is a masterlist that cannot report one.
+     */
+    public function testEveryOfferedProgramGetsAFolderEvenWithNoStudents(): void
+    {
+        $catalogue = [
+            'BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY (BSIT)',
+            'BACHELOR OF SCIENCE IN COMPUTER ENGINEERING (BSCpE)',
+        ];
+
+        $node = mlf_resolve(mlf_seed_catalogue([], $catalogue), '');
+
+        self::assertSame(
+            ['BACHELOR OF SCIENCE IN COMPUTER ENGINEERING (BSCpE)',
+             'BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY (BSIT)'],
+            array_column($node['folders'], 'name'),
+            'a program nobody has enrolled yet still gets a folder'
+        );
+    }
+
+    /** Four year levels per program, always, and named the way the paths are. */
+    public function testEveryProgramHasAllFourYearFolders(): void
+    {
+        $catalogue = ['BACHELOR OF SCIENCE IN COMPUTER ENGINEERING (BSCpE)'];
+        $program   = $catalogue[0];
+
+        $node = mlf_resolve(mlf_seed_catalogue([], $catalogue), $program);
+
+        self::assertSame(
+            ['Year 1', 'Year 2', 'Year 3', 'Year 4'],
+            array_column($node['folders'], 'name'),
+            'an empty program still offers all four year levels'
+        );
+        foreach ($node['folders'] as $folder) {
+            self::assertSame(0, (int) $folder['count'], 'a seeded folder counts zero, never a guess');
+        }
+    }
+
+    /**
+     * The seeded year has to be the SAME path a row-built year uses, or
+     * 'BSIT/Year 3' would 404 on the way to an empty cohort.
+     */
+    public function testASeededYearResolvesUnderThePathARowWouldUse(): void
+    {
+        $catalogue = ['BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY (BSIT)'];
+
+        $seeded = mlf_resolve(mlf_seed_catalogue([], $catalogue), 'BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY (BSIT)/Year 3');
+        $fromRow = mlf_resolve(
+            mlf_build_tree([$this->student(['year_level' => 3, 'section' => '31001'])]),
+            'BSIT/Year 3'
+        );
+
+        self::assertTrue($seeded['exists'], 'a seeded year folder must resolve, not 404');
+        self::assertSame('year', $seeded['level'], 'a seeded year reads as a year, not as a program');
+        self::assertSame('year', $fromRow['level'], 'the path shape is unchanged by seeding');
+        self::assertSame(
+            $catalogue[0],
+            $seeded['parent'],
+            'the seeded year sits directly under the program folder'
+        );
+        self::assertSame([], $seeded['folders'], 'an empty year offers no sections - that is the whole point');
+        self::assertSame(0, $seeded['count'], 'and counts zero rather than guessing');
+
+        // And the path a ROW produces resolves to the same shape as the
+        // seeded one, so a bookmark of a real cohort and a click into an
+        // empty year are the same kind of address.
+        self::assertSame(
+            array_keys($seeded),
+            array_keys($fromRow),
+            'a seeded year folder and a row-built one carry the same keys'
+        );
+    }
+
+    /**
+     * A clerk types "BSIT"; the catalogue says the full degree title. Two
+     * BSIT folders, one of them permanently empty, is worse than either -
+     * and the students under the acronym must not vanish from the folder
+     * the catalogue owns.
+     */
+    public function testAnAcronymInTheDataFoldsOntoItsCatalogueFolder(): void
+    {
+        $catalogue = ['BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY (BSIT)'];
+        $tree = mlf_seed_catalogue(
+            mlf_build_tree([
+                $this->student(['id' => 1, 'course' => 'BSIT', 'section' => '11001']),
+                $this->student(['id' => 2, 'course' => 'BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY (BSIT)', 'section' => '11002']),
+            ]),
+            $catalogue
+        );
+
+        self::assertSame(
+            ['BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY (BSIT)'],
+            array_keys($tree),
+            'one BSIT folder, not a catalogue BSIT beside a data BSIT'
+        );
+        self::assertSame(2, $tree['BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY (BSIT)']['count'],
+            'folding must add the rows up, not drop either set');
+
+        $names = array_column(mlf_resolve($tree, 'BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY (BSIT)/Year 1')['folders'], 'name');
+        self::assertSame(['11001', '11002'], $names, 'both sections survive the fold');
+    }
+
+    /**
+     * Renaming a course does not delete its students, so a program that is
+     * NOT in the catalogue keeps its own folder rather than being folded
+     * away — and the seeded years still appear inside it.
+     */
+    public function testAProgramOutsideTheCatalogueKeepsItsOwnFolder(): void
+    {
+        $tree = mlf_seed_catalogue(
+            mlf_build_tree([$this->student(['course' => 'BSED-GRADUATE', 'section' => '11001'])]),
+            ['BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY (BSIT)']
+        );
+
+        self::assertArrayHasKey('BSED-GRADUATE', $tree);
+        self::assertSame(1, $tree['BSED-GRADUATE']['count']);
+        self::assertSame(
+            ['Year 1', 'Year 2', 'Year 3', 'Year 4'],
+            array_keys($tree['BSED-GRADUATE']['years'])
+        );
+    }
+
+    /** Seeding adds folders, never rows: it cannot invent a student. */
+    public function testSeedingNeverInventsAStudent(): void
+    {
+        $catalogue = ['BACHELOR OF SCIENCE IN COMPUTER ENGINEERING (BSCpE)'];
+        $tree = mlf_seed_catalogue([], $catalogue);
+
+        self::assertSame(0, $tree[$catalogue[0]]['count']);
+        self::assertSame([], mlf_sections_under($tree, ''), 'an empty catalogue exports nothing');
+    }
+
+    /**
+     * An empty catalogue adds no PROGRAMS - only the year shape.
+     *
+     * With no catalogue to seed from, the tree is still what the rows
+     * said: no program is invented, and the only thing added is the four
+     * year levels every program now carries.
+     */
+    public function testSeedingWithNoCatalogueInventsNoProgram(): void
+    {
+        $tree = mlf_build_tree([$this->student(['section' => '11001'])]);
+        $seeded = mlf_seed_catalogue($tree, []);
+
+        self::assertSame(array_keys($tree), array_keys($seeded), 'no program is invented');
+        self::assertSame(1, $seeded['BSIT']['count'], 'and no student is');
+        self::assertSame(
+            ['Year 1', 'Year 2', 'Year 3', 'Year 4'],
+            array_keys($seeded['BSIT']['years'])
+        );
+        self::assertSame(
+            ['11001'],
+            // Through the public resolver, not the raw array: PHP coerces a
+            // numeric key like '11001' into an int, and the reader only ever
+            // sees the string form the resolver hands back.
+            array_column(mlf_resolve($seeded, 'BSIT/Year 1')['folders'], 'name'),
+            'the section that existed still exists, untouched'
+        );
+    }
 }
