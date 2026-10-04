@@ -6,11 +6,14 @@
 //    node tests/insights_print_probe.js <port> <cookie> [outPrefix]
 //
 // The report text is INJECTED rather than generated. Calling the real
-// endpoint needs the AI gateway, and when it is down the page falls back to
-// a deterministic report — so a probe that generates its own content would
-// silently test two different documents on two different days, and could
-// never fail on a layout break. The letterhead is what is under test, and it
-// does not depend on the prose.
+// endpoint needs the AI gateway and takes 40-65 seconds, so the probe
+// stubs the fetch with a fixture that matches the endpoint's own contract:
+// seven numbered sections, the seventh being the cross-module findings and
+// recommended actions that the print document lifts out as its Conclusion.
+// A probe that generated its own content would silently test two different
+// documents on two different days, and could never fail on a layout break.
+// The letterhead and the title -> body -> conclusion structure are what is
+// under test, and neither depends on the prose.
 // ============================================================
 
 'use strict';
@@ -86,27 +89,41 @@ function done(code) {
         window.fetch = function(url, opts) {
             if (String(url).indexOf('ai-insights-report') !== -1) {
                 return Promise.resolve({
-                    ok: true, json: function(){
-                        return Promise.resolve({ success: true, data: {
-                            report: '## 1. AI Registrar Summary\\n'
+                    ok: true, status: 200,
+                    // The page reads the body as TEXT (res.text(), then
+                    // JSON.parse), so the stub must provide text(), not
+                    // json(): a json()-only stub throws inside the page's
+                    // .then and the probe would be testing the error path
+                    // instead of the print path.
+                    text: function(){
+                        return Promise.resolve(JSON.stringify({ success: true, data: {
+                            report: '## 1. Executive Summary\\n'
                                 + 'The reporting period closed with a settled enrolment picture and no new backlog.\\n\\n'
-                                + '## 2. Detected Trends\\n'
+                                + '## 2. Student Population and Registration\\n'
                                 + '- **Students:** enrolment held steady across the period.\\n'
-                                + '- **Document Transactions:** request volume tracked the term calendar.\\n'
-                                + '- **RFID:** card coverage remained complete.\\n'
-                                + '- **Queue:** peak waiting occurred at midday.\\n\\n'
-                                + '## 3. Patterns Observed\\n'
+                                + '- **Document Transactions:** request volume tracked the term calendar.\\n\\n'
+                                + '## 3. Programme Mix\\n'
+                                + '- The mix was unchanged from the previous period.\\n\\n'
+                                + '## 4. Document Services\\n'
                                 + '- Turnaround stayed inside the usual window.\\n'
-                                + '- No status contradicted the record.\\n',
-                            // Deliberately 'fallback'. The probe has to
-                            // prove the gateway notice is suppressed, and
-                            // that branch only runs when the source is not
-                            // 'ai' — an 'ai' fixture would pass trivially.
-                            source: 'fallback', model: null,
-                            generated_at: '2026-01-01 00:00:00',
-                            period: JSON.parse(document.getElementById('insPrintPeriod') || 'null'),
-                            facts: null, cards: null
-                        }});
+                                + '- No status contradicted the record.\\n\\n'
+                                + '## 5. RFID and Campus Cards\\n'
+                                + '- **RFID:** card coverage remained complete.\\n\\n'
+                                + '## 6. Queue Operations\\n'
+                                + '- **Queue:** peak waiting occurred at midday.\\n\\n'
+                                + '## 7. Cross-Module Findings and Recommended Actions\\n'
+                                + '- Document backlog and queue peaks moved together; keep midday staffing.\\n'
+                                + '- Recommended action: hold current card-coverage rates through the term.\\n'
+                                + '- Largest uncertainty: walk-in counts without student records.',
+                            // Source 'ai' so the narrative actually renders on
+                            // screen — renderReport() only fills #reportOutput
+                            // for an AI-sourced report, and the probe must
+                            // exercise that real path. The gateway-notice
+                            // suppression is asserted below against the
+                            // printed meta line.
+                            source: 'ai', model: 'probe-fixture',
+                            generated_at: '2026-01-01 00:00:00'
+                        }}));
                     }
                 });
             }
@@ -131,6 +148,26 @@ function done(code) {
         done(1);
     }
 
+
+    // The Export as CSV option must be gone from the page itself. Checked
+    // here, before the print markup replaces this document — in the print
+    // document this element never existed, so the assertion would pass
+    // vacuously.
+    const menu = await ev(`(function(){
+        var m = document.getElementById('exportMenu');
+        return JSON.stringify({
+            csvGone: !document.getElementById('exportCsv'),
+            pdf: !!document.getElementById('exportPdf'),
+            txt: !!document.getElementById('exportTxt'),
+            menuText: m ? m.textContent.replace(/\\s+/g, ' ').trim() : null
+        });
+    })()`);
+    const menuState = JSON.parse(menu);
+    console.log('  export menu: ' + menu);
+    if (!menuState.csvGone || !menuState.pdf || !menuState.txt) {
+        console.log('  FAIL: export menu must offer PDF and TXT only — CSV is gone');
+        failures++;
+    }
 
     // The print path now writes into a hidden <iframe> on this page instead of
     // opening a pop-up. Two things are checked:
@@ -270,6 +307,11 @@ function done(code) {
             reportSections: document.querySelectorAll('.report-section').length,
             headings: Array.prototype.map.call(document.querySelectorAll('.doc-h'),
                 function (el) { return el.textContent.trim(); }),
+            conclusionBlock: !!document.querySelector('.doc-conclusion'),
+            conclusionText: (function () {
+                var el = document.querySelector('.doc-conclusion');
+                return el ? el.textContent.replace(/\\s+/g, ' ').trim() : null;
+            })(),
             bodyAlign: cs('.doc-body p', 'textAlign'),
             lhAlign: cs('.letterhead', 'textAlign'),
             footAlign: cs('.footer', 'textAlign'),
@@ -313,7 +355,9 @@ function done(code) {
         + r.imgsInBody + ' images -> ' + (noFurniture ? 'none (ok)' : 'STILL PRESENT'));
     if (!noFurniture) failures++;
     console.log('  headings: ' + JSON.stringify(r.headings));
-    if (r.headings.length !== 3) { console.log('  FAIL: expected 3 numbered sections'); failures++; }
+    // Six numbered body sections + the Conclusion heading = seven .doc-h
+    // nodes in the printed document.
+    if (r.headings.length !== 7) { console.log('  FAIL: expected 7 headings (6 body + Conclusion)'); failures++; }
 
     const checks = [
         ['school name all caps', r.school === 'BESTLINK COLLEGE OF THE PHILIPPINES'],
@@ -348,7 +392,9 @@ function done(code) {
         ['all ink is pure black', Object.keys(r.ink).every(function (k) {
             return r.ink[k] === 'rgb(0, 0, 0)';
         })],
-        // The fixture source is 'fallback', so this proves the branch is gone.
+        // The fixture is AI-sourced, so the meta line never carries the
+        // gateway note by construction — this still guards the print path,
+        // which must never print operational status regardless of source.
         ['no gateway notice printed', r.metaText
             && r.metaText.indexOf('gateway') === -1
             && r.metaText.indexOf('rule-based') === -1
@@ -358,10 +404,23 @@ function done(code) {
         ['footer is centred', r.footAlign === 'center'],
         ['body prose is justified', r.bodyAlign === 'justify'],
         ['no charts or tiles in body', noFurniture],
-        ['three numbered sections', r.headings.length === 3],
-        ['section numbers kept', /^1\./.test(r.headings[0] || '')
-            && /^2\./.test(r.headings[1] || '') && /^3\./.test(r.headings[2] || '')],
-        ['page margin is zeroed', /@page\s*\{[^}]*margin:\s*0/.test(html)],
+        ['body sections numbered 1-6', /^1\./.test(r.headings[0] || '')
+            && /^2\./.test(r.headings[1] || '') && /^3\./.test(r.headings[2] || '')
+            && /^4\./.test(r.headings[3] || '') && /^5\./.test(r.headings[4] || '')
+            && /^6\./.test(r.headings[5] || '')],
+        ['conclusion is its own heading', r.headings[6] === 'Conclusion'],
+        ['conclusion block present', !!r.conclusionBlock],
+        ['conclusion carries the recommendations', !!r.conclusionText
+            && r.conclusionText.indexOf('Recommended action') !== -1
+            && r.conclusionText.toLowerCase().indexOf('document backlog') !== -1],
+        ['no Export CSV option on the page', menuState.csvGone === true],
+        // The letterhead reserves a real @page bottom band (16mm top,
+        // 22mm bottom, 0 left/right) so the fixed footer repeats on every
+        // page without the browser's own print furniture moving in. Pin the
+        // exact values: a partial edit here is how the footer-on-text bug
+        // came back the first time.
+        ['@page reserves the header and footer bands',
+            /@page\s*\{[^}]*margin:\s*16mm\s+0\s+22mm\s+0/.test(html)],
     ];
     checks.forEach(function (c) {
         if (!c[1]) { console.log('  FAIL: ' + c[0]); failures++; }

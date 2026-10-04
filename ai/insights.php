@@ -596,7 +596,6 @@ body[data-page="insights"] .ai-export-menu.is-open{display:block}
                         </button>
                         <div class="ai-export-menu" id="exportMenu">
                             <a href="#" id="exportPdf"><i class="fas fa-file-pdf"></i> Export PDF</a>
-                            <a href="#" id="exportCsv"><i class="fas fa-file-csv"></i> Export CSV</a>
                             <a href="#" id="exportTxt"><i class="fas fa-file-lines"></i> Export TXT</a>
                         </div>
                     </div>

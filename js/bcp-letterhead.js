@@ -133,6 +133,10 @@ var BCPPrint = (function () {
             '.doc-body ul { margin:0 0 12px; padding-left:24px; color:#000; }',
             '.doc-body li { margin-bottom:6px; }',
             '.doc-body strong { font-weight:700; }',
+            // The conclusion is the same prose as the body — it earns its
+            // boundary from the rule above the heading and the heading
+            // itself, not from a different ink or a box.
+            '.doc-conclusion { margin-top:20px; padding-top:14px; border-top:1px solid #000; }',
             '.meta { font-size:10pt; color:#000; margin-bottom:20px; text-align:center; }',
 
             // LINES WERE BEING CUT OFF AT THE RIGHT EDGE.
