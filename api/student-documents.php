@@ -326,6 +326,14 @@ try {
     }
 
     // Legacy document_type vocabulary, kept for the old column.
+    //
+    // This MUST produce a value the column can actually hold. It did not:
+    // four of the seven values below sit outside the enum, and this server
+    // runs without STRICT_TRANS_TABLES, so MySQL did not reject them - it
+    // coerced them to ''. Every Diploma, CTC, Honorary Dismissal and Course
+    // Description request was filed with a blank type and displayed as one.
+    // migrations/document_type_enum.sql widens the enum; the guard below is
+    // what stops the next unmapped SKU from repeating it.
     $legacyTypeMap = [
         'DOC-TOR'     => 'transcript',
         'DOC-COE'     => 'certificate',
@@ -336,6 +344,20 @@ try {
         'DOC-CD'      => 'course_description',
     ];
     $legacyType = $legacyTypeMap[$catalog['sku']] ?? strtolower($catalog['sku']);
+
+    // Total function: anything the map does not name is folded onto a type
+    // the enum permits rather than written and silently erased. The request
+    // is filed under catalog_id + sku, which is what the registrar works
+    // from, so this stops the column reading as blank without hiding the
+    // document. The SKU is logged so a new one is noticed rather than
+    // quietly absorbed.
+    if (!in_array($legacyType, [
+        'form137', 'good_moral', 'transcript', 'certificate', 'clearance',
+        'diploma', 'ctc', 'honorable_dismissal', 'course_description',
+    ], true)) {
+        error_log('[student-documents] unmapped catalog SKU, folding document_type: ' . $catalog['sku']);
+        $legacyType = 'certificate';
+    }
 
     // Requirement file upload (scanned ID / affidavit) — optional but expected.
     $reqFilePath = null;

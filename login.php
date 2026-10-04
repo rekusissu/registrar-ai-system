@@ -599,7 +599,7 @@ $('step1Form').addEventListener('submit', async function (e) {
                     : '';
                 $('otpResentMsg').style.color = data.data.delivered === false ? '#dc2626' : '#16a34a';
                 $('otp').value = '';
-                showStep('otp');
+                showForm('otp');
                 $('otp').focus();
                 return;
             }
