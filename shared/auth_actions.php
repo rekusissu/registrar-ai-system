@@ -91,10 +91,55 @@ if ($action === 'login') {
             sendResponse(false, "Account temporarily locked. Try again in {$mins} minute(s).");
         }
 
-        // Direct sign-in without OTP
+        // The password is correct. What happens next depends on the
+        // account's role - see loginRequiresOtp().
+        //
+        // Staff-side accounts get a second factor: no session is created
+        // here at all. The OTP is issued, the response says so, and
+        // verify_otp is the ONLY place a real session is minted (it calls
+        // signInSession). This used to call signInSession() directly
+        // ("Direct sign-in without OTP"), which left every helper in
+        // auth_security.php correct and the login path not using them.
         resetLoginLockout($db, (int) $user['id']);
         loginThrottleRecord($credential, $clientIp, true);
         loginThrottleClear($credential, $clientIp);
+
+        if (loginRequiresOtp($user)) {
+            // Fail closed when the code cannot be delivered. Silently
+            // signing in instead would turn "this account is protected"
+            // into a claim nobody verified, and it would do it exactly
+            // when the mail server is broken - the moment an attacker
+            // would most like it.
+            if (!isValidEmail((string) ($user['email'] ?? ''))) {
+                sendResponse(false,
+                    'This account has no deliverable email address, so the verification code cannot be sent. '
+                    . 'Please contact the administrator.');
+            }
+
+            // Remember which account this session is legitimately working
+            // on, so verify_otp / resend_otp cannot be aimed at another user.
+            $_SESSION['otp_user_id'] = (int) $user['id'];
+            $_SESSION['otp_purpose'] = 'login';
+
+            try {
+                $otp = issueOtp($db, (int) $user['id'], 'login', (string) $user['email']);
+            } catch (Exception $e) {
+                error_log('[login] OTP issue failed for user ' . (int) $user['id'] . ': ' . $e->getMessage());
+                sendResponse(false, 'Could not send the verification code. Please try again.');
+            }
+
+            sendResponse(true, 'Verification code sent.', [
+                'step'         => 'otp',
+                'user_id'      => (int) $user['id'],
+                'purpose'      => 'login',
+                'masked_email' => $otp['masked_email'],
+                // Lets the page say "check your inbox" vs "we could not
+                // reach the mail server". The code itself is never returned.
+                'delivered'    => $otp['delivered'],
+            ]);
+        }
+
+        // Student portal: the password is the whole of it.
         $redirect = signInSession($user);
 
         sendResponse(true, 'Login successful.', [

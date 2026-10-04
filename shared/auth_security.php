@@ -160,6 +160,47 @@ function maskEmail(?string $email): string {
  *                       on-screen fallback path
  *   ]
  */
+/**
+ * Must this account clear an emailed OTP to finish signing in?
+ *
+ * WHY A HELPER AND NOT A CONDITION AT THE CALL SITE
+ * --------------------------------------------------
+ * The login endpoint exists in two places - shared/auth_actions.php for
+ * the form and api/auth.php for JSON clients - and they have drifted
+ * before. The rule "who needs a second factor" is a POLICY decision, and
+ * a policy written twice is a policy that will be true on one screen and
+ * false on the other, which is exactly the state nobody notices.
+ *
+ * It was written inline once and drifted: the JSON endpoint kept its OTP
+ * step while the form's endpoint signed in directly.
+ *
+ * EVERY STAFF-SIDE ACCOUNT MUST CLEAR ONE. admin, registrar, staff and
+ * teacher all hold access to student records, so all four are covered -
+ * the point is that an account cannot quietly opt out of it by being
+ * created under a role somebody forgot to list.
+ *
+ * The student portal is deliberately EXEMPT. A student may be a minor on
+ * a shared or address they do not control, and an account that cannot
+ * receive its own code cannot log in at all - which would lock the
+ * portal rather than protect it. Students hold no staff privileges; the
+ * password is the only thing standing between them and their own record.
+ *
+ * Flip the STUDENT exclusion by removing 'student' from the list below.
+ * There is no other switch: this must not be a per-account opt-out,
+ * because an unset flag would read as "not required" and silently turn
+ * MFA off for an account someone believed was protected.
+ *
+ * @param array $user A row from `users` (needs `role`).
+ */
+function loginRequiresOtp(array $user): bool
+{
+    // Unknown role: treat as staff-side and require the code. Failing
+    // closed is the only safe default for a role this build has not seen.
+    $staffSide = ['admin', 'registrar', 'staff', 'teacher'];
+
+    return in_array((string) ($user['role'] ?? ''), $staffSide, true);
+}
+
 function issueOtp($db, int $userId, string $purpose = 'login', ?string $email = null): array {
     $user = $db->fetchOne(
         "SELECT id, email FROM users WHERE id = ?", [$userId]

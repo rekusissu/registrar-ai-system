@@ -80,6 +80,41 @@ if ($method === 'POST' && $action === 'login') {
         resetLoginLockout($db, (int) $user['id']);
         loginThrottleRecord($credential, $clientIp, true);
         loginThrottleClear($credential, $clientIp);
+
+        // Same rule as shared/auth_actions.php, by the same helper - see
+        // loginRequiresOtp(). These two endpoints drifted once already:
+        // this one kept its OTP step while the form's did not. Sharing
+        // the decision is the fix, not copying the same condition twice.
+        if (loginRequiresOtp($user)) {
+            // Fail closed rather than fall back to a password-only session.
+            if (!isValidEmail((string) ($user['email'] ?? ''))) {
+                failJson('This account has no deliverable email address, so the verification code cannot be sent. Please contact the administrator.');
+            }
+            $_SESSION['otp_user_id'] = (int) $user['id'];
+            $_SESSION['otp_purpose'] = 'login';
+
+            try {
+                $otp = issueOtp($db, (int) $user['id'], 'login', (string) $user['email']);
+            } catch (Exception $e) {
+                error_log('[auth] OTP issue failed for user ' . (int) $user['id'] . ': ' . $e->getMessage());
+                failJson('Could not send the verification code. Please try again.');
+            }
+
+            // No session here. verify_otp is the only thing that mints one.
+            echo json_encode([
+                'success' => true,
+                'message' => 'Verification code sent.',
+                'data'    => [
+                    'step'         => 'otp',
+                    'user_id'      => (int) $user['id'],
+                    'purpose'      => 'login',
+                    'masked_email' => $otp['masked_email'],
+                    'delivered'    => $otp['delivered'],
+                ],
+            ]);
+            exit;
+        }
+
         $redirect = signInSession($user);
 
         echo json_encode([
