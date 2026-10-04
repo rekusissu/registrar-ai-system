@@ -243,15 +243,16 @@ define('KIOSK_ACCESS_TOKEN', secretFromEnvOrLocal('KIOSK_ACCESS_TOKEN', 'kiosk-t
 //     Do NOT also prefix "openrouter/" — the API rejects that form (400).
 //
 // Environment variables:
-//   OPENROUTER_API_KEY or AI_API_KEY - your OpenRouter API key
-//     (or paste the key into the git-ignored shared/ai_key.local file)
+//   OPENCODE_API_KEY  - the key for OpenCode Zen, the default gateway below
+//   OPENROUTER_API_KEY / AI_API_KEY - keys for a different gateway, still read
+//     (see the lookup order further down). Any of them can also be pasted into
+//     the git-ignored shared/ai_key.local file.
 //
-//   ┌─ ON A HOSTING PANEL, SET EXACTLY ONE OF THESE TWO ────────────────────┐
+//   ┌─ ON A HOSTING PANEL, SET THIS ONE ────────────────────────────────────┐
 //   │                                                                        │
-//   │   OPENROUTER_API_KEY   <- use this one                                   │
-//   │   AI_API_KEY           <- accepted as an alias, same value              │
+//   │   OPENCODE_API_KEY   <- use this one                                   │
 //   │                                                                        │
-//   │ The value is the raw key, e.g. sk-or-v1-xxxxxxxx. No prefix, no quotes. │
+//   │ The value is the raw key. No prefix, no quotes.                        │
 //   └────────────────────────────────────────────────────────────────────────┘
 //
 //   LOCAL SETUP - the key is NOT in this repository and never will be.
@@ -271,15 +272,35 @@ define('KIOSK_ACCESS_TOKEN', secretFromEnvOrLocal('KIOSK_ACCESS_TOKEN', 'kiosk-t
 //     A missing key does not produce an obvious error. The gateway comes back
 //     401 "No cookie auth credentials found", which reads like a proxy or URL
 //     problem and sends you looking at the endpoint instead of the credential.
-//   AI_MODEL - model to use (default: stealth/space-bunny-alpha;
-//     NO "openrouter/" prefix - the gateway 400s those)
-//   AI_API_URL - override URL if needed (default: https://openrouter.ai/api/v1/chat/completions)
-
-$aiProvider    = env('AI_PROVIDER') ?: 'openrouter';
-$aiApiUrl      = env('AI_API_URL') ?: 'https://openrouter.ai/api/v1/chat/completions';
+//   AI_MODEL     - default: space-bunny-free. Zen model ids carry NO provider
+//                  prefix when you call its HTTP API.
+//   AI_API_URL   - default: https://opencode.ai/zen/v1/chat/completions
+//
+//  THE DEFAULT GATEWAY IS OPENCODE ZEN, NOT OPENROUTER.
+//
+//  This was OpenRouter until the office moved to Zen. The two are not
+//  interchangeable, and mixing them fails confusingly:
+//
+//    * Zen speaks OpenAI chat/completions at /zen/v1/chat/completions, so the
+//      request shape ai_client already sends is correct. Some Zen models use
+//      /zen/v1/responses instead - the Responses API, a different body - but
+//      every free model in the chain below is on chat/completions.
+//    * Zen model ids are BARE: space-bunny-free, mimo-v2.5-free. OpenRouter
+//      ids carry a provider prefix and 404 here. The "oc/" and "opencode/"
+//      forms are OpenCode CONFIG names, not API model ids - which is why
+//      "oc/mimo-v2.5-free" is not an id to send over HTTP.
+//    * Auth is still `Authorization: Bearer <key>`, so the header is unchanged.
+//
+//  To go back to OpenRouter: set AI_API_URL to
+//  https://openrouter.ai/api/v1/chat/completions, AI_MODEL to an OpenRouter id
+//  such as stealth/space-bunny-alpha, and OPENROUTER_API_KEY. Nothing else
+//  changes - aiNormalizeModel() already handles that gateway's prefix rules.
+//
+$aiProvider    = env('AI_PROVIDER') ?: 'zen';
+$aiApiUrl      = env('AI_API_URL') ?: 'https://opencode.ai/zen/v1/chat/completions';
 $aiApiKey      = '';
 $aiGeminiModel = env('GEMINI_MODEL') ?: env('AI_GEMINI_MODEL') ?: 'gemini-2.0-flash';
-$aiModel       = env('AI_MODEL') ?: ($aiProvider === 'gemini' ? $aiGeminiModel : 'stealth/space-bunny-alpha');
+$aiModel       = env('AI_MODEL') ?: ($aiProvider === 'gemini' ? $aiGeminiModel : 'space-bunny-free');
 $aiCacheTtl    = (int) (env('AI_CACHE_TTL') ?: 3600);   // seconds
 
 // Optional OpenRouter (or gateway) failover chain, comma-separated:
@@ -297,39 +318,34 @@ if ($aiModelsEnv !== '') {
 if (empty($aiModels)) {
     // The failover chain, in order. ai_client.php walks it top to bottom and
     // moves on when a model errors, so an entry that does not resolve costs one
-    // wasted call per generation and nothing else - the report still lands.
+    // wasted call per generation and nothing else.
     //
-    // 1. stealth/space-bunny-alpha - free, 1M context, 524288 out. The
-    //    office's first choice. Reasoning is MANDATORY on it, so the Insights
-    //    budget carries headroom for the reasoning pass.
+    // EVERY id below was read live off https://opencode.ai/zen/v1/models, and
+    // every one ends in "-free", so nothing here can spend money. They are BARE
+    // ids - no "opencode/" prefix, because that is the OpenCode config form, not
+    // the HTTP form.
     //
-    // 2. oc/mimo-v2.5-free - the requested backup, placed here on the office's
-    //    word. IT IS NOT IN THE OPENROUTER CATALOGUE. That catalogue was fetched
-    //    and searched: 466 models, no "opencode" namespace, no "oc/" namespace,
-    //    and five MiMo entries, all under xiaomi/, none of them free. So this id
-    //    will 404 against openrouter.ai and the chain will step past it.
+    //   1. space-bunny-free        the office's first choice. A stealth model
+    //      whose provider keeps zero retention and does not train on the data -
+    //      which matters here, because this system sends registrar records.
+    //   2. mimo-v2.5-free          the requested backup.
+    //   3. mimo-v2.6-flash-free    its newer sibling.
+    //   4+. more free models, so one provider being down does not take the
+    //      Insights report with it.
     //
-    //    It is kept because it may well be correct somewhere this repo cannot
-    //    see - a different gateway via AI_API_URL, or a model added after the
-    //    catalogue was read. The office is testing it against the live key.
-    //    If it works there, nothing needs changing; the chain already tries it.
-    //    If it does not, delete this one line - position 3 already covers it.
-    //
-    // 3. xiaomi/mimo-v2.5 - the verified MiMo. Bills about 0.14 per million
-    //    prompt tokens and 0.28 per million completion. Cheap, but a real
-    //    charge, and it runs whenever the free primary is unavailable. Set
-    //    AI_MODELS to the free models only if the account must not spend.
-    //
-    // The rest are free, so a paid outage does not take the report down.
+    // Two of these (MiMo 2.5 and 2.6 Flash) are documented as using collected
+    // data to improve the model during their free period. They are fallbacks
+    // only - the primary is the zero-retention one - but if that matters to the
+    // office, delete them and the chain still has five entries left.
     $aiModels = [
         $aiModel,
-        'oc/mimo-v2.5-free',
-        'xiaomi/mimo-v2.5',
-        'nvidia/nemotron-3-ultra-550b-a55b:free',
-        'z-ai/glm-5.2:free',
-        'google/gemma-4-31b-it:free',
-        'inclusionai/ling-3.0-flash-sante:free',
-        'nvidia/nemotron-3-super-120b-a12b:free',
+        'mimo-v2.5-free',
+        'mimo-v2.6-flash-free',
+        'ling-3.1-flash-free',
+        'nemotron-3-ultra-free',
+        'deepseek-v4-flash-free',
+        'fledge-alpha-free',
+        'longcat-2.5-preview-free',
     ];
 }
 if (!in_array($aiModel, $aiModels, true)) {
@@ -337,7 +353,20 @@ if (!in_array($aiModel, $aiModels, true)) {
 }
 
 // Load API key from env or local file
-$aiApiKey = env('OPENROUTER_API_KEY') ?: env('AI_API_KEY') ?: '';
+// THE KEY LOOKUP ORDER.
+//
+// OPENCODE_API_KEY first, because Zen is the default gateway and that is the
+// name its own documentation uses ("Authorization: Bearer $OPENCODE_API_KEY").
+// It used to lead with OPENROUTER_API_KEY, which is right for OpenRouter and
+// silently wrong here: a host configured for both would send an OpenRouter key
+// to Zen and get a 401 that names neither.
+//
+// AI_API_KEY and shared/ai_key.local remain as provider-agnostic fallbacks, so
+// nothing breaks for anyone already set up the old way.
+$aiApiKey = env('OPENCODE_API_KEY')
+        ?: env('OPENROUTER_API_KEY')
+        ?: env('AI_API_KEY')
+        ?: '';
 if ($aiApiKey === '' && is_file(__DIR__ . '/ai_key.local')) {
     $aiApiKey = trim((string) file_get_contents(__DIR__ . '/ai_key.local'));
 }
