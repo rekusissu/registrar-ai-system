@@ -155,34 +155,48 @@
 .lane-choice:hover { transform: translateY(-1px); }
 .lane-choice:active { transform: translateY(0); }
 .lane-choice:focus-visible { outline: 3px solid #1d4ed8; outline-offset: 3px; }
-.lane-letter {
-    width: 52px;
-    height: 52px;
-    flex: 0 0 52px;
-    border-radius: 13px;
-    display: grid;
-    place-items: center;
-    font-size: 22px;
-    font-weight: 800;
-    background: #f1f5f9;
-    color: #475569;
-}
 .lane-body { flex: 1 1 auto; min-width: 0; }
-.lane-title { font-size: 32px; font-weight: 800; line-height: 1.1; color: #0f172a; }
-.lane-meta { font-size: 15px; color: #64748b; margin-top: 5px; line-height: 1.4; }
+
+/* BOTH CHILDREN ARE BLOCK.
+   They are <span>s in js/queue.js, and vertical margins do not apply to
+   non-replaced inline elements - so `margin-top: 5px` on the description
+   was DEAD CSS and never rendered. The real gap was whatever line-height
+   left behind: on a 32px title at line-height 1.1 that was roughly 1.6px
+   of half-leading below the baseline, so the description sat directly on
+   the title's descenders and the two read as a single block. Making them
+   block applies the spacing that was always intended. */
+.lane-title {
+    display: block;
+    /* 32px -> 27px. The screen's own question (.lane-head h2) is 30px, so
+       at 32px the option was outranking the prompt asking you to choose
+       it. A card label sits BELOW the question, and the description needs
+       the room that gives back. */
+    font-size: 27px;
+    font-weight: 800;
+    line-height: 1.15;      /* was 1.1 - descenders were nearly touching */
+    letter-spacing: -0.015em;
+    color: #0f172a;
+}
+.lane-meta {
+    display: block;
+    font-size: 15px;
+    color: #64748b;
+    line-height: 1.45;      /* it can wrap to two lines on a narrow viewport */
+    margin-top: 12px;       /* now live. Roughly the caption's own line
+                               height, which is the distance at which a
+                               caption reads as a caption rather than as a
+                               tail on the headline. */
+}
 .lane-go { font-size: 20px; color: #cbd5e1; flex: 0 0 auto; }
 
 /* Tone is carried by a modifier class rather than an attribute, so a
    choice can never render with a stale colour after a state change. */
 .lane-choice.t-service  { border-color: #bfdbfe; background: #f8fbff; }
 .lane-choice.t-service:hover  { border-color: #2563eb; }
-.lane-choice.t-service .lane-letter  { background: linear-gradient(140deg, #2563eb, #1d4ed8); color: #fff; }
 .lane-choice.t-claim    { border-color: #99f6e4; background: #f4fffd; }
 .lane-choice.t-claim:hover    { border-color: #0d9488; }
-.lane-choice.t-claim .lane-letter    { background: linear-gradient(140deg, #0d9488, #0f766e); color: #fff; }
 .lane-choice.t-priority { border-color: #fcd34d; background: #fffcf2; }
 .lane-choice.t-priority:hover { border-color: #d97706; }
-.lane-choice.t-priority .lane-letter { background: linear-gradient(140deg, #d97706, #b45309); color: #fff; }
 .lane-choice.t-student  { border-color: #bfdbfe; background: #f8fbff; }
 .lane-choice.t-student:hover  { border-color: #2563eb; }
 
@@ -305,9 +319,12 @@
     .lane-pick { padding: 22px 18px; border-radius: 20px; }
     .lane-head h2 { font-size: 23px; }
     .lane-choice { min-height: 84px; gap: 14px; padding: 14px 16px; }
-    .lane-letter { width: 44px; height: 44px; flex-basis: 44px; }
-    .lane-title { font-size: 24px; }
-    .lane-meta { font-size: 13.5px; }
+
+    /* Same inversion as the base rule, at the smaller scale: the title was
+       24px against a 23px question. Content box here is 84 - 28 = 56px, and
+       22 x 1.15 + 10 + 13.5 x 1.45 = 54.9, so it still fits. */
+    .lane-title { font-size: 22px; }
+    .lane-meta { font-size: 13.5px; margin-top: 10px; }
     .closed-sign { padding: 40px 22px; }
     .closed-sign h2 { font-size: 30px; }
     .closed-sign p { font-size: 17px; }
