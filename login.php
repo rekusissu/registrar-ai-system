@@ -562,7 +562,10 @@ async function post(action, body) {
     return res.json();
 }
 
-// ── Step 1: ID/username + password (Direct Login) ──
+// ── Step 1: ID/username + password ──
+// A correct password does NOT finish the login. It proves half of it:
+// the server answers `step: 'otp'` and has issued a code, and no session
+// exists yet. The session is granted by verify_otp and by nothing else.
 $('step1Form').addEventListener('submit', async function (e) {
     e.preventDefault();
     const credential = $('credential').value.trim();
@@ -578,12 +581,33 @@ $('step1Form').addEventListener('submit', async function (e) {
     }
 
     btn.disabled = true;
-    btn.innerHTML = 'Signing in… <i class="fa-solid fa-spinner fa-spin"></i>';
+    btn.innerHTML = 'Checking… <i class="fa-solid fa-spinner fa-spin"></i>';
     try {
         const data = await post('login', { username: credential, password });
-        if (data.success) {
-            showSuccess('Login successful! Redirecting…');
-            window.location.href = data.data?.redirect || 'dashboard.php';
+        if (data.success && data.data && data.data.step === 'otp') {
+            // Hand the code step the account it is verifying. The server
+            // has already bound this session to that account, so a
+            // swapped user_id here would be rejected, not honoured.
+            session.user_id = data.data.user_id;
+            session.purpose = 'login';
+            session.status = 'awaiting_otp';
+            $('otp').value = '';
+            $('otpMasked').textContent = data.data.masked_email || 'your email';
+            // 'delivered' carries no secret, so it is safe to surface: it
+            // is the difference between "check your inbox" and "we could
+            // not reach the mail server", which is the difference between
+            // a five-minute wait and a support ticket.
+            $('otpResentMsg').textContent = data.data.delivered === false
+                ? '⚠ We could not reach the mail server. Use Resend, or contact the registrar.'
+                : 'Check your inbox for a 6-digit code.';
+            showForm('otp');
+            $('otp').focus();
+        } else if (data.success) {
+            // Defensive only. A login that returns success WITHOUT the
+            // otp step would be a server-side regression, and following
+            // it would drop the user into a session the second factor was
+            // supposed to guard. Refusing here is the safer failure.
+            showError('Sign-in is incomplete. Please try again.');
         } else {
             showError(data.message || 'Invalid ID / username or password.');
         }
