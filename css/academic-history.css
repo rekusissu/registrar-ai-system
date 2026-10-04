@@ -112,7 +112,7 @@ body[data-page="academic"] .dashboard-main { padding: 24px clamp(18px, 2.5vw, 38
     border-right: 1px solid #e2e8f0;
 }
 /* The bottom bar is the only thing telling one metric from another, so it
-   carries the tone. Tinting whole cards would make five competing blocks
+   carries the tone. Tinting whole cards would make four competing blocks
    where the system has one. */
 .ah-metric:last-child { border-right: 0; }
 .ah-metric::after {
@@ -127,8 +127,7 @@ body[data-page="academic"] .dashboard-main { padding: 24px clamp(18px, 2.5vw, 38
 .ah-metric.is-view::after   { background: #1d4ed8; }
 .ah-metric.is-done::after   { background: #16a34a; }
 .ah-metric.is-wait::after   { background: #d97706; }
-.ah-metric.is-mean::after   { background: #64748b; }
-.ah-metric.is-career::after { background: #7c3aed; }
+.ah-metric.is-mean::after { background: #64748b; }
 .ah-metric .ah-label {
     font-size: 10px;
     font-weight: 800;

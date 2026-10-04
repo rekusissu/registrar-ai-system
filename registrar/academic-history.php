@@ -332,12 +332,7 @@ foreach ($visible as $r) {
 // branch fires only when tests/ah_shot.php defines the constant; with
 // nothing defined this is the database result, unchanged.
 //
-// The career GWA below is still read from the database, because it is
-// computed over every term the filtered students have and a sample
-// roster has no history to compute it from. A screenshot therefore shows
-// a real career figure above a sample roster. That is a property of the
-// harness, not of the page, and it is why these images are for looking
-// at layout and not at data.
+// These images are for looking at layout, not at data.
 if (defined('AH_SHOT_ROWS')) {
     $rows           = json_decode(AH_SHOT_ROWS, true);
     $termComplete   = 0;
@@ -816,30 +811,10 @@ if ($boardNode['level'] === 'program') {
 }
 // The stale-link case renders the root, so it gets the root's controls - none.
 
-
-// Career GWA across every term on file for the filtered roster, so the
-// figure someone remembers can be checked against what is actually held.
-$career      = null;
-$careerUnits = 0.0;
-if ($visible) {
-    $in = implode(',', array_map(static fn($r) => (int) $r['id'], $visible));
-    $careerTerms = [];
-    foreach ($db->fetchAll("SELECT id FROM academic_history WHERE student_id IN ($in)") as $h) {
-        $subjectsForTerm = [];
-        foreach ($db->fetchAll("SELECT units, final_rating FROM academic_grades WHERE academic_history_id = ?", [(int) $h['id']]) as $gs) {
-            $subjectsForTerm[] = ['units' => (float) ($gs['units'] ?? 0), 'final_rating' => $gs['final_rating']];
-        }
-        $careerTerms[] = ['subjects' => $subjectsForTerm];
-    }
-    $career = careerGwa($careerTerms);
-    foreach ($careerTerms as $t) {
-        foreach ($t['subjects'] as $s) {
-            if (termRatingValid($s['final_rating'])) {
-                $careerUnits += max(0.0, (float) $s['units']);
-            }
-        }
-    }
-}
+// (The roster-wide Career GWA metric card used to sit here. It ran one query
+// per history row across the whole filtered roster on every page load, for a
+// screen-only figure. The per-student figure is still computed, in the payload
+// below, because the printed Certificate of Grades carries it.)
 
 // The expected load, used only to raise a question and never to block.
 $typicalUnits = null;
@@ -1124,15 +1099,6 @@ include '../includes/sidebar.php';
         <p class="ah-label">Mean term GWA</p>
         <p class="ah-value"><?= $termMeanGwa === null ? '&mdash;' : number_format($termMeanGwa, 2) ?></p>
         <p class="ah-note"><?= $termMeanGwa === null ? 'nothing recorded' : 'across recorded terms' ?></p>
-    </div>
-    <div class="ah-metric is-career"<?= $career === null ? ' data-empty="true"' : '' ?>>
-        <p class="ah-label">Career GWA</p>
-        <p class="ah-value"><?= $career === null ? '&mdash;' : number_format($career, 2) ?></p>
-        <p class="ah-note">
-            <?= $career === null
-                ? 'no ratings on file'
-                : 'over ' . rtrim(rtrim(number_format($careerUnits, 0), '0'), '.') . ' units' ?>
-        </p>
     </div>
 </section>
 
