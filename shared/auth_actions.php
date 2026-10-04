@@ -310,6 +310,30 @@ if ($action === 'forgot') {
             sendResponse(false, 'If that email is registered, a reset code has been sent.');
         }
 
+        // LOCAL OVERRIDE (shared/mfa.local = OFF)
+        //
+        // There is no mail transport here, so a reset code would be
+        // generated and then go nowhere and nobody could ever reset a
+        // password again. When the switch is set, the emailed code is
+        // skipped and the flow continues straight to the reset screen.
+        //
+        // WHAT SURVIVES, deliberately: the reset GRANT is still minted
+        // here and is still required by reset_password, so it stays
+        // single-use, hashed at rest and 15-minute. Rate limiting and the
+        // neutral wording above are untouched. Only the proof that the
+        // requester owns the mailbox is gone - see mfaLocalOverride() for
+        // what that costs.
+        if (function_exists('mfaLocalOverride') && mfaLocalOverride()) {
+            $resetToken = issueResetGrant($db, (int) $user['id']);
+            error_log('[auth] MFA OFF locally: reset code step skipped for user ' . (int) $user['id']);
+            sendResponse(true, 'Local mode: the emailed reset code is switched off.', [
+                'step'        => 'reset_password',
+                'user_id'     => (int) $user['id'],
+                'reset_token' => $resetToken,
+                'local_mode'  => true,
+            ]);
+        }
+
         // Remember which account this session is legitimately working on,
         // so resend_otp/verify_otp cannot be pointed at another user.
         $_SESSION['otp_user_id'] = (int) $user['id'];

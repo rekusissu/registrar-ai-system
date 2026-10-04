@@ -192,6 +192,46 @@ function maskEmail(?string $email): string {
  *
  * @param array $user A row from `users` (needs `role`).
  */
+/**
+ * Is MFA switched off on THIS MACHINE?
+ *
+ * shared/mfa.local containing the single word OFF.
+ *
+ * WHY A FILE AND NOT AN ENV VAR OR A CODE CHANGE
+ *   An env var can be set on the live host by accident and nobody reads
+ *   the deploy log. A code change gets committed and forgotten. This
+ *   file is covered by the `*.local` gitignore rule, so it cannot be
+ *   pushed - a production host physically cannot carry it, and the
+ *   override is local by construction rather than by discipline. It
+ *   follows the pattern already used by secrets.local, ai_key.local
+ *   and session_timeout.local.
+ *
+ *   Re-enabling is `del shared/mfa.local`. Nothing else changes.
+ *
+ * WHY IT EXISTS
+ *   The second factor needs a mail transport. A developer box has none:
+ *   the code is generated and then goes nowhere, and every staff
+ *   account is locked out of a system they need to work on. Correct for
+ *   production, useless for development.
+ *
+ * WHAT IT COSTS - READ THIS BEFORE RELYING ON IT
+ *   With this set, PASSWORD RESET stops proving that the requester owns
+ *   the email address. Anyone who knows a username can set that
+ *   account's password. The reset GRANT itself still exists - single
+ *   use, hashed at rest, 15-minute expiry - and rate limiting and
+ *   account-enumeration wording are unchanged, so this is not a bare
+ *   "change any password" endpoint. It is still the weakest this system
+ *   is capable of being.
+ *
+ *   Local only, never pushed. Never leave it on a live host.
+ */
+function mfaLocalOverride(): bool
+{
+    $flag = __DIR__ . '/mfa.local';
+    return is_file($flag)
+        && strtoupper(trim((string) file_get_contents($flag))) === 'OFF';
+}
+
 function loginRequiresOtp(array $user): bool
 {
     // Unknown role: treat as staff-side and require the code. Failing
@@ -202,30 +242,7 @@ function loginRequiresOtp(array $user): bool
         return false;
     }
 
-    // LOCAL OVERRIDE - shared/mfa.local containing the single word OFF.
-    //
-    // This exists because the second factor needs a working mail transport,
-    // and a developer box usually does not have one: with no transport the
-    // code is generated and then goes nowhere, and every staff account is
-    // locked out of a system they need to work on. That is the correct
-    // behaviour for production and useless for development.
-    //
-    // WHY A FILE AND NOT AN ENV VAR OR A CODE CHANGE
-    //   An env var can be set on the live host by accident and nobody
-    //   reads the deploy log. A code change gets committed and forgotten.
-    //   This file is covered by the `*.local` gitignore rule, so it cannot
-    //   be pushed - a production host physically cannot carry it, and the
-    //   override is therefore local by construction rather than by
-    //   discipline. It follows the pattern already used by
-    //   secrets.local, ai_key.local and session_timeout.local.
-    //
-    //   Re-enabling is `del shared/mfa.local`. Nothing else changes.
-    $flag = __DIR__ . '/mfa.local';
-    if (is_file($flag) && strtoupper(trim((string) file_get_contents($flag))) === 'OFF') {
-        return false;
-    }
-
-    return true;
+    return !mfaLocalOverride();
 }
 
 function issueOtp($db, int $userId, string $purpose = 'login', ?string $email = null): array {
