@@ -255,6 +255,22 @@ define('KIOSK_ACCESS_TOKEN', secretFromEnvOrLocal('KIOSK_ACCESS_TOKEN', 'kiosk-t
 //   │ The value is the raw key. No prefix, no quotes.                        │
 //   └────────────────────────────────────────────────────────────────────────┘
 //
+//  WHAT THE KEY ACTUALLY BUYS - measured against the live gateway, not read
+//  from the docs:
+//
+//    space-bunny-free          works with NO key at all. Anonymous, cost 0.
+//    every other model below   HTTP 403 without a key.
+//
+//  So the app is functional this minute with no credential, on the primary
+//  alone. But the failover chain is dead without one: if Space Bunny is busy -
+//  and it is a free model, so it will be - there is nowhere to fall back to, and
+//  the Insights report degrades to counts with no analysis.
+//
+//  A key costs nothing for these models; the completion above returned cost=0
+//  with one. Treat anonymous access as a stopgap, not a configuration: it is
+//  unversioned and revocable, and nothing in this file can tell you when it
+//  stops working.
+//
 //   LOCAL SETUP - the key is NOT in this repository and never will be.
 //
 //     Create shared/ai_key.local containing ONE line: the bare key, with no
