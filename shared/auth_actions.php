@@ -91,20 +91,51 @@ if ($action === 'login') {
             sendResponse(false, "Account temporarily locked. Try again in {$mins} minute(s).");
         }
 
-        // Direct sign-in without OTP
+        // THE PASSWORD IS HALF THE PROOF. The other half is the code.
+        //
+        // This used to call signInSession() right here, so a correct
+        // password was a complete login. Every other reason the OTP
+        // machinery exists was still wired up - issueOtp(), the
+        // otp_codes table, the verify_otp endpoint, the step-2 form in
+        // login.php - and none of it ran. A stolen or reused password
+        // was therefore a full account takeover, which is the one thing
+        // the second factor exists to prevent.
+        //
+        // So no session is granted here. The code goes out, and
+        // verify_otp is what actually calls signInSession().
         resetLoginLockout($db, (int) $user['id']);
         loginThrottleRecord($credential, $clientIp, true);
         loginThrottleClear($credential, $clientIp);
-        $redirect = signInSession($user);
 
-        sendResponse(true, 'Login successful.', [
-            'user' => [
-                'id'        => (int) $user['id'],
-                'email'     => $user['email'],
-                'full_name' => $user['full_name'],
-                'role'      => $user['role'],
-            ],
-            'redirect' => $redirect,
+        // Bind the session to this account before the code goes out, so
+        // resend_otp and verify_otp cannot be aimed at a different
+        // user_id mid-flow. Without this the pending check in those two
+        // endpoints has nothing to match against and every verification
+        // would be rejected as "Invalid request".
+        $_SESSION['otp_user_id'] = (int) $user['id'];
+        $_SESSION['otp_purpose'] = 'login';
+
+        // No deliverable address means no second factor, and without a
+        // second factor this login cannot complete. Saying so plainly
+        // is the honest outcome: it tells a real user why they are stuck
+        // instead of stranding them on a code that will never arrive.
+        // The password was already proven above, so this reveals nothing
+        // an attacker who has the password does not already know.
+        if (!isValidEmail((string) ($user['email'] ?? ''))) {
+            unset($_SESSION['otp_user_id'], $_SESSION['otp_purpose']);
+            sendResponse(false, 'This account has no email address on file, so we cannot send a verification code. Please contact the registrar.');
+        }
+
+        $otp = issueOtp($db, (int) $user['id'], 'login');
+
+        sendResponse(true, 'A verification code has been sent to your email.', [
+            'step'         => 'otp',
+            'user_id'      => (int) $user['id'],
+            'purpose'      => 'login',
+            'masked_email' => $otp['masked_email'],
+            // Lets the page say "check your inbox" vs "we could not reach
+            // the mail server". The CODE itself is never returned.
+            'delivered'    => $otp['delivered'],
         ]);
     } catch (Exception $e) {
         sendResponse(false, 'An error occurred. Please try again.');

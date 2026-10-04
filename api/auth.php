@@ -77,22 +77,35 @@ if ($method === 'POST' && $action === 'login') {
             failJson("Account temporarily locked. Try again in {$mins} minute(s).");
         }
 
+        // Same two-step rule as shared/auth_actions.php: a correct password
+        // is HALF the proof. This endpoint granted the session right here
+        // while its sibling withheld it, which meant a JSON client - any
+        // kiosk, script or future mobile app - got strictly weaker login
+        // than the browser form. Two endpoints for one policy, and they
+        // had drifted apart.
         resetLoginLockout($db, (int) $user['id']);
         loginThrottleRecord($credential, $clientIp, true);
         loginThrottleClear($credential, $clientIp);
-        $redirect = signInSession($user);
+
+        $_SESSION['otp_user_id'] = (int) $user['id'];
+        $_SESSION['otp_purpose'] = 'login';
+
+        if (!isValidEmail((string) ($user['email'] ?? ''))) {
+            unset($_SESSION['otp_user_id'], $_SESSION['otp_purpose']);
+            failJson('This account has no email address on file, so we cannot send a verification code. Please contact the registrar.');
+        }
+
+        $otp = issueOtp($db, (int) $user['id'], 'login');
 
         echo json_encode([
             'success' => true,
-            'message' => 'Login successful.',
+            'message' => 'A verification code has been sent to your email.',
             'data' => [
-                'user' => [
-                    'id'        => (int) $user['id'],
-                    'email'     => $user['email'],
-                    'full_name' => $user['full_name'],
-                    'role'      => $user['role'],
-                ],
-                'redirect' => $redirect,
+                'step'         => 'otp',
+                'user_id'      => (int) $user['id'],
+                'purpose'      => 'login',
+                'masked_email' => $otp['masked_email'],
+                'delivered'    => $otp['delivered'],
             ],
         ]);
     } catch (Exception $e) {
