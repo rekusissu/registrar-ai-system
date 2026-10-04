@@ -323,7 +323,19 @@ function aiHttpChat(array $payload) {
         CURLOPT_POST           => true,
         CURLOPT_POSTFIELDS     => json_encode($payload),
         CURLOPT_HTTPHEADER     => $headers,
-        CURLOPT_TIMEOUT        => 60,
+        // MEASURED, NOT GUESSED. A full seven-section Insights report against
+        // the current primary takes 40-65s wall clock, because that model
+        // reasons MANDATORILY and the reasoning pass is most of the time. This
+        // was 60, which is BELOW the observed worst case - so a slow report was
+        // aborted by curl rather than returned, and the caller saw an error
+        // that named neither the gateway nor the timeout.
+        //
+        // Turning the reasoning off was tried as a way to make this shorter and
+        // does not work: include_reasoning=false came back in 40.0s against
+        // 41.8s for the default, and reasoning_effort is advertised but
+        // rejected with HTTP 400. The time is the model and a loaded free tier,
+        // not a setting. So the budget has to fit the real cost.
+        CURLOPT_TIMEOUT        => 180,
         CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_WRITEFUNCTION  => function ($ch, $data) use (&$buffer) {
             $buffer .= $data;

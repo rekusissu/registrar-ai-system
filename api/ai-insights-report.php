@@ -32,6 +32,22 @@ require_once __DIR__ . '/../shared/ai_client.php';
 
 header('Content-Type: application/json');
 
+// ── This request can take a minute ──────────────────────────────────
+//
+// Generating the report is a synchronous upstream call that was measured at
+// 40-65 seconds against the current primary model. A stock shared host runs
+// PHP with max_execution_time at 30s, and when that fires PHP kills the script
+// mid-response: the browser receives a truncated body, the JSON never parses,
+// and the page says only "Failed to generate the analysis" - naming neither
+// the host limit nor the gateway. That is the failure this endpoint reports
+// when the office reported it.
+//
+// set_time_limit RAISES the limit where the host allows it. It is refused on
+// some CGI/FastCGI configurations, which is why the host setting is still
+// documented below - but it costs nothing to try, and where it works it fixes
+// the problem without the operator touching anything.
+@set_time_limit(180);
+
 if (!isLoggedIn()) {
     http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized.']);

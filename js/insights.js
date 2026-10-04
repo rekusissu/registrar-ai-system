@@ -921,24 +921,67 @@
                 force: !!force
             })
         })
-            .then(function (res) { return res.json(); })
-            .then(function (json) {
+            .then(function (res) {
+                // Read the body as TEXT first.
+                //
+                // res.json() rejects on a body that is not JSON, and the most
+                // likely cause here is not a network problem at all: this
+                // request can take a minute, a host with a 30s PHP limit kills
+                // the script mid-response, and what arrives is a truncated HTML
+                // error page. Calling res.json() on that throws, and the catch
+                // below then reports "Network error" - which is not what
+                // happened and sends the reader to the wrong place.
+                return res.text().then(function (text) {
+                    try {
+                        return { ok: true, json: JSON.parse(text) };
+                    } catch (e) {
+                        return {
+                            ok: false,
+                            status: res.status,
+                            snippet: text.slice(0, 200)
+                        };
+                    }
+                });
+            })
+            .then(function (r) {
                 window.clearInterval(slowTimer);
                 hideLoading();
                 var t = document.getElementById('reportLoadingText');
                 if (t) t.textContent = 'Analysing registrar data…';
 
-                if (json && json.success && json.data && json.data.report) {
-                    renderReport(json.data.report, json.data);
+                if (!r.ok) {
+                    // The server did not answer with JSON. Say which of the two
+                    // causes it is, because they need different fixes.
+                    var truncated = (r.status === 200 || r.status === 500) && r.snippet.indexOf('<') === 0;
+                    showReportError(truncated
+                        ? 'The server stopped before it could reply. Generating the report takes 40-60 seconds and this host appears to cut PHP off sooner than that — raise max_execution_time to 180 (see .user.ini) and try again.'
+                        : 'The server returned an unexpected response (HTTP ' + r.status + ').');
+                    el.reportEmpty.style.display = 'block';
+                    return;
+                }
+
+                var json = r.json;
+
+                // THE FALLBACK IS NOT A FAILURE.
+                //
+                // This test used to require json.data.report to be non-empty,
+                // which meant a fallback response - success, empty report, real
+                // figures - was routed to the error branch and the figures never
+                // rendered at all. renderReport() already handles the empty case:
+                // it shows the banner and the figures and leaves the narrative
+                // slot empty. So the only question here is whether the server
+                // succeeded at all.
+                if (json && json.success && json.data) {
+                    renderReport(json.data.report || '', json.data);
                 } else {
-                    showReportError((json && json.message) || 'Failed to generate the analysis.');
+                    showReportError((json && json.message) || 'The server could not generate the analysis.');
                     el.reportEmpty.style.display = 'block';
                 }
             })
             .catch(function (err) {
                 window.clearInterval(slowTimer);
                 hideLoading();
-                showReportError('Network error: ' + err.message);
+                showReportError('Could not reach the server: ' + err.message);
                 el.reportEmpty.style.display = 'block';
             });
     }

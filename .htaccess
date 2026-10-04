@@ -46,3 +46,18 @@
     RewriteRule ^verify/([A-Za-z0-9]{32,64})$ verify.php?qr=$1 [L,QSA]
 </IfModule>
 
+# ── PHP execution time ────────────────────────────────────────────────
+# For mod_php hosts. .user.ini covers PHP-FPM/CGI shared hosting; this block
+# is the equivalent for Apache with mod_php, and the two do not overlap.
+#
+# An AI Insight report is a synchronous upstream call measured at 40-65s. The
+# stock 30s limit kills the script partway through the response, so the browser
+# receives a truncated body, the JSON never parses, and the page reports only
+# that the analysis "failed". Raising the limit is what stops that.
+#
+# php_flag is only legal when PHP runs as a module; under CGI/FPM it would be a
+# 500 on every request, hence the IfModule guard.
+<IfModule mod_php.c>
+    php_value max_execution_time 180
+</IfModule>
+
