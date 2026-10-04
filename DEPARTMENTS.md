@@ -208,24 +208,130 @@ templates print N/A pending assignment.
 Still open: no syllabus-text column, so `DOC-CD`'s description is
 permanently N/A (owned by Curriculum #293 anyway).
 
-## Masterlist Folders — a view inside the Masterlist
+## Masterlist Folders — views inside the Masterlist
 
-The masterlist reads two ways, toggled in the Masterlist header
-(`List` / `Folders`):
+The masterlist reads three ways:
+
+> **There is no view toggle in the header any more.** All three buttons
+> (`Browse` / `Table` / `List`) were removed, along with the
+> `.masterlist-views` / `.mlv-btn` CSS that styled them. The views
+> themselves were **not** removed — `?view=folders` and `?view=list`
+> still render in full, with their ZIP downloads, bulk select and
+> CSV/Excel export, reachable only by URL. Browse is the default and
+> what the page now simply *is*.
+>
+> What was given up: the header no longer says which view you are in.
+> That is visible from the page itself instead — folder tiles, or a
+> ledger. Read the rest of this section as describing what each view
+> *is*, not what the header offers.
 
 - **List** — the flat blocks that get printed, signed and handed off.
-- **Folders** — **one table** in which a folder is a row you expand: a
-  program row, its year rows inside it, its section rows inside those,
-  and the student rows inside a section. A caret opens and closes what
+- **Table** (`?view=folders`) — **one table** in which a folder is a row you
+  expand: a program row, its year rows inside it, its section rows inside
+  those, and the student rows inside a section. A caret opens and closes what
   is under a folder; `Expand all` / `Collapse all` are there for when
   someone wants the whole tree.
 
-There is **no separate page** and **no second sidebar entry**. It is a
-view of the Masterlist module, not a module beside it.
+  Its columns lead with **Program · Section · Year Level · Semester**,
+  because those four are what say *which cohort* a row is. The other
+  columns (name, type, counts, status, contact, email, download) follow.
 
-`?view=folders` is a real URL, so the view survives Back, can be linked
-to, and `?open=BSIT/Year 1/11001` lands with that section visible and
-every folder above it already expanded.
+  Three of those four are **derived from the row's folder path**
+  (`PROGRAM/Year 1/11001`) rather than stored again — a second copy of
+  the same fact is a second thing to fall out of step. **Semester is the
+  exception**: a section code encodes year and term, but the tree does
+  not keep the term, so it comes from the student data on a student row
+  and is a dash on a folder row that has no students to ask.
+
+  A program or year row leaves Section and Semester blank rather than
+  repeating its own name — it *contains* sections, it is not one.
+
+  The header and the cells are written in two separate blocks, which is
+  a trap worth naming: adding a column to one and not the other raises
+  no error and no warning. It silently shifts every cell after the gap
+  one place left, and a registrar reads a status as a phone number.
+  `tests/explore_render_check.php` therefore asserts **one cell per
+  column on every row**, not just that the columns exist.
+- **Browse** (`?view=explore`) — a **folder browser**, the shape a shared
+  drive has. It is not the table with folders removed; it stands at exactly
+  one folder at a time. Click **BSIT** and you go *into* BSIT and see its
+  year folders; click a year and you see its sections; click a section and
+  you get the roster that folder holds, as a table of every detail
+  (`mlf_roster_columns()` — the same columns the ZIP export writes).
+  A breadcrumb bar and `Up one level` move back out.
+
+### Programs print as acronyms, everywhere they are listed
+
+`BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY (BSIT)` is **55
+characters**. Wherever programs are *listed*, they print as `BSIT`:
+the browser's program tiles, the breadcrumb, the program heading, the
+section sub-line, the folder table's program rows, the Masterlist
+filter dropdown, and the Edit Section course dropdown. The status
+tracker's program listbox already worked this way; this makes the
+Masterlist agree with it.
+
+The rule is enforced in one place, `courseDisplay()` /
+`courseDisplayTitle()` (`shared/functions.php`), not by truncating at
+each call site. Two things it will not do:
+
+1. **It is display-only.** The `course` column, the folder paths, the
+   ZIP structure and every `<option value>` keep the **full** name. A
+   dropdown whose *value* was abbreviated would match no row and filter
+   silently to nothing — the label is free to be short, the value is
+   not. `tests/explore_render_check.php` asserts exactly this: the tile
+   reads `BSIT` while its `href` still carries the whole string.
+2. **It never abbreviates the work-queue folders.** `Unassigned
+   Program` is not a program, and `courseAcronym()` would reduce it to
+   `UP` — which is a real degree abbreviation and would be a lie on the
+   page. Years and sections are left alone too: "Year 1" has no shorter
+   true form, and a section code *is* its own name.
+
+The full name is never discarded. Wherever a name is shortened, it
+becomes the `title` (hover) and the `aria-label` (screen readers), so
+the acronym is a compression rather than a replacement. That tooltip
+is now the **only** way back to the full name: a legend table decoding
+every acronym was built and then removed, on the grounds that the
+acronyms are the office's own vocabulary and the browser already
+answers "what is this folder" from the tiles themselves.
+`tests/explore_render_check.php` pins the tooltip down, so the
+abbreviations can never become undecodable by accident.
+
+The one surface that needed its own handling is the **section roster**
+(`mlx-table`), whose fourteen cells are written in one generic loop
+over `mlf_roster_row()`. The Program cell is special-cased by locating
+its index with `array_search('Program', mlf_roster_columns())` rather
+than counting to it, so inserting a column later cannot silently shift
+the abbreviation onto the wrong field.
+
+That loop is also what the ZIP export is built from — but the export
+calls `mlf_roster_row()` in `shared/`, not this markup, so the export
+still writes the **full** program name. A handoff must carry what was
+filed; only the screen is abbreviated.
+
+Why both folder views exist: the Table answers "show me everything, I will
+find BSIT in the middle of it", and it does not scale — a college with eight
+programs and four years each is hundreds of rows nobody will scroll. The
+Browse answers "show me BSIT", which is the question the office actually
+asks. Neither replaces the other.
+
+Both read the **same** tree (`mlf_build_tree` on one query), so they cannot
+disagree about who is filed where. Only the presentation differs: the table
+flattens the tree with `mlf_rows()`, the browser stands inside it with
+`mlf_resolve()`.
+
+There is **no separate page** and **no second sidebar entry**. They are
+views of the Masterlist module, not modules beside it.
+
+`?view=folders` and `?view=explore&path=...` are real URLs, so a view
+survives Back and can be linked to: `?open=BSIT/Year 1/11001` lands on the
+table with that section expanded, and `?view=explore&path=BSIT/Year 1/11001`
+lands inside that folder. Navigation in the browser is plain links, not JS.
+A stale path says so ("That folder is not here") and shows the root rather
+than a blank screen.
+
+Checked by `tests/explore_render_check.php`, which fetches the page over
+real HTTP at every level of the tree and reads the rendered HTML — the
+breadcrumbs, the tile links, and every roster column.
 
 Three rules, recorded here because they are the ones a later change
 could quietly undo:
@@ -234,14 +340,34 @@ could quietly undo:
    from `students` on every load (`shared/masterlist_folders.php`);
    nothing stores a path. Assigning a student to a section is still
    the Masterlist page's job, and the tree rebuilds itself.
-2. **The two views list DIFFERENT rows, on purpose.** The List view is
-   the signable roster and drops students with no section. The Folders
-   view is an inventory and keeps them, under `Unassigned Section`. An
+2. **The views list DIFFERENT rows, on purpose.** The List view is
+   the signable roster and drops students with no section. Both folder
+   views are inventories and keep them, under `Unassigned Section`. An
    unplaced student who vanished from the table would be precisely the
-   work the table exists to show.
+   work the folders exist to show.
 3. **Folder names are filesystem-safe.** Program names are free text,
    and a `:` or `/` in one makes the whole archive un-extractable on
    the receiving machine.
+4. **The three views are mutually exclusive, and each one gates on
+   `$view`.** This one was broken and is worth stating plainly. The
+   printable List sat at the `else` of `if ($view === 'folders')`, but
+   the browser is an **independent `if` above it**, not the other arm of
+   that chain. So `?view=explore` matched neither and fell straight into
+   the `else`: every folder page rendered the browser *and* the entire
+   printable ledger underneath it — four `.masterlist-table` blocks
+   below the roster the registrar actually asked for. Nothing looked
+   broken; the page was simply twice as long, with a second complete
+   rendering of the same students under the first.
+
+   The lesson is the shape, not the typo. An `else` only names "the
+   other two views" while there are two. The moment a third view arrives
+   as its own branch, the `else` silently becomes "every view nobody
+   claimed" — which is exactly what a new branch looks like. So each
+   view now tests `$view` explicitly and nothing falls through by
+   default. `tests/explore_render_check.php` asserts the ledger class is
+   **absent** from a browser page, not merely that the roster is present:
+   a presence check passes just as happily with two rosters on the page
+   as with one.
 
 Downloading any folder gives that folder's **whole subtree** as a `.zip`
 that unpacks to the same structure (`api/masterlist-folders.php`), so a

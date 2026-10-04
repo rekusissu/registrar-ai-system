@@ -3,6 +3,10 @@
 use PHPUnit\Framework\TestCase;
 
 require_once __DIR__ . '/../shared/masterlist_folders.php';
+// courseDisplay() / courseDisplayTitle(), the display-name pair the
+// masterlist prints programs through. Required here so the tests below
+// can pin the abbreviation rules without a browser or a database.
+require_once __DIR__ . '/../shared/functions.php';
 
 /**
  * The folder shape of a masterlist, and the navigation that walks
@@ -342,5 +346,160 @@ final class MasterlistFoldersTest extends TestCase
         self::assertSame(2, $byPath['BSIT/Year 1']['subfolders']);
         self::assertSame(1, $byPath['BSIT/Year 1/11001']['count']);
         self::assertSame(0, $byPath['BSIT/Year 1/11001']['subfolders'], 'a section holds students, not folders');
+    }
+
+    // ─── THE PAGE, NOT THE HELPERS ──────────────────────────
+    //
+    // The rules above are shared code. These pin the WIRING, because
+    // nothing else does — the helpers pass whichever way the page is
+    // written, and the page is where this went wrong twice already:
+    // first as a flat list with no folders at all, then as an
+    // expand-everything outline where clicking BSIT went nowhere.
+    //
+    // The page carries THREE views, and this is the load-bearing
+    // fact about them:
+    //
+    //   list     the printable blocks
+    //   folders  the folder TABLE - one table, rows you expand
+    //   explore  the folder BROWSER - one folder at a time
+    //
+    // The browser is the gdrive shape (click BSIT, get its years). The
+    // table is the outline. They are different tools, so both stay.
+
+    private static function page(): string
+    {
+        return file_get_contents(__DIR__ . '/../registrar/masterlist.php');
+    }
+
+    /** All three views are reachable, and the browser is a real one. */
+    public function testThePageOffersBothTheFolderTableAndTheFolderBrowser(): void
+    {
+        $page = self::page();
+
+        foreach (['list', 'folders', 'explore'] as $view) {
+            self::assertStringContainsString(
+                "\$view === '" . $view . "'",
+                $page,
+                'the ' . $view . ' view must still exist'
+            );
+        }
+
+        // The browser stands INSIDE one folder (mlf_resolve); the table
+        // flattens the lot (mlf_rows). Losing either silently turns the
+        // other into a broken duplicate.
+        self::assertStringContainsString('mlf_resolve(', $page, 'the browser resolves one folder');
+        self::assertStringContainsString('mlf_rows(', $page, 'the folder table flattens the tree');
+    }
+
+    /** Clicking a folder has to be a LINK, and it has to be in the URL. */
+    public function testTheBrowserRendersLinkableTilesAndBreadcrumbs(): void
+    {
+        $page = self::page();
+
+        self::assertStringContainsString('class="mlx-tile', $page, 'folders render as tiles');
+        self::assertStringContainsString('class="mlx-crumbs"', $page, 'the current folder is named in a breadcrumb');
+        self::assertStringContainsString('view=explore', $page, 'folder links name the browser view');
+        self::assertStringContainsString('&amp;path=', $page, 'the folder location is in the URL');
+    }
+
+    /**
+     * The view is chosen from a fixed allow-list, and anything
+     * unrecognised falls back to the default rather than rendering
+     * nothing — a stale bookmark must not dead-end on a blank page.
+     *
+     * Note this asserts the allow-list rather than the absence of the
+     * old toggle's CSS names: the page mentions those in the comment
+     * recording why they were deleted, so a source-level "not present
+     * anywhere" check fails on documentation. The rendered output is
+     * checked properly, over real HTTP, by explore_render_check.php.
+     */
+    public function testTheViewIsChosenFromAClosedAllowList(): void
+    {
+        $page = self::page();
+
+        self::assertStringContainsString(
+            "in_array(\$_GET['view'], ['list', 'folders', 'explore'], true)",
+            $page,
+            'only the three known views may be requested'
+        );
+        self::assertStringContainsString(
+            "\$explorePath = \$view === 'explore'",
+            $page,
+            'the browser reads its folder from the path parameter'
+        );
+    }
+
+    /**
+     * Program names are printed as acronyms with the full name on
+     * hover — in the tiles, the breadcrumbs and the roster alike. A
+     * 55-character degree title repeated down a column is unreadable,
+     * and this is a DISPLAY change: the stored value and the folder
+     * path keep the full name.
+     */
+    public function testProgramsArePrintedAsAcronymsViaTheDisplayHelpers(): void
+    {
+        $page = self::page();
+
+        self::assertStringContainsString('courseDisplay(', $page, 'programs print through courseDisplay()');
+        self::assertStringContainsString('courseDisplayTitle(', $page, 'the full name stays one hover away');
+        // The abbreviation must never reach the URL or the query.
+        self::assertStringNotContainsString('courseDisplay($folder[', $page,
+            'a folder path must keep the real course value, not its abbreviation');
+    }
+
+    // ─── courseDisplay() / courseDisplayTitle() ────────────
+    //
+    // These decide what a program is CALLED on screen, and they are the
+    // only place a lie can be told about a degree: abbreviate
+    // "Unassigned Program" to "UP" and the column is asserting
+    // something untrue about the student sitting in that row.
+
+    /**
+     * A degree title reads as its acronym.
+     */
+    public function testALongDegreeTitleIsPrintedAsItsAcronym(): void
+    {
+        self::assertSame('BSIT', courseDisplay('BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY (BSIT)'));
+    }
+
+    /**
+     * The work-queue folders are NOT programs and must never be
+     * abbreviated. courseAcronym() would turn "Unassigned Program"
+     * into "UP" — a real degree abbreviation, attached to a row that
+     * is not a degree at all.
+     */
+    public function testWorkQueueFoldersAreNeverAbbreviated(): void
+    {
+        self::assertSame('Unassigned Program', courseDisplay('Unassigned Program'));
+        self::assertSame('Unassigned Section', courseDisplay('Unassigned Section'));
+    }
+
+    /**
+     * An abbreviation that is not actually shorter has compressed
+     * nothing, and only costs the reader a trip to the tooltip.
+     */
+    public function testAValueThatDoesNotShrinkIsLeftAlone(): void
+    {
+        self::assertSame('BSIT', courseDisplay('BSIT'));
+    }
+
+    /** The full name is what the hover reveals — and only when there is one. */
+    public function testTheTitleCarriesTheFullNameOnlyWhenItAddsSomething(): void
+    {
+        self::assertSame(
+            'BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY (BSIT)',
+            courseDisplayTitle('BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY (BSIT)')
+        );
+        self::assertSame('', courseDisplayTitle('BSIT'), 'an empty title attribute is worse than none');
+        self::assertSame('', courseDisplayTitle('Unassigned Program'));
+        self::assertSame('', courseDisplayTitle(''));
+    }
+
+    /** Empty input must not warn, and must not print a stray character. */
+    public function testBlankProgramNamesAreHandled(): void
+    {
+        self::assertSame('', courseDisplay(''));
+        self::assertSame('', courseDisplay('   '));
+        self::assertSame('', courseDisplay(null));
     }
 }
