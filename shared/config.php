@@ -295,27 +295,35 @@ if ($aiModelsEnv !== '') {
     }
 }
 if (empty($aiModels)) {
-    // The failover chain, in order.
+    // The failover chain, in order. ai_client.php walks it top to bottom and
+    // moves on when a model errors, so an entry that does not resolve costs one
+    // wasted call per generation and nothing else - the report still lands.
     //
-    // 1. stealth/space-bunny-alpha - free, 1M context, and the office's
-    //    first choice. It is reasoning-first, so it is given the largest
-    //    budget on the Insights report.
-    // 2. xiaomi/mimo-v2.5 - the backup. NOT free: it bills at roughly
-    //    0.14 per million prompt tokens and 0.28 per million completion
-    //    tokens. That is cheap, but it is a real charge, and it only runs
-    //    when the primary is unavailable - which on a free model is most
-    //    of the time under load. If the account must not spend anything,
-    //    set AI_MODELS to the free models only.
+    // 1. stealth/space-bunny-alpha - free, 1M context, 524288 out. The
+    //    office's first choice. Reasoning is MANDATORY on it, so the Insights
+    //    budget carries headroom for the reasoning pass.
     //
-    // "oc/mimo-v2.5-free" was asked for by name and does not exist on this
-    // gateway: the catalogue has no opencode/ or oc/ namespace at all, and
-    // no free MiMo. That string is a picker label from another tool, not an
-    // OpenRouter model id, so xiaomi/mimo-v2.5 stands in for it.
+    // 2. oc/mimo-v2.5-free - the requested backup, placed here on the office's
+    //    word. IT IS NOT IN THE OPENROUTER CATALOGUE. That catalogue was fetched
+    //    and searched: 466 models, no "opencode" namespace, no "oc/" namespace,
+    //    and five MiMo entries, all under xiaomi/, none of them free. So this id
+    //    will 404 against openrouter.ai and the chain will step past it.
     //
-    // The remaining entries are free, and are there so a paid outage does not
-    // also take the report down.
+    //    It is kept because it may well be correct somewhere this repo cannot
+    //    see - a different gateway via AI_API_URL, or a model added after the
+    //    catalogue was read. The office is testing it against the live key.
+    //    If it works there, nothing needs changing; the chain already tries it.
+    //    If it does not, delete this one line - position 3 already covers it.
+    //
+    // 3. xiaomi/mimo-v2.5 - the verified MiMo. Bills about 0.14 per million
+    //    prompt tokens and 0.28 per million completion. Cheap, but a real
+    //    charge, and it runs whenever the free primary is unavailable. Set
+    //    AI_MODELS to the free models only if the account must not spend.
+    //
+    // The rest are free, so a paid outage does not take the report down.
     $aiModels = [
         $aiModel,
+        'oc/mimo-v2.5-free',
         'xiaomi/mimo-v2.5',
         'nvidia/nemotron-3-ultra-550b-a55b:free',
         'z-ai/glm-5.2:free',
