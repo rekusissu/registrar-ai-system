@@ -562,9 +562,7 @@ async function post(action, body) {
     return res.json();
 }
 
-// ── Step 1: ID/username + password ──
-// Staff-side accounts are answered with step:'otp' and go to Step 2.
-// Students are signed in directly.
+// ── Step 1: ID/username + password (Direct Login) ──
 $('step1Form').addEventListener('submit', async function (e) {
     e.preventDefault();
     const credential = $('credential').value.trim();
@@ -584,25 +582,6 @@ $('step1Form').addEventListener('submit', async function (e) {
     try {
         const data = await post('login', { username: credential, password });
         if (data.success) {
-            // A second factor is required: hand over to the OTP step
-            // instead of redirecting. The server has NOT created a
-            // session yet, so there is nothing to lose by waiting here.
-            if (data.data && data.data.step === 'otp') {
-                session.user_id   = data.data.user_id;
-                session.purpose   = data.data.purpose || 'login';
-                session.status    = 'idle';
-                $('otpMasked').textContent = data.data.masked_email || '';
-                // 'delivered' is the difference between "check your inbox"
-                // and "we could not reach the mail server" - say which.
-                $('otpResentMsg').textContent = data.data.delivered === false
-                    ? 'We could not reach the mail server. Use Resend, or contact the administrator.'
-                    : '';
-                $('otpResentMsg').style.color = data.data.delivered === false ? '#dc2626' : '#16a34a';
-                $('otp').value = '';
-                showForm('otp');
-                $('otp').focus();
-                return;
-            }
             showSuccess('Login successful! Redirecting…');
             window.location.href = data.data?.redirect || 'dashboard.php';
         } else {
