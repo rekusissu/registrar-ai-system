@@ -117,12 +117,22 @@
 --   grades_faculty_source.sql academic_grades provenance columns + uq_ag_source
 --                             / idx_ag_faculty, and academic_history's
 --                             gwa_reported / gwa_computed pair
+--   document_type_enum.sql    document_requests.document_type widened from five
+--                             values to nine, so the four catalog SKUs that map
+--                             outside the original enum can round-trip instead
+--                             of being silently coerced to ''
+--   add_queue_daily_tap_cap.sql queue_day_settings.max_daily_taps
 --
 -- Both were previously migration-only, so a fresh install shipped a queue with
 -- no lanes and no opening hours, and a records page reading six columns that
 -- did not exist. migrations/queue_lanes_cutoff.sql and
 -- migrations/grades_faculty_source.sql remain for databases that ALREADY exist
 -- and are no-ops against this file.
+--
+-- Everything else in migrations/ is either a repair for rows a PREVIOUS
+-- revision already damaged (document_type_enum's backfill), or a no-op here.
+-- Re-running any of them against a database created from this file is harmless
+-- - they are all guarded - but unnecessary.
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
@@ -444,7 +454,27 @@ CREATE TABLE `document_requests` (
   `record_file_generated_at` datetime DEFAULT NULL,
   `record_copies_issued` int(11) NOT NULL DEFAULT 0,
   `student_id` int(11) NOT NULL,
-  `document_type` enum('form137','good_moral','transcript','certificate','clearance') NOT NULL,
+  -- Nine values, folded in from migrations/document_type_enum.sql.
+  --
+  -- The five-value list this line used to carry was the bug, not the target:
+  -- api/student-documents.php derives document_type from the catalog SKU, and
+  -- four of the seven SKUs map to values the five-value enum could not hold -
+  -- diploma, ctc, honorable_dismissal, course_description.
+  --
+  -- This server does not run STRICT_TRANS_TABLES, so writing one of those four
+  -- does NOT raise an error. MySQL silently coerces it to ''. The request files
+  -- successfully, the registrar sees it, and the document type is blank - which
+  -- reads on the student's own page and in the registrar's filters as "the
+  -- document type is missing".
+  --
+  -- form137 and clearance are kept: they were already permitted and older rows
+  -- may still carry them. catalog_id + document_catalog.sku is the real source
+  -- of truth; this column is legacy but is still read for display and filtering,
+  -- so it has to be able to hold a real answer.
+  --
+  -- A MODIFY COLUMN written from a SHORT list replaces the enum rather than
+  -- extending it. The same trap the note on document_status below warns about.
+  `document_type` enum('form137','good_moral','transcript','certificate','clearance','diploma','ctc','honorable_dismissal','course_description') NOT NULL,
   `catalog_id` int(11) DEFAULT NULL,
   `quantity` int(11) NOT NULL DEFAULT 1,
   `request_type` enum('Express','Regular') NOT NULL DEFAULT 'Regular',
@@ -989,6 +1019,11 @@ CREATE TABLE `status_tracker` (
   KEY `changed_by` (`changed_by`),
   KEY `idx_student_id` (`student_id`),
   KEY `idx_current_status` (`current_status`),
+  -- From migrations/status_loa_window.sql. The LOA view asks "which
+  -- time-boxed statuses are open for this student", which filters on student_id
+  -- and end_date together - idx_student_id alone does not serve it, and the
+  -- table grows one row per status change per student.
+  KEY `idx_student_end_date` (`student_id`,`end_date`),
   CONSTRAINT `status_tracker_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE,
   CONSTRAINT `status_tracker_ibfk_2` FOREIGN KEY (`changed_by`) REFERENCES `users` (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
@@ -1102,6 +1137,23 @@ CREATE TABLE `students` (
 DROP TABLE IF EXISTS `users`;
 CREATE TABLE `users` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
+  -- NOT widened, and NOT nullable, even though
+  -- migrations/security_hardening_phase1.sql would do both. Deliberate:
+  --
+  --   * That migration MODIFYs this column to varchar(190) NULL. It also
+  --     DROPs the unique index and replaces it with a plain one
+  --     (idx_users_email). Making email nullable and non-unique is a change
+  --     to who may hold an account, not a schema tidy-up, so it is not folded
+  --     in here on the strength of a migration that has not been applied.
+  --
+  --   * varchar(100) indexes this column perfectly well - the 190/767-byte
+  --     limit in that migration applies to a longer column, and is not a
+  --     reason to widen one that is already indexed (UNIQUE KEY `email` and
+  --     KEY `idx_email` below both exist).
+  --
+  -- If the office decides duplicate emails should be allowed, that decision
+  -- belongs in the migration and in a reviewed deploy - not silently in a
+  -- schema file that gets imported over production.
   `email` varchar(100) NOT NULL,
   `password_hash` varchar(255) NOT NULL,
   `full_name` varchar(100) NOT NULL,
