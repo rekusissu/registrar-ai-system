@@ -88,6 +88,25 @@ function doc_blocker(array $row): ?array
         ];
     }
 
+    // An unpaid GCash request is waiting on the student. Reported as
+    // waiting rather than left clear, because clear was actively
+    // misleading: with no case for it the desk drew "Nothing — start it"
+    // with a green tick and offered no action, so a clerk could tell a
+    // student to collect a document nobody had paid for.
+    //
+    // Placed after a registrar's own hold and before the balance, so a
+    // clerk's note still wins, but an unpaid request is never presented
+    // as ready to start.
+    //
+    // api/documents.php 'verify_receipt' releases it, by moving the row
+    // to Filed once the screenshot has been checked.
+    if ($st === 'Awaiting_Payment') {
+        return [
+            'reason' => 'the student to pay by GCash and send the receipt',
+            'since'  => $since,
+        ];
+    }
+
     // 1. Outstanding balance. A real block: the office cannot issue against
     //    an unpaid account, and it clears itself the moment money lands.
     if (isset($row['balance']) && (float) $row['balance'] > 0) {

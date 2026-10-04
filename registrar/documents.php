@@ -276,6 +276,10 @@ $students  = $db->fetchAll(
 );
 
 $statusPill = [
+    // A student who chose GCash lands here and stays until the receipt is
+    // checked. It is given a real pill rather than falling through to the
+    // 'filed' default, which made an unpaid request look filed on the desk.
+    'Awaiting_Payment'  => ['awaiting-payment', 'fa-clock'],
     'Pending_Clearance' => ['pending-clearance','fa-triangle-exclamation'],
     'Filed'             => ['filed','fa-folder-open'],
     'Processing'        => ['processing','fa-gear'],
@@ -284,6 +288,9 @@ $statusPill = [
     'Rejected'          => ['rejected','fa-xmark'],
 ];
 $statusLabel = [
+    // "Waiting on payment", not the raw enum and not "Awaiting Payment":
+    // it is what the row is, in the words the person reading it uses.
+    'Awaiting_Payment'  => 'Waiting on payment',
     'Pending_Clearance' => 'Pending Clearance',
     'Filed'             => 'Filed',
     'Processing'        => 'Being prepared',
@@ -688,55 +695,35 @@ body[data-page="documents"] .dq-empty span{font-size:12.5px;color:#94a3b8}
    fills in as the step below it becomes usable, which is the only
    motion on this dialog and it answers the clerk's next question:
    "what can I do next?". */
-.nq-steps{list-style:none;margin:0 0 4px;padding:0;counter-reset:nq}
-.nq-step{position:relative;display:grid;grid-template-columns:26px 1fr;gap:12px;padding-bottom:18px}
-.nq-step:last-child{padding-bottom:4px}
-/* The rail between steps. Drawn on the step, not as a separate element,
-   so it cannot outnumber the steps and leave a dangling stub. */
-.nq-step:not(:last-child)::after{
-  content:"";position:absolute;left:13px;top:26px;bottom:2px;width:2px;
-  background:#e2e8f0;border-radius:1px;
-}
-.nq-step.is-done::after{background:#2563eb}
-.nq-step-mark{
-  display:grid;place-items:center;width:26px;height:26px;border-radius:8px;
-  background:#f1f5f9;color:#94a3b8;font:700 12px/1 "JetBrains Mono",ui-monospace,monospace;
-  border:1px solid #e2e8f0;transition:background .16s ease,color .16s ease,border-color .16s ease;
-}
-.nq-step.is-active .nq-step-mark{background:#2563eb;border-color:#2563eb;color:#fff}
-.nq-step.is-done .nq-step-mark{background:#dbeafe;border-color:#bfdbfe;color:#1d4ed8}
-.nq-step-body{min-width:0}
-.nq-step-label{margin-bottom:6px;font-size:12.5px;font-weight:650;color:#334155}
-.nq-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.nq-field>label{display:block;margin-bottom:6px;font-size:12px;font-weight:600;color:#64748b}
-.nq-field>label .nq-req{color:#dc2626;margin-left:2px}
-/* The one line that says what the optional field is for. Sits under the
-   input rather than in the label, because it is a caution about filling
-   the field in, not a description of its contents. */
-.nq-hint{margin-top:6px;font-size:11px;line-height:1.45;color:#94a3b8}
+/* ?? The steps ??????????????????????????????????????????????
+   Numbered, because filling this form IS a sequence: who, then what,
+   then why. Four uppercase headings with rules under them said "here is
+   a document" rather than "this is the order to work", and the rules
+   added four more horizontal lines to a form that already had a boxed
+   fee ticket below it.
 
-/* Facts about the request, as opposed to fields on it. Kept together
-   under the form because that is where a clerk looks for the two things
-   that are true rather than typed: what it costs, and how it is
-   handed over. */
-.nq-facts{margin-top:2px;padding-top:16px;border-top:1px solid #e2e8f0}
-.nq-fact{display:flex;align-items:center;gap:8px;margin:11px 0 0;font-size:12px;color:#64748b}
-.nq-fact i{font-size:11px;color:#94a3b8}
-#newRequestModal .form-control{width:100%;height:40px;box-sizing:border-box;padding:0 12px;border:1px solid #cbd5e1;border-radius:9px;background:#f8faff;color:#1e293b;font:13px Inter,sans-serif;transition:border-color .15s ease,box-shadow .15s ease}
-#newRequestModal select.form-control{cursor:pointer;padding-right:30px}
-#newRequestModal .form-control:focus{outline:0;border-color:#2563eb;background:#fff;box-shadow:0 0 0 4px rgba(37,99,235,.12)}
-#newRequestModal .form-control::placeholder{color:#94a3b8}
-#newRequestModal .form-control[readonly]{background:#f1f5f9;color:#64748b;cursor:default}
-#newRequestModal .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+   The numeral carries the order, the label carries the meaning, and a
+   thin rail joins them so the eye reads down one column instead of
+   hopping between left-edge numbers and right-edge labels. The rail
+   fills in as the step below it becomes usable, which is the only
+   motion on this dialog and it answers the clerk's next question:
+   "what can I do next?".
+
+   The shared vocabulary now lives in css/documents.css as plain
+   classes, because registrar/documents-add.php files the same row
+   through the same endpoint and has to look like the same act. What
+   stays here is only what is genuinely a dialog's: the fixed-height
+   flex column with a pinned header and footer. The rest was copied,
+   and two copies of the same form are two forms free to drift - this
+   page was still offering an Express priority the modal had retired. */
+#newRequestModal .form-row{grid-template-columns:1fr 1fr}
 #newRequestModal .req-hint{margin-top:8px}
 
-/* The fee ticket ? the one loud element. */
-.nq-fee{position:relative;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:0 0 2px;padding:15px 18px 14px;border:1px solid #bfdbfe;border-radius:14px;background:linear-gradient(140deg,#eff6ff,#fff 72%)}
-.nq-fee::before{content:"";position:absolute;left:18px;right:18px;top:11px;height:2px;background:repeating-linear-gradient(90deg,#c7d7fe 0 7px,transparent 7px 14px)}
-.nq-fee-cap{font-size:10px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:#1d4ed8}
-.nq-fee-note{margin-top:5px;font-size:12px;color:#64748b;max-width:38ch}
-.nq-fee-amount{font:800 30px/1 JetBrains Mono,ui-monospace,monospace;letter-spacing:-.03em;color:#1d4ed8;font-variant-numeric:tabular-nums;white-space:nowrap}
-
+/* The fee ticket is in documents.css now, alongside the rest of the shared
+   vocabulary. It was duplicated here once, which meant a change to the
+   ticket's type or padding had to be made twice and neither copy could be
+   trusted as the current one. */
+#newRequestModal .nq-fee{margin-bottom:2px}
 #newRequestModal .modal-footer{flex:0 0 auto;display:flex;align-items:center;justify-content:flex-end;gap:9px;padding:14px 22px;background:#f8faff;border-top:1px solid #e2e8f0}
 #newRequestModal .modal-footer .btn{min-height:40px;padding:0 20px;font-size:13px}
 #newRequestModal .modal-footer .btn-primary{display:inline-flex;align-items:center;gap:7px}
@@ -983,6 +970,11 @@ tr.is-blocked:hover{background:#fffbeb}
         </select>
         <select id="statusFilter" onchange="applyFilters()" aria-label="Filter by status">
             <option value="">All Statuses</option>
+            <?php // The value is the raw status, because applyFilters() compares it
+                  // against tr.dataset.status, which is also the raw status.
+                  // The TEXT is the plain-language label, so the enum never
+                  // reaches the screen. ?>
+            <option value="Awaiting_Payment">Waiting on payment</option>
             <option value="Filed">Filed</option>
             <option value="Pending_Clearance">Pending Clearance</option>
             <option value="Processing">Being prepared</option>
@@ -1357,7 +1349,31 @@ tr.is-blocked:hover{background:#fffbeb}
                                       // writes it; the desk no longer displays
                                       // or asks for it. ?>
                                 <div><strong>Qty:</strong> <?= (int) ($r['quantity'] ?? 1) ?></div>
-                                <div><strong>Payment:</strong> Paid at the counter</div>
+                                <?php // Was hardcoded "Paid at the counter", which is
+                                      // false for every GCash request — the exact
+                                      // request kind the student portal now creates.
+                                      // A clerk reading that on an unpaid request
+                                      // would believe the money had been taken in
+                                      // when it had not. Stated from the columns. ?>
+                                <div><strong>Payment:</strong>
+                                    <?php
+                                    $rcptState = doc_requires_receipt($r) ? doc_receipt_state($r) : null;
+                                    $paidAt    = !empty($r['paid_at']) ? date('M d, Y', strtotime($r['paid_at'])) : null;
+                                    if (($r['payment_method'] ?? 'Online') === 'Cash_on_Delivery') {
+                                        echo $paidAt ? 'Cash at the counter on ' . htmlspecialchars($paidAt)
+                                                     : 'Cash at the counter on collection';
+                                    } elseif ($r['document_status'] === 'Awaiting_Payment') {
+                                        echo 'GCash &mdash; not paid yet';
+                                    } elseif ($rcptState === 'submitted') {
+                                        echo 'GCash &mdash; receipt sent, awaiting check'
+                                           . (!empty($r['payment_receipt_ref'])
+                                               ? ' (ref ' . htmlspecialchars($r['payment_receipt_ref']) . ')' : '');
+                                    } else {
+                                        echo 'GCash &mdash; paid'
+                                           . ($paidAt ? ' on ' . htmlspecialchars($paidAt) : '');
+                                    }
+                                    ?>
+                                </div>
                                 <div><strong>Target:</strong> <?= $age['target'] !== null ? (int) $age['target'] . ' day' . ($age['target'] === 1 ? '' : 's') : '?' ?></div>
                                 <div><strong>Requested:</strong> <?= date('M d, Y h:i A', strtotime($r['request_date'])) ?></div>
                                 <?php // What to ask the student for. An ask, not a

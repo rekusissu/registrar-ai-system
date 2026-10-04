@@ -13,6 +13,10 @@ require_once __DIR__ . '/../shared/database.php';
 // explicitly rather than relying on the chain: a page that silently
 // loses these renders every request as if no receipt were needed.
 require_once __DIR__ . '/../shared/document_process.php';
+// The office's GCash QR, and whether it is actually on this server. The
+// payment screen shows the code, or says it is not set up — never a
+// broken image. See shared/payment_qr.php.
+require_once __DIR__ . '/../shared/payment_qr.php';
 
 $page_title = 'My Documents';
 $APP_ROOT = '../';
@@ -22,6 +26,7 @@ $extra_css = ['student.css', 'documents.css'];
 require_once __DIR__ . '/_guard.php';
 
 $db = Database::getInstance();
+$gcashQr = gcashQrImage();
 
 // ── Catalog (active only)
 $catalog = $db->fetchAll(
@@ -72,11 +77,19 @@ $statusLabel = [
     'Claimed'           => 'Collected',
     'Rejected'          => 'Rejected',
 ];
+// One icon per SKU. This list used to stop at four, so Diploma Replacement,
+// Honorable Dismissal and Course Description all fell through to the same
+// grey placeholder — three of the seven documents a student can pick looked
+// identical at a glance, which is the one thing the icon column exists to
+// prevent. Kept in step with the registrar desk's map (documents.php:294).
 $catIcon = [
-    'DOC-TOR' => ['linear-gradient(135deg,#2563eb,#1d4ed8)', 'fa-file-invoice'],
-    'DOC-COE' => ['linear-gradient(135deg,#16a34a,#15803d)', 'fa-certificate'],
-    'DOC-GM'  => ['linear-gradient(135deg,#0d9488,#0f766e)', 'fa-handshake-angle'],
-    'DOC-CTC' => ['linear-gradient(135deg,#4f46e5,#4338ca)', 'fa-copy'],
+    'DOC-TOR'     => ['linear-gradient(135deg,#2563eb,#1d4ed8)', 'fa-file-invoice'],
+    'DOC-COE'     => ['linear-gradient(135deg,#16a34a,#15803d)', 'fa-certificate'],
+    'DOC-GM'      => ['linear-gradient(135deg,#0d9488,#0f766e)', 'fa-handshake-angle'],
+    'DOC-DIPLOMA' => ['linear-gradient(135deg,#7c3aed,#6d28d9)', 'fa-graduation-cap'],
+    'DOC-CTC'     => ['linear-gradient(135deg,#4f46e5,#4338ca)', 'fa-copy'],
+    'DOC-HD'      => ['linear-gradient(135deg,#ea580c,#c2410c)', 'fa-sign-out-alt'],
+    'DOC-CD'      => ['linear-gradient(135deg,#db2777,#be185d)', 'fa-book-open'],
 ];
 
 function feeLabel($c) {
@@ -331,7 +344,7 @@ $claimed     = $counts['Claimed'];
                             <td style="font-size:12px;color:#64748b;"><?= date('M d, Y', strtotime($r['request_date'])) ?></td>
                             <td style="text-align:right;white-space:nowrap;">
                                 <?php if ($payable): ?>
-                                    <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();openPaymentModal(<?= (int) $r['id'] ?>, '<?= htmlspecialchars($r['request_id']) ?>', <?= (float) $r['fee_amount'] ?>);"><i class="fa-solid fa-credit-card"></i> Pay Online</button>
+                                    <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();openPaymentModal(<?= (int) $r['id'] ?>, '<?= htmlspecialchars($r['request_id']) ?>', <?= (float) $r['fee_amount'] ?>, '<?= htmlspecialchars($r['catalog_name'] ?? '', ENT_QUOTES) ?>');"><i class="fa-solid fa-qrcode"></i> Pay with GCash</button>
                                 <?php elseif ($receiptState === 'none'): ?>
                                     <!-- Paid, no receipt yet. This button IS the
                                          next action, so it takes the primary
@@ -422,108 +435,226 @@ $claimed     = $counts['Claimed'];
     </div>
 </main>
 
-<!-- New Request Modal -->
+<!-- New Request Modal
+
+     A student's request is a different act from a clerk's, and this form
+     is built for that difference rather than for parity with the desk.
+
+     The clerk already knows the student, so their form opens with two
+     selects and a fee. The student has to CHOOSE a document from a
+     catalog of seven, so that choice is the first thing on screen and it
+     is made from cards carrying a name and a price — the two things being
+     compared. A dropdown hides the prices side by side and makes the
+     student open each one to compare, which is the whole decision. -->
 <div class="modal-overlay" id="requestModal">
-    <div class="modal-content" style="max-width:640px;">
-        <div class="modal-header"><h2><i class="fas fa-file-circle-plus"></i> New Document Request</h2><button class="modal-close" onclick="closeRequestModal()"><i class="fas fa-times"></i></button></div>
-        <form id="requestForm"><div class="modal-body">
-            <div class="form-group">
-                <label>Document <span class="required">*</span></label>
-                <div class="catalog-picker" id="catalogPicker">
+    <div class="modal-content nq-dialog">
+        <div class="modal-header nq-dialog-head">
+            <div class="nq-mark"><i class="fa-solid fa-file-circle-plus"></i></div>
+            <div>
+                <h2>New Document Request</h2>
+                <p>Choose a document, then how you want to receive it.</p>
+            </div>
+            <button class="modal-close" onclick="closeRequestModal()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <form id="requestForm">
+        <div class="modal-body nq-dialog-body">
+
+            <div class="nq-field">
+                <div class="nq-step-label" id="reqDocLabel">Which document</div>
+                <?php // Real radio inputs, styled as cards. They were divs
+                      // with an onclick, which put the catalog outside the
+                      // form's accessibility tree entirely: no role, no
+                      // checked state, unreachable by keyboard, and a screen
+                      // reader read seven prices with no way to say which was
+                      // chosen. The native input carries all of that for free;
+                      // only the skin is custom. ?>
+                <div class="catalog-picker" id="catalogPicker" role="radiogroup" aria-labelledby="reqDocLabel">
                     <?php foreach ($catalog as $c):
-                        $ci = $catIcon[$c['sku']] ?? ['linear-gradient(135deg,#64748b,#475569)', 'fa-file-lines']; ?>
-                    <div class="catalog-option" data-id="<?= (int) $c['id'] ?>" onclick="selectCatalogOption(this,<?= (int) $c['id'] ?>)">
-                        <div class="catalog-option-icon" style="background:<?= $ci[0] ?>;"><i class="fa-solid <?= $ci[1] ?>"></i></div>
-                        <div><div class="catalog-option-name"><?= htmlspecialchars($c['name']) ?></div><div class="catalog-option-fee"><?= feeLabel($c) ?></div></div>
-                    </div>
+                        $ci = $catIcon[$c['sku']] ?? ['linear-gradient(135deg,#64748b,#475569)', 'fa-file-lines'];
+                        $hasReq = trim((string) ($c['requirement'] ?? '')) !== ''; ?>
+                        <label class="co-card" data-id="<?= (int) $c['id'] ?>">
+                            <input type="radio" name="catalog_pick" value="<?= (int) $c['id'] ?>"
+                                   class="co-radio" data-req="<?= htmlspecialchars((string) $c['requirement'], ENT_QUOTES) ?>">
+                            <span class="co-icon" style="background:<?= $ci[0] ?>;"><i class="fa-solid <?= $ci[1] ?>"></i></span>
+                            <span class="co-text">
+                                <span class="co-name"><?= htmlspecialchars($c['name']) ?></span>
+                                <span class="co-fee"><?= feeLabel($c) ?></span>
+                                <?php if ($hasReq): ?>
+                                    <span class="co-req"><i class="fa-solid fa-id-card"></i> Bring an ID</span>
+                                <?php endif; ?>
+                            </span>
+                        </label>
                     <?php endforeach; ?>
                 </div>
                 <input type="hidden" name="catalog_id" id="catalogId">
             </div>
-            <div class="form-group" id="qtyGroup" style="display:none;">
-                <label>Quantity</label>
-                <input type="number" id="reqQty" class="form-control" min="1" max="20" value="1">
+
+            <div class="nq-field nq-qty" id="qtyGroup" hidden>
+                <label for="reqQty">How many</label>
+                <input type="number" id="reqQty" class="form-control" min="1" max="100" value="1">
+                <p class="nq-hint" id="qtyHint">This document is charged per page.</p>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-                <div class="form-group"><label>Request Type</label><input type="text" class="form-control" value="Regular" readonly style="background:#f1f5f9;cursor:not-allowed;"><small style="color:#94a3b8;">Students can only submit regular requests.</small></div>
-                <div class="form-group">
-                    <label>Fulfillment <span class="required">*</span></label>
-                    <select id="reqFulfillment" class="form-control">
-                        <option value="Pickup" selected>Pickup at Registrar</option>
-                        <option value="Delivery">Courier delivery</option>
-                        <option value="Digital">Digital copy (email)</option>
-                    </select>
+            <div class="nq-field">
+                <?php // Fulfillment is no longer a question. The office runs
+                      // no courier and issues no emailed copy, so "Collect at
+                      // the office" was the only reachable answer among three
+                      // — and two of the three promised something the office
+                      // cannot do. A student choosing "Digital copy" would have
+                      // been told to expect an email the registrar has no way
+                      // to send. The choice is now a stated fact, sent as the
+                      // fixed value the API validates, exactly as the desk's
+                      // own form does it. ?>
+                <div class="nq-facts nq-facts--inline">
+                    <div class="nq-fact nq-fact--box">
+                        <span class="get-icon get-icon--counter"><i class="fa-solid fa-building-columns"></i></span>
+                        <span><b>Collect at the registrar counter</b><small>On your student ID, once it is marked ready</small></span>
+                    </div>
                 </div>
+                <input type="hidden" name="fulfillment_type" id="reqFulfillment" value="Pickup">
             </div>
 
-            <!-- Courier needs somewhere to send it. Hidden until Delivery is
-                 chosen, so the form does not ask a question that has no
-                 bearing on a pickup or a digital copy. -->
-            <div class="form-group" id="addressGroup" style="display:none;">
-                <label>Delivery Address <span class="required">*</span></label>
-                <textarea id="reqAddress" class="form-control" rows="2" placeholder="House no., street, barangay, city, province"></textarea>
-            </div>
-
-            <div class="form-group">
-                <label>Payment Method <span class="required">*</span></label>
-                <div style="display:flex;gap:12px;margin-top:4px;">
-                    <label class="payment-option" style="display:flex;align-items:center;gap:8px;padding:10px 16px;border:2px solid #2563eb;border-radius:10px;cursor:pointer;flex:1;">
-                        <input type="radio" name="payment_method" value="Online" checked style="accent-color:#2563eb;">
-                        <div><div style="font-weight:700;font-size:13px;color:#1e293b;"><i class="fa-solid fa-mobile-screen-button" style="color:#2563eb;"></i> Pay Online (GCash)</div><div style="font-size:11px;color:#94a3b8;">Pay now, collect when ready</div></div>
+            <div class="nq-field">
+                <div class="nq-step-label" id="reqPayLabel">How you'll pay</div>
+                <div class="get-row" role="radiogroup" aria-labelledby="reqPayLabel">
+                    <label class="get-choice">
+                        <input type="radio" name="payment_method" value="Online" class="get-radio" checked>
+                        <span class="get-icon get-icon--online"><i class="fa-solid fa-mobile-screen-button"></i></span>
+                        <span class="get-text"><b>Pay online with GCash</b><small>Pay now, collect when it's ready</small></span>
                     </label>
-                    <label class="payment-option" style="display:flex;align-items:center;gap:8px;padding:10px 16px;border:2px solid #e2e8f0;border-radius:10px;cursor:pointer;flex:1;">
-                        <input type="radio" name="payment_method" value="Cash_on_Delivery" style="accent-color:#dc2626;">
-                        <div><div style="font-weight:700;font-size:13px;color:#1e293b;"><i class="fa-solid fa-hand-holding-dollar" style="color:#dc2626;"></i> Payment Upon Pickup</div><div style="font-size:11px;color:#94a3b8;">Pay cash at the office</div></div>
+                    <label class="get-choice">
+                        <input type="radio" name="payment_method" value="Cash_on_Delivery" class="get-radio">
+                        <span class="get-icon get-icon--counter"><i class="fa-solid fa-hand-holding-dollar"></i></span>
+                        <span class="get-text"><b>Pay when you collect</b><small>Cash at the registrar counter</small></span>
                     </label>
                 </div>
+                <?php // The fee line below says "you can pay at the counter if you
+                      // pick that above". Which is a claim the form has to keep
+                      // true, so choosing GCash here rewrites that sentence
+                      // rather than leaving a second thing to remember. ?>
+                <p class="nq-hint" id="payHint">Paying online starts your request as soon as you submit.</p>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-                <?php // Recipient is gone. A document requested here is
-                      // released to the student who asked for it, at the
-                      // counter, on their student ID — there is no courier
-                      // and no third-party collection, so the field could
-                      // only ever have been filled with the student's own
-                      // name or an office's. The column is still in
-                      // document_requests; nothing writes to it from here
-                      // any more. Purpose now takes the full width. ?>
-                <div class="form-group" style="grid-column:1 / -1;"><label>Purpose <span class="required">*</span></label><input type="text" name="purpose" id="reqPurpose" class="form-control" required placeholder="e.g. Job application, Transfer"></div>
+
+            <div class="nq-field">
+                <label for="reqPurpose">What it's for <span class="nq-req">*</span></label>
+                <input type="text" name="purpose" id="reqPurpose" class="form-control" required
+                       placeholder="Job application, transfer to another school">
+                <p class="nq-hint">A sentence is enough. It tells the office who to prepare the document for.</p>
             </div>
-            <div class="form-group" id="reqFileGroup" style="display:none;"><label>Requirement File</label><input type="file" name="requirement_file" id="reqFile" class="form-control" accept=".pdf,.jpg,.jpeg,.png"><div class="req-hint" id="reqHint"></div></div>
-            <div class="fee-preview"><div><div class="fp-label">Total fee</div><div style="font-size:11px;color:#94a3b8;" id="feeNote">Select a document to see the fee.</div></div><div class="fp-amount" id="feePreview">&mdash;</div></div>
+
+            <div class="nq-field" id="reqFileGroup" hidden>
+                <label for="reqFile">Attach the requirement</label>
+                <input type="file" name="requirement_file" id="reqFile" class="form-control" accept=".pdf,.jpg,.jpeg,.png">
+                <div class="req-hint" id="reqHint" role="status"></div>
+            </div>
+
+            <?php // Priority is Regular for every request and the API
+                 // validates it, so the field is sent but never offered. It
+                 // used to be a readonly box labelled "Request Type" with a
+                 // note under it, which read as a setting that had gone wrong
+                 // rather than as a fact about the request. ?>
+            <input type="hidden" name="request_type" value="Regular">
+
+            <?php // The fee is the one number the student came for, so it is
+                  // the one loud thing. Same perforated ticket the desk uses,
+                  // for the same reason: both are read across a counter. ?>
+            <div class="nq-facts">
+                <div class="nq-fee">
+                    <div>
+                        <div class="nq-fee-cap">Total to pay</div>
+                        <div class="nq-fee-note" id="feeNote">Pick a document to see its fee.</div>
+                    </div>
+                    <div class="nq-fee-amount" id="feePreview">&mdash;</div>
+                </div>
+                <p class="nq-fact"><i class="fa-solid fa-circle-info" aria-hidden="true"></i> <span id="feeFootNote">You can pay at the counter if you pick that above.</span></p>
+            </div>
         </div>
-        <div class="modal-footer">
+        <div class="modal-footer nq-dialog-foot">
             <button type="button" class="btn btn-light" onclick="closeRequestModal()">Cancel</button>
-            <button type="submit" class="btn btn-primary" id="submitReqBtn"><i class="fas fa-paper-plane"></i> Submit Request</button>
-        </div></form>
+            <button type="submit" class="btn btn-primary" id="submitReqBtn"><i class="fa-solid fa-paper-plane"></i> Submit request</button>
+        </div>
+        </form>
     </div>
 </div>
 
-<!-- Payment Modal -->
+<!-- Payment Modal
+
+     Not a gateway. The office collects against one static GCash QR: the
+     student scans it, pays, and sends the screenshot back for a
+     registrar to check. There is no transaction to create, no status to
+     poll and no provider to call — so this screen does none of that,
+     and the request only advances once a person has looked at the
+     receipt. See api/documents.php 'verify_receipt'. -->
 <div class="modal-overlay" id="payModal">
-    <div class="modal-content" style="max-width:460px;">
-        <div class="modal-header"><h2><i class="fa-solid fa-credit-card"></i> Pay Online</h2><button class="modal-close" onclick="closePayModal()"><i class="fas fa-times"></i></button></div>
-        <div class="modal-body">
-            <div id="payLoading" style="text-align:center;padding:26px 0;"><i class="fa-solid fa-spinner fa-spin" style="font-size:22px;color:#2563eb;"></i><p style="color:#64748b;font-size:13px;margin-top:8px;">Contacting payment gateway...</p></div>
-            <div id="payContent" style="display:none;">
-                <div class="pay-gateway">
-                    <div class="pay-brand" id="payGatewayBrand"><i class="fa-solid fa-bolt"></i> Mock Payment Gateway</div>
-                    <div class="pay-amount" id="payAmount">&#8369;0.00</div>
-                    <div class="pay-row"><span>Fee</span><b id="payDocFee">&mdash;</b></div>
-                    <div class="pay-row"><span>Request</span><b id="payReq">&mdash;</b></div>
-                    <div class="pay-row"><span>Transaction ID</span><b id="payTxn">&mdash;</b></div>
-                    <div class="pay-row"><span>Status</span><b style="color:#fde68a;">PENDING</b></div>
-                </div>
-                <span class="gateway-chip"><i class="fa-solid fa-link"></i> <span id="payUrl">&mdash;</span></span>
-                <p style="font-size:12.5px;color:#64748b;margin:12px 0 4px;" id="payNote">This is a mock gateway. Press the button below to simulate.</p>
-                <div class="simulate-actions" id="paymongoActions" style="display:none;">
-                    <button class="btn btn-primary" style="flex:1;" id="payNowBtn"><i class="fa-solid fa-mobile-screen-button"></i> Pay with GCash</button>
-                    <button class="btn btn-light" id="checkStatusBtn"><i class="fa-solid fa-rotate"></i> Check status</button>
-                </div>
-                <div class="simulate-actions" id="mockActions">
-                    <button class="btn btn-primary" style="flex:1;" id="simulateSuccessBtn"><i class="fa-solid fa-circle-check"></i> Simulate Success</button>
-                    <button class="btn btn-light" id="simulateFailBtn"><i class="fa-solid fa-xmark"></i> Fail</button>
-                </div>
+    <div class="modal-content nq-dialog pay-dialog">
+        <div class="modal-header nq-dialog-head">
+            <div class="nq-mark nq-mark--gcash"><i class="fa-solid fa-qrcode"></i></div>
+            <div>
+                <h2>Pay with GCash</h2>
+                <p>Scan the code, then send the amount.</p>
             </div>
+            <button class="modal-close" onclick="closePayModal()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div class="modal-body nq-dialog-body pay-body">
+
+            <?php // The amount sits ABOVE the code, not below it, and that is
+                  // the whole reason this screen is laid out this way. After
+                  // the student scans, GCash asks them to TYPE the amount —
+                  // so the number and the code have to be readable at the
+                  // same moment, without scrolling or looking away. With the
+                  // amount underneath, the student scans, looks at their
+                  // phone for the figure, and comes back to the screen. ?>
+            <div class="pay-amount-card">
+                <div class="pay-amount-cap">Amount to send</div>
+                <div class="pay-amount" id="payAmount">&#8369;0.00</div>
+                <dl class="pay-amount-rows">
+                    <div><dt>Document</dt><dd id="payDocName">&mdash;</dd></div>
+                    <div><dt>Request</dt><dd id="payReq">&mdash;</dd></div>
+                </dl>
+            </div>
+
+            <div class="pay-qr-frame">
+                <?php // Both states are rendered and the image is the one
+                      // hidden. `exists` is a filesystem check, which is
+                      // right for "has this host been given the file" but
+                      // cannot see a web server that refuses to serve a
+                      // file that IS there — wrong permissions, a deny rule
+                      // in .htaccess, the file moved after the page was
+                      // cached. That still renders a broken-image icon, and
+                      // a broken icon inside a payment screen is worse than
+                      // no icon: it looks like the student's phone failed.
+                      // So the image also carries an onerror that reveals
+                      // the same notice, and the notice is the resting
+                      // state the image replaces. ?>
+                <div class="pay-qr-missing" id="payQrMissing"<?= $gcashQr['exists'] ? ' hidden' : '' ?>>
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <b>GCash payment is not available right now</b>
+                    <span>Please pay at the registrar counter instead.</span>
+                </div>
+                <?php if ($gcashQr['exists']): ?>
+                    <img class="pay-qr" id="payQrImg" src="<?= htmlspecialchars($gcashQr['url']) ?>"
+                         alt="GCash QR code — scan this with the GCash app"
+                         onerror="document.getElementById('payQrImg').hidden=true;document.getElementById('payQrMissing').hidden=false;">
+                <?php endif; ?>
+            </div>
+
+            <?php if ($gcashQr['exists']): ?>
+                <ol class="pay-steps">
+                    <li>Open GCash and choose <b>Scan QR</b>.</li>
+                    <li>Enter the amount above.</li>
+                    <li>Send it, then tap <b>I have paid</b> to send the screenshot.</li>
+                </ol>
+            <?php else: ?>
+                <p class="pay-next">Pay at the counter, then attach the receipt so the office can record it.</p>
+            <?php endif; ?>
+        </div>
+
+        <div class="modal-footer nq-dialog-foot pay-foot">
+            <button type="button" class="btn btn-light" onclick="closePayModal()">Close</button>
+            <button type="button" class="btn btn-primary" id="payDoneBtn" onclick="payDone()">
+                <i class="fa-solid fa-receipt"></i> I have paid
+            </button>
         </div>
     </div>
 </div>
@@ -583,57 +714,100 @@ const CATALOG = <?= json_encode(array_map(function ($c) {
 }, $catalog)) ?>;
 const STUDENT_ID = <?= (int) $student['id'] ?>;
 let selectedCatalogId = 0;
-let currentTxn = null;
+// No currentTxn any more. Payment happens inside the GCash app on the
+// student's phone, where this page cannot observe it — so there is no
+// transaction to hold open, and nothing to poll for.
 
 function openRequestModal(presetId) {
     document.getElementById('requestForm').reset();
     document.getElementById('requestModal').classList.add('active');
     document.body.style.overflow = 'hidden';
-    document.querySelectorAll('.catalog-option').forEach(o => o.classList.remove('sel'));
-    if (presetId) selectCatalogOption(document.querySelector('.catalog-option[data-id="'+presetId+'"]'), presetId);
-    else { selectedCatalogId = 0; document.getElementById('catalogId').value = ''; updateFeePreview(); }
+    // reset() returns the radios to their markup defaults, so the styling
+    // that keys off :checked comes back with them. Nothing to restore by
+    // hand — which is the point of using real inputs.
+    if (presetId) {
+        const radio = document.querySelector('.co-radio[value="' + presetId + '"]');
+        if (radio) { radio.checked = true; selectCatalogOption(radio); }
+        else { selectedCatalogId = 0; document.getElementById('catalogId').value = ''; updateFeePreview(); }
+    } else {
+        selectedCatalogId = 0;
+        document.getElementById('catalogId').value = '';
+        updateFeePreview();
+    }
+    syncPayNote();
 }
 function closeRequestModal() { document.getElementById('requestModal').classList.remove('active'); document.body.style.overflow = ''; }
 function pickFromCatalog(id) { openRequestModal(id); }
-function selectCatalogOption(el, id) {
-    document.querySelectorAll('.catalog-option').forEach(o => o.classList.remove('sel'));
-    if (el) el.classList.add('sel');
-    selectedCatalogId = id;
-    document.getElementById('catalogId').value = id;
+
+// Called on every catalog radio's change. The card's selected look comes
+// from .co-radio:checked + .co-card, so there is no class to add or remove
+// and nothing here can leave the highlight stranded on a card the student
+// has already moved away from.
+document.querySelectorAll('.co-radio').forEach(function (radio) {
+    radio.addEventListener('change', function () { if (this.checked) selectCatalogOption(this); });
+});
+function selectCatalogOption(radio) {
+    selectedCatalogId = parseInt(radio.value, 10) || 0;
+    document.getElementById('catalogId').value = selectedCatalogId;
     updateFeePreview();
 }
 function updateFeePreview() {
     const opt = CATALOG.find(c => c.id === selectedCatalogId);
     const qtyGroup = document.getElementById('qtyGroup');
+    const qtyHint  = document.getElementById('qtyHint');
     const qtyInput = document.getElementById('reqQty');
-    if (!opt) { document.getElementById('feePreview').innerHTML = '&mdash;'; document.getElementById('feeNote').textContent = 'Select a document to see the fee.'; qtyGroup.style.display = 'none'; document.getElementById('reqFileGroup').style.display = 'none'; return; }
+    if (!opt) {
+        document.getElementById('feePreview').textContent = '—';
+        document.getElementById('feeNote').textContent = 'Pick a document to see its fee.';
+        qtyGroup.hidden = true;
+        document.getElementById('reqFileGroup').hidden = true;
+        return;
+    }
     const perUnit = opt.fee_type !== 'flat';
-    qtyGroup.style.display = perUnit ? 'block' : 'none';
+    qtyGroup.hidden = !perUnit;
+    if (perUnit && qtyHint) {
+        const unit = opt.fee_type === 'per_syllabus' ? 'syllabus' : 'page';
+        qtyHint.textContent = 'This document is charged per ' + unit + '.';
+    }
     if (!perUnit) qtyInput.value = 1;
     const qty = Math.max(1, parseInt(qtyInput.value) || 1);
     const docFee = opt.base_fee * (perUnit ? qty : 1);
-    document.getElementById('feePreview').innerHTML = '&#8369;' + docFee.toLocaleString('en-PH', {minimumFractionDigits:2});
-    document.getElementById('feeNote').textContent = opt.name + (perUnit ? ' x ' + qty : ' (one-time)');
+    document.getElementById('feePreview').textContent = '₱' + docFee.toLocaleString('en-PH', {minimumFractionDigits:2, maximumFractionDigits:2});
+    document.getElementById('feeNote').textContent = opt.name + (perUnit ? ' × ' + qty : ' · one-time');
     const fileGroup = document.getElementById('reqFileGroup');
     const hint = document.getElementById('reqHint');
-    if (opt.requirement) { fileGroup.style.display = 'block'; hint.textContent = 'Required: ' + opt.requirement; hint.classList.add('visible'); }
-    else { fileGroup.style.display = 'none'; hint.classList.remove('visible'); }
+    if (opt.requirement) {
+        fileGroup.hidden = false;
+        hint.textContent = 'Bring: ' + opt.requirement;
+        hint.classList.add('visible');
+    } else {
+        fileGroup.hidden = true;
+        hint.classList.remove('visible');
+    }
 }
 document.getElementById('reqQty').addEventListener('input', updateFeePreview);
-// Courier is the only mode that needs an address, so the field appears
-// only for it and is cleared when switching away — a stale address left
-// in a hidden field would ship with a pickup request.
-document.getElementById('reqFulfillment')?.addEventListener('change', function () {
-    const isDelivery = this.value === 'Delivery';
-    document.getElementById('addressGroup').style.display = isDelivery ? 'block' : 'none';
-    if (!isDelivery) document.getElementById('reqAddress').value = '';
-    updateFeePreview();
-});
-document.querySelectorAll('.payment-option input[type=radio]').forEach(r => {
-    r.addEventListener('change', function() {
-        document.querySelectorAll('.payment-option').forEach(l => l.style.borderColor = '#e2e8f0');
-        this.closest('.payment-option').style.borderColor = '#2563eb';
-    });
+
+// Fulfillment is fixed at Pickup, so there is nothing left to synchronise
+// between a card and a field. What remains here is the one thing the fee
+// ticket's footnote has to keep true: it states when the student pays, and
+// that depends on the payment radio.
+function syncPayNote() {
+    const online = (document.querySelector('input[name="payment_method"]:checked') || {}).value === 'Online';
+    document.getElementById('payHint').textContent = online
+        ? "You'll pay by GCash right after you submit."
+        : "You won't pay anything yet — settle it at the counter when you collect.";
+    syncFeeFootnote();
+}
+function syncFeeFootnote() {
+    const el = document.getElementById('feeFootNote');
+    if (!el) return;
+    const online = (document.querySelector('input[name="payment_method"]:checked') || {}).value === 'Online';
+    el.textContent = online
+        ? 'Pay online now, then collect at the counter when it is ready.'
+        : 'Pay at the registrar counter when you collect.';
+}
+document.querySelectorAll('input[name="payment_method"]').forEach(function (r) {
+    r.addEventListener('change', syncPayNote);
 });
 document.getElementById('requestModal').addEventListener('click', function(e) { if (e.target === this) closeRequestModal(); });
 document.getElementById('payModal').addEventListener('click', function(e) { if (e.target === this) closePayModal(); });
@@ -744,10 +918,6 @@ async function submitReceipt() {
 document.getElementById('requestForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     if (!selectedCatalogId) { showToast('Please select a document from the catalog.', 'error'); return; }
-    const fulfillment = document.getElementById('reqFulfillment').value;
-    if (fulfillment === 'Delivery' && !document.getElementById('reqAddress').value.trim()) {
-        showToast('Please enter a delivery address for courier delivery.', 'error'); return;
-    }
     const btn = document.getElementById('submitReqBtn');
     btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
     try {
@@ -758,8 +928,12 @@ document.getElementById('requestForm').addEventListener('submit', async function
         // 'Pickup' in JS, which silently discarded the payment radio they
         // had just clicked — the request was filed as paid at the counter
         // while the screen said GCash.
-        fd.set('fulfillment_type', fulfillment);
-        fd.set('delivery_address', document.getElementById('reqAddress').value.trim());
+        //
+        // fulfillment_type and request_type are hidden fields carrying fixed
+        // values, so FormData already has them and they are not re-set here.
+        // delivery_address is gone entirely: with no courier there is nowhere
+        // to send one, and sending an empty string invited the API to store a
+        // blank address against a pickup request.
         fd.set('payment_method', (document.querySelector('input[name="payment_method"]:checked') || {}).value || 'Online');
         const res = await fetch('../api/student-documents.php', { method: 'POST', body: fd });
         const d = await res.json();
@@ -768,80 +942,40 @@ document.getElementById('requestForm').addEventListener('submit', async function
     } catch (err) { showToast('Network error.', 'error'); btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Request'; }
 });
 
-function openPaymentModal(requestId, requestLabel, amount) {
-    const modal = document.getElementById('payModal');
-    modal.classList.add('active'); document.body.style.overflow = 'hidden';
-    document.getElementById('payLoading').style.display = 'block';
-    document.getElementById('payContent').style.display = 'none';
-    document.getElementById('payAmount').innerHTML = '&#8369;' + amount.toLocaleString('en-PH', {minimumFractionDigits:2});
-    document.getElementById('payDocFee').innerHTML = '&#8369;' + amount.toLocaleString('en-PH', {minimumFractionDigits:2});
+// The payment screen shows a QR code and a receipt. There is no
+// transaction to create and no status to poll: the money moves inside
+// the GCash app, on the student's own phone, where this page cannot see
+// it. So opening the screen is pure display, and the only thing that
+// happens next is the student sending the screenshot back.
+let payTarget = null;
+
+function openPaymentModal(requestId, requestLabel, amount, docName) {
+    payTarget = { id: requestId, label: requestLabel };
+    const pesos = '₱' + Number(amount || 0).toLocaleString('en-PH', {
+        minimumFractionDigits: 2, maximumFractionDigits: 2
+    });
+    document.getElementById('payAmount').textContent = pesos;
     document.getElementById('payReq').textContent = requestLabel;
-    document.getElementById('simulateSuccessBtn').disabled = true;
-    document.getElementById('simulateFailBtn').disabled = true;
-    document.getElementById('mockActions').style.display = '';
-    document.getElementById('paymongoActions').style.display = 'none';
-    fetch('../api/mock/payment.php', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'create', request_id: requestId, student_id: STUDENT_ID })
-    }).then(r => r.json()).then(d => {
-        if (d.success) {
-            currentTxn = d.data.transaction_id;
-            document.getElementById('payTxn').textContent = currentTxn;
-            document.getElementById('payUrl').textContent = d.data.payment_url;
-            document.getElementById('payLoading').style.display = 'none';
-            document.getElementById('payContent').style.display = 'block';
-            if (d.data.gateway === 'paymongo') {
-                document.getElementById('payGatewayBrand').innerHTML = '<i class="fa-solid fa-bolt"></i> PayMongo &middot; GCash (test mode)';
-                document.getElementById('payUrl').textContent = d.data.intent_id || d.data.payment_url;
-                document.getElementById('mockActions').style.display = 'none';
-                document.getElementById('paymongoActions').style.display = '';
-                document.getElementById('payNote').textContent = "You'll pay on PayMongo's hosted GCash page (test mode). After paying, click Check status.";
-                document.getElementById('payNowBtn').onclick = function() { window.open(d.data.payment_url, '_blank'); startStatusPolling(currentTxn); };
-                document.getElementById('checkStatusBtn').onclick = function() {
-                    var btn = document.getElementById('checkStatusBtn'); if (btn.disabled) return;
-                    btn.disabled = true; var orig = btn.innerHTML;
-                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking...';
-                    pollStatusOnce(currentTxn).finally(function() { btn.disabled = false; btn.innerHTML = orig; });
-                };
-            } else {
-                document.getElementById('payGatewayBrand').innerHTML = '<i class="fa-solid fa-bolt"></i> Mock Payment Gateway &middot; GCash / Maya';
-                document.getElementById('simulateSuccessBtn').disabled = false;
-                document.getElementById('simulateFailBtn').disabled = false;
-            }
-        } else { closePayModal(); showToast(d.message || 'Could not start payment.', 'error'); }
-    }).catch(() => { closePayModal(); showToast('Payment gateway unreachable.', 'error'); });
+    document.getElementById('payDocName').textContent = docName || '—';
+    document.getElementById('payModal').classList.add('active');
+    document.body.style.overflow = 'hidden';
 }
-function closePayModal() { stopStatusPolling(); document.getElementById('payModal').classList.remove('active'); document.body.style.overflow = ''; }
-function simulatePayment(status) {
-    if (!currentTxn) return;
-    const btn = status === 'COMPLETED' ? document.getElementById('simulateSuccessBtn') : document.getElementById('simulateFailBtn');
-    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
-    fetch('../api/mock/payment.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'webhook', transaction_id: currentTxn, status: status }) })
-    .then(r => r.json()).then(d => {
-        if (d.success) { showToast(d.message, status === 'COMPLETED' ? 'success' : 'info'); setTimeout(() => location.reload(), 900); }
-        else { showToast(d.message || 'Simulation failed.', 'error'); btn.disabled = false; btn.innerHTML = status === 'COMPLETED' ? '<i class="fa-solid fa-circle-check"></i> Simulate Success' : '<i class="fa-solid fa-xmark"></i> Fail'; }
-    }).catch(() => { showToast('Network error.', 'error'); btn.disabled = false; });
+function closePayModal() {
+    document.getElementById('payModal').classList.remove('active');
+    document.body.style.overflow = '';
 }
-document.getElementById('simulateSuccessBtn').addEventListener('click', () => simulatePayment('COMPLETED'));
-document.getElementById('simulateFailBtn').addEventListener('click', () => simulatePayment('FAILED'));
+
+// "I have paid" goes straight to the receipt form, because that is the
+// only thing left to do. The student has the screenshot in their camera
+// roll and the reference number in their GCash history; making them
+// close this dialog and find another button would be a step with no
+// reason behind it.
+function payDone() {
+    if (!payTarget) { closePayModal(); return; }
+    closePayModal();
+    openReceiptModal(payTarget.id, payTarget.label, '');
+}
 </script>
-
-<script>
-let pollTimer = null;
-function fetchPaymentStatus(txnId) {
-    return fetch('../api/mock/payment.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'check_status', transaction_id: txnId }) }).then(r => r.json());
-}
-function stopStatusPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
-function startStatusPolling(txnId) { stopStatusPolling(); pollTimer = setInterval(function() { pollStatusOnce(txnId); }, 4000); }
-function pollStatusOnce(txnId) {
-    return fetchPaymentStatus(txnId).then(function(d) {
-        if (!d.success) { if (d.timeout) { stopStatusPolling(); window.location.href = '../login.php?timeout=1'; return; } stopStatusPolling(); showToast(d.message || 'Could not check payment status.', 'error'); return; }
-        const st = d.data && d.data.status;
-        if (st === 'completed') { stopStatusPolling(); showToast('Payment confirmed. Request is now being processed.', 'success'); setTimeout(function() { location.reload(); }, 900); }
-        else if (st === 'failed') { stopStatusPolling(); showToast('Payment failed. Try paying again.', 'error'); }
-    }).catch(function() {});
-}
-
 function toggleDetail(id) { const row = document.getElementById('detail-' + id); if (row) row.style.display = row.style.display === 'none' ? '' : 'none'; }
 
 function applyFilters() {

@@ -150,33 +150,507 @@
 .btn-download { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
 .btn-download:hover { background: #bbf7d0; }
 
-/* Catalog picker inside the request modal */
-.catalog-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.catalog-option {
-    border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 10px 12px;
-    cursor: pointer; display: flex; flex-direction: column; gap: 2px;
-    transition: border-color .12s ease, background .12s ease;
+/* ============================================================
+   STUDENT NEW REQUEST — the catalog as cards.
+
+   These rules existed as .catalog-option with .co-name/.co-fee,
+   but the markup rendered .catalog-option-name and
+   .catalog-option-fee. Two names for one thing, neither of which
+   matched, so every card rendered its name and price as unstyled
+   inherited text at the same size and weight — the catalog looked
+   like a wall of identical grey rows and the prices, the only thing
+   the student is comparing, were the least readable thing on screen.
+
+   The card is now a <label> wrapping a real radio, and the selected
+   state is a sibling selector on :checked. There is no JS class to add
+   and therefore none that can be left stranded on a card the student
+   has already moved away from.
+   ============================================================ */
+.catalog-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.co-card {
+    position: relative; display: flex; align-items: center; gap: 11px;
+    padding: 12px 13px; cursor: pointer; min-width: 0;
+    background: #fff; border: 1.5px solid #e2e8f0; border-radius: 12px;
+    transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
 }
+.co-card:hover { border-color: #93c5fd; background: #fbfdff; }
+.co-radio {
+    position: absolute; opacity: 0; pointer-events: none;
+    width: 1px; height: 1px; margin: 0;
+}
+/* Focus is drawn on the icon, because the input that took the
+   keystroke is invisible and would otherwise show nothing at all. */
+.co-radio:focus-visible + .co-icon,
+.co-radio:checked + .co-icon { outline: 2px solid #2563eb; outline-offset: 2px; }
+.co-card:has(.co-radio:checked) {
+    border-color: #2563eb; background: #eff6ff;
+    box-shadow: 0 0 0 1px #2563eb inset;
+}
+.co-radio:focus-visible ~ .co-text .co-name { color: #1d4ed8; }
+
+.co-icon {
+    flex: 0 0 auto; display: grid; place-items: center;
+    width: 38px; height: 38px; color: #fff; font-size: 15px; border-radius: 10px;
+}
+.co-text { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.co-name {
+    font-weight: 650; color: #1e293b; font-size: 12.5px;
+    line-height: 1.25; transition: color .15s ease;
+}
+/* The price is the reason the cards exist rather than a dropdown, so it
+   is given the weight and the name is not. */
+.co-fee {
+    color: #1d4ed8; font-size: 12px; font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+.co-req {
+    display: inline-flex; align-items: center; gap: 5px; margin-top: 3px;
+    font-size: 10.5px; color: #92400e;
+}
+.co-req i { font-size: 9.5px; }
+
+/* Choice rows: how the student wants it, and how they will pay. The same
+   component twice — two questions of exactly one shape, so they are one
+   component rather than two that could drift apart. */
+.get-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: 9px; }
+.get-choice {
+    position: relative; display: flex; align-items: center; gap: 10px;
+    padding: 11px 12px; cursor: pointer; min-width: 0;
+    background: #fff; border: 1.5px solid #e2e8f0; border-radius: 12px;
+    transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+.get-choice:hover { border-color: #93c5fd; background: #fbfdff; }
+.get-radio { position: absolute; opacity: 0; pointer-events: none; width: 1px; height: 1px; margin: 0; }
+.get-choice:has(.get-radio:checked) {
+    border-color: #2563eb; background: #eff6ff;
+    box-shadow: 0 0 0 1px #2563eb inset;
+}
+.get-radio:focus-visible ~ .get-icon { outline: 2px solid #2563eb; outline-offset: 2px; }
+.get-icon {
+    flex: 0 0 auto; display: grid; place-items: center;
+    width: 34px; height: 34px; border-radius: 10px; font-size: 14px;
+}
+.get-icon--counter { background: #dbeafe; color: #1d4ed8; }
+.get-icon--courier { background: #ede9fe; color: #6d28d9; }
+.get-icon--digital { background: #e0f2fe; color: #0369a1; }
+.get-icon--online  { background: #dcfce7; color: #15803d; }
+.get-text { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.get-text b { font-weight: 650; font-size: 12.5px; color: #1e293b; line-height: 1.25; }
+.get-text small { font-size: 11px; color: #94a3b8; line-height: 1.35; }
+
+/* Hidden but still submitted, and out of the tab order — it mirrors a
+   choice the cards have already made, so reaching it by keyboard would be
+   reaching a control with no visible counterpart. */
+.visually-hidden {
+    position: absolute !important; width: 1px; height: 1px;
+    margin: -1px; padding: 0; border: 0; overflow: hidden;
+    clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+}
+/* The old .catalog-option rules. Nothing renders them any more — the
+   student catalog is .co-card above — and they are kept only until every
+   caller is confirmed off them. */
 .catalog-option:hover { border-color: #93c5fd; }
 .catalog-option.sel { border-color: #2563eb; background: #eff6ff; }
-.catalog-option .co-name { font-weight: 700; color: #1e293b; font-size: 12.5px; }
-.catalog-option .co-fee { color: #64748b; font-size: 11.5px; }
 
-/* Fee preview box in the modal */
-.fee-preview {
-    display: flex; align-items: baseline; justify-content: space-between;
-    background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;
-    padding: 10px 14px; margin-top: 4px;
+/* ── Pay with GCash (student) ─────────────────────────────────── */
+/* A QR code IS the payment address. There is no provider, no hosted
+   checkout and no transaction to display, so this screen is the amount,
+   the code, and one action.
+
+   The amount is the loud thing and it sits ABOVE the code, because that
+   is the order the student needs it in: GCash asks for the figure after
+   the scan, so the number and the code have to be readable in the same
+   glance. Below the code it reads as a receipt summary; above it, it
+   reads as the thing to type. */
+.pay-dialog { max-width: 400px; }
+.pay-dialog .nq-mark--gcash { background: linear-gradient(140deg, #16a34a, #15803d); box-shadow: 0 6px 16px rgba(22, 163, 74, .28); }
+.pay-body { padding: 18px 20px 20px; text-align: center; }
+
+.pay-amount-card {
+    text-align: left; padding: 13px 15px 12px;
+    background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 13px;
+    margin-bottom: 16px;
 }
-.fee-preview .fp-label { font-size: 12px; color: #64748b; }
-.fee-preview .fp-amount { font-size: 20px; font-weight: 800; color: #0f172a; }
+.pay-amount-cap {
+    font-size: 10.5px; font-weight: 800; letter-spacing: .09em;
+    text-transform: uppercase; color: #15803d;
+}
+/* Monospaced and tabular, like every other figure in this module: the
+   peso sign and the digits hold still while the value is written in. */
+.pay-amount {
+    font: 800 30px/1 "JetBrains Mono", ui-monospace, monospace;
+    letter-spacing: -.03em; color: #14532d;
+    font-variant-numeric: tabular-nums; margin: 6px 0 10px;
+}
+.pay-amount-rows { margin: 0; display: flex; flex-direction: column; gap: 5px; }
+.pay-amount-rows > div { display: flex; justify-content: space-between; gap: 12px; }
+.pay-amount-rows dt { font-size: 12px; color: #4b7a5f; margin: 0; }
+.pay-amount-rows dd {
+    font-size: 12px; color: #14532d; font-weight: 600; margin: 0;
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* The code sits on white with a quiet frame. A QR reader needs high
+   contrast and an unbroken quiet zone, so the padding is generous and
+   nothing decorative is allowed inside it. */
+.pay-qr-frame {
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 13px; margin-bottom: 14px;
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+}
+/* The hidden attribute only works because the user agent stylesheet sets
+   display:none on it — which any author `display` declaration beats. Both
+   children of this frame set one (flex on the notice, block on the image),
+   so `hidden` was silently ignored and the "not available" notice rendered
+   ON TOP OF a perfectly good QR code. Stated once, with !important,
+   because losing it does not look broken: it looks like a page with two
+   things in it. */
+.pay-qr-frame [hidden] { display: none !important; }
+.pay-qr { display: block; width: 190px; height: 190px; object-fit: contain; }
+
+/* Shown instead of the image when the file is not on this server. Says
+   what to do rather than rendering a broken-image icon a student would
+   have no way to interpret. */
+.pay-qr-missing {
+    width: 216px; min-height: 216px; padding: 18px;
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 8px; text-align: center;
+}
+.pay-qr-missing i { font-size: 24px; color: #b45309; }
+.pay-qr-missing b { font-size: 13.5px; color: #78350f; }
+.pay-qr-missing span { font-size: 12.5px; color: #92400e; line-height: 1.45; }
+
+/* Three short steps, numbered. This IS a sequence — the order GCash's
+   own screens impose — so numbering carries information here rather
+   than decoration. Short enough to read on a phone without scrolling. */
+.pay-steps {
+    list-style: none; counter-reset: pay; margin: 0; padding: 0;
+    text-align: left;
+}
+.pay-steps li {
+    counter-increment: pay; position: relative;
+    padding-left: 26px; margin-bottom: 7px;
+    font-size: 12.5px; line-height: 1.45; color: #475569;
+}
+.pay-steps li:last-child { margin-bottom: 0; }
+.pay-steps li::before {
+    content: counter(pay); position: absolute; left: 0; top: 0;
+    width: 18px; height: 18px; border-radius: 6px;
+    display: grid; place-items: center;
+    background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0;
+    font: 700 10.5px/1 "JetBrains Mono", ui-monospace, monospace;
+}
+.pay-steps b { color: #1e293b; font-weight: 650; }
+
+.pay-next {
+    margin: 0; font-size: 12.5px; line-height: 1.5;
+    color: #64748b; text-align: left;
+}
+/* min-width:0 on the shared footer: a flex item defaults to min-width:auto,
+   which refuses to go narrower than its own text, so at a narrow phone the
+   two buttons overflowed and "I have paid" was cut off at the right edge. */
+.nq-dialog-foot .btn { min-width: 0; }
+
+@media (max-width: 420px) {
+    .pay-qr { width: 172px; height: 172px; }
+    .pay-qr-missing { width: 200px; min-height: 200px; }
+    .pay-amount { font-size: 26px; }
+    .pay-foot .btn { flex: 1 1 0; min-width: 0; padding: 0 10px; justify-content: center; }
+}
 
 /* Requirement upload hint */
 .req-hint { font-size: 12px; color: #b45309; background: #fffbeb; border: 1px dashed #fcd34d; border-radius: 8px; padding: 8px 10px; margin-top: 4px; display: none; }
 .req-hint.visible { display: block; }
 
+/* ---- The student dialog shell ------------------------------------
+   registrar.css already makes .modal-content the scroll box; here it
+   becomes a fixed-height flex column so the header and footer stay put
+   and only the body scrolls. A student reads this on a phone, where a
+   footer that scrolls off the bottom is a footer they cannot find.
+
+   The <form> is what made this unscrollable, and it is worth saying why
+   rather than just fixing it. The flex column needs header / body /
+   footer to be DIRECT children of it. The form sits between the dialog
+   and the body, so .nq-dialog-body was a flex item of the form — a
+   plain block — and `flex: 1 1 auto` on it did nothing at all. The body
+   grew to its full content height, the dialog clipped it at max-height,
+   and the footer ended up ~700px below the viewport with no way to
+   reach it. Measured in headless Chrome before the fix: footer bottom
+   1405 against a 685px window, scrollTop pinned at 0.
+
+   So the form is made the flex child and the scrolling happens inside
+   it. One wrapper, one scroll box, and the body can now actually be
+   told it may shrink. */
+#requestModal { align-items: flex-start; }
+/* The SHELL of every dialog in this module: the mark-and-title header, the
+   scrolling body, the pinned footer. Promoted off #requestModal because two
+   dialogs now use it and the second one was inheriting an unstyled
+   .modal-header — the title sat on one line and the mark plus subtitle
+   wrapped underneath it, which is what a header looks like when none of its
+   own rules reach it.
+
+   Width stays per-dialog and stays on the id, because the two want
+   different amounts of it and an id is what keeps .pay-dialog's 400px from
+   being overwritten by the shared 600px below it. */
+.nq-dialog {
+    display: flex; flex-direction: column;
+    max-height: calc(100vh - 32px);
+    padding: 0; border-radius: 18px; overflow: hidden;
+    border: 1px solid #dbeafe; box-shadow: 0 24px 60px rgba(15, 23, 42, .22);
+}
+#requestModal .nq-dialog { max-width: 600px; }
+.nq-dialog-head {
+    flex: 0 0 auto; display: flex; align-items: center; gap: 13px;
+    padding: 17px 21px; margin: 0;
+    background: linear-gradient(120deg, #eff6ff, #fff 70%);
+    border-bottom: 1px solid #dbeafe;
+}
+/* The mark keeps its square and the title block is allowed to shrink, so a
+   long document name cannot push the close button off the row. */
+.nq-mark {
+    display: grid; place-items: center; width: 38px; height: 38px;
+    flex: 0 0 38px; border-radius: 11px; font-size: 15px; color: #fff;
+    background: linear-gradient(140deg, #2563eb, #1d4ed8);
+    box-shadow: 0 6px 16px rgba(37, 99, 235, .28);
+}
+.nq-dialog-head > div:not(.nq-mark) { min-width: 0; }
+.nq-dialog-head h2 {
+    margin: 0; font-size: 16.5px; font-weight: 700;
+    letter-spacing: -.02em; color: #172554;
+}
+.nq-dialog-head p { margin: 2px 0 0; font-size: 12px; color: #64748b; }
+.nq-dialog-head .modal-close {
+    margin-left: auto; background: transparent; border: 1px solid #dbeafe;
+    color: #64748b; width: 32px; height: 32px; border-radius: 9px;
+    display: grid; place-items: center; cursor: pointer;
+    transition: background .15s ease, color .15s ease;
+}
+.nq-dialog-head .modal-close:hover { background: #e0e7ff; color: #1d4ed8; }
+
+/* The form is the dialog's one growing child. min-height:0 is what allows
+   it to shrink below its content height — without it a flex item refuses
+   to go smaller than its contents and the whole thing overflows again. */
+#requestModal .nq-dialog-body,
+#payModal .nq-dialog-body {
+    flex: 1 1 auto; min-height: 0;
+    overflow-y: auto; overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    margin: 0; background: #fff;
+}
+#requestModal #requestForm {
+    flex: 1 1 auto; min-height: 0;
+    display: flex; flex-direction: column;
+    overflow: hidden;
+}
+#requestModal .nq-dialog-body { padding: 20px 21px; }
+#requestModal .nq-field { margin-bottom: 18px; }
+#requestModal .nq-field:last-child { margin-bottom: 0; }
+#requestModal .nq-field > label {
+    display: block; margin-bottom: 6px;
+    font-size: 12px; font-weight: 600; color: #64748b;
+}
+#requestModal .nq-req { color: #dc2626; margin-left: 2px; }
+#requestModal .nq-step-label { margin-bottom: 8px; }
+#requestModal .form-control {
+    width: 100%; box-sizing: border-box; min-height: 40px; padding: 9px 12px;
+    border: 1px solid #cbd5e1; border-radius: 9px;
+    background: #f8faff; color: #1e293b; font: 13px Inter, sans-serif;
+    transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+#requestModal .form-control:focus {
+    outline: 0; border-color: #2563eb; background: #fff;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, .12);
+}
+#requestModal .form-control::placeholder { color: #94a3b8; }
+#requestModal input[type="file"].form-control { padding: 8px 12px; cursor: pointer; }
+#requestModal input[type="file"].form-control::file-selector-button {
+    margin-right: 10px; padding: 5px 11px; border: 1px solid #cbd5e1;
+    border-radius: 7px; background: #fff; color: #334155;
+    font: 600 12px Inter, sans-serif; cursor: pointer;
+}
+#requestModal .req-hint { margin-top: 6px; }
+/* Pinned footer, shared by both dialogs. */
+.nq-dialog-foot {
+    flex: 0 0 auto; display: flex; align-items: center;
+    justify-content: flex-end; gap: 9px;
+    padding: 13px 21px; margin: 0;
+    background: #f8faff; border-top: 1px solid #e2e8f0;
+}
+.nq-dialog-foot .btn { min-height: 40px; padding: 0 20px; font-size: 13px; }
+.nq-dialog-foot .btn-primary { display: inline-flex; align-items: center; gap: 7px; }
+
+@media (max-width: 560px) {
+    #requestModal .nq-dialog { max-height: calc(100vh - 20px); }
+    #requestModal .nq-dialog-body { padding: 16px; }
+    #requestModal .nq-dialog-foot { padding: 11px 15px; }
+    .nq-dialog-head { padding: 14px 15px; }
+    .nq-dialog-foot { padding: 11px 15px; }
+    /* The two buttons split the row and must fit it. Padding drops with the
+       width so the pair never has to overflow, and min-width:0 (above) lets
+       them actually shrink rather than clip. */
+    .nq-dialog-foot .btn {
+        flex: 1 1 0; min-width: 0; padding: 0 10px; justify-content: center;
+    }
+    .nq-dialog-foot .btn-primary { flex: 1.4 1 0; }
+    .catalog-picker { grid-template-columns: 1fr; }
+    .get-row { grid-template-columns: 1fr; }
+    .nq-fee { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .nq-fee-amount { font-size: 26px; }
+    .nq-qty { max-width: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .co-card, .get-choice, .co-name { transition: none; }
+}
+
 @media (max-width: 640px) {
     .catalog-picker { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   NEW REQUEST — shared vocabulary for both entry points.
+
+   The desk modal (#newRequestModal on documents.php) and this
+   standalone page file the same row through the same endpoint, so
+   they must look like the same act. The modal's styles were written
+   under an id selector, which is correct for a dialog but left this
+   page with no rules at all — it fell back to whatever .form-group
+   and .form-control happened to give it, which is how two ways of
+   filing one request ended up looking like two different products.
+
+   So the system moves into documents.css as real class selectors,
+   and the modal's id-scoped block is reduced to what only a dialog
+   needs (its fixed-height flex column and pinned header/footer).
+   ============================================================ */
+.nq-sheet {
+    max-width: 640px; margin: 0 auto;
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 16px;
+    padding: 26px 28px 22px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 8px 24px rgba(15, 23, 42, .05);
+}
+
+.nq-steps { list-style: none; margin: 0; padding: 0; }
+.nq-step {
+    position: relative; display: grid;
+    grid-template-columns: 26px 1fr; gap: 13px;
+    padding-bottom: 22px;
+}
+.nq-step:last-child { padding-bottom: 4px; }
+/* The rail is drawn on the step, not as a separate element, so it
+   cannot outnumber the steps and leave a dangling stub. */
+.nq-step:not(:last-child)::after {
+    content: ""; position: absolute; left: 13px; top: 28px; bottom: 4px;
+    width: 2px; background: #e2e8f0; border-radius: 1px;
+    transition: background .18s ease;
+}
+.nq-step.is-done::after { background: #2563eb; }
+
+.nq-step-mark {
+    display: grid; place-items: center; width: 26px; height: 26px;
+    border-radius: 8px; background: #f1f5f9; color: #94a3b8;
+    font: 700 12px/1 "JetBrains Mono", ui-monospace, monospace;
+    border: 1px solid #e2e8f0;
+    transition: background .16s ease, color .16s ease, border-color .16s ease;
+}
+.nq-step.is-active .nq-step-mark { background: #2563eb; border-color: #2563eb; color: #fff; }
+.nq-step.is-done   .nq-step-mark { background: #dbeafe; border-color: #bfdbfe; color: #1d4ed8; }
+
+.nq-step-body { min-width: 0; }
+.nq-step-label { margin-bottom: 7px; font-size: 13px; font-weight: 650; color: #334155; }
+.nq-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.nq-field > label {
+    display: block; margin-bottom: 6px;
+    font-size: 12px; font-weight: 600; color: #64748b;
+}
+.nq-field > label .nq-req { color: #dc2626; margin-left: 2px; }
+.nq-hint { margin-top: 6px; font-size: 11.5px; line-height: 1.45; color: #94a3b8; }
+
+/* Controls. Box-sizing is explicit because a number input's spinner
+   and a select's arrow both add width the grid does not account for,
+   which is what pushed these past their column on a narrow screen. */
+.nq-sheet .form-control,
+#newRequestModal .form-control {
+    width: 100%; box-sizing: border-box; height: 40px; padding: 0 12px;
+    border: 1px solid #cbd5e1; border-radius: 9px;
+    background: #f8faff; color: #1e293b;
+    font: 13px Inter, sans-serif;
+    transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+.nq-sheet select.form-control,
+#newRequestModal select.form-control { cursor: pointer; padding-right: 30px; }
+.nq-sheet .form-control:focus,
+#newRequestModal .form-control:focus {
+    outline: 0; border-color: #2563eb; background: #fff;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, .12);
+}
+.nq-sheet .form-control::placeholder,
+#newRequestModal .form-control::placeholder { color: #94a3b8; }
+.nq-qty { max-width: 190px; margin-top: 12px; }
+
+/* The fee ticket — the one loud element on the form. A clerk reads it
+   across the counter, so the amount is monospaced and tabular: the
+   digits do not shift as the number changes. */
+.nq-facts { margin-top: 2px; padding-top: 20px; border-top: 1px solid #e2e8f0; }
+.nq-fee {
+    position: relative; display: flex; align-items: flex-end;
+    justify-content: space-between; gap: 16px;
+    padding: 15px 18px 14px; border: 1px solid #bfdbfe;
+    border-radius: 14px; background: linear-gradient(140deg, #eff6ff, #fff 72%);
+}
+/* The perforation. Drawn rather than imaged so it stays crisp and
+   costs nothing. */
+.nq-fee::before {
+    content: ""; position: absolute; left: 18px; right: 18px; top: 11px;
+    height: 2px;
+    background: repeating-linear-gradient(90deg, #c7d7fe 0 7px, transparent 7px 14px);
+}
+.nq-fee-cap {
+    font-size: 10px; font-weight: 800; letter-spacing: .09em;
+    text-transform: uppercase; color: #1d4ed8;
+}
+.nq-fee-note { margin-top: 5px; font-size: 12px; color: #64748b; max-width: 38ch; }
+.nq-fee-amount {
+    font: 800 30px/1 "JetBrains Mono", ui-monospace, monospace;
+    letter-spacing: -.03em; color: #1d4ed8;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.nq-fact {
+    display: flex; align-items: center; gap: 8px;
+    margin: 11px 0 0; font-size: 12px; color: #64748b;
+}
+.nq-fact i { font-size: 11px; color: #94a3b8; }
+
+/* A fact about the request, set in a box because it answers a question the
+   student would otherwise have been asked. Fulfillment is the only one: it
+   used to be a three-way choice where two options promised something the
+   office cannot do. */
+.nq-facts--inline { padding-top: 0; border-top: 0; margin-top: 0; }
+.nq-fact--box {
+    margin: 0; gap: 11px; align-items: center;
+    padding: 11px 13px; background: #f8faff;
+    border: 1px solid #e2e8f0; border-radius: 12px;
+}
+.nq-fact--box > span:last-child { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.nq-fact--box b { font-weight: 650; font-size: 12.5px; color: #1e293b; line-height: 1.25; }
+.nq-fact--box small { font-size: 11px; color: #94a3b8; line-height: 1.35; }
+
+.nq-actions {
+    display: flex; align-items: center; justify-content: flex-end;
+    gap: 9px; margin-top: 22px; padding-top: 16px; border-top: 1px solid #e2e8f0;
+}
+.nq-actions .btn { min-height: 40px; padding: 0 20px; font-size: 13px; }
+.nq-submit { display: inline-flex; align-items: center; gap: 7px; }
+
+@media (max-width: 640px) {
+    .nq-sheet { padding: 20px 16px 16px; }
+    .nq-fields { grid-template-columns: 1fr; }
+    .nq-qty { max-width: none; }
+    .nq-fee { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .nq-fee-amount { font-size: 26px; }
+    .nq-actions .btn { flex: 1 1 auto; justify-content: center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .nq-step-mark, .nq-step::after, .nq-sheet .form-control { transition: none; }
 }
 
 /* ── Registrar metrics grid ───────────────────────────────────── */

@@ -111,9 +111,23 @@ check('no custom card classes',    strpos($html, 'dq-card') === false);
 check('no lane grid',              strpos($html, 'dq-lane') === false);
 
 echo "\nRetired vocabulary must not leak\n";
+// Asserted against the VISIBLE TEXT, not the raw HTML. It used to be
+// asserted against the markup, which only passed while no row could ever
+// hold these statuses — an empty document_requests table. Now that a
+// student pays by GCash QR, a row legitimately sits in Awaiting_Payment,
+// and its raw status has to appear in data-status (the filter reads it)
+// and in the filter's value. Those are plumbing, not vocabulary: nobody
+// reads them. What must never reach a clerk is the retired wording, so
+// the tags come off first and the words are checked on what is left.
+$visible = trim(preg_replace('/\s+/', ' ', strip_tags($html)));
 foreach (['Awaiting Payment', 'Awaiting_Payment', 'awaiting-payment', '>Shipped<', 'Ready for Release', 'Request Queue'] as $bad) {
-    check('absent: ' . $bad, strpos($html, $bad) === false);
+    // "Awaiting Payment" is the spaced form of a status that now has a
+    // plain-language label, so it is checked in the visible text only.
+    check('absent: ' . $bad, strpos($visible, $bad) === false);
 }
+// The positive half of the same rule: the status a GCash request sits in
+// must be named in words a registrar would use, not as the enum.
+check('presents: Waiting on payment', strpos($visible, 'Waiting on payment') !== false);
 
 echo "\nWalk-in lifecycle is offered\n";
 foreach (['Filed', 'Being prepared', 'Ready for collection', 'Claimed', 'Rejected'] as $term) {

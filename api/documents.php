@@ -542,6 +542,26 @@ try {
                 $clearWaiver = ['payment_receipt_waived_at' => null,
                                 'payment_receipt_waived_by' => null,
                                 'payment_receipt_waived_reason' => null];
+
+                // Verifying the receipt IS the payment confirmation, so a
+                // request still sitting in Awaiting_Payment is released
+                // here, and paid_at is stamped now — that is the moment
+                // the money is known to have arrived.
+                //
+                // Without this the request was stranded. doc_next_step()
+                // returns null for Awaiting_Payment, because the walk-in
+                // track starts at Filed, so the row offered no action at
+                // all and no clerk could ever move it: a payment screen
+                // that can be paid but never completed is worse than no
+                // payment at all. A receipt that turns out to be wrong is
+                // reset_receipt, which withdraws the sign-off and puts
+                // the request back where it was — deliberately not a
+                // silent refund, because the money did move.
+                if ($req['document_status'] === 'Awaiting_Payment') {
+                    $data['document_status'] = 'Filed';
+                    $data['paid_at'] = $now;
+                    $note .= ' — payment confirmed, released to the desk';
+                }
             } elseif ($v2Action === 'waive_receipt') {
                 $reason = trim($input['waive_reason'] ?? '');
                 if ($reason === '') {
