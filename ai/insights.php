@@ -267,6 +267,11 @@ body[data-page="insights"] .ai-report-loading .spinner{
 body[data-page="insights"] .ai-report-error{
     display:none;background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;
     border-radius:12px;padding:12px 16px;font-size:13px;margin-bottom:14px;
+    /* A failed request is reported as plain text and includes paragraphs and a
+       quoted excerpt from the server. Collapsing that into one run-on line
+       makes it unreadable, and whitespace collapsing in the excerpt is done
+       in JS where the text is built, not by the browser. */
+    white-space:pre-wrap;
 }
 /* The DEGRADED banner.
    Amber rather than red, because the request did not fail - it succeeded and

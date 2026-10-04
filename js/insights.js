@@ -909,6 +909,57 @@
         el.exportBtn.style.display = hasAi ? 'inline-flex' : 'none';
     }
 
+/**
+     * Explain a non-JSON response from the server.
+     *
+     * This endpoint is the only one that takes a minute, so it is the only one
+     * where the web server is likely to give up on it. The statuses that reach
+     * here have causes that are indistinguishable from the browser but fixed in
+     * completely different places - PHP settings, the server, or something in
+     * front of the server - so the status alone sends the operator to the wrong
+     * one every time.
+     *
+     * The snippet of what actually arrived is included because it settles the
+     * question outright: Apache's mod_evasive, PHP-FPM's "service temporarily
+     * unavailable", and Cloudflare's own error page all carry identifying text,
+     * and the operator can match it in one look instead of guessing.
+     *
+     * Returns plain text. The caller renders it, and nothing here is ever put
+     * into innerHTML, so the server's body cannot inject markup.
+     */
+    function describeFailedResponse(status, snippet) {
+        var s = String(snippet || '');
+        var looksLikeHtml = s.indexOf('<') === 0;
+
+        var base;
+        if (status === 503 || status === 502 || status === 504) {
+            base = 'The web server could not complete the request (HTTP ' + status + '), '
+                 + 'so no analysis was produced. The page itself is unaffected and the '
+                 + 'measured figures are unaffected - this is the server refusing a long '
+                 + 'request, not the AI service.\n\n'
+                 + 'Most likely, in order:\n'
+                 + '• A proxy in front of the site (Cloudflare, or the host\'s own) gives up '
+                 + 'before the ~60 seconds a full report takes. Raise its read timeout.\n'
+                 + '• PHP is being killed mid-request. .user.ini sets max_execution_time to '
+                 + '180; confirm the host is honouring it rather than overriding it.\n'
+                 + '• The host is rate limiting this IP, which is common on shared hosting '
+                 + 'and returns 503 with no further detail. Waiting a minute and retrying '
+                 + 'will show whether it is that.';
+        } else if ((status === 200 || status === 500) && looksLikeHtml) {
+            base = 'The server stopped before it could reply (HTTP ' + status + '). A full '
+                 + 'report takes 40-60 seconds and this host is cutting PHP off before that '
+                 + 'finishes. Raise max_execution_time to 180 — .user.ini already requests '
+                 + 'it, so the host is overriding it.';
+        } else {
+            base = 'The server returned a response that was not JSON (HTTP ' + status + ').';
+        }
+
+        // The single most useful clue, so it is always shown. Trimmed and
+        // flattened because a wall of HTML helps nobody.
+        var evidence = s.replace(/\s+/g, ' ').trim().slice(0, 220);
+        return evidence ? base + '\n\nThe server sent: "' + evidence + '"' : base;
+    }
+
     function generateReport(force) {
         showLoading();
         var started = Date.now();
@@ -973,12 +1024,16 @@
                 if (t) t.textContent = 'Analysing registrar data…';
 
                 if (!r.ok) {
-                    // The server did not answer with JSON. Say which of the two
-                    // causes it is, because they need different fixes.
-                    var truncated = (r.status === 200 || r.status === 500) && r.snippet.indexOf('<') === 0;
-                    showReportError(truncated
-                        ? 'The server stopped before it could reply. Generating the report takes 40-60 seconds and this host appears to cut PHP off sooner than that — raise max_execution_time to 180 (see .user.ini) and try again.'
-                        : 'The server returned an unexpected response (HTTP ' + r.status + ').');
+                    // The server did not answer with JSON.
+                    //
+                    // Anything that answers in the 5xx range with an HTML body
+                    // is the SERVER, not this application: ai-insights-report.php
+                    // only ever emits 401, 403, 405 and 500, so a 503 cannot have
+                    // come from it. On shared hosting that leaves a short list of
+                    // real causes, and each is fixed in a different place, so the
+                    // message names them and shows what actually arrived rather
+                    // than just the status.
+                    showReportError(describeFailedResponse(r.status, r.snippet || ''));
                     el.reportEmpty.style.display = 'block';
                     return;
                 }
