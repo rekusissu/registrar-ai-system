@@ -3075,7 +3075,13 @@ async function sendList() {
     background:#fff; transition:border-color .12s, background .12s, box-shadow .12s;
 }
 .mlx-tile:hover { border-color:#93c5fd; background:#f8fbff; box-shadow:0 2px 8px rgba(30,64,175,.08); }
-.mlx-tile-icon { font-size:26px; color:#f0b429; flex:none; }
+/* The folder tile icon. Blue, not the usual amber folder: the folder TABLE
+   on the same page already draws its folder rows in #2563eb, and the two
+   views file the same tree, so a yellow folder in the browser next to a blue
+   folder in the table reads as two different things. Unassigned keeps the
+   amber - there it is a warning that the cohort is not placed yet, not a
+   folder colour. */
+.mlx-tile-icon { font-size:26px; color:#2563eb; flex:none; }
 .mlx-tile.is-unassigned .mlx-tile-icon { color:#d97706; }
 .mlx-tile-body { display:flex; flex-direction:column; gap:4px; min-width:0; flex:1; }
 .mlx-tile-name { font-size:14.5px; font-weight:700; color:#1e293b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
