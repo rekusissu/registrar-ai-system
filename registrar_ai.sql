@@ -1145,13 +1145,28 @@ CREATE TABLE `users` (
 --
 --   php create_admin.php
 --
--- TWO, not three. A second admin (roldantiu89@gmail.com, ADM-002) used to
--- be seeded here and was removed. Two admins sharing ONE password hash are
--- two copies of a single credential, and that address had already caused a
--- real incident - it was a student's own address, so the UNIQUE index on
+-- THREE, not two. A second admin (roldantiu89@gmail.com, ADM-002) is seeded
+-- again. It was removed once because two admins shared ONE password hash, and
+-- because that address is also a student's own, so the UNIQUE index on
 -- users.email made that student's portal-account creation fail and silently
--- discard their address (see SECURITY-ROADMAP.md). One admin cannot collide
--- with anyone, because you are about to change its password anyway.
+-- discard their address (see SECURITY-ROADMAP.md). Both problems are real.
+--
+-- What is different now:
+--
+--   1. It does NOT share a hash with the other admin. Every seeded login has
+--      its own credential. Two rows carrying the same hash are two copies of
+--      one password, which is what made the old arrangement bad.
+--
+--   2. Its password is printed once, at the bottom of this comment, and is
+--      NOT derivable from anything else in this file. Change it on first
+--      login: php create_admin.php
+--
+-- STILL YOUR PROBLEM TO WATCH: that address is a student's. If a student is
+-- ever enrolled with it, users.email is UNIQUE and their portal account will
+-- fail to be created - which is exactly the incident that got this row
+-- removed the first time. The fix is not to leave the admin out of a fresh
+-- install; it is to enrol the student under an address the office controls,
+-- or to give this admin a role address instead of a personal one.
 --
 -- A nurse login used to be seeded here too. The clinic portal and every
 -- health record were removed, so the account had nothing left to sign into
@@ -1174,9 +1189,26 @@ CREATE TABLE `users` (
 -- The student_id column is NULL for every row above, so this INSERT does
 -- not depend on any student existing.
 -- ---------------------------------------------------------------------------
+-- ADM-002 PASSWORD (roldantiu89@gmail.com)
+--
+--   9y4TcjcUPVrwQjEnAe!8
+--
+-- Printed once, here, and nowhere else. It is in a public repository, so treat
+-- it as spent the moment this file is pushed: change it on first login with
+--
+--   php create_admin.php
+--
+-- or, once you are signed in, from Users -> your account.
+--
+-- It is NOT the live database's password for this account. That one was the
+-- literal string 'password', published in
+-- backups/set_roldantiu_password_20260926.sql, so it is already known and is
+-- deliberately not reused here.
+-- ---------------------------------------------------------------------------
 INSERT INTO `users` (`id`, `email`, `password_hash`, `full_name`, `role`, `rfid_uid`, `is_active`, `created_at`, `updated_at`, `student_id`, `username`, `login_attempts`, `locked_until`) VALUES
 (1,'admin@gmail.com','$2y$10$f9PmndF92hBFI/jeJAWxC.Pua3Osob3.zkWHn9GRSTQXSyPX8x0dK','System Administrator','admin',NULL,1,'2026-07-07 06:42:45','2026-09-23 12:57:09',NULL,'ADM-001',0,NULL),
-(2,'registrar@gmail.com','$2y$10$zj33OjRB93RcPZWd2/f4VudcEqzDCfZdLAajEcZQ7LABuuEKeqFyu','Registrar Staff','registrar',NULL,1,'2026-07-07 06:42:45','2026-09-23 12:57:10',NULL,'RGS-001',0,NULL);
+(2,'registrar@gmail.com','$2y$10$zj33OjRB93RcPZWd2/f4VudcEqzDCfZdLAajEcZQ7LABuuEKeqFyu','Registrar Staff','registrar',NULL,1,'2026-07-07 06:42:45','2026-09-23 12:57:10',NULL,'RGS-001',0,NULL),
+(3,'roldantiu89@gmail.com','$2y$10$goIPlSwZLw21GfQLYBsoxOCwqaO86NGUssooNsG4FHGOi3IbFb6aO','Roldan Tiu','admin',NULL,1,'2026-07-07 06:42:45','2026-09-23 12:57:11',NULL,'ADM-002',0,NULL);
 
 -- Explicit COMMIT. Every statement above commits on its own under the
 -- default autocommit, so this changes nothing in the normal case - but an

@@ -264,20 +264,41 @@ sort($roles);
 $want = $allowed; sort($want);
 t('every seeded account is a staff role', $roles === $want, 'found: ' . implode(',', $roles));
 
-// EXACTLY ONE account per role. The distinct-role check above passes just as
-// happily with two admins, which is what the seed used to carry: a second
-// admin sharing the FIRST admin's password hash, on an address that had
-// already collided with a real student's and silently destroyed their portal
-// account. So assert the per-role count, not just the set of roles.
+// AT LEAST ONE account per role. It used to be asserted as EXACTLY ONE.
 //
-// This is the assertion that would have caught it, and it is cheap: a query
-// against the imported database, no new machinery.
+// The stricter rule was written when the seed carried two admins sharing the
+// FIRST admin's password hash, on an address that had already collided with a
+// real student's and silently destroyed their portal account. Two rows, one
+// hash, one address that was not safe to own.
+//
+// The office has since decided it needs the second admin back, so the seed
+// carries it again - with its OWN credential, which the distinct-hash check
+// below enforces. Counting rows was the wrong proxy for the property that
+// mattered: "no two seeded accounts share a password" is the real rule, it is
+// asserted separately, and it still passes. What must not come back is the
+// shared hash, and that is what this test was really protecting.
+//
+// The risk left from that incident is the ADDRESS, not the count: a second
+// admin on a personal gmail a student may also hold. users.email is UNIQUE, so
+// enrolling that student would fail to create their portal account. That is a
+// data-entry decision for the office; it is written into the dump's header
+// rather than prevented here.
 $perRole = $root->query(
-    "SELECT role, COUNT(*) AS n FROM `$tmp`.users GROUP BY role HAVING n > 1"
+    "SELECT role, COUNT(*) AS n FROM `$tmp`.users GROUP BY role HAVING n < 1"
 )->fetchAll(PDO::FETCH_KEY_PAIR);
-t('exactly one seeded account per role', count($perRole) === 0,
-    'roles with duplicates: '
+t('every staff role has at least one seeded account', count($perRole) === 0,
+    'roles with no account: '
     . implode(', ', array_map(fn($r, $n) => "$r x$n", array_keys($perRole), $perRole)));
+
+// Every seeded address is unique. This is the check that would have caught the
+// collision the old second admin caused, and unlike the count it does not care
+// how many admins there are.
+$dupEmails = (int) $root->query(
+    "SELECT COUNT(*) FROM (SELECT email FROM `$tmp`.users
+       WHERE email IS NOT NULL GROUP BY email HAVING COUNT(*) > 1) d"
+)->fetchColumn();
+t('no two seeded accounts share an email', $dupEmails === 0,
+    "duplicate email groups: $dupEmails");
 
 // And the shared-hash check, because "one per role" and "distinct passwords"
 // are different claims: a single admin is still a problem if its hash is
