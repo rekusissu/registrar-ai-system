@@ -55,9 +55,21 @@ var BCPPrint = (function () {
     // low-contrast ink that reads as blurred on paper.
     function letterheadCss() {
         return [
-            '@page { size: A4 portrait; margin: 0 0 22mm 0; }',
+            '@page { size: A4 portrait; margin: 16mm 0 22mm 0; }',
+            // The top and bottom @page bands are the working area for the
+            // running header and footer. They have to be @page margins, not
+            // body padding: padding reserves room once, at the end of the flow,
+            // so it clears only the LAST page and leaves every intermediate
+            // page running under the fixed furniture.
+            //
+            // Top, left and right stay 0 so the browser's own date/URL header
+            // has nowhere to go. The BOTTOM margin is the price of the
+            // repeating footer, and it has a known cost: a browser prints its
+            // OWN footer ("1/3", the date, the URL) into any page margin band
+            // it is given. Untick "Headers and footers" in the print dialog,
+            // or it appears underneath ours.
             'body { font-family: Calibri, "Segoe UI", Arial, sans-serif; font-size: 11pt;',
-            '       line-height: 1.6; color: #000; margin: 0; padding: 14mm 16mm 4mm;',
+            '       line-height: 1.6; color: #000; margin: 0; padding: 2mm 16mm 4mm;',
             '       -webkit-print-color-adjust: exact; }',
 
             '.letterhead { text-align:center; border-bottom:1px solid #1a2d4a;',
@@ -89,6 +101,26 @@ var BCPPrint = (function () {
             '.lh-doc { font-family: Calibri, "Segoe UI", Arial, sans-serif; font-size:11pt;',
             '           line-height:1.35; margin-top:12px; font-weight:700; letter-spacing:.6px; }',
 
+            // THE RUNNING HEADER. Repeats on every page, like the footer.
+            //
+            // The full crest letterhead stays in the flow on page 1 only -
+            // a block in the flow prints once. This is the compact version
+            // that carries the identity and the document title on pages 2+
+            // (and above the crest on page 1, where both are visible and read
+            // as a masthead plus a letterhead rather than as a duplicate).
+            //
+            // position:fixed is the only mechanism browsers give for
+            // repeating content, and it positions against the PAGE box, which
+            // is why @page has to reserve the band for it.
+            '.rhead { position:fixed; top:0; left:0; right:0; text-align:center;',
+            '         font-family: Calibri, "Segoe UI", Arial, sans-serif;',
+            '         font-size:8.5pt; line-height:1.35; color:#000; padding-top:2mm; }',
+            '.rhead .rh-school { font-family: Garamond, "EB Garamond", "Times New Roman", serif;',
+            '                    font-size:11pt; font-weight:700; letter-spacing:.3px; }',
+            '.rhead .rh-doc { margin-top:1px; font-size:8.5pt; letter-spacing:.4px;',
+            '                text-transform:uppercase; }',
+            '.rhead .rh-rule { margin:2mm 16mm 0; border-bottom:.5px solid #1a2d4a; }',
+
             // position:fixed is what makes the footer repeat on EVERY page.
             // A block at the end of the document prints once, last page only.
             '.footer { position:fixed; left:0; right:0; bottom:10mm; text-align:center;',
@@ -102,6 +134,25 @@ var BCPPrint = (function () {
             '.doc-body li { margin-bottom:6px; }',
             '.doc-body strong { font-weight:700; }',
             '.meta { font-size:10pt; color:#000; margin-bottom:20px; text-align:center; }',
+
+            // LINES WERE BEING CUT OFF AT THE RIGHT EDGE.
+            //
+            // The measure is 16mm inside a 210mm page, and the model writes
+            // long unbroken tokens - identifiers, "N/A", en-dashed ranges,
+            // capitals. A word wider than the line has nowhere to go, so it
+            // either overflows past the margin (invisible against the edge,
+            // so it looks like the sentence was truncated) or forces the line
+            // to break mid-word and leave a ragged, visibly damaged sentence.
+            //
+            // hyphens:auto lets long words break with a hyphen and justify
+            // evenly; overflow-wrap:break-word is the backstop for tokens with
+            // no break opportunity at all, and only those.
+            '.doc-body p, .doc-body li, .doc-body td, .doc-body th {',
+            '    hyphens:auto; -webkit-hyphens:auto; hyphenate-limit-chars:6 3 3;',
+            '    overflow-wrap:break-word; }',
+            // Justification without hyphenation produces rivers of white
+            // space down the page. With it on, both defects go together.
+            '.doc-body p { text-align:justify; }',
 
             // PAGE BREAKS for a document that is now routinely two or three
             // pages, which a one-page memo never had to think about.
@@ -142,6 +193,26 @@ var BCPPrint = (function () {
             + '<div class="lh-address">1071 Brgy. Kaligayahan Quirino Highway, Novaliches, Quezon City</div>'
             + '</div></div>'
             + (o.title ? '<div class="lh-doc">' + esc(o.title) + '</div>' : '')
+            + '</div>';
+    }
+
+    /**
+     * The compact running header, repeated on every page.
+     *
+     * Separate from headerHtml() on purpose. That one is the full crest
+     * letterhead and it belongs in the flow, so it prints once on page 1.
+     * A crest and a three-line address repeated on all three pages of a
+     * report would be noise, and would push the text further down each page.
+     * This carries the two things a page needs to identify itself: who
+     * issued it, and what it is.
+     */
+    function runningHeaderHtml(o) {
+        o = o || {};
+        return '<div class="rhead">'
+            + '<div class="rh-school">BESTLINK COLLEGE OF THE PHILIPPINES</div>'
+            + '<div class="rh-doc">Office of the Registrar'
+            + (o.title ? ' &middot; ' + esc(o.title) : '') + '</div>'
+            + '<div class="rh-rule"></div>'
             + '</div>';
     }
 
@@ -195,8 +266,9 @@ var BCPPrint = (function () {
         // recover from an unclosed <style> in <head>, which works in a real
         // window but leaves the stylesheet swallowing the markup after it.
         d.write('</style></head><body>');
-        // Written immediately after the head so the fixed element exists
-        // for every page, before any table can overlap it.
+        // Written immediately after the head so the fixed elements exist
+        // for every page, before any content can overlap them.
+        d.write(runningHeaderHtml({ title: opts.title || '' }));
         d.write(footerHtml());
         d.write(opts.body || '');
         d.write('</body></html>');
@@ -239,6 +311,7 @@ var BCPPrint = (function () {
     return {
         letterheadCss: letterheadCss,
         headerHtml: headerHtml,
+        runningHeaderHtml: runningHeaderHtml,
         footerHtml: footerHtml,
         printDocument: printDocument,
         esc: esc

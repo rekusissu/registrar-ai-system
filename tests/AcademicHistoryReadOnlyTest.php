@@ -313,11 +313,51 @@ final class AcademicHistoryReadOnlyTest extends TestCase
         $js = self::source(self::LETTER);
 
         // Browsers draw their own date/URL/page-number header only into the
-        // page margin, so a zero margin on top/left/right leaves them nowhere
-        // to go. The BOTTOM is deliberately NOT zero - see below.
-        self::assertStringContainsString('@page { size: A4 portrait; margin: 0 0', $js);
+        // top page margin, so a zero margin on top/left/right leaves them
+        // nowhere to go. Top is NOT zero - it is the band the running
+        // header occupies. Bottom is the band the footer occupies.
+        self::assertStringContainsString('@page { size: A4 portrait; margin: 16mm 0 22mm 0; }', $js);
         self::assertStringContainsString('position:fixed', $js,
             'The footer must be position:fixed to repeat on every page.');
+    }
+
+    /**
+     * Every page needs both a header and a footer, and neither may collide
+     * with the body text.
+     *
+     * Both are position:fixed, which browsers position against the PAGE box
+     * rather than the content box. So neither can reserve its own space: only
+     * an @page margin can, and the margins are what this pins down.
+     */
+    public function testRunningHeaderAndFooterRepeatWithRoomForThem(): void
+    {
+        $js = self::source(self::LETTER);
+
+        self::assertMatchesRegularExpression(
+            '/\.rhead\s*\{[^}]*position:fixed[^}]*top:\s*0/',
+            $js,
+            'The running header must be position:fixed at top:0 to repeat on every page. '
+            . 'In normal flow it would print once, on page 1 only.'
+        );
+
+        preg_match('/@page\s*\{[^}]*margin:\s*([^;}]+)/', $js, $m);
+        $sides = preg_split('/\s+/', trim($m[1]));
+        self::assertCount(4, $sides);
+
+        // Top and bottom, in that order: top / right / bottom / left.
+        $topMm = (float) rtrim($sides[0], 'mmpx');
+        $footerBandMm = (float) rtrim($sides[2], 'mmpx');
+
+        self::assertGreaterThan(
+            6.0, $topMm,
+            'The top band must be deep enough to hold the running header. A header '
+            . 'taller than the band it sits in spills into the body text.'
+        );
+        self::assertGreaterThan(
+            14.0, $footerBandMm,
+            'The bottom band must clear the footer: 10mm offset plus a two-line '
+            . '10pt block. Anything under that prints the text through it.'
+        );
     }
 
     /**
