@@ -11,10 +11,13 @@
 //  built from the very same numbers the charts are drawn from — the
 //  model interprets, it never calculates.
 //
-//  When the gateway is unreachable (or returns text that does not match
-//  the required three-section shape) the deterministic
-//  aiInsightFallbackReport() is returned with source=fallback, so the
-//  report card is never empty.
+//  When the gateway is unreachable, or returns something unusable, `report`
+//  is EMPTY and source=fallback. It is never filled with a template.
+//
+//  The deterministic figures are returned SEPARATELY as `figures`, on every
+//  response whatever happened, because they are always true. They are shown in
+//  their own block, styled as counts, and never under a heading that says AI.
+//  See aiInsightFiguresMarkdown() for why that separation exists.
 // ============================================================
 
 require_once __DIR__ . '/../shared/security_headers.php';
@@ -59,31 +62,60 @@ try {
     $build = aiInsightBuild($period);
     $facts = $build['facts'];
 
-    // ── Prompt contract: exactly three sections, supplied facts only ──
+    // ── Prompt contract: one section per module, supplied facts only ──
+    //
+    // The previous contract asked for three sections and capped the reply at 320
+    // words, which produced a paragraph per module. A registrar opening
+    // Insights wants the whole picture: what each module did, how it moved, and
+    // what it means for the office. So the model now writes a section per
+    // module, in full, and is allowed the room to say what it sees.
+    //
+    // The headings are FIXED and named, because the client checks for them and
+    // because a reader who knows where to look is a reader who reads.
     $systemPrompt = "You are the data analyst for the Office of the Registrar at Bestlink College "
-        . "of the Philippines. Write a short, factual analysis of the registrar data you are given.\n\n"
-        . "Your reply MUST be plain Markdown with EXACTLY these three numbered headings, in this order, "
+        . "of the Philippines. Write a full operational analysis of the registrar data you are given.\n\n"
+        . "Your reply MUST be plain Markdown with EXACTLY these seven numbered headings, in this order, "
         . "and nothing before the first heading:\n\n"
-        . "## 1. AI Registrar Summary\n"
-        . "## 2. Detected Trends\n"
-        . "## 3. Patterns Observed\n\n"
-        . "Section 1: two to three sentences describing the reporting period as a whole.\n"
-        . "Section 2: a bullet list with one bullet per category, each starting with the category name in bold "
-        . "exactly as \"- **Students:**\", \"- **Document Transactions:**\", \"- **RFID:**\", \"- **Queue:**\". "
-        . "Every bullet must cite at least one figure from the data.\n"
-        . "Section 3: two to four bullets on notable strengths, risks or bottlenecks, such as document turnaround, "
-        . "pending backlog, card coverage, or queue peaks.\n\n"
-        . "RULES:\n"
+        . "## 1. Executive Summary\n"
+        . "## 2. Student Population and Registration\n"
+        . "## 3. Programme Mix\n"
+        . "## 4. Document Services\n"
+        . "## 5. RFID and Campus Cards\n"
+        . "## 6. Queue Operations\n"
+        . "## 7. Cross-Module Findings and Recommended Actions\n\n"
+        . "SECTION 1 - Executive Summary\n"
+        . "Four to six sentences. State the period, the scale of activity across all modules, the single "
+        . "most important thing a reader should know, and what it implies. This is the only section that "
+        . "may be read alone, so it must stand on its own without the later sections.\n\n"
+        . "SECTIONS 2 TO 6 - one per module, in full\n"
+        . "For each module write two to four short paragraphs or bullet groups covering: what the "
+        . "figures are; how they compare with the previous period; the internal distribution (statuses, "
+        . "programmes, document types, workflow stages, card states) and what the biggest slice is; and "
+        . "what this means operationally for the registrar's office. Cite a figure for every claim. "
+        . "Where a figure is zero, say so plainly and say what it implies - do not skip the module.\n\n"
+        . "SECTION 7 - Cross-module findings\n"
+        . "Three to six bullets, each connecting at least TWO modules (for example document backlog "
+        . "against queue peaks, or card coverage against enrolment), followed by two to four concrete "
+        . "recommended actions. Each action must name the module it belongs to and say what it would "
+        . "change. End with one bullet naming the single largest uncertainty in this data and what "
+        . "would resolve it.\n\n"
+        . "RULES\n"
         . "- Use ONLY the figures supplied below. Never estimate, extrapolate or invent numbers.\n"
         . "- Never name or identify an individual student; aggregates only.\n"
-        . "- One sentence per bullet, no paragraphs, no preamble, no closing remarks.\n"
-        . "- Professional, neutral, administrative tone. Under 320 words.";
+        . "- Keep every bullet to one or two sentences. No paragraphs inside a bullet.\n"
+        . "- Professional, neutral, administrative tone. No preamble, no closing pleasantries.\n"
+        . "- Do not use emoji. Do not use tables.\n"
+        . "- Aim for 700 to 1000 words. Be specific; do not pad to reach the length.";
 
     $userPrompt = aiInsightFactSheetText($facts)
         . "\nWrite the three-section analysis for this reporting period.";
 
     $aiText = aiGenerate($systemPrompt, $userPrompt, [
-        'max_tokens'   => 1200,
+        'max_tokens'   => 2600,   // was 1200. Seven sections at 700-1000 words
+                                 // will not fit in 1200 tokens, and a truncated
+                                 // reply is a report that stops mid-sentence in
+                                 // the last section - the one holding the
+                                 // recommended actions.
         'temperature'  => 0.3,
         'forceRefresh' => $force,
     ]);
@@ -91,18 +123,30 @@ try {
     $source  = 'ai';
     $aiError = '';
 
-    // Guard the promised format: if the model ignored the headings, ship the
-    // deterministic report instead of an unformatted wall of text.
-    $hasShape = $aiText !== ''
-        && strpos($aiText, '## 1.') !== false
-        && strpos($aiText, '## 2.') !== false
-        && strpos($aiText, '## 3.') !== false;
+    // Guard the promised shape. A model that returns prose without the seven
+    // headings would render as an undifferentiated wall, so the shape is
+    // checked rather than trusted - and a shape failure is treated exactly
+    // like an unreachable gateway: no report, error shown, figures still
+    // served.
+    $required = [
+        '## 1.', '## 2.', '## 3.', '## 4.', '## 5.', '## 6.', '## 7.',
+    ];
+    $hasShape = $aiText !== '';
+    foreach ($required as $heading) {
+        if (strpos($aiText, $heading) === false) {
+            $hasShape = false;
+            break;
+        }
+    }
 
     if (!$hasShape) {
         $aiError = aiLastError() !== ''
             ? aiLastError()
-            : 'The AI model did not return the required three-section format.';
-        $aiText  = aiInsightFallbackReport($facts);
+            : 'The AI model did not return the required seven-section report.';
+        // The report slot is left EMPTY. Not filled with a template, not filled
+        // with a trimmed partial. A half-report from a model that ignored its
+        // format is worse than none, because it looks like the whole thing.
+        $aiText  = '';
         $source  = 'fallback';
     }
 
@@ -126,8 +170,9 @@ try {
         'success' => true,
         'data'    => [
             'report'       => $aiText,
-            'source'       => $source,          // 'ai' | 'fallback'
-            'ai_error'     => $aiError,         // shown as a hint when fallback
+            'figures'     => aiInsightFiguresMarkdown($facts),
+            'source'      => $source,          // 'ai' | 'fallback'
+            'ai_error'    => $aiError,         // shown as a banner when fallback
             'model'        => $source === 'ai' ? AI_MODEL : null,
             'generated_at' => date('Y-m-d H:i:s'),
             'period'       => [

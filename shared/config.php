@@ -245,6 +245,29 @@ define('KIOSK_ACCESS_TOKEN', secretFromEnvOrLocal('KIOSK_ACCESS_TOKEN', 'kiosk-t
 // Environment variables:
 //   OPENROUTER_API_KEY or AI_API_KEY - your OpenRouter API key
 //     (or paste the key into the git-ignored shared/ai_key.local file)
+//
+//   LOCAL SETUP - the key is NOT in this repository and never will be.
+//
+//     Create shared/ai_key.local containing ONE line: the bare key, with no
+//     "AI_API_KEY=" prefix and no quotes. It is git-ignored, so it stays local.
+//
+//         shared/ai_key.local
+//         -------------------------------
+//         sk-or-v1-xxxxxxxxxxxxxxxx
+//
+//     Or export it in the environment instead, which is the better choice on a
+//     real host because it never touches disk:
+//
+//         export OPENROUTER_API_KEY=sk-or-v1-xxxxxxxx
+//
+//     Then confirm it took, BEFORE assuming the gateway is at fault:
+//
+//         php -r "require 'shared/config.php';
+//                 echo AI_API_KEY === '' ? 'NOT SET' : 'loaded';"
+//
+//     A missing key does not produce an obvious error. The gateway comes back
+//     401 "No cookie auth credentials found", which reads like a proxy or URL
+//     problem and sends you looking at the endpoint instead of the credential.
 //   AI_MODEL - model to use (default: qwen/qwen3.8-27b:free; NO "openrouter/" prefix)
 //   AI_API_URL - override URL if needed (default: https://openrouter.ai/api/v1/chat/completions)
 

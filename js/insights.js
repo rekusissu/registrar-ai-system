@@ -59,6 +59,13 @@
         reportMeta:   document.getElementById('reportMeta'),
         reportSourceBadge: document.getElementById('reportSourceBadge'),
         reportMetaText: document.getElementById('reportMetaText'),
+        // The loud degradation banner and the measured-figures block. Both are
+        // new, and both are about the same thing: never letting a reader
+        // mistake counts for analysis. See renderReport().
+        reportUnavailable:       document.getElementById('reportUnavailable'),
+        reportUnavailableReason: document.getElementById('reportUnavailableReason'),
+        reportFigures:           document.getElementById('reportFigures'),
+        reportFiguresBody:       document.getElementById('reportFiguresBody'),
         reportFooter: document.getElementById('reportFooter'),
         printBtn:   document.getElementById('printBtn'),
         exportBtn:  document.getElementById('exportBtn'),
@@ -803,6 +810,23 @@
             : '<i class="fas fa-wand-magic-sparkles"></i> Generate AI Insight';
     }
 
+    // ── The report, the banner, and the figures are three different things ──
+    //
+    // They used to be one. The endpoint returned a "rule-based summary" in the
+    // same slot the model's text went in, under the same headings and the same
+    // title, and the only signal that no model had run was a small amber badge
+    // and a sentence of meta text. That is the shape of output that gets
+    // believed: it is well-formed, it cites figures, and it concludes.
+    //
+    // So the three are now kept apart.
+    //
+    //   report  - the model's narrative, or NOTHING.
+    //   banner  - shown when there is no model output, saying so in a sentence
+    //             a skimming reader cannot miss.
+    //   figures - the database counts, always, in a ledger treatment that is
+    //             deliberately unlike the report.
+    //
+    // A reader can now answer "who wrote this?" without reading a word of it.
     function renderReport(report, meta) {
         state.report = report;
         state.source = meta.source || 'ai';
@@ -810,33 +834,69 @@
         if (meta.cards)  state.cards  = meta.cards;
         state.stale = false;
 
-        el.reportOutput.innerHTML = '<div class="ai-report-title"><i class="fas fa-chart-line"></i> AI Analysis Report</div>'
-            + markdownToHtml(report);
-        el.reportOutput.style.display = 'block';
-        el.reportFooter.style.display = 'block';
+        var hasAi = state.source === 'ai' && !!report;
 
-        // Source badge + meta line keep the report honest about who wrote it.
+        // The banner. Its presence is the honest signal; the badge is a
+        // secondary confirmation, not the primary one.
+        if (el.reportUnavailable) {
+            if (hasAi) {
+                el.reportUnavailable.style.display = 'none';
+            } else {
+                el.reportUnavailable.style.display = 'block';
+                if (el.reportUnavailableReason) {
+                    el.reportUnavailableReason.textContent = meta.ai_error
+                        ? 'Reported by the gateway: ' + meta.ai_error
+                        : 'No reason was reported.';
+                }
+            }
+        }
+
+        // The narrative slot. Left genuinely empty on fallback - not filled with
+        // the figures, and not filled with a template.
+        if (hasAi) {
+            el.reportOutput.innerHTML = '<div class="ai-report-title"><i class="fas fa-chart-line"></i> AI Analysis Report</div>'
+                + markdownToHtml(report);
+            el.reportOutput.style.display = 'block';
+            el.reportFooter.style.display = 'block';
+        } else {
+            el.reportOutput.innerHTML = '';
+            el.reportOutput.style.display = 'none';
+            // No model output means there is nothing to attribute to the model,
+            // so the AI disclaimer does not belong on this card.
+            el.reportFooter.style.display = 'none';
+        }
+
+        // The measured figures, always, in their own language.
+        if (el.reportFigures && el.reportFiguresBody) {
+            if (meta.figures) {
+                el.reportFiguresBody.textContent = meta.figures;
+                el.reportFigures.style.display = 'block';
+            } else {
+                el.reportFigures.style.display = 'none';
+            }
+        }
+
         if (el.reportSourceBadge) {
-            if (state.source === 'ai') {
+            if (hasAi) {
                 el.reportSourceBadge.textContent = 'AI-generated' + (meta.model ? ' · ' + meta.model : '');
                 el.reportSourceBadge.classList.remove('is-fallback');
             } else {
-                el.reportSourceBadge.textContent = 'Rule-based summary';
+                el.reportSourceBadge.textContent = 'No AI analysis · counts only';
                 el.reportSourceBadge.classList.add('is-fallback');
             }
         }
         if (el.reportMetaText) {
             var text = (meta.period && meta.period.label) ? meta.period.label : state.period.label;
             text += ' · generated ' + new Date().toLocaleString();
-            if (state.source === 'fallback' && meta.ai_error) {
-                text += ' · AI gateway unavailable: ' + meta.ai_error;
-            }
             el.reportMetaText.textContent = text;
         }
         el.reportMeta.style.display = 'flex';
 
-        el.printBtn.style.display  = 'inline-flex';
-        el.exportBtn.style.display = 'inline-flex';
+        // Print and export only make sense when there is a report to carry. With
+        // counts alone they would export a page of figures under a title that
+        // promises analysis.
+        el.printBtn.style.display  = hasAi ? 'inline-flex' : 'none';
+        el.exportBtn.style.display = hasAi ? 'inline-flex' : 'none';
     }
 
     function generateReport(force) {
@@ -960,7 +1020,7 @@
         text += 'Bestlink College of the Philippines — Office of the Registrar\n';
         text += 'Reporting period: ' + (state.period.label || '') + ' (compared with ' + (state.period.prev_label || '—') + ')\n';
         text += 'Generated: ' + new Date().toLocaleString() + '\n';
-        text += 'Source: ' + (state.source === 'ai' ? 'AI-generated' : 'Rule-based summary (AI gateway unavailable)') + '\n';
+        text += 'Source: ' + (state.source === 'ai' ? 'AI-generated' : 'AI analysis unavailable (gateway not reached)') + '\n';
         text += Array(64).join('=') + '\n\n';
         text += state.report + '\n\n';
         text += Array(64).join('-') + '\n';
@@ -981,7 +1041,7 @@
         add('Period start', f.period.start);
         add('Period end', f.period.end);
         add('Comparison period', f.period.prev_label);
-        add('Report source', state.source === 'ai' ? 'AI-generated' : 'Rule-based summary');
+        add('Report source', state.source === 'ai' ? 'AI-generated' : 'No AI analysis (gateway unavailable)');
 
         add('Total students', f.students.total);
         add('Active or enrolled', f.students.active_enrolled);

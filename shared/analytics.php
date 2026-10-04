@@ -1,7 +1,7 @@
 <?php
 // ============================================================
 //  SHARED/ANALYTICS.PHP
-//  Intelligent Analytics and Reports — data layer.
+//  Intelligent Analytics and Reports â€” data layer.
 //
 //  Single source of truth for:
 //    * the 4 KPI cards        (aiInsightBuild()['cards'])
@@ -13,7 +13,7 @@
 //  (api/ai-insights-report.php) all read from here, so the charts
 //  and the AI narrative can never disagree.
 //
-//  Aggregates only — no student name or student number ever leaves
+//  Aggregates only â€” no student name or student number ever leaves
 //  this file, which is what keeps the AI prompt privacy-safe.
 // ============================================================
 
@@ -33,7 +33,7 @@ if (defined('ANALYTICS_LOADED')) {
 }
 define('ANALYTICS_LOADED', true);
 
-// ─── Access ──────────────────────────────────────────────────
+// â”€â”€â”€ Access â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 /**
  * Roles allowed to see registrar analytics. Mirrors the sidebar
  * ("AI Tools" group is hidden for student accounts).
@@ -42,7 +42,7 @@ function aiInsightRoles(): array {
     return ['admin', 'registrar', 'staff'];
 }
 
-// ─── Reporting period ────────────────────────────────────────
+// â”€â”€â”€ Reporting period â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 /**
  * Resolve a month/year pair into concrete date windows plus the
  * previous period, which powers every "vs last month" comparison.
@@ -80,7 +80,7 @@ function aiInsightPeriodFromRequest(): array {
     return aiInsightPeriod($month, $year);
 }
 
-// ─── Sign-off pending: document taxonomy ─────────────────────
+// â”€â”€â”€ Sign-off pending: document taxonomy â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // The 8 document types requested by the registrar are not all
 // present in document_requests.document_type (the enum holds only
 // form137, good_moral, transcript, certificate, clearance) and 4 of
@@ -88,13 +88,13 @@ function aiInsightPeriodFromRequest(): array {
 // api/student-documents.php writes values that enum rejects.
 //
 // Classification precedence is therefore:
-//     catalog SKU  →  catalog name keyword  →  document_type  →  Others
+//     catalog SKU  â†’  catalog name keyword  â†’  document_type  â†’  Others
 // SKU is authoritative because catalog_id is always populated.
 //
 // SIGN-OFF D1d: DOC-HD ("Honorable Dismissal") is treated as
 //               Withdrawal Form.
 // SIGN-OFF D1e: DOC-COE ("Certificate of Enrollment") is treated as
-//               COR (4 of 11 August requests land in this bucket —
+//               COR (4 of 11 August requests land in this bucket â€”
 //               the single biggest swing in the document chart).
 // Edit only this map once the registrar rules on those two buckets.
 function aiInsightDocTaxonomy(): array {
@@ -102,7 +102,7 @@ function aiInsightDocTaxonomy(): array {
         // Display order of the bars (the trailing "Others" is appended by the chart builder).
         'buckets' => ['Form 137', 'Form 138', 'Good Moral', 'Withdrawal Form', 'COR', 'COG', 'TOR', 'Diploma'],
 
-        // catalogue SKU → bucket
+        // catalogue SKU â†’ bucket
         'sku' => [
             'DOC-F137'    => 'Form 137',
             'DOC-F138'    => 'Form 138',
@@ -112,7 +112,7 @@ function aiInsightDocTaxonomy(): array {
             'DOC-COG'     => 'COG',
             'DOC-TOR'     => 'TOR',
             'DOC-DIPLOMA' => 'Diploma',
-            'DOC-CTC'     => 'Others',            // Certified True Copy — not one of the requested 8
+            'DOC-CTC'     => 'Others',            // Certified True Copy â€” not one of the requested 8
             'DOC-CD'      => 'Others',            // Course Description
         ],
 
@@ -130,7 +130,7 @@ function aiInsightDocTaxonomy(): array {
             ['Diploma',         'diploma'],
         ],
 
-        // legacy document_type enum → bucket
+        // legacy document_type enum â†’ bucket
         'type' => [
             'form137'    => 'Form 137',
             'form138'    => 'Form 138',
@@ -191,7 +191,7 @@ function aiInsightDocStatusGroup(?string $status): string {
     return 'Processing';
 }
 
-// ─── Student status buckets (the pie) ────────────────────────
+// â”€â”€â”€ Student status buckets (the pie) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Read from studentStatuses() so the pie cannot offer a slice the column would
 // reject.
 //
@@ -257,16 +257,16 @@ function aiInsightProgramMetrics(array $period, int $topLimit = 8): array {
     return ['items' => $items, 'program_count' => count($rows)];
 }
 
-// ─── Metric blocks (one per data domain) ─────────────────────
+// â”€â”€â”€ Metric blocks (one per data domain) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 /**
- * "+8 requests vs Jul 2026" / "-2 vs Jul 2026" / "±0 vs Jul 2026".
+ * "+8 requests vs Jul 2026" / "-2 vs Jul 2026" / "Â±0 vs Jul 2026".
  *
- * @param string $unit optional unit word shown before "vs" ("new", "issued", …)
+ * @param string $unit optional unit word shown before "vs" ("new", "issued", â€¦)
  */
 function aiInsightDelta(int $current, int $previous, string $prevLabel, string $unit = ''): array {
     $d    = $current - $previous;
     $dir  = $d > 0 ? 'up' : ($d < 0 ? 'down' : 'flat');
-    $sign = $d > 0 ? '+' : ($d < 0 ? '-' : '±');
+    $sign = $d > 0 ? '+' : ($d < 0 ? '-' : 'Â±');
     $text = $sign . abs($d) . ($unit !== '' ? ' ' . $unit : '') . ' vs ' . $prevLabel;
     return ['dir' => $dir, 'value' => $d, 'text' => $text];
 }
@@ -450,7 +450,7 @@ function aiInsightQueueMetrics(array $period): array {
     $served        = (int) $db->fetchColumn("SELECT COUNT(*) FROM queue_tickets WHERE joined_at >= ? AND joined_at < ? AND status = 'completed'", [$s, $e]);
     $cancelled     = (int) $db->fetchColumn("SELECT COUNT(*) FROM queue_tickets WHERE joined_at >= ? AND joined_at < ? AND status IN ('cancelled','no-show','removed')", [$s, $e]);
 
-    // Peak day inside the period — gives the AI something concrete to observe.
+    // Peak day inside the period â€” gives the AI something concrete to observe.
     $peak = $db->fetchOne(
         "SELECT queue_date, COUNT(*) AS c FROM queue_tickets
           WHERE joined_at >= ? AND joined_at < ?
@@ -472,7 +472,7 @@ function aiInsightQueueMetrics(array $period): array {
     ];
 }
 
-// ─── Main builder ────────────────────────────────────────────
+// â”€â”€â”€ Main builder â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 /**
  * Everything the dashboard, the data endpoint and the AI report
  * need for one reporting period. Runs each aggregate query once.
@@ -488,7 +488,7 @@ function aiInsightBuild(array $period): array {
 
     $prev = $period['prev_short'];
 
-    // ─── KPI cards (headline = snapshot, badge = vs previous period) ───
+    // â”€â”€â”€ KPI cards (headline = snapshot, badge = vs previous period) â”€â”€â”€
     $cards = [
         [
             'key'    => 'students',
@@ -511,7 +511,7 @@ function aiInsightBuild(array $period): array {
             'badge'  => aiInsightDelta($rfid['issued_period'], $rfid['issued_previous'], $prev, 'issued'),
             'footer' => [
                 'dot'  => 'purple',
-                'text' => $rfid['active'] . ' active · ' . $rfid['expired'] . ' expired',
+                'text' => $rfid['active'] . ' active Â· ' . $rfid['expired'] . ' expired',
             ],
         ],
         [
@@ -523,7 +523,7 @@ function aiInsightBuild(array $period): array {
             'badge'  => aiInsightDelta($docs['total'], $docs['previous'], $prev, 'requests'),
             'footer' => [
                 'dot'  => 'blue',
-                'text' => $docs['pending'] . ' pending · ' . $docs['completed'] . ' completed',
+                'text' => $docs['pending'] . ' pending Â· ' . $docs['completed'] . ' completed',
             ],
         ],
         [
@@ -535,12 +535,12 @@ function aiInsightBuild(array $period): array {
             'badge'  => aiInsightDelta($queue['students'], $queue['students_previous'], $prev, 'students'),
             'footer' => [
                 'dot'  => 'purple',
-                'text' => $queue['tickets'] . ' tickets · ' . $queue['today'] . ' today',
+                'text' => $queue['tickets'] . ' tickets Â· ' . $queue['today'] . ' today',
             ],
         ],
     ];
 
-    // ─── Chart 1 · Student status distribution (pie) ───
+    // â”€â”€â”€ Chart 1 Â· Student status distribution (pie) â”€â”€â”€
     $statusLabels = []; $statusValues = []; $statusColors = [];
     $claimed = [];
     foreach (aiInsightStatusBuckets() as $label => $meta) {
@@ -567,7 +567,7 @@ function aiInsightBuild(array $period): array {
         $statusColors[] = '#94a3b8';
     }
 
-    // ─── Chart 2 · Student program distribution (bar) ───
+    // â”€â”€â”€ Chart 2 Â· Student program distribution (bar) â”€â”€â”€
     $programLabels = []; $programTotals = []; $programNew = []; $programColors = [];
     $palette = ['#2563eb', '#7c3aed', '#0ea5e9', '#b45309', '#db2777', '#16a34a', '#0891b2', '#ea580c', '#64748b'];
     foreach ($programs['items'] as $i => $row) {
@@ -577,7 +577,7 @@ function aiInsightBuild(array $period): array {
         $programColors[] = $palette[$i % count($palette)];
     }
 
-    // ─── Chart 3 · Document transaction overview (stacked bar) ───
+    // â”€â”€â”€ Chart 3 Â· Document transaction overview (stacked bar) â”€â”€â”€
     $seriesColors = [
         'Pending'    => '#b45309',
         'Processing' => '#2563eb',
@@ -598,7 +598,7 @@ function aiInsightBuild(array $period): array {
         ];
     }
 
-    // ─── Chart 4 · RFID overview (doughnut + 12-month trend) ───
+    // â”€â”€â”€ Chart 4 Â· RFID overview (doughnut + 12-month trend) â”€â”€â”€
     $rfidLabels = []; $rfidValues = []; $rfidColors = [];
     $rfidMeta = [
         'active'   => ['Active',   '#16a34a'],
@@ -658,7 +658,7 @@ function aiInsightBuild(array $period): array {
         ],
     ];
 
-    // ─── Fact sheet (aggregates only — feeds the prompt and the fallback) ───
+    // â”€â”€â”€ Fact sheet (aggregates only â€” feeds the prompt and the fallback) â”€â”€â”€
     $statusMap = [];
     foreach ($statusLabels as $i => $label) {
         $statusMap[$label] = (int) $statusValues[$i];
@@ -746,8 +746,8 @@ function aiInsightBuild(array $period): array {
     ];
 }
 
-// ─── Text builders ───────────────────────────────────────────
-/** Safe percentage helper — never divides by zero. */
+// â”€â”€â”€ Text builders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+/** Safe percentage helper â€” never divides by zero. */
 function aiInsightPct($part, $whole, int $decimals = 1): string {
     $whole = (float) $whole;
     if ($whole <= 0) return 'n/a';
@@ -827,94 +827,88 @@ function aiInsightFactSheetText(array $facts): string {
 }
 
 /**
- * Rule-based three-section report, rendered whenever the AI gateway
- * is unreachable. Deliberately identical in shape to the model's
- * output so the report card never appears empty or broken.
+ * The MEASURED FIGURES for the period, as Markdown.
+ *
+ * This is not a report, and it must never be rendered where a report goes. It
+ * is the raw counts, and it is always correct because nothing infers anything:
+ * every figure here came out of a query.
+ *
+ * WHY IT IS SEPARATE FROM THE NARRATIVE
+ *
+ * The version this replaces assembled the same figures into three titled
+ * sections - "AI Registrar Summary", "Detected Trends", "Patterns Observed" -
+ * and returned that as `report`. It read exactly like analysis: narrative tone,
+ * a conclusion, a heading that said AI. But it was string concatenation. When
+ * the gateway failed, the page produced something indistinguishable from a
+ * successful model call, and a registrar in a hurry had no way to tell that no
+ * AI had run at all.
+ *
+ * So the figures are now shown AS figures - a titled block of counts, visibly
+ * not an analysis, always present. The narrative slot above it is either the
+ * model or it is empty. There is no third option where a template wears the
+ * AI's headings.
+ *
+ * @param  array $facts The fact bundle from aiInsightBuild().
+ * @return string Markdown.
  */
-function aiInsightFallbackReport(array $facts): string {
+function aiInsightFiguresMarkdown(array $facts): string
+{
     $p  = $facts['period'];
     $st = $facts['students'];
     $rf = $facts['rfid'];
     $dc = $facts['documents'];
     $q  = $facts['queue'];
 
-    // Pre-assigned so PHP 7/8 string interpolation never trips over "??"
-    // inside "{...}" in the templates below.
-    $rfLost                  = (int) ($rf['lost'] ?? 0);
-    $served                  = (int) ($q['served'] ?? 0);
-    $cancelledOrNoShow       = (int) ($q['cancelled_or_no_show'] ?? 0);
-    $walkIns                 = (int) ($q['walk_ins'] ?? 0);
-    $newInPeriod             = (int) ($st['new_in_period'] ?? 0);
-    $newInPrevious           = (int) ($st['new_in_previous'] ?? 0);
-
     $docDelta  = (int) $dc['total_in_period'] - (int) $dc['total_previous'];
-    $deltaWord = $docDelta > 0 ? "rose by {$docDelta}" : ($docDelta < 0 ? 'fell by ' . abs($docDelta) : 'held steady');
-    $pendingShare = aiInsightPct($dc['pending'], $dc['total_in_period'], 0);
+    $deltaWord = $docDelta > 0 ? '+' . $docDelta
+               : ($docDelta < 0 ? (string) $docDelta : 'no change');
 
-    // Most-requested document type in the period.
-    $types = $dc['by_type'];
-    arsort($types);
-    $topType = null; $topCount = 0;
-    foreach ($types as $label => $count) {
-        if ((int) $count > 0) { $topType = $label; $topCount = (int) $count; break; }
-    }
+    $newInPeriod   = (int) ($st['new_in_period']   ?? 0);
+    $newInPrevious = (int) ($st['new_in_previous'] ?? 0);
+    $rfLost        = (int) ($rf['lost'] ?? 0);
+    $served        = (int) ($q['served'] ?? 0);
+    $cancelled     = (int) ($q['cancelled_or_no_show'] ?? 0);
+    $walkIns       = (int) ($q['walk_ins'] ?? 0);
 
-    // ── 1. AI Registrar Summary ──
-    $summary = "{$p['label']} recorded {$dc['total_in_period']} document transactions and "
-        . "{$q['tickets_in_period']} queue tickets from {$q['students_in_period']} students, against a population of "
-        . "{$st['total']} students ({$st['active_enrolled']} active or enrolled). "
-        . "Document request volume {$deltaWord} compared with {$p['prev_label']}.";
-    $summary .= (int) $rf['total_cards'] === 0
-        ? ' No RFID cards are on record yet.'
-        : " {$rf['active']} of {$rf['total_cards']} RFID cards are active.";
+    $t = "Counts for {$p['label']}, compared with {$p['prev_label']}. "
+       . "Every figure below is a direct count from the database.\n\n";
 
-    // ── 2. Detected Trends ──
-    $trends   = [];
-    $trends[] = "- **Students:** {$st['total']} students on record, {$st['active_enrolled']} active or enrolled; "
-        . "{$newInPeriod} new registrations this period against {$newInPrevious} in {$p['prev_label']}.";
-    $trends[] = "- **Document Transactions:** {$dc['total_in_period']} requests this period versus {$dc['total_previous']} "
-        . "in {$p['prev_label']}; {$dc['pending']} are still in progress and {$dc['completed']} are ready, shipped or claimed."
-        . ($topType ? " {$topType} is the most requested type with {$topCount}." : '');
-    $trends[] = (int) $rf['total_cards'] === 0
-        ? "- **RFID:** no cards have been issued, so card coverage cannot be measured; {$rf['kiosk_taps_total']} kiosk taps were logged in the last 12 months."
-        : "- **RFID:** {$rf['issued_in_period']} cards issued this period versus {$rf['issued_in_previous']} in {$p['prev_label']}; {$rf['active']} active, {$rf['expired']} expired, {$rfLost} lost.";
-    $trends[] = "- **Queue:** {$q['students_in_period']} students took {$q['tickets_in_period']} tickets this period "
-        . "(versus {$q['students_previous']} students in {$p['prev_label']}); {$served} were completed and "
-        . "{$cancelledOrNoShow} were cancelled or no-show.";
-
-    // ── 3. Patterns Observed ──
-    $observations = [];
-    if ((int) $dc['total_in_period'] > 0) {
-        if ($topType) {
-            $observations[] = "- {$topType} accounts for {$topCount} of {$dc['total_in_period']} requests ("
-                . aiInsightPct($topCount, $dc['total_in_period'], 0) . '), the largest single demand this period.';
-        }
-        $observations[] = "- Work still in progress represents {$pendingShare} of the period's requests, "
-            . 'making turnaround the main operational focus.';
-    } else {
-        $observations[] = '- No document requests were logged in this period, so document demand is flat.';
-    }
-    if (!empty($q['busiest_day']) && (int) $q['busiest_day_tickets'] > 0) {
-        $observations[] = "- Queue demand is unevenly spread: {$q['busiest_day']} carried {$q['busiest_day_tickets']} of "
-            . "{$q['tickets_in_period']} tickets, so counter staffing should follow the daily peaks.";
-    }
-    if ($walkIns > 0) {
-        $observations[] = "- {$walkIns} queue tickets had no matching student record, which limits per-student reporting.";
-    }
-    if ((int) $rf['expired'] > 0) {
-        $observations[] = "- {$rf['expired']} RFID cards have expired, which reduces active card coverage.";
-    }
-    if ($newInPeriod === 0 && $newInPrevious === 0) {
-        $observations[] = '- No new students were registered in the selected period or the period before it.';
-    }
-    if (count($observations) === 0) {
-        $observations[] = '- Registrar activity is within its normal operating range for this period.';
+    $t .= "**Students**\n";
+    $t .= "- On record: {$st['total']}\n";
+    $t .= "- Active or enrolled: {$st['active_enrolled']} ("
+        . aiInsightPct($st['active_enrolled'], $st['total'], 0) . ")\n";
+    $t .= "- New registrations: {$newInPeriod} (previous period: {$newInPrevious})\n";
+    $t .= "- By status: " . aiInsightPairs($st['by_status']) . "\n";
+    $t .= "- Programmes on offer: {$facts['programs']['program_count']}\n";
+    foreach ($facts['programs']['top'] as $prog) {
+        $t .= "  - {$prog['course']}: {$prog['students']} students"
+            . " ({$prog['new_in_period']} new this period)\n";
     }
 
-    return "## 1. AI Registrar Summary\n"
-        . trim($summary) . "\n\n"
-        . "## 2. Detected Trends\n"
-        . implode("\n", $trends) . "\n\n"
-        . "## 3. Patterns Observed\n"
-        . implode("\n", $observations);
+    $t .= "\n**Document services**\n";
+    $t .= "- Requests: {$dc['total_in_period']} (previous period: {$dc['total_previous']}; {$deltaWord})\n";
+    $t .= "- Not yet ready: {$dc['pending']}\n";
+    $t .= "- Ready, shipped or claimed: {$dc['completed']}\n";
+    $t .= "- Rejected: {$dc['rejected']}\n";
+    $t .= "- By workflow stage: " . aiInsightPairs($dc['by_stage']) . "\n";
+    $t .= "- By document type: " . aiInsightPairs($dc['by_type']) . "\n";
+
+    $t .= "\n**RFID / campus cards**\n";
+    $t .= "- Cards on record: {$rf['total_cards']}\n";
+    $t .= "- Active: {$rf['active']} (" . aiInsightPct($rf['active'], $rf['total_cards'], 0) . ")\n";
+    $t .= "- Expired: {$rf['expired']}; lost: {$rfLost}; inactive: {$rf['inactive']}\n";
+    $t .= "- Issued this period: {$rf['issued_in_period']} (previous period: {$rf['issued_in_previous']})\n";
+    $t .= "- Kiosk taps, last 12 months: {$rf['kiosk_taps_total']}\n";
+
+    $t .= "\n**Queue**\n";
+    $t .= "- Students queuing: {$q['students_in_period']} (previous period: {$q['students_previous']})\n";
+    $t .= "- Tickets issued: {$q['tickets_in_period']} (previous period: {$q['tickets_previous']})\n";
+    $t .= "- Completed: {$served}; cancelled or no-show: {$cancelled}\n";
+    $t .= "- Walk-in tickets with no student record: {$walkIns}\n";
+    if (!empty($q['busiest_day'])) {
+        $t .= "- Busiest day: {$q['busiest_day']} ({$q['busiest_day_tickets']} tickets)\n";
+    }
+    $t .= "- Tickets issued today: {$q['tickets_today']}\n";
+
+    return $t;
 }
