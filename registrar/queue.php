@@ -329,7 +329,21 @@ body[data-page="console"] td.empty-state{display:table-cell;height:300px;padding
                 </span>
             </label>
 
-            <div class="day-rule"><span>Daily tap limit</span></div>
+            <div class="day-rule"><span>Daily capacity</span></div>
+
+            <div class="day-grid">
+                <div class="form-group">
+                    <label for="dayMaxDaily">Numbers for the whole day</label>
+                    <input type="number" id="dayMaxDaily" class="form-control" min="0" step="1" value="0" placeholder="0 = unlimited">
+                    <small class="form-text" id="dayIssuedNote">&nbsp;</small>
+                </div>
+            </div>
+            <p class="day-note">
+                How many numbers the counter can issue in one day, all students together.
+                When this is reached the kiosk stops issuing numbers to everyone until tomorrow.
+            </p>
+
+            <div class="day-rule"><span>Per-person tap limit</span></div>
 
             <div class="day-grid">
                 <div class="form-group">

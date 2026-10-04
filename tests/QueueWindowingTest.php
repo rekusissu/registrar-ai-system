@@ -495,4 +495,134 @@ final class QueueWindowingTest extends TestCase
             'Window slots still read the short keys, which the per-window map never sets.'
         );
     }
+
+    /**
+     * THE DAY'S CAPACITY IS A TOTAL, NOT A PER-PERSON COUNT.
+     *
+     * The two existing caps answer "has this person used theirs". This one
+     * answers "is the counter still inside today's capacity", which is the
+     * number the office actually plans against - roughly 500-600 people
+     * across an eight-hour day.
+     *
+     * The boundary matters more than the middle. At exactly the limit the
+     * kiosk must refuse, because the NEXT number is the one that would
+     * exceed it.
+     */
+    public function testDailyCapacityIsCheckedAtTheBoundary(): void
+    {
+        require_once __DIR__ . '/../shared/queue_helpers.php';
+
+        self::assertTrue(
+            queueDailyTapLimitReached(['max_daily_taps' => 600], 600),
+            'At exactly the cap the day is full. Using > instead would let 601 out.'
+        );
+        self::assertFalse(queueDailyTapLimitReached(['max_daily_taps' => 600], 599));
+
+        self::assertFalse(
+            queueDailyTapLimitReached(['max_daily_taps' => 0], 99999),
+            'A cap of 0 is unlimited in this table, matching every other cap here.'
+        );
+        self::assertFalse(
+            queueDailyTapLimitReached([], 500),
+            'A pre-migration database returns no key at all. Degrading to '
+            . 'unlimited keeps the queue working; degrading to "always full" '
+            . 'would shut the kiosk entirely.'
+        );
+    }
+
+    public function testDailyCapacityIsIndependentOfThePerPersonCaps(): void
+    {
+        require_once __DIR__ . '/../shared/queue_helpers.php';
+
+        // A student well inside their personal allowance is still refused
+        // once the office is full. This is the case the feature exists for:
+        // personal taps are fine, the day has run out.
+        $settings = [
+            'max_daily_taps'   => 600,
+            'max_taps_student' => 5,
+        ];
+
+        self::assertFalse(queueTapLimitReached($settings, 1, 'student'),
+            'One tap is nowhere near the personal cap.');
+        self::assertTrue(queueDailyTapLimitReached($settings, 600),
+            'But the office being full is a separate fact and closes the door.');
+
+        $roomy = ['max_daily_taps' => 600, 'max_taps_student' => 2];
+        self::assertTrue(queueTapLimitReached($roomy, 2, 'student'));
+        self::assertFalse(queueDailyTapLimitReached($roomy, 2));
+    }
+
+    /**
+     * The cap is only real if it survives a save. A column added to the
+     * schema but left out of the INSERT would read back as 0 - unlimited -
+     * every time the registrar touched the form, so the cap would silently
+     * switch itself off on first use.
+     */
+    public function testDailyCapacityIsSavedAndEnforcedBeforeThePersonalCaps(): void
+    {
+        $save = (string) file_get_contents(__DIR__ . '/../api/queue.php');
+        self::assertStringContainsString('max_daily_taps', $save,
+            'The day capacity is not persisted at all.');
+        self::assertStringContainsString('max_daily_taps = VALUES(max_daily_taps)', $save,
+            'The upsert does not carry the new column, so it reads back as 0 '
+            . '(unlimited) after any save.');
+
+        $public = (string) file_get_contents(__DIR__ . '/../api/queue-public.php');
+        self::assertStringContainsString('queueDailyTapLimitReached(', $public,
+            'The join path never checks the day capacity, so the cap cannot be '
+            . 'enforced no matter what the registrar sets.');
+        self::assertLessThan(
+            strpos($public, 'queueTapLimitReached('),
+            strpos($public, 'queueDailyTapLimitReached('),
+            'The day capacity must be checked BEFORE the per-person caps: a full '
+            . 'office outranks any individual allowance.'
+        );
+    }
+
+    /**
+     * A STUDENT MUST NEVER BE STUCK MID-JOIN.
+     *
+     * Two separate defects, both a dead end on a public kiosk:
+     *
+     *  - No way out. The back control was hidden on the first question,
+     *    because there was no earlier step to return to. But no ticket
+     *    exists until the join is submitted, so a student who tapped their
+     *    card by mistake had no exit at all except taking a number for a
+     *    transaction they did not want and standing in it.
+     *
+     *  - No time to think. refreshClosed() is called from a 15-second poll.
+     *    Its reopen branch was unconditional, so on every tick where the
+     *    queue was merely OPEN it sent the kiosk back to the tap prompt -
+     *    including while the student was still on the picker. Deciding
+     *    between Service and Claim took longer than 15 seconds, so the
+     *    screen reset, losing the card read and the half-made choice.
+     *
+     * The second is the one worth pinning: it presents as a timeout, and
+     * would be "fixed" by raising a timeout constant that does not exist.
+     */
+    public function testPickerIsNotResetByTheStatusPollAndAlwaysOffersAnExit(): void
+    {
+        $js = (string) file_get_contents(__DIR__ . '/../js/queue.js');
+
+        self::assertStringContainsString('function laneCancel(', $js,
+            'There is no way to abandon a join, so a mis-tap cannot be undone.');
+        self::assertDoesNotMatchRegularExpression(
+            '/back\.style\.display\s*=\s*[\'"]none[\'"]/',
+            $js,
+            'The back/cancel control is hidden somewhere. It must always be '
+            . 'available: the card has been read and the student owns that state.'
+        );
+
+        self::assertMatchesRegularExpression(
+            '/if\s*\(\s*wasClosed\s*\)\s*\{[^}]*activeScreen\s*===\s*[\'"]pick[\'"]/s',
+            $js,
+            'The reopen branch must run only when the queue has actually just '
+            . 'reopened. Un-gated, a 15-second status poll throws the student '
+            . 'off the picker mid-decision, which is the reported symptom.'
+        );
+
+        self::assertStringContainsString("'Cancel'", $js,
+            'On the first question, going back abandons the join. Labelling '
+            . 'that "Back" promises navigation that does not exist.');
+    }
 }

@@ -864,6 +864,12 @@ CREATE TABLE `queue_day_settings` (
   `cutoff_forced_by` int unsigned DEFAULT NULL,
   `max_taps_student` int unsigned NOT NULL DEFAULT 0,
   `max_taps_priority` int unsigned NOT NULL DEFAULT 0,
+  -- FROM migrations/add_queue_daily_tap_cap.sql
+  -- How many numbers may be issued for the WHOLE day, all students
+  -- together - the throughput the counter is staffed for. The two caps
+  -- above are PER STUDENT (an abuse guard); this one is the day's capacity.
+  -- 0 = unlimited, like every other cap here.
+  `max_daily_taps`   int unsigned NOT NULL DEFAULT 0,
   `updated_at`       timestamp    NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `updated_by`       int unsigned DEFAULT NULL,
   PRIMARY KEY (`queue_date`),

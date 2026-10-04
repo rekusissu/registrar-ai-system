@@ -220,11 +220,17 @@ var LANE_STEPS = [
         question: 'What do you need?',
         sub: 'Choose one to continue.',
         choices: [
-            { letter: 'A', tone: 'service', title: 'Service',
+            // NO LETTER BADGE. The A/B chips were a keyboard affordance - a
+            // letter you type - on a touch screen where nobody types
+            // anything. They also took the most prominent position on each
+            // card, which is the one place a competing element should not be:
+            // the card's job is to be read, and it drew the eye to a token
+            // that carried no meaning. Removed; the title now leads.
+            { tone: 'service', title: 'Service',
               meta: 'Enrolment, payments, records, and other registrar work.',
               value: 'service' },
-            { letter: 'B', tone: 'claim', title: 'Claim',
-              meta: 'Pick up a document you already filed for.',
+            { tone: 'claim', title: 'Claim',
+              meta: 'Collect a document you already filed for.',
               value: 'claim' }
         ]
     },
@@ -234,11 +240,25 @@ var LANE_STEPS = [
         question: 'Are you a priority client?',
         sub: 'Choose the one that applies to you.',
         choices: [
-            { letter: 'A', tone: 'service', title: 'Student',
+            // TONE IS THE BUG THAT MATTERED HERE.
+            //
+            // "Student" was tagged tone:'service', so it rendered in the same
+            // blue as Service on step 1 - on a screen where Service is not one
+            // of the options. The colour was encoding the wrong dimension:
+            // blue meant "service desk", but this step is asking about
+            // priority, not about the desk. A student glancing at the board
+            // saw a blue chip on step 2 and had no way to know blue meant
+            // something different there.
+            //
+            // Each step now colours by ITS OWN dimension: step 1 by desk
+            // (service / claim), step 2 by priority (student / priority).
+            // The colour means one thing within the screen you are looking
+            // at.
+            { tone: 'student', title: 'Student',
               meta: 'Joining as a regular student.',
               value: 'student' },
-            { letter: 'B', tone: 'priority', title: 'Priority',
-              meta: 'PWD · Senior Citizen · Pregnant · Parent',
+            { tone: 'priority', title: 'Priority',
+              meta: 'PWD · Senior citizen · Pregnant · Parent',
               value: 'priority' }
         ]
     }
@@ -264,7 +284,6 @@ function renderLaneStep() {
         btn.type = 'button';
         btn.className = 'lane-choice t-' + c.tone;
         btn.innerHTML =
-            '<span class="lane-letter">' + esc(c.letter) + '</span>' +
             '<span class="lane-body">' +
                 '<span class="lane-title">' + esc(c.title) + '</span>' +
                 '<span class="lane-meta">' + esc(c.meta) + '</span>' +
@@ -275,14 +294,15 @@ function renderLaneStep() {
     });
 
     var back = document.getElementById('laneBack');
-    // On the first question there is nowhere to go back to, so the
-    // control is hidden rather than shown and inert.
-    if (laneStep === 0) {
-        back.style.display = 'none';
-    } else {
-        back.style.display = '';
-        document.getElementById('laneBackLabel').textContent = LANE_STEPS[0].question;
-    }
+    // The control is ALWAYS present, because a student who tapped their card
+    // must always be able to leave. On step 1 there is no earlier step, so
+    // going back means abandoning the join - and the label says Cancel rather
+    // than Back, because those are different promises and a dead-end Back is
+    // worse than no control at all.
+    back.style.display = '';
+    document.getElementById('laneBackLabel').textContent =
+        laneStep === 0 ? 'Cancel' : LANE_STEPS[0].question;
+    back.classList.toggle('is-cancel', laneStep === 0);
 }
 
 function pickLane(value) {
@@ -297,8 +317,34 @@ function pickLane(value) {
     submitJoin(pendingUid);
 }
 
+function laneCancel() {
+    // Abandon the join and hand the kiosk back.
+    //
+    // Without this, a student who tapped their card by mistake, or who
+    // changed their mind, was STUCK: the Back control is hidden on step 1
+    // (there is no earlier step to go to) and the only way out was to make
+    // a choice and then stand in a queue for a transaction they did not
+    // want. On a public kiosk that is a dead end with no way back.
+    //
+    // Clearing pendingUid is what actually ends the join. The card read has
+    // not been spent - no ticket exists until submitJoin - so the next tap
+    // starts clean.
+    pendingUid = null;
+    laneStep = 0;
+    laneChoice = { txn_type: null, priority_group: null };
+    show('tap');
+    if (cardInput) cardInput.focus();
+}
+
 function laneBack() {
-    if (laneStep === 0) return;
+    // Step 2 goes back to step 1. On step 1 the only way "back" exists is
+    // abandoning the join entirely, which is what Cancel does - so the
+    // control is labelled for what it actually does rather than shown as an
+    // inert Back.
+    if (laneStep === 0) {
+        laneCancel();
+        return;
+    }
     laneStep--;
     renderLaneStep();
 }
@@ -376,7 +422,25 @@ function refreshClosed(data) {
     closedInfo = null;
     document.getElementById('closedMessage').textContent = 'The queue is closed right now.';
     document.getElementById('closedTitle').textContent = 'The queue is closed';
-    if (activeScreen === 'closed' || activeScreen === 'pick') show('tap');
+
+    // ONLY when the queue has actually just been reopened.
+    //
+    // This used to be an unconditional `if (activeScreen === 'closed' ||
+    // activeScreen === 'pick') show('tap')`. The intent was "a closed kiosk
+    // that reopens returns to the tap prompt", but written that way it also
+    // fired on EVERY poll tick while the queue was simply open - and this
+    // poll runs every 15 seconds.
+    //
+    // So a student who tapped their card and took longer than a few seconds
+    // deciding between Service and Claim was thrown back to the tap prompt
+    // mid-decision, losing their card read and their half-made choice. The
+    // reported symptom was "it goes back to ready after a few seconds", and
+    // the cause was the poll treating an open queue as news.
+    //
+    // Gating on wasClosed makes it fire once, on the actual transition.
+    if (wasClosed) {
+        if (activeScreen === 'closed' || activeScreen === 'pick') show('tap');
+    }
 }
 
 // "17:00:00" / "2026-02-10 17:00:00" -> "5:00 PM"
@@ -497,6 +561,18 @@ function submitJoin(uid) {
                     icon.className = 'result-icon warn fas fa-hourglass-half';
                     icon.style.display = '';
                     sub.textContent = d.message || 'You have used all of your numbers for today.';
+                } else if (d.code === 'day_full') {
+                    // The office has issued every number it planned for today.
+                    // This is NOT the student's fault and must not read as one,
+                    // so it takes the clock icon the queue-closed sign uses
+                    // rather than the error icon, and the copy says when the
+                    // line reopens rather than what went wrong.
+                    icon.className = 'result-icon warn fas fa-clock';
+                    icon.style.display = '';
+                    sub.textContent = d.message
+                        || 'All of today\'s numbers have been issued. Please come back tomorrow.';
+                    name.style.display = '';
+                    name.textContent = 'Numbers reopen at 8:00 AM.';
                 } else if (d.code === 'bad_lane') {
                     icon.className = 'result-icon error fas fa-circle-question';
                     icon.style.display = '';
@@ -879,6 +955,9 @@ function renderOpenState(d) {
         bar.classList.remove('is-closed');
         txt.textContent = 'Open';
         sub.textContent = 'Taking numbers ' + hours + '.'
+            + (s.max_daily_taps
+                ? ' ' + s.issued_today + ' of ' + s.max_daily_taps + ' issued today.'
+                : '')
             + (s.max_taps_student ? ' Student limit ' + s.max_taps_student + '/day.' : '')
             + (s.max_taps_priority ? ' Priority limit ' + s.max_taps_priority + '/day.' : '');
         btnOff.style.display = '';
@@ -896,6 +975,17 @@ function openDayPanel() {
     set('dayCloses', hhmm(s.closes_time) || '17:00');
     set('dayMaxStudent', s.max_taps_student != null ? s.max_taps_student : 0);
     set('dayMaxPriority', s.max_taps_priority != null ? s.max_taps_priority : 0);
+    set('dayMaxDaily', s.max_daily_taps != null ? s.max_daily_taps : 0);
+    // How much of today's capacity is already gone, stated where the number
+    // is edited rather than only on the open-bar summary. Deciding whether to
+    // raise the cap mid-morning is impossible without it.
+    var issuedNote = document.getElementById('dayIssuedNote');
+    if (issuedNote) {
+        var issued = Number(s.issued_today || 0);
+        issuedNote.textContent = s.max_daily_taps
+            ? issued + ' of ' + s.max_daily_taps + ' issued so far today.'
+            : (issued ? issued + ' issued today. No cap is set.' : 'No numbers issued yet today.');
+    }
     var en = document.getElementById('dayEnabled');
     if (en) en.checked = s.cutoff_enabled === undefined ? true : !!Number(s.cutoff_enabled);
     document.getElementById('dayModal').classList.add('active');
@@ -916,7 +1006,8 @@ function saveDaySettings() {
         closes_time: document.getElementById('dayCloses').value,
         cutoff_enabled: document.getElementById('dayEnabled').checked,
         max_taps_student: document.getElementById('dayMaxStudent').value,
-        max_taps_priority: document.getElementById('dayMaxPriority').value
+        max_taps_priority: document.getElementById('dayMaxPriority').value,
+        max_daily_taps: document.getElementById('dayMaxDaily').value
     }).then(function (d) {
         if (d.success) { showToast(d.message, 'success'); closeDay(); loadState(); }
         else showToast(d.message || 'Could not save.', 'error');

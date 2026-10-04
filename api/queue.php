@@ -225,6 +225,12 @@ if ($action === 'state') {
                     'cutoff_forced_at'  => $daySettings['cutoff_forced_at'],
                     'max_taps_student'  => (int) $daySettings['max_taps_student'],
                     'max_taps_priority' => (int) $daySettings['max_taps_priority'],
+                    // Sent alongside the caps so the console can show how
+                    // much of the day's capacity is already gone. The kiosk
+                    // must never learn the number: a student who can see
+                    // "487 of 600" learns where the cut-off is.
+                    'max_daily_taps'    => (int) ($daySettings['max_daily_taps'] ?? 0),
+                    'issued_today'      => queueNumbersIssuedToday($db, (string) ($today ?: date('Y-m-d'))),
                 ],
             ],
         ]);
@@ -520,6 +526,13 @@ if ($action === 'save_day_settings') {
 
         $maxStudent  = max(0, (int) ($input['max_taps_student']  ?? $cur['max_taps_student']));
         $maxPriority = max(0, (int) ($input['max_taps_priority'] ?? $cur['max_taps_priority']));
+        // The day's capacity, all students together. Distinct from the two
+        // above, which are per PERSON. Absent from the payload means "leave
+        // it alone" rather than "zero it", so an older console that has not
+        // been updated cannot silently switch the cap off.
+        $maxDaily    = isset($input['max_daily_taps'])
+            ? max(0, (int) $input['max_daily_taps'])
+            : (int) ($cur['max_daily_taps'] ?? 0);
         $enabled = isset($input['cutoff_enabled'])
             ? (int) (bool) $input['cutoff_enabled']
             : (int) $cur['cutoff_enabled'];
@@ -531,20 +544,23 @@ if ($action === 'save_day_settings') {
         $db->query(
             "INSERT INTO queue_day_settings
                 (queue_date, opens_time, closes_time, cutoff_enabled,
-                 cutoff_forced_at, cutoff_forced_by, max_taps_student, max_taps_priority, updated_by)
-             VALUES (?,?,?,?,NULL,NULL,?,?,?)
+                 cutoff_forced_at, cutoff_forced_by, max_taps_student, max_taps_priority,
+                 max_daily_taps, updated_by)
+             VALUES (?,?,?,?,NULL,NULL,?,?,?,?)
              ON DUPLICATE KEY UPDATE
                 opens_time = VALUES(opens_time),
                 closes_time = VALUES(closes_time),
                 cutoff_enabled = VALUES(cutoff_enabled),
                 max_taps_student = VALUES(max_taps_student),
                 max_taps_priority = VALUES(max_taps_priority),
+                max_daily_taps = VALUES(max_daily_taps),
                 updated_by = VALUES(updated_by)",
-            [$date, $opens, $closes, $enabled, $maxStudent, $maxPriority, $_SESSION['user_id']]
+            [$date, $opens, $closes, $enabled, $maxStudent, $maxPriority, $maxDaily, $_SESSION['user_id']]
         );
         logActivity($_SESSION['user_id'], 'queue_day_settings', null, 'queue_day_settings', null,
             [], ['queue_date' => $date, 'opens_time' => $opens, 'closes_time' => $closes,
-                 'max_taps_student' => $maxStudent, 'max_taps_priority' => $maxPriority]);
+                 'max_taps_student' => $maxStudent, 'max_taps_priority' => $maxPriority,
+                 'max_daily_taps' => $maxDaily]);
 
         $fresh = queueDaySettings($db, $date);
         $closed = queueIsClosed($fresh);

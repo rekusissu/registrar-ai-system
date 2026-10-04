@@ -183,6 +183,15 @@
 .lane-choice.t-priority { border-color: #fcd34d; background: #fffcf2; }
 .lane-choice.t-priority:hover { border-color: #d97706; }
 .lane-choice.t-priority .lane-letter { background: linear-gradient(140deg, #d97706, #b45309); color: #fff; }
+.lane-choice.t-student  { border-color: #bfdbfe; background: #f8fbff; }
+.lane-choice.t-student:hover  { border-color: #2563eb; }
+
+/* Cancel state.
+   The control is always visible now, so it must read as an exit rather
+   than as navigation. Same button, but quieter and in the ink colour -
+   a student should see it as available without it competing with the
+   choice they are in the middle of making. */
+.lane-back.is-cancel { color: #64748b; }
 
 .lane-back {
     margin-top: 20px;

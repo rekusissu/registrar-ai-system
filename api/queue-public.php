@@ -244,7 +244,35 @@ if ($action === 'join') {
                 exit;
             }
 
-            // ── 3b. Daily tap cap for this lane ────────────────
+            // ── 3a. THE DAY'S CAPACITY ────────────────────────────────────
+            // Checked BEFORE the per-student caps, because they answer
+            // different questions and only one of them can close the door
+            // for everybody. max_daily_taps is the office's throughput for
+            // the day - how many people the counter can actually serve -
+            // so when it is reached nobody is issued a number, whoever
+            // they are. The per-student caps below still run, but they are
+            // an abuse guard for one person and are irrelevant once the
+            // office itself is full.
+            //
+            // Inside the transaction and under the same FOR UPDATE lock as
+            // the live-ticket check, so two rapid taps cannot both read a
+            // stale count and both pass - which is exactly what happens at
+            // a busy kiosk.
+            $issuedToday = queueNumbersIssuedToday($db, $today);
+            if (queueDailyTapLimitReached($daySettings, $issuedToday)) {
+                $db->rollBack();
+                $limit = queueDailyTapLimit($daySettings);
+                echo json_encode([
+                    'success' => false,
+                    'code'    => 'day_full',
+                    'message' => 'All ' . $limit . ' numbers for today have been issued. '
+                               . 'The queue is closed for new arrivals — please come back tomorrow.',
+                    'data'    => ['issued' => $issuedToday, 'limit' => $limit],
+                ]);
+                exit;
+            }
+
+            // ── 3b. Per-student tap cap for this lane ────────────────
             // Inside the transaction and before the number is drawn, so
             // two rapid taps cannot both read a stale count and both pass.
             // Read inside the same FOR UPDATE block as the live-ticket
