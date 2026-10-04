@@ -91,55 +91,10 @@ if ($action === 'login') {
             sendResponse(false, "Account temporarily locked. Try again in {$mins} minute(s).");
         }
 
-        // The password is correct. What happens next depends on the
-        // account's role - see loginRequiresOtp().
-        //
-        // Staff-side accounts get a second factor: no session is created
-        // here at all. The OTP is issued, the response says so, and
-        // verify_otp is the ONLY place a real session is minted (it calls
-        // signInSession). This used to call signInSession() directly
-        // ("Direct sign-in without OTP"), which left every helper in
-        // auth_security.php correct and the login path not using them.
+        // Direct sign-in without OTP
         resetLoginLockout($db, (int) $user['id']);
         loginThrottleRecord($credential, $clientIp, true);
         loginThrottleClear($credential, $clientIp);
-
-        if (loginRequiresOtp($user)) {
-            // Fail closed when the code cannot be delivered. Silently
-            // signing in instead would turn "this account is protected"
-            // into a claim nobody verified, and it would do it exactly
-            // when the mail server is broken - the moment an attacker
-            // would most like it.
-            if (!isValidEmail((string) ($user['email'] ?? ''))) {
-                sendResponse(false,
-                    'This account has no deliverable email address, so the verification code cannot be sent. '
-                    . 'Please contact the administrator.');
-            }
-
-            // Remember which account this session is legitimately working
-            // on, so verify_otp / resend_otp cannot be aimed at another user.
-            $_SESSION['otp_user_id'] = (int) $user['id'];
-            $_SESSION['otp_purpose'] = 'login';
-
-            try {
-                $otp = issueOtp($db, (int) $user['id'], 'login', (string) $user['email']);
-            } catch (Exception $e) {
-                error_log('[login] OTP issue failed for user ' . (int) $user['id'] . ': ' . $e->getMessage());
-                sendResponse(false, 'Could not send the verification code. Please try again.');
-            }
-
-            sendResponse(true, 'Verification code sent.', [
-                'step'         => 'otp',
-                'user_id'      => (int) $user['id'],
-                'purpose'      => 'login',
-                'masked_email' => $otp['masked_email'],
-                // Lets the page say "check your inbox" vs "we could not
-                // reach the mail server". The code itself is never returned.
-                'delivered'    => $otp['delivered'],
-            ]);
-        }
-
-        // Student portal: the password is the whole of it.
         $redirect = signInSession($user);
 
         sendResponse(true, 'Login successful.', [
@@ -308,30 +263,6 @@ if ($action === 'forgot') {
             // Portal account with no deliverable address. Same neutral
             // message so this cannot be used to probe for real accounts.
             sendResponse(false, 'If that email is registered, a reset code has been sent.');
-        }
-
-        // LOCAL OVERRIDE (shared/mfa.local = OFF)
-        //
-        // There is no mail transport here, so a reset code would be
-        // generated and then go nowhere and nobody could ever reset a
-        // password again. When the switch is set, the emailed code is
-        // skipped and the flow continues straight to the reset screen.
-        //
-        // WHAT SURVIVES, deliberately: the reset GRANT is still minted
-        // here and is still required by reset_password, so it stays
-        // single-use, hashed at rest and 15-minute. Rate limiting and the
-        // neutral wording above are untouched. Only the proof that the
-        // requester owns the mailbox is gone - see mfaLocalOverride() for
-        // what that costs.
-        if (function_exists('mfaLocalOverride') && mfaLocalOverride()) {
-            $resetToken = issueResetGrant($db, (int) $user['id']);
-            error_log('[auth] MFA OFF locally: reset code step skipped for user ' . (int) $user['id']);
-            sendResponse(true, 'Local mode: the emailed reset code is switched off.', [
-                'step'        => 'reset_password',
-                'user_id'     => (int) $user['id'],
-                'reset_token' => $resetToken,
-                'local_mode'  => true,
-            ]);
         }
 
         // Remember which account this session is legitimately working on,
