@@ -31,6 +31,11 @@
         cards:  payload.cards,
         charts: payload.charts,
         report: null,
+        // The measured figures, kept on state and not only in the DOM.
+        // openPrintView() needs them to build the one-page brief, and
+        // reading them back out of the rendered element would couple the
+        // printout to a class name on the screen view.
+        figures: null,
         source: null,
         stale:  false
     };
@@ -756,6 +761,7 @@
     function splitReportSections(report) {
         var body = [];
         var conclusion = null;
+        var summary = null;
         var current = null;
 
         String(report).split('\n').forEach(function (line) {
@@ -771,6 +777,10 @@
                     : { num: 0, title: heading[1].trim(), lines: [] };
                 if (current.num === 7) {
                     conclusion = current;
+                } else if (current.num === 1) {
+                    // Lifted out of the body, because the one-page brief
+                    // prints exactly this and nothing else.
+                    summary = current;
                 } else {
                     body.push(current);
                 }
@@ -779,7 +789,7 @@
             }
         });
 
-        return { body: body, conclusion: conclusion };
+        return { body: body, summary: summary, conclusion: conclusion };
     }
 
     /**
@@ -818,16 +828,103 @@
         return html;
     }
 
-    /** The body of the printout: each section's numbered heading, then its
-     *  lines. The conclusion is NOT included — openPrintView() prints it as
-     *  its own block after this. */
-    function reportBodyHtml(sections) {
-        return sections.map(function (s) {
-            var title = s.num ? s.num + '. ' + s.title : s.title;
-            return '<h2 class="doc-h">' + inlineFormat(escapeHtml(title)) + '</h2>'
-                + sectionLinesHtml(s.lines);
-        }).join('');
+    /**
+     * The measured figures as a compact two-column ledger.
+     *
+     * WHAT IS LEFT OFF, AND WHY
+     * ------------------------
+     * A one-page sheet cannot carry every count, so this prints the headline
+     * figures and leaves the two kinds of detail on screen:
+     *
+     *   - the "By status / By stage / By type" breakdowns, which are long
+     *     strings that wrap to three or four lines in a narrow column
+     *   - the nested per-programme lines, which carry full degree titles and
+     *     wrap even worse
+     *
+     * That is an editorial cut, and a deliberate one: the sheet says the
+     * full figures are on the AI Insight page. Nothing is recomputed,
+     * shortened or reworded - the counts that do appear are the server's
+     * own, verbatim, so the sheet cannot disagree with the screen beside it.
+     *
+     * Two columns rather than one. A single column of every figure is what
+     * pushed this onto a second page; side by side, the same headline
+     * counts take roughly a third of the height.
+     */
+    function briefFiguresHtml(markdown) {
+        var groups = [];
+        var current = null;
+
+        String(markdown).split('\n').forEach(function (raw) {
+            var line = raw.trim();
+            if (!line) return;
+
+            // "**Students**" opens a module group.
+            var group = /^\*\*(.+)\*\*$/.exec(line);
+            if (group) {
+                current = { section: group[1].replace(/[:.]+$/, ''), rows: [] };
+                groups.push(current);
+                return;
+            }
+
+            var item = /^-\s+(.+)$/.exec(line);
+            if (!item || !current) return;
+
+            // Nesting is read from the RAW line: the indentation is the only
+            // thing marking a row as per-programme detail, and trimming the
+            // line first would throw that signal away.
+            var nested = /^\s/.test(raw);
+
+            var text = item[1].replace(/^\s*-\s*/, '');
+            // The intro line already appears above as the reporting period.
+            if (/^Counts for /i.test(text)) return;
+            if (nested) return;
+            if (/^By\b/.test(text)) return;
+
+            // Split on the FIRST colon only. A label may itself contain one,
+            // and splitting on the last would move the number into it.
+            var cut = text.indexOf(':');
+            current.rows.push(cut === -1
+                ? { label: text, value: '' }
+                : { label: text.slice(0, cut).trim(), value: text.slice(cut + 1).trim() });
+        });
+
+        groups = groups.filter(function (g) { return g.rows.length; });
+        if (!groups.length) return '';
+
+        // Split where the row count balances, so one module does not end up
+        // stacked above the other four.
+        var total = groups.reduce(function (n, g) { return n + g.rows.length + 1; }, 0);
+        var run = 0, cut = groups.length;
+        for (var i = 0; i < groups.length; i++) {
+            run += groups[i].rows.length + 1;
+            if (run >= total / 2) { cut = i + 1; break; }
+        }
+
+        function column(list) {
+            var html = '<table class="doc-figures"><tbody>';
+            list.forEach(function (g) {
+                html += '<tr class="g"><th colspan="2">'
+                    + inlineFormat(escapeHtml(g.section)) + '</th></tr>';
+                g.rows.forEach(function (r) {
+                    html += '<tr><td>' + inlineFormat(escapeHtml(r.label)) + '</td>'
+                        + '<td class="v">' + inlineFormat(escapeHtml(r.value)) + '</td></tr>';
+                });
+            });
+            return html + '</tbody></table>';
+        }
+
+        return '<div class="doc-figures-wrap">'
+            + column(groups.slice(0, cut)) + column(groups.slice(cut))
+            + '</div>';
     }
+
+    // reportBodyHtml() used to live here and render sections 1-6 under their
+    // numbered headings. It is gone on purpose. The one-page brief prints the
+    // figures, the Executive Summary and the conclusion, so nothing calls it
+    // - and leaving it in place would invite exactly the wrong "fix" later:
+    // someone sees an unused helper, wires it back into the print path to
+    // "restore the full report", and the sheet quietly goes back to three
+    // pages. The absence is the decision.
 
     function showLoading() {
         el.reportEmpty.style.display = 'none';
@@ -906,6 +1003,7 @@
         }
 
         // The measured figures, always, in their own language.
+        state.figures = meta.figures || null;
         if (el.reportFigures && el.reportFiguresBody) {
             if (meta.figures) {
                 el.reportFiguresBody.textContent = meta.figures;
@@ -1193,16 +1291,34 @@
 
     // ─── Printable executive report ─────────────────────────────
     /**
-     * Prints the report as ONE file with three parts, in this order:
+     * Prints a ONE-PAGE summary sheet, and says plainly what it is.
      *
-     *   1. Title    — the BCP letterhead and the reporting-period line.
-     *   2. Body     — sections 1-6 of the analysis, under their numbered
-     *                 headings.
-     *   3. Conclusion — section 7 (cross-module findings and recommended
-     *                 actions), lifted out of the body and printed under
-     *                 its own "Conclusion" heading, so the end of the
-     *                 document reads as conclusions rather than as one
-     *                 more section that happened to come last.
+     *   1. Title      the BCP letterhead and the reporting-period line.
+     *   2. Figures    the measured counts, as a ledger.
+     *   3. Summary    section 1, the model's own Executive Summary.
+     *   4. Conclusion section 7, findings and recommended actions.
+     *
+     * WHY NOT THE OLD THREE-SECTION SUMMARY
+     * -------------------------------------
+     * There was a version that printed "AI Registrar Summary", "Detected
+     * Trends" and "Patterns Observed": three headings assembled by string
+     * concatenation from the same counts. It fit one page, and it was
+     * removed for a reason worth repeating here. It read exactly like
+     * analysis, with a conclusion and a heading that said AI, while being
+     * a template. When the gateway failed it produced something
+     * indistinguishable from a successful model call. Printing THAT under
+     * the letterhead, on a sheet a registrar signs, is the worst possible
+     * place for it.
+     *
+     * So this one page holds only what is real: the figures as figures, and
+     * the model's own summary and conclusion. Sections 2 to 6 are the
+     * per-module detail. They stay on screen, where there is room to read
+     * them, and stay off the sheet, which is what makes it one page.
+     *
+     * Nothing is truncated to achieve that. A brief that cut a sentence
+     * mid-clause would be a mangled document, not a short one. Section 1
+     * is written by contract to be readable alone, which is exactly what a
+     * one-page sheet needs.
      *
      * Section 7 is the conclusion BY CONTRACT, not by keyword search: the
      * endpoint requires exactly seven numbered headings and names the
@@ -1241,32 +1357,52 @@
         // it, so nothing is hidden from the user who needs to know.
         var parts = splitReportSections(state.report);
 
+        // The figures, as a compact two-column ledger rather than the long
+        // bullet list shown on screen. Rendered from the same string the
+        // screen shows, so the sheet cannot disagree with the page.
+        var figuresHtml = state.figures ? briefFiguresHtml(state.figures) : '';
+
         var body = ''
             + BCPPrint.headerHtml({
                 logoUrl: logo,
-                title: 'AI INSIGHT REPORT — ' + String(periodLabel).toUpperCase()
+                title: 'AI INSIGHT SUMMARY — ' + String(periodLabel).toUpperCase()
             })
             // Part 1 closes here; the period line is the bridge to the body.
             + '<div class="meta">Reporting period: ' + escapeHtml(periodLabel)
             + ' (compared with ' + escapeHtml(state.period.prev_label || '—')
             + ') · Generated: ' + escapeHtml(generated)
             + '</div>'
-            // Part 2 — the body. No KPI tiles and no chart snapshots —
-            // those are a screen view; the printout is the written analysis.
-            + '<div class="doc-body">' + reportBodyHtml(parts.body) + '</div>'
-            // Part 3 — the conclusion: its own block, its own heading,
-            // rendered from the same lines section 7 would have printed as
-            // inside the body, so nothing is lost by lifting it out.
+            // Part 2 — the measured figures, as a ledger and visibly not as
+            // analysis.
+            + (figuresHtml ? '<h2 class="doc-h">Measured Figures</h2>' + figuresHtml : '')
+            // Part 3 — the model's own Executive Summary.
+            + (parts.summary
+                ? '<div class="doc-body"><h2 class="doc-h">Executive Summary</h2>'
+                    + sectionLinesHtml(parts.summary.lines) + '</div>'
+                : '')
+            // Part 4 — findings and actions, with their own boundary so the
+            // end of the sheet reads as conclusions.
             + (parts.conclusion
-                ? '<div class="doc-body doc-conclusion"><h2 class="doc-h">Conclusion</h2>'
+                ? '<div class="doc-body doc-conclusion"><h2 class="doc-h">Conclusion and Recommended Actions</h2>'
                     + sectionLinesHtml(parts.conclusion.lines) + '</div>'
                 : '')
             + '<div class="sig"><div class="box"><div class="line">Prepared by:<br>Registrar</div></div>'
             + '<div class="box"><div class="line">Noted by:<br>School Head / President</div></div></div>'
             + '<div class="foot-note">Generated by: Registrar Information System<br>'
-            + 'AI-generated information is provided for administrative reference.</div>';
+            + 'AI-generated information is provided for administrative reference.<br>'
+            // Named on the sheet, so a reader knows this is the summary and
+            // the full seven-section analysis is a screen document. Without
+            // this the sheet reads as the whole analysis and is not.
+            + 'Full analysis: seven sections, available from the AI Insight page.</div>';
 
-        if (!BCPPrint.printDocument({ title: periodLabel, body: body })) {
+        if (!BCPPrint.printDocument({
+            title: periodLabel,
+            body: body,
+            // 'brief' turns on the tighter vertical rhythm in the
+            // stylesheet. It is opt-in per document rather than global,
+            // because the grade template has to keep the roomier spacing.
+            bodyClass: 'brief'
+        })) {
             showReportError('Unable to prepare the report for printing.');
         }
     }
