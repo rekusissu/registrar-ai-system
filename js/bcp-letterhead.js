@@ -25,51 +25,36 @@ var BCPPrint = (function () {
     }
 
     // ── Styles ────────────────────────────────────────────────────
-    // @page margin:0 on three sides is deliberate. Browsers draw their own
-    // print header and footer ("10/2/26, 11:44 AM Title" / "about:blank 2/2")
-    // only into the page margin area, so with no margin they have nowhere to
-    // go and are omitted. The body padding is where our own centred header
-    // and the first page's footer sit.
+    // @page margin:0 on the top, left and right is deliberate. Browsers draw
+    // their own print header and footer ("10/2/26, 11:44 AM Title" /
+    // "about:blank 2/2") only into the page margin area, so with no margin
+    // they have nowhere to go and are omitted. The body's padding is where
+    // our own header and the footer sit.
     //
-    // THE BOTTOM PAGE MARGIN IS NOT OPTIONAL, AND IT IS NOT THE SAME THING AS
-    // THE BODY PADDING.
+    // THERE IS NO RUNNING HEADER, AND THAT IS THE POINT.
     //
-    // This used to be margin:0 all round, with the footer's space reserved by
-    // the body's padding-bottom. That works on the LAST page and nowhere else:
-    // padding-bottom reserves room once, at the end of the document flow. Every
-    // intermediate page fills its whole box, so a fixed footer pinned at
-    // bottom:10mm sits ON TOP of the text.
+    // A position:fixed banner was tried, to give pages 2+ the same identity
+    // as page 1. It made the printout worse in three ways at once: page 1
+    // then showed the running header AND the crest letterhead stacked above
+    // each other, reading as a duplicated masthead; reserving its band
+    // required a @page TOP margin, and a top margin is precisely what invites
+    // the browser's own date/URL header back in; and the crest letterhead
+    // already says who issued the document, so pages 2+ lost nothing by not
+    // repeating it. The crest is in the flow, so it prints once, and once is
+    // correct.
     //
-    // It stayed invisible while these documents were one page. The Insight
-    // report is seven sections of 700-1000 words, so it is two or three, and
-    // the collision appeared exactly then: body text running through the
-    // footer on pages 2 and 3.
-    //
-    // A @page bottom margin reserves the band on EVERY page, which is the only
-    // thing that can. Top, left and right stay 0 so the browser's own header
-    // and footer are still suppressed - we are claiming the bottom strip, not
-    // inviting the browser back in.
+    // Only the bottom band remains a margin. The footer is position:fixed (a
+    // block at the end of the flow prints on the last page only), and a fixed
+    // element cannot reserve its own space - so the band has to be @page.
     //
     // Every colour is #000. The screen's slate greys (#64748b, #334155)
     // are tuned for a white UI background and print as washed-out,
     // low-contrast ink that reads as blurred on paper.
     function letterheadCss() {
         return [
-            '@page { size: A4 portrait; margin: 16mm 0 22mm 0; }',
-            // The top and bottom @page bands are the working area for the
-            // running header and footer. They have to be @page margins, not
-            // body padding: padding reserves room once, at the end of the flow,
-            // so it clears only the LAST page and leaves every intermediate
-            // page running under the fixed furniture.
-            //
-            // Top, left and right stay 0 so the browser's own date/URL header
-            // has nowhere to go. The BOTTOM margin is the price of the
-            // repeating footer, and it has a known cost: a browser prints its
-            // OWN footer ("1/3", the date, the URL) into any page margin band
-            // it is given. Untick "Headers and footers" in the print dialog,
-            // or it appears underneath ours.
+            '@page { size: A4 portrait; margin: 0 0 22mm 0; }',
             'body { font-family: Calibri, "Segoe UI", Arial, sans-serif; font-size: 11pt;',
-            '       line-height: 1.6; color: #000; margin: 0; padding: 2mm 16mm 4mm;',
+            '       line-height: 1.6; color: #000; margin: 0; padding: 14mm 16mm 4mm;',
             '       -webkit-print-color-adjust: exact; }',
 
             '.letterhead { text-align:center; border-bottom:1px solid #1a2d4a;',
@@ -101,26 +86,13 @@ var BCPPrint = (function () {
             '.lh-doc { font-family: Calibri, "Segoe UI", Arial, sans-serif; font-size:11pt;',
             '           line-height:1.35; margin-top:12px; font-weight:700; letter-spacing:.6px; }',
 
-            // THE RUNNING HEADER. Repeats on every page, like the footer.
+            // The full crest letterhead prints ONCE, on page 1.
             //
-            // The full crest letterhead stays in the flow on page 1 only -
-            // a block in the flow prints once. This is the compact version
-            // that carries the identity and the document title on pages 2+
-            // (and above the crest on page 1, where both are visible and read
-            // as a masthead plus a letterhead rather than as a duplicate).
+            // It is a block in the normal flow, which is exactly what makes it
+            // print once. There is deliberately no position:fixed twin of it:
+            // a fixed copy repeats on every page AND sits above the in-flow
+            // copy on page 1, so the two read as a duplicated masthead.
             //
-            // position:fixed is the only mechanism browsers give for
-            // repeating content, and it positions against the PAGE box, which
-            // is why @page has to reserve the band for it.
-            '.rhead { position:fixed; top:0; left:0; right:0; text-align:center;',
-            '         font-family: Calibri, "Segoe UI", Arial, sans-serif;',
-            '         font-size:8.5pt; line-height:1.35; color:#000; padding-top:2mm; }',
-            '.rhead .rh-school { font-family: Garamond, "EB Garamond", "Times New Roman", serif;',
-            '                    font-size:11pt; font-weight:700; letter-spacing:.3px; }',
-            '.rhead .rh-doc { margin-top:1px; font-size:8.5pt; letter-spacing:.4px;',
-            '                text-transform:uppercase; }',
-            '.rhead .rh-rule { margin:2mm 16mm 0; border-bottom:.5px solid #1a2d4a; }',
-
             // position:fixed is what makes the footer repeat on EVERY page.
             // A block at the end of the document prints once, last page only.
             '.footer { position:fixed; left:0; right:0; bottom:10mm; text-align:center;',
@@ -184,6 +156,10 @@ var BCPPrint = (function () {
     // The document title is passed in rather than baked in, so one
     // letterhead serves the AI Insight report and the grade template
     // without either hardcoding the other's wording.
+    //
+    // THIS IS THE ONLY HEADER. It is written into the flow, so it prints
+    // once, on page 1, and pages 2+ simply continue the text. There is no
+    // repeating companion for it - see the note on letterheadCss().
     function headerHtml(o) {
         o = o || {};
         var logoUrl = o.logoUrl || '';
@@ -200,25 +176,20 @@ var BCPPrint = (function () {
             + '</div>';
     }
 
-    /**
-     * The compact running header, repeated on every page.
-     *
-     * Separate from headerHtml() on purpose. That one is the full crest
-     * letterhead and it belongs in the flow, so it prints once on page 1.
-     * A crest and a three-line address repeated on all three pages of a
-     * report would be noise, and would push the text further down each page.
-     * This carries the two things a page needs to identify itself: who
-     * issued it, and what it is.
-     */
-    function runningHeaderHtml(o) {
-        o = o || {};
-        return '<div class="rhead">'
-            + '<div class="rh-school">BESTLINK COLLEGE OF THE PHILIPPINES</div>'
-            + '<div class="rh-doc">Office of the Registrar'
-            + (o.title ? ' &middot; ' + esc(o.title) : '') + '</div>'
-            + '<div class="rh-rule"></div>'
-            + '</div>';
-    }
+    // Removed: the compact running header that repeated on every page.
+    //
+    // It was added so pages 2+ carried the college name and document title,
+    // on the reasoning that a crest and a three-line address repeated down a
+    // report would be noise. In practice it produced a visibly broken sheet:
+    // page 1 carried the running header AND the crest stacked above one
+    // another, a duplicated masthead; reserving its band forced a @page TOP
+    // margin, which is exactly what lets the browser print its own date/URL
+    // header back in; and pages 2+ gained two short lines that pushed the
+    // text down without identifying anything the footer did not.
+    //
+    // So the letterhead prints once and the pages after it just continue.
+    // Kept as a note rather than deleted silently - if a repeating header is
+    // ever wanted again, this is what it cost.
 
     function footerHtml() {
         return '<div class="footer">'
@@ -270,9 +241,8 @@ var BCPPrint = (function () {
         // recover from an unclosed <style> in <head>, which works in a real
         // window but leaves the stylesheet swallowing the markup after it.
         d.write('</style></head><body>');
-        // Written immediately after the head so the fixed elements exist
-        // for every page, before any content can overlap them.
-        d.write(runningHeaderHtml({ title: opts.title || '' }));
+        // The footer is written immediately after the head so the fixed
+        // element exists for every page, before any content can overlap it.
         d.write(footerHtml());
         d.write(opts.body || '');
         d.write('</body></html>');
@@ -315,7 +285,6 @@ var BCPPrint = (function () {
     return {
         letterheadCss: letterheadCss,
         headerHtml: headerHtml,
-        runningHeaderHtml: runningHeaderHtml,
         footerHtml: footerHtml,
         printDocument: printDocument,
         esc: esc

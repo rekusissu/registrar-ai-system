@@ -312,46 +312,80 @@ final class AcademicHistoryReadOnlyTest extends TestCase
     {
         $js = self::source(self::LETTER);
 
-        // Browsers draw their own date/URL/page-number header only into the
-        // top page margin, so a zero margin on top/left/right leaves them
-        // nowhere to go. Top is NOT zero - it is the band the running
-        // header occupies. Bottom is the band the footer occupies.
-        self::assertStringContainsString('@page { size: A4 portrait; margin: 16mm 0 22mm 0; }', $js);
+        // Browsers draw their own date/URL/page-number header ONLY into a top
+        // page margin. With the top margin at zero it has nowhere to go and is
+        // omitted - which is the whole point, and is why a repeating header
+        // was removed rather than re-bandaged. Bottom stays a real margin
+        // because the fixed footer needs a band to sit in.
+        self::assertStringContainsString('@page { size: A4 portrait; margin: 0 0 22mm 0; }', $js);
         self::assertStringContainsString('position:fixed', $js,
             'The footer must be position:fixed to repeat on every page.');
     }
 
     /**
-     * Every page needs both a header and a footer, and neither may collide
-     * with the body text.
+     * The letterhead prints ONCE. There is no repeating header.
      *
-     * Both are position:fixed, which browsers position against the PAGE box
-     * rather than the content box. So neither can reserve its own space: only
-     * an @page margin can, and the margins are what this pins down.
+     * A position:fixed running header was added and then removed. It was meant
+     * to identify pages 2+, and it broke the sheet in three ways: page 1 then
+     * carried the running header AND the crest stacked above each other, a
+     * duplicated masthead; reserving its band forced a @page TOP margin, which
+     * is exactly what invites the browser's own header back in; and pages 2+
+     * gained lines that identified nothing the footer did not.
+     *
+     * So the rule is now structural: there is exactly one header, and it is in
+     * the flow. This asserts both halves - the CSS is gone AND nothing writes
+     * it - because restoring either alone gives a different broken sheet.
      */
-    public function testRunningHeaderAndFooterRepeatWithRoomForThem(): void
+    public function testTheLetterheadPrintsOnceWithNoRepeatingHeader(): void
     {
         $js = self::source(self::LETTER);
 
-        self::assertMatchesRegularExpression(
-            '/\.rhead\s*\{[^}]*position:fixed[^}]*top:\s*0/',
+        self::assertStringNotContainsString(
+            '.rhead',
             $js,
-            'The running header must be position:fixed at top:0 to repeat on every page. '
-            . 'In normal flow it would print once, on page 1 only.'
+            'The fixed running header is what duplicated the masthead on page 1 and '
+            . 'forced a top margin. The crest letterhead already prints once, in the flow.'
+        );
+        self::assertStringNotContainsString(
+            'runningHeaderHtml',
+            $js,
+            'Nothing may write a second header into the document.'
         );
 
+        // The crest is still there, in the flow, so page 1 is identified.
+        self::assertStringContainsString('.letterhead {', $js);
+        self::assertStringContainsString('function headerHtml(', $js);
+    }
+
+    /**
+     * The repeating footer must have a band of its own.
+     *
+     * The footer is position:fixed, and browsers position a fixed element
+     * against the PAGE box rather than the content box - so it cannot reserve
+     * its own space. Only an @page margin can, and only a BOTTOM margin does.
+     *
+     * The TOP margin is asserted to be ZERO here, and that is load-bearing,
+     * not incidental. A zero top margin is what stops the browser printing its
+     * own date/URL header into a band we happen to have opened up.
+     */
+    public function testFooterRepeatsWithRoomForItAndTheTopBandStaysClosed(): void
+    {
+        $js = self::source(self::LETTER);
+
         preg_match('/@page\s*\{[^}]*margin:\s*([^;}]+)/', $js, $m);
+        self::assertNotEmpty($m, 'No @page margin found in the letterhead styles.');
         $sides = preg_split('/\s+/', trim($m[1]));
         self::assertCount(4, $sides);
 
-        // Top and bottom, in that order: top / right / bottom / left.
+        // CSS shorthand order is top / right / bottom / LEFT.
         $topMm = (float) rtrim($sides[0], 'mmpx');
         $footerBandMm = (float) rtrim($sides[2], 'mmpx');
 
-        self::assertGreaterThan(
-            6.0, $topMm,
-            'The top band must be deep enough to hold the running header. A header '
-            . 'taller than the band it sits in spills into the body text.'
+        self::assertSame(
+            0.0, $topMm,
+            'The top margin must stay zero. Opening it is what invited the '
+            . "browser's own header back in, and it only existed to hold a "
+            . 'repeating header that has since been removed.'
         );
         self::assertGreaterThan(
             14.0, $footerBandMm,
