@@ -471,7 +471,11 @@ $page_description = 'Enrolled student masterlist, with section codes assigned in
 $body_page = 'masterlist';
 $APP_ROOT = '../';
 $ACTIVE_NAV = 'masterlist';
-$prepared = isset($_GET['prepared']) && $_GET['prepared'] === '1';
+// The "Prepare Full List" button and its ?prepared=1 view are gone. The
+// button only reloaded the page with no filters applied - a state the toolbar
+// already reaches by clearing the filter boxes - and the green banner it
+// produced claimed the list was "prepared" when nothing had been prepared. No
+// data was ever written, so removing it loses no state.
 
 include '../includes/header.php';
 include '../includes/sidebar.php';
@@ -851,10 +855,6 @@ body[data-page="masterlist"] .masterlist-table{min-width:1390px}
         <div class="masterlist-action-group">
             <span class="masterlist-action-label">Output &amp; handoff</span>
             <div class="masterlist-action-buttons">
-                <button type="button" class="btn btn-primary" id="btnPrepareList"
-                        title="Show every student who has a section, with no filters applied">
-                    <i class="fas fa-list-check"></i> Prepare Full List
-                </button>
                 <button type="button" class="btn btn-primary" onclick="sendList()" title="Send the masterlist to the Academic Strand / Course Assignment module (CMS)">
                     <i class="fas fa-paper-plane"></i> Send List
                 </button>
@@ -883,12 +883,6 @@ body[data-page="masterlist"] .masterlist-table{min-width:1390px}
             </p>
         </div>
     </section>
-
-    <?php if ($prepared): ?>
-        <div class="card" style="margin-bottom: 16px; padding: 12px 16px; background: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <i class="fas fa-check-circle"></i> Full list prepared. It holds every student who has a section, sorted by course, year, and section, with no filters applied.
-        </div>
-    <?php endif; ?>
 
     <!-- Toolbar: the search box and Filter. Create Section is gone - a new
          section code is no longer minted from this page; the chips in the
@@ -2311,14 +2305,6 @@ async function assignSelectedToSection() {
         btn.disabled = false;
     }
 }
-
-// ─── PREPARE FULL LIST ───────────────────────────────────────
-// Clears every filter so the whole roster is on screen, ready to hand off.
-// The registrar does not write section codes — the receiving department does.
-// The blocks are handed off whole; nothing here cuts them into lists.
-document.getElementById('btnPrepareList')?.addEventListener('click', function () {
-    window.location.href = 'masterlist.php?prepared=1';
-});
 
 // ─── SEARCH (client-side) ────────────────────────────────────
 //
