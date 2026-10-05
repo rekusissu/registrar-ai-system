@@ -2026,6 +2026,19 @@ async function submitNewRequest(e) {
         catalog_id: document.getElementById('nrCatalog').value,
         request_type: document.getElementById('nrPriority').value,
         fulfillment_type: 'Pickup',
+        // payment_method is what decides the request's opening status at the
+        // API (api/student-documents.php:307-326). Left unset it defaults to
+        // 'Online', which files the request at the stage where it waits for
+        // its fee - a stage the walk-in track does not have, so
+        // doc_next_step() returned null and the row sat on the desk with no
+        // action button and no way forward. 'Counter' is mapped to
+        // Cash_on_Delivery and starts at Filed.
+        //
+        // documents-add.php sends the same value as a hidden form field. This
+        // modal posts JSON, so it goes in the payload instead - and it has to
+        // be sent explicitly rather than left to the API default, because the
+        // student standing at the counter is not waiting on a QR code.
+        payment_method: 'Counter',
         purpose: document.getElementById('nrPurpose').value.trim(),
         // Empty means "nothing is holding this", which is the default and
         // the common case. Sent as an empty string rather than omitted so
