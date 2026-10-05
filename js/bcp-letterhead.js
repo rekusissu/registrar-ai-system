@@ -59,15 +59,22 @@ var BCPPrint = (function () {
 
             '.letterhead { text-align:center; border-bottom:1px solid #1a2d4a;',
             '              padding-bottom:10px; margin-bottom:22px; }',
-            // The crest spans the three name lines — from the top of the
-            // college name to the bottom of the address. The COLUMN WIDTH
-            // must be pinned, not the height: with auto columns the column
-            // sizes to the image's intrinsic width (220px) and height:100%
-            // against an auto row is circular, so the crest renders three
-            // times too big. A fixed column gives the wrapper an
-            // unambiguous width; the row height then comes from the text
-            // column, and object-fit:contain scales the shield to exactly
-            // the name block without distorting it.
+            // The crest sits BESIDE the name block, on the left, sharing one row.
+            //
+            // The COLUMN WIDTH must be pinned, not the height. With auto
+            // columns the crest column sizes itself to the image's
+            // intrinsic width (220px) and height:100% against an auto row is
+            // circular, so the shield renders three times too big. A fixed
+            // column gives the wrapper an unambiguous width; the row height
+            // then comes from the text column, and object-fit:contain
+            // scales the shield to exactly the name block without
+            // distorting it.
+            //
+            // height:100% is REQUIRED here, not a leftover. The row is
+            // stretched by the taller text column, and the crest has to
+            // fill that height for the shield to sit level with the three
+            // name lines. Remove it and the crest collapses to its own
+            // intrinsic height at the top of the row.
             '.lh-top { display:grid; grid-template-columns:76px auto; align-items:stretch;',
             '          justify-content:center; column-gap:16px; }',
             '.lh-logo img { display:block; width:100%; height:100%; object-fit:contain; }',
@@ -109,6 +116,52 @@ var BCPPrint = (function () {
             // boundary from the rule above the heading and the heading
             // itself, not from a different ink or a box.
             '.doc-conclusion { margin-top:20px; padding-top:14px; border-top:1px solid #000; }',
+
+            // ── THE ONE-PAGE BRIEF ──────────────────────────────────────
+            // The AI Insight sheet is a summary, not the full seven-section
+            // analysis, and it has to come out as ONE page. That is done by
+            // printing less, not by printing smaller - the type stays at a
+            // readable size and no sentence is truncated.
+            //
+            // So the only real lever left is the vertical rhythm: the body
+            // margins and the gaps are tightened for this document so the
+            // title block, the figures ledger, the Executive Summary, the
+            // conclusion and the signature block all fit a single A4.
+            '.brief { margin: 0; padding: 12mm 14mm 2mm; }',
+            '.brief .letterhead { margin-bottom: 10px; padding-bottom: 7px; }',
+            '.brief .meta { margin-bottom: 12px; }',
+            '.brief .doc-h { font-size: 11pt; margin: 12px 0 5px; }',
+            '.brief .doc-body p { margin: 0 0 7px; line-height: 1.45; }',
+            '.brief .doc-body ul { margin: 0 0 7px; padding-left: 18px; }',
+            '.brief .doc-body li { margin-bottom: 3px; line-height: 1.4; }',
+            '.brief .doc-conclusion { margin-top: 10px; padding-top: 8px; }',
+            '.brief .sig { margin-top: 14px; }',
+            '.brief .foot-note { margin-top: 8px; font-size: 8pt; }',
+
+            // The figures ledger. Two columns so a count sits in a fixed place rather
+            // than drifting with the length of its label, and so the whole
+            // ledger costs about a third of the height it would in one
+            // column - which is what keeps the sheet to one page.
+            '.doc-figures-wrap { display: flex; gap: 9mm; align-items: flex-start; }',
+            '.doc-figures { flex: 1 1 0; width: 50%; border-collapse: collapse;',
+            '                font-size: 9pt; line-height: 1.35; color: #000; }',
+            '.doc-figures th { text-align: left; font-weight: 700; padding: 4px 0 2px;',
+            '                 border-bottom: .5px solid #94a3b8; }',
+            // The module heading for each group - STUDENTS, DOCUMENT SERVICES, RFID.
+            // Bold and black, not a small grey label.
+            //
+            // It was 7.5pt in #475569, which is how a reader ends up not
+            // knowing which module a row of counts belongs to: the heading
+            // looked like a caption and the figures looked like one flat
+            // list. The heading is what separates the modules, so it has to
+            // look like one - a group marker, clearly heavier than the rows
+            // under it.
+            '.doc-figures tr.g th { text-transform: uppercase; letter-spacing: .04em;',
+            '                       font-size: 8.5pt; font-weight: 700; color: #000; }',
+            '.doc-figures td { padding: 1.5px 0; vertical-align: top; }',
+            '.doc-figures td.v { text-align: right; padding-left: 8px;',
+            '                      font-variant-numeric: tabular-nums; white-space: nowrap; }',
+
             '.meta { font-size:10pt; color:#000; margin-bottom:20px; text-align:center; }',
 
             // LINES WERE BEING CUT OFF AT THE RIGHT EDGE.
@@ -165,7 +218,23 @@ var BCPPrint = (function () {
         var logoUrl = o.logoUrl || '';
         var img = logoUrl
             ? '<div class="lh-logo"><img src="' + esc(logoUrl) + '" alt="Bestlink College of the Philippines"></div>'
-            : '<div class="lh-logo"></div>';
+            : '';
+        // The crest sits BESIDE the name block, on the left.
+        //
+        // Stacked above was tried and reverted: it is the conventional
+        // crest-over-name masthead, but it costs a full extra row of height
+        // on every printed document, and for the one-page brief that height
+        // is the scarcest thing on the page. Beside, the crest and the three
+        // name lines share one row and the college name stays legible at a
+        // glance next to the shield that stands for it.
+        //
+        // The crest column is a FIXED width, never auto - see the CSS note
+        // on .lh-top for why an auto column plus height:100% renders the
+        // shield three times too big.
+        //
+        // The empty-logo branch emits nothing rather than an empty column.
+        // A blank .lh-logo left a 76px hole beside the name that looked
+        // deliberate, which is how a missing crest went unnoticed.
         return '<div class="letterhead"><div class="lh-top">' + img
             + '<div class="lh-lines">'
             + '<div class="lh-school">BESTLINK COLLEGE OF THE PHILIPPINES</div>'
@@ -240,7 +309,7 @@ var BCPPrint = (function () {
         // Closed explicitly. document.write alone leaves the parser to
         // recover from an unclosed <style> in <head>, which works in a real
         // window but leaves the stylesheet swallowing the markup after it.
-        d.write('</style></head><body>');
+        d.write('</style></head><body' + (opts.bodyClass ? ' class="' + esc(opts.bodyClass) + '"' : '') + '>');
         // The footer is written immediately after the head so the fixed
         // element exists for every page, before any content can overlap it.
         d.write(footerHtml());
