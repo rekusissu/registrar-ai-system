@@ -33,7 +33,13 @@
 --  only the first one is the file working.
 -- ============================================================================
 
-START TRANSACTION;
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- No transaction here either, and for the same reason: phpMyAdmin opens
+-- one around an import, and a second START TRANSACTION raises MySQL 1568
+-- and aborts the whole file with a generic "import could not be
+-- completed". phpMyAdmin commits for us.
 
 -- ── What is about to go ──────────────────────────────────────────
 SELECT 'students' AS what, COUNT(*) AS n
@@ -79,7 +85,7 @@ DELETE u FROM users u
 DELETE FROM students
     WHERE student_number LIKE 'S26%' AND email LIKE '%@testdata.example';
 
-COMMIT;
+SET FOREIGN_KEY_CHECKS = 1;
 
 -- ── What is left ───────────────────────────────────────────────
 -- All five should read 0. Anything else means something in the file
