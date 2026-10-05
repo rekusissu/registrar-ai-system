@@ -94,6 +94,58 @@ PREPARE s FROM @ddl;
 EXECUTE s;
 DEALLOCATE PREPARE s;
 
+-- ----------------------------------------------------------------------------
+-- 0b. Ensure the document catalog exists.
+--
+--     The requests below JOIN document_catalog, and the join produces NOTHING
+--     when the table is empty. On a database imported from registrar_ai.sql the
+--     catalog IS empty - create_admin.php deliberately never loads it, because
+--     which documents a school issues and at what price is a business decision
+--     rather than a default.
+--
+--     So against a fresh install this seed used to create 150 students and
+--     zero document requests, exit 0, and print a report in which every
+--     request count was legitimately 0. Nothing errored. The failure was
+--     completely silent, and a report full of zeroes reads as "nothing to do"
+--     rather than "nothing was created".
+--
+--     The seven rows below are the same defaults create_admin.php offers in
+--     defaultCatalog(), because a seed cannot ask a question. On a real
+--     installation this is only ever a test fixture - it inserts nothing when
+--     the catalog is already populated, and never edits or deletes an
+--     existing row.
+--
+--     Guarded on sku, not on the table being empty: a partly-populated catalog
+--     gets the missing SKUs and keeps the ones it has, so an office that has
+--     retired a document keeps its own fee and pricing decision.
+-- ----------------------------------------------------------------------------
+INSERT INTO document_catalog
+    (sku, name, description, base_fee, fee_type, requirement, sla_days, is_active)
+SELECT d.sku, d.name, d.description, d.base_fee, d.fee_type, d.requirement, d.sla_days, 1
+FROM (
+    SELECT 'DOC-COE' AS sku, 'Certificate of Enrollment' AS name,
+           'Proof of current enrollment' AS description, '100.00' AS base_fee,
+           'flat' AS fee_type, NULL AS requirement, 1 AS sla_days
+    UNION ALL SELECT 'DOC-TOR', 'Transcript of Records',
+           'Complete academic record (TOR)', '250.00', 'per_page',
+           'Scanned copy of valid ID', 3
+    UNION ALL SELECT 'DOC-GM', 'Certificate of Good Moral',
+           'Good moral character certificate', '150.00', 'flat',
+           'No pending disciplinary cases', 3
+    UNION ALL SELECT 'DOC-DIPLOMA', 'Diploma Replacement',
+           'Replacement of lost diploma', '1000.00', 'flat',
+           'Notarized Affidavit of Loss', 5
+    UNION ALL SELECT 'DOC-CTC', 'Certified True Copy',
+           'Certified true copy of a record', '50.00', 'per_page', NULL, 2
+    UNION ALL SELECT 'DOC-HD', 'Honorable Dismissal',
+           'Transfer / honorable dismissal', '300.00', 'flat', NULL, 10
+    UNION ALL SELECT 'DOC-CD', 'Course Description',
+           'Subject syllabus / course description', '100.00', 'per_syllabus', NULL, 1
+) d
+WHERE NOT EXISTS (
+    SELECT 1 FROM document_catalog c WHERE c.sku = d.sku
+);
+
 START TRANSACTION;
 
 -- ----------------------------------------------------------------------------
@@ -824,6 +876,46 @@ UNION ALL SELECT 'students with a section', COUNT(*)
 UNION ALL SELECT 'students with an LRN (must be 0)', COUNT(*)
     FROM students WHERE student_number LIKE 'T9150%'
       AND email LIKE '%@seed150.test' AND lrn IS NOT NULL AND lrn <> '';
+
+-- DID THE SEED ACTUALLY DO ITS JOB?
+--
+-- Every count above is a plain COUNT, so a total failure also reads as a
+-- passing report: 150 students and zero document requests, with
+-- paid_at_violations legitimately 0 because it is counting violations among
+-- no requests at all. That is what happened against a database whose catalog
+-- was empty, and the output could not be distinguished from success.
+--
+-- So each expectation is stated here and reported as EXPECTED / GOT / OK,
+-- where a shortfall is a FAIL rather than a number to be interpreted. This is
+-- the part that turns a silent no-op into something you would notice.
+SELECT 'students' AS expectation, 150 AS expected_rows, COUNT(*) AS got,
+       IF(COUNT(*) = 150, 'OK', 'FAIL') AS result
+    FROM students WHERE student_number LIKE 'T9150%' AND email LIKE '%@seed150.test'
+UNION ALL SELECT 'document_requests', 900, COUNT(*),
+       IF(COUNT(*) = 900, 'OK', 'FAIL')
+    FROM document_requests r JOIN students s ON s.id = r.student_id
+    WHERE s.student_number LIKE 'T9150%' AND s.email LIKE '%@seed150.test'
+UNION ALL SELECT 'student_ids', 150, COUNT(*),
+       IF(COUNT(*) = 150, 'OK', 'FAIL')
+    FROM student_ids i JOIN students s ON s.id = i.student_id
+    WHERE s.student_number LIKE 'T9150%' AND s.email LIKE '%@seed150.test'
+UNION ALL SELECT 'active catalog items the requests need', 6, COUNT(*),
+       IF(COUNT(*) >= 6, 'OK', 'FAIL')
+    FROM document_catalog WHERE is_active = 1
+UNION ALL SELECT 'rfid_cards (must be 0)', 0, COUNT(*),
+       IF(COUNT(*) = 0, 'OK', 'FAIL')
+    FROM rfid_cards c JOIN students s ON s.id = c.student_id
+    WHERE s.student_number LIKE 'T9150%' AND s.email LIKE '%@seed150.test'
+UNION ALL SELECT 'ids linked to an RFID card (must be 0)', 0, COUNT(*),
+       IF(COUNT(*) = 0, 'OK', 'FAIL')
+    FROM student_ids i JOIN students s ON s.id = i.student_id
+    WHERE s.student_number LIKE 'T9150%' AND s.email LIKE '%@seed150.test'
+      AND i.rfid_card_id IS NOT NULL
+UNION ALL SELECT 'paid_at violations (must be 0)', 0, COUNT(*),
+       IF(COUNT(*) = 0, 'OK', 'FAIL')
+    FROM document_requests r JOIN students s ON s.id = r.student_id
+    WHERE s.student_number LIKE 'T9150%' AND s.email LIKE '%@seed150.test'
+      AND ( (r.document_status = 'Awaiting_Payment') <> (r.paid_at IS NULL) );
 
 -- Section codes, so the grouping can be eyeballed. Every code should be
 -- [year][sem][###] and agree with that student's own year and semester.
