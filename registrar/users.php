@@ -132,6 +132,12 @@ include '../includes/sidebar.php';
 </main>
 
 <!-- Add User Modal -->
+<!-- One show/hide control per password field. The four inputs below are
+     type="text" data-masked="1" rather than type="password": a real password
+     input makes the browser draw its own reveal eye in the same corner as this
+     page's toggle, and the user sees two. This stylesheet masks the value with
+     text-security so the characters stay hidden. -->
+<link rel="stylesheet" href="../css/password-field.css">
 <style>
 .password-field-shell{position:relative}.password-field-shell input{padding-right:82px}.password-tools{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:flex;gap:2px}.password-tool{border:0;background:transparent;color:#64748b;width:30px;height:30px;border-radius:6px;cursor:pointer}.password-tool:hover,.password-tool:focus-visible{background:#eef2ff;color:#2563eb;outline:none}.password-meter{margin-top:10px;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px}.password-meter-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:8px}.password-meter-head span:first-child{font-size:11px;font-weight:700;letter-spacing:.04em;color:#475569}.password-score{font-size:12px;font-weight:700;color:#b45309}.password-track{height:5px;background:#e2e8f0;border-radius:99px;overflow:hidden}.password-track span{display:block;width:0;height:100%;background:#b45309;transition:width .18s ease,background-color .18s ease}.password-requirements{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin-top:10px}.password-requirement{display:flex;align-items:center;gap:7px;font-size:12px;color:#64748b}.password-requirement i{width:16px;height:16px;display:grid;place-items:center;border-radius:50%;background:#e2e8f0;color:#64748b;font-size:9px}.password-requirement.met{color:#166534}.password-requirement.met i{background:#dcfce7;color:#15803d}.password-strength-complete .password-score{color:#15803d}.password-strength-complete .password-track span{background:#15803d}.password-error{color:#b91c1c;font-size:12px;margin-top:8px;min-height:18px}.password-error:empty{display:none}.password-identity{font-size:12px;color:#64748b;margin-top:8px}.password-confirm{margin-top:12px}@media(max-width:600px){.form-row{grid-template-columns:1fr!important}.password-requirements{grid-template-columns:1fr}}@media(prefers-reduced-motion:reduce){.password-track span{transition:none}}
 </style>
@@ -141,12 +147,12 @@ include '../includes/sidebar.php';
     <div class="form-group"><label for="addEmail">Email <span style="color:#dc2626;">*</span></label><input type="email" id="addEmail" class="form-control" autocomplete="email" required></div>
     <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
         <div class="form-group"><label for="addRole">Role</label><select id="addRole" class="form-control"><option value="staff">Staff</option><option value="registrar">Registrar</option><option value="admin">Admin</option></select></div>
-        <div class="form-group"><label for="addPassword">Password <span style="color:#dc2626;">*</span></label><div class="password-field-shell"><input type="password" id="addPassword" class="form-control" autocomplete="new-password" required minlength="<?= $passwordMinLength ?>" aria-describedby="addPasswordMeter addPasswordError"><div class="password-tools"><button type="button" class="password-tool" data-password-toggle="addPassword" aria-label="Show password"><i class="fas fa-eye"></i></button><button type="button" class="password-tool" data-password-generate="addPassword" aria-label="Generate strong password" title="Generate strong password"><i class="fas fa-wand-magic-sparkles"></i></button></div></div></div>
+        <div class="form-group"><label for="addPassword">Password <span style="color:#dc2626;">*</span></label><div class="password-field-shell"><input type="text" data-masked="1" id="addPassword" class="form-control" autocomplete="new-password" required minlength="<?= $passwordMinLength ?>" aria-describedby="addPasswordMeter addPasswordError"><div class="password-tools"><button type="button" class="password-tool" data-password-toggle="addPassword" aria-label="Show password"><i class="fas fa-eye"></i></button><button type="button" class="password-tool" data-password-generate="addPassword" aria-label="Generate strong password" title="Generate strong password"><i class="fas fa-wand-magic-sparkles"></i></button></div></div></div>
     </div>
     <div class="password-meter" id="addPasswordMeter" data-password-meter="addPassword" data-min-length="<?= $passwordMinLength ?>"><div class="password-meter-head"><span>Password strength</span><span class="password-score" aria-live="polite">Not started</span></div><div class="password-track" aria-hidden="true"><span></span></div><div class="password-requirements">
         <?php foreach ($passwordRequirements as $key => $label): ?><div class="password-requirement" data-requirement="<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-times" aria-hidden="true"></i><span><?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?></span></div><?php endforeach; ?>
     </div></div>
-    <div class="form-group password-confirm"><label for="addPasswordConfirm">Confirm Password <span style="color:#dc2626;">*</span></label><div class="password-field-shell"><input type="password" id="addPasswordConfirm" class="form-control" autocomplete="new-password" required minlength="<?= $passwordMinLength ?>" aria-describedby="addPasswordError"><div class="password-tools"><button type="button" class="password-tool" data-password-toggle="addPasswordConfirm" aria-label="Show confirmation"><i class="fas fa-eye"></i></button></div></div></div>
+    <div class="form-group password-confirm"><label for="addPasswordConfirm">Confirm Password <span style="color:#dc2626;">*</span></label><div class="password-field-shell"><input type="text" data-masked="1" id="addPasswordConfirm" class="form-control" autocomplete="new-password" required minlength="<?= $passwordMinLength ?>" aria-describedby="addPasswordError"><div class="password-tools"><button type="button" class="password-tool" data-password-toggle="addPasswordConfirm" aria-label="Show confirmation"><i class="fas fa-eye"></i></button></div></div></div>
     <p class="password-identity" id="addPasswordIdentity">Use a password not used for any other account.</p><div class="password-error" id="addPasswordError" role="alert"></div>
 </div>
 <div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeModal('addModal')">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-user-plus"></i> Create user</button></div></form></div></div>
@@ -165,9 +171,9 @@ include '../includes/sidebar.php';
 <div class="modal-overlay" id="passwordModal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="passwordModalTitle"><div class="modal-content"><div class="modal-header"><h2 id="passwordModalTitle"><i class="fas fa-key"></i> Reset Password</h2><button class="modal-close" type="button" onclick="closeModal('passwordModal')" aria-label="Close"><i class="fas fa-times"></i></button></div>
 <form id="passwordForm"><input type="hidden" id="passwordUserId" value=""><div class="modal-body">
     <p id="passwordTarget" style="font-size:13px;color:#64748b;margin-bottom:12px;"></p>
-    <div class="form-group"><label for="passwordValue">New Password <span style="color:#dc2626;">*</span></label><div class="password-field-shell"><input type="password" id="passwordValue" class="form-control" autocomplete="new-password" required minlength="<?= $passwordMinLength ?>" aria-describedby="passwordMeter passwordError"><div class="password-tools"><button type="button" class="password-tool" data-password-toggle="passwordValue" aria-label="Show password"><i class="fas fa-eye"></i></button><button type="button" class="password-tool" data-password-generate="passwordValue" aria-label="Generate strong password"><i class="fas fa-wand-magic-sparkles"></i></button></div></div></div>
+    <div class="form-group"><label for="passwordValue">New Password <span style="color:#dc2626;">*</span></label><div class="password-field-shell"><input type="text" data-masked="1" id="passwordValue" class="form-control" autocomplete="new-password" required minlength="<?= $passwordMinLength ?>" aria-describedby="passwordMeter passwordError"><div class="password-tools"><button type="button" class="password-tool" data-password-toggle="passwordValue" aria-label="Show password"><i class="fas fa-eye"></i></button><button type="button" class="password-tool" data-password-generate="passwordValue" aria-label="Generate strong password"><i class="fas fa-wand-magic-sparkles"></i></button></div></div></div>
     <div class="password-meter" id="passwordMeter" data-password-meter="passwordValue" data-min-length="<?= $passwordMinLength ?>"><div class="password-meter-head"><span>Password strength</span><span class="password-score" aria-live="polite">Not started</span></div><div class="password-track" aria-hidden="true"><span></span></div><div class="password-requirements"><?php foreach ($passwordRequirements as $key => $label): ?><div class="password-requirement" data-requirement="<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>"><i class="fas fa-times" aria-hidden="true"></i><span><?= htmlspecialchars($label, ENT_QUOTES, 'UTF-8') ?></span></div><?php endforeach; ?></div></div>
-    <div class="form-group password-confirm"><label for="passwordConfirm">Confirm Password <span style="color:#dc2626;">*</span></label><div class="password-field-shell"><input type="password" id="passwordConfirm" class="form-control" autocomplete="new-password" required minlength="<?= $passwordMinLength ?>" aria-describedby="passwordError"><div class="password-tools"><button type="button" class="password-tool" data-password-toggle="passwordConfirm" aria-label="Show confirmation"><i class="fas fa-eye"></i></button></div></div></div>
+    <div class="form-group password-confirm"><label for="passwordConfirm">Confirm Password <span style="color:#dc2626;">*</span></label><div class="password-field-shell"><input type="text" data-masked="1" id="passwordConfirm" class="form-control" autocomplete="new-password" required minlength="<?= $passwordMinLength ?>" aria-describedby="passwordError"><div class="password-tools"><button type="button" class="password-tool" data-password-toggle="passwordConfirm" aria-label="Show confirmation"><i class="fas fa-eye"></i></button></div></div></div>
     <p class="password-identity">The user must use a unique password they do not use elsewhere.</p><div class="password-error" id="passwordError" role="alert"></div>
 </div>
 <div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeModal('passwordModal')">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Set password</button></div></form></div></div>
@@ -286,10 +292,32 @@ function generatePassword() {
 document.querySelectorAll('[data-password-toggle]').forEach(button => {
     button.addEventListener('click', () => {
         const input = document.getElementById(button.dataset.passwordToggle);
+        const icon = button.querySelector('i');
+        if (!input || !icon) return;
+
+        // The inputs are type="text" data-masked="1" rather than
+        // type="password". A real password field makes the browser draw its own
+        // reveal eye in the same corner as this button, so the user saw two.
+        // ../css/password-field.css keeps the value visually masked with
+        // text-security, so revealing means dropping data-masked - which also
+        // means no native control can reappear underneath.
+        if (input.hasAttribute('data-masked')) {
+            const masked = input.dataset.masked === '1';
+            if (masked) input.removeAttribute('data-masked');
+            else input.dataset.masked = '1';
+
+            icon.className = masked ? 'fas fa-eye' : 'fas fa-eye-slash';
+            button.setAttribute('aria-label', masked ? 'Show password' : 'Hide password');
+            button.setAttribute('aria-pressed', masked ? 'false' : 'true');
+            return;
+        }
+
+        // Ordinary path for any field still on a real password input.
         const show = input.type === 'password';
         input.type = show ? 'text' : 'password';
         button.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
-        button.querySelector('i').className = show ? 'fas fa-eye-slash' : 'fas fa-eye';
+        button.setAttribute('aria-pressed', show ? 'true' : 'false');
+        icon.className = show ? 'fas fa-eye-slash' : 'fas fa-eye';
     });
 });
 document.querySelectorAll('[data-password-generate]').forEach(button => {

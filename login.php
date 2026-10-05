@@ -33,6 +33,11 @@ $timeout = isset($_GET['timeout']) ? true : false;
 
     <link rel="stylesheet" href="css/auth.css" />
     <link rel="stylesheet" href="css/page-loader.css" />
+    <!-- One show/hide control per password field. Shared because login.php,
+         settings.php and registrar/users.php all had their own copy of these
+         rules, and they had drifted apart - which is how two of them ended up
+         showing the browser's native eye next to the page's own. -->
+    <link rel="stylesheet" href="css/password-field.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
 
     <style>
@@ -42,46 +47,13 @@ $timeout = isset($_GET['timeout']) ? true : false;
             width: 100%;
         }
 
+        /* Suppressing the browser's OWN reveal control, and masking this
+           field's value, both live in css/password-field.css now. The rules
+           that used to be duplicated here are what drifted apart from the
+           other pages, which is how they ended up showing two eyes. */
         .password-field input {
             width: 100%;
             padding-right: 45px;
-        }
-
-        /* Hide the browser's OWN reveal control.
-           Chromium-based browsers (Edge especially) still draw a native
-           eye inside a type="password" field, and Firefox/Chrome can add
-           one via the password manager. That control is not part of this
-           page, so it cannot be styled to match, and it sits in the same
-           corner as .password-toggle-btn - the user saw two show-password
-           buttons side by side.
-
-           There is one page toggle, wired in the script at the bottom of
-           this file, and it works in every browser including the ones
-           with no native control at all. */
-        .password-field input::-ms-reveal,
-        .password-field input::-ms-clear {
-            display: none;
-            width: 0;
-            height: 0;
-        }
-        .password-field input::-webkit-credentials-manager-button,
-        .password-field input::-webkit-contacts-auto-fill-button,
-        .password-field input::-webkit-inner-spin-button,
-        .password-field input::-webkit-search-cancel-button,
-        .password-field input::-webkit-search-decoration {
-            -webkit-appearance: none;
-            appearance: none;
-            display: none !important;
-        }
-        /* Chromium has no pseudo-element for the native eye, so the
-           field must stop advertising itself as a password field to get
-           rid of it. -moz-text-security keeps the value masked in
-           Firefox while the type stays "text", so the characters are
-           still hidden and still never render as plain text. */
-        .password-field input[data-masked="1"] {
-            -webkit-text-security: disc !important;
-            -moz-text-security: disc !important;
-            text-security: disc !important;
         }
 
         .password-toggle-btn {

@@ -66,6 +66,12 @@ $lastUpdated = $fmtDate($me['updated_at'] ?? null);
         </div>
     </header>
 
+    <!-- One show/hide control per password field. Kept out of the <style>
+         block below because it is shared with the other pages that have the
+         same fields, and duplicating it per page is how they drifted apart in
+         the first place. -->
+    <link rel="stylesheet" href="css/password-field.css">
+
     <style>
     /* ============================================================
        ACCOUNT SETTINGS — registrar-blue layer.
@@ -192,6 +198,13 @@ $lastUpdated = $fmtDate($me['updated_at'] ?? null);
     body[data-page="settings"] .pw-toggle:hover { color:#2563eb; background:#eef4ff; }
     /* The toggle is a real control, so it needs a visible focus ring. */
     body[data-page="settings"] .pw-toggle:focus-visible{outline:2px solid #2563eb;outline-offset:1px}
+    /* The browser draws its OWN reveal eye inside a type="password" field, in
+       the same corner as the page's toggle, so the user sees two eyes. The
+       three password fields below are therefore type="text" with
+       data-masked="1": css/password-field.css masks them with text-security
+       so the characters stay hidden, and the browser stops drawing a native
+       control on a field that no longer advertises itself as a password field.
+       login.php does the same for its own field. */
     /* Bars plus a word. Colour alone would leave the strength
        unreadable to anyone who cannot separate the hues. */
     body[data-page="settings"] .strength-row{display:flex;align-items:center;gap:9px;margin-top:8px}
@@ -308,14 +321,14 @@ $lastUpdated = $fmtDate($me['updated_at'] ?? null);
                 <div class="form-group">
                     <label>Current Password</label>
                     <div class="pw-field-wrap">
-                        <input type="password" id="currentPassword" class="form-control" placeholder="Enter current password" required autocomplete="current-password" />
+                        <input type="text" id="currentPassword" data-masked="1" class="form-control" placeholder="Enter current password" required autocomplete="current-password" />
                         <button type="button" class="pw-toggle" data-target="currentPassword" title="Show password"><i class="fa-solid fa-eye"></i></button>
                     </div>
                 </div>
                 <div class="form-group">
                     <label>New Password</label>
                     <div class="pw-field-wrap">
-                        <input type="password" id="newPassword" class="form-control" placeholder="Enter new password" required minlength="6" autocomplete="new-password" />
+                        <input type="text" id="newPassword" data-masked="1" class="form-control" placeholder="Enter new password" required minlength="6" autocomplete="new-password" />
                         <button type="button" class="pw-toggle" data-target="newPassword" title="Show password"><i class="fa-solid fa-eye"></i></button>
                     </div>
                     <div class="strength-row">
@@ -326,7 +339,7 @@ $lastUpdated = $fmtDate($me['updated_at'] ?? null);
                 <div class="form-group">
                     <label>Confirm New Password</label>
                     <div class="pw-field-wrap">
-                        <input type="password" id="confirmPassword" class="form-control" placeholder="Confirm new password" required autocomplete="new-password" />
+                        <input type="text" id="confirmPassword" data-masked="1" class="form-control" placeholder="Confirm new password" required autocomplete="new-password" />
                         <button type="button" class="pw-toggle" data-target="confirmPassword" title="Show password"><i class="fa-solid fa-eye"></i></button>
                     </div>
                     <div class="field-error" id="pwMismatch">Passwords do not match.</div>
@@ -370,10 +383,36 @@ document.querySelectorAll('.pw-toggle').forEach(btn => {
         const input = document.getElementById(btn.dataset.target);
         const icon = btn.querySelector('i');
         if (!input || !icon) return;
+
+        // These fields are type="text" data-masked="1" rather than
+        // type="password", because a real password input makes the browser
+        // draw its own reveal eye in the same corner as this button and the
+        // user sees two. css/password-field.css keeps the characters hidden
+        // with text-security, so revealing is a matter of dropping that
+        // attribute rather than switching the type - which is also what stops
+        // the browser reappearing underneath.
+        if (input.hasAttribute('data-masked')) {
+            const masked = input.dataset.masked === '1';
+            if (masked) input.removeAttribute('data-masked');
+            else input.dataset.masked = '1';
+
+            icon.classList.toggle('fa-eye', masked);
+            icon.classList.toggle('fa-eye-slash', !masked);
+            btn.setAttribute('aria-pressed', masked ? 'false' : 'true');
+            btn.title = masked ? 'Show password' : 'Hide password';
+            btn.setAttribute('aria-label', masked ? 'Show password' : 'Hide password');
+            return;
+        }
+
+        // Anything still on a real password field (no data-masked) flips type,
+        // which is the ordinary path and the one the icon reflects.
         const show = input.type === 'password';
         input.type = show ? 'text' : 'password';
         icon.classList.toggle('fa-eye', !show);
         icon.classList.toggle('fa-eye-slash', show);
+        btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+        btn.title = show ? 'Hide password' : 'Show password';
+        btn.setAttribute('aria-label', show ? 'Hide password' : 'Show password');
     });
 });
 

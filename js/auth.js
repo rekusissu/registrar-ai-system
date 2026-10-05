@@ -224,6 +224,12 @@
             // A field that masks via CSS (data-masked) has no type to
             // flip, so toggle the attribute instead. Otherwise fall back
             // to switching type on a real password input.
+            //
+            // data-masked is also what keeps the browser's OWN reveal eye
+            // away: a real password input draws a native control in the same
+            // corner as this button, so the user sees two. Removing the
+            // attribute reveals the value and stops the native control
+            // appearing underneath.
             if (input.hasAttribute('data-masked')) {
                 if (input.dataset.masked === '1') input.removeAttribute('data-masked');
                 else input.dataset.masked = '1';
@@ -231,9 +237,18 @@
                 input.type = input.type === 'password' ? 'text' : 'password';
             }
 
-            const revealed = icon.classList.contains('fa-eye');
-            icon.classList.toggle('fa-eye', !revealed);
-            icon.classList.toggle('fa-eye-slash', revealed);
+            // Read the state AFTER the change rather than inferring it from
+            // the old class list, then write exactly one of the two classes.
+            // Toggling both with a computed force argument left the icon in a
+            // state that could hold both at once.
+            const revealed = input.hasAttribute('data-masked')
+                ? input.dataset.masked !== '1'
+                : input.type === 'text';
+
+            icon.classList.remove('fa-eye', 'fa-eye-slash');
+            icon.classList.add(revealed ? 'fa-eye-slash' : 'fa-eye');
+            this.setAttribute('aria-pressed', revealed ? 'true' : 'false');
+            this.setAttribute('aria-label', revealed ? 'Hide password' : 'Show password');
         });
     });
 
