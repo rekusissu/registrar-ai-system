@@ -328,9 +328,25 @@ check('the toolbar no longer holds a section button',
 check('the search box still filters on input',
     str_contains($b, 'id="masterlistSearch"')
     && preg_match('/getElementById\(.masterlistSearch.\)/', $b) === 1);
-// The hand-off row is Prepare Full List -> Send List -> Export, in that order.
-check('the output group is prepare, send, export, in order',
-    preg_match('/id="btnPrepareList".*?onclick="sendList\(\)".*?id="exportBtn"/s', $b) === 1);
+// The hand-off row is Send List -> Export, in that order.
+check('the output group is send then export, in order',
+    preg_match('/onclick="sendList\(\)".*?id="exportBtn"/s', $b) === 1);
+
+// Prepare Full List is gone. Its removal is asserted, not assumed: the button,
+// the listener that navigated to ?prepared=1, the green "Full list prepared"
+// banner and the $prepared flag it keyed off all have to stay gone, because a
+// half-removal leaves either a dead control or a banner no longer reachable.
+// The banner in particular would be the worst artifact - it announces a list as
+// prepared, which it never was.
+check('no Prepare Full List button', !str_contains($b, 'btnPrepareList'));
+check('no "Prepare Full List" label', !str_contains($b, 'Prepare Full List'));
+check('no listener navigating to ?prepared=1',
+    !str_contains($b, 'prepared=1'));
+check('no $prepared flag', !str_contains($b, '$prepared'));
+check('no "Full list prepared" banner', !str_contains($b, 'Full list prepared'));
+// The hand-off that button sat in front of must survive its removal.
+check('Send List survived the removal', str_contains($b, 'onclick="sendList()"'));
+check('Export survived the removal', str_contains($b, 'id="exportBtn"'));
 check('the status line still reports unassigned students',
     str_contains($b, 'id="sectionStatus"'));
 check('has a Section column', str_contains($b, 'data-field="section"'));
