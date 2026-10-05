@@ -1023,7 +1023,85 @@
             }
         }, 1000);
 
-        fetch(ENDPOINTS.report, {
+        // The POST returns in about a second now, not a minute. What follows is the
+    // wait: a cheap GET every few seconds until the finished report lands in
+    // the cache.
+    //
+    // WHY THIS, RATHER THAN ONE LONG REQUEST
+    //
+    // The generation itself takes 40-70 seconds and always did. What changed is
+    // that no single HTTP request does any of it: the server answers "pending"
+    // immediately and finishes the work after the response is gone. The proxy
+    // in front of PHP never gets a long request to give up on, which is the
+    // only fix that survives a shared host - raising max_execution_time did
+    // nothing, because the timeout was never PHP's.
+    //
+    // Polling is safe here because the poll is a cache read, not a second
+    // generation. That distinction is the whole design: the expensive thing
+    // happens exactly once.
+    var pollUrl = ENDPOINTS.report
+        + '?month=' + encodeURIComponent(el.month.value)
+        + '&year=' + encodeURIComponent(el.year.value);
+    var waited = 0;
+    var POLL_EVERY_MS = 4000;
+    var POLL_GIVE_UP_MS = 180000;
+
+    function pollOnce() {
+        return fetch(pollUrl, { headers: { 'Accept': 'application/json' }, cache: 'no-store' })
+            .then(function (res) { return res.text(); })
+            .then(function (text) {
+                try { return JSON.parse(text); } catch (e) { return null; }
+            });
+    }
+
+    function startPolling() {
+        waited = 0;
+        function again() {
+            waited += POLL_EVERY_MS;
+            if (waited > POLL_GIVE_UP_MS) {
+                // The job is genuinely stuck or the server is gone. Say so
+                // plainly rather than spinning forever: the honest failure is
+                // that we stopped waiting, not that the analysis failed.
+                window.clearInterval(tick);
+                hideLoading();
+                showReportError('The analysis is taking longer than expected and has not finished yet. '
+                    + 'Close this page and open it again shortly - the report is saved as soon as it is written, '
+                    + 'so you will not pay for it twice.');
+                el.reportEmpty.style.display = 'block';
+                return;
+            }
+            pollOnce().then(function (j) {
+                if (j && j.success && j.data && j.data.status === 'ready' && j.data.report) {
+                    window.clearInterval(tick);
+                    hideLoading();
+                    // Re-fetched through the normal path so figures, source
+                    // badge and period all come from one authoritative
+                    // response rather than being assembled here.
+                    generateReport(false);
+                    return;
+                }
+                if (j && j.success && j.data && j.data.status === 'ready') {
+                    // Ready, but the job that was running did not write
+                    // anything this build understands. Fall back to one
+                    // synchronous attempt rather than reporting success on
+                    // an empty report.
+                    window.clearInterval(tick);
+                    hideLoading();
+                    showReportError('The analysis finished but could not be read back. Please generate it again.');
+                    el.reportEmpty.style.display = 'block';
+                    return;
+                }
+                // Still pending. Keep the clock honest.
+                if (loadingText) {
+                    loadingText.textContent = 'Still writing — a full report takes up to a minute. '
+                        + Math.round(waited / 1000) + 's';
+                }
+            });
+        }
+        window.setInterval(again, POLL_EVERY_MS);
+    }
+
+    fetch(ENDPOINTS.report, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1088,6 +1166,13 @@
                 // it shows the banner and the figures and leaves the narrative
                 // slot empty. So the only question here is whether the server
                 // succeeded at all.
+                if (json && json.success && json.data && json.data.status === 'pending') {
+                    // Accepted and running. The spinner stays up and the clock
+                    // keeps counting while the poll waits for it.
+                    startPolling();
+                    return;
+                }
+
                 if (json && json.success && json.data) {
                     renderReport(json.data.report || '', json.data);
                 } else {

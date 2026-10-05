@@ -33,21 +33,33 @@ require_once __DIR__ . '/../shared/ai_report_cache.php';
 
 header('Content-Type: application/json');
 
-// ── This request can take a minute ──────────────────────────────────
+// ── This request must NOT take a minute ───────────────────────────────────
 //
-// Generating the report is a synchronous upstream call that was measured at
-// 40-65 seconds against the current primary model. A stock shared host runs
-// PHP with max_execution_time at 30s, and when that fires PHP kills the script
-// mid-response: the browser receives a truncated body, the JSON never parses,
-// and the page says only "Failed to generate the analysis" - naming neither
-// the host limit nor the gateway. That is the failure this endpoint reports
-// when the office reported it.
+// Generating the report is a synchronous upstream call measured at 40-65
+// seconds against the current primary model (the reasoning pass is most of
+// the wall clock). A stock shared host runs PHP with max_execution_time at
+// 30s and sits behind a proxy that gives up at 60s, so the long version of
+// this endpoint ended in a 503 "Gateway timeout" HTML page from the HOST -
+// not from this application, which only ever emits 401/403/405/500.
 //
-// set_time_limit RAISES the limit where the host allows it. It is refused on
-// some CGI/FastCGI configurations, which is why the host setting is still
-// documented below - but it costs nothing to try, and where it works it fixes
-// the problem without the operator touching anything.
-@set_time_limit(180);
+// set_time_limit() cannot fix that. It raises PHP's own limit, but the proxy
+// in front of PHP is a different limit, on a different clock, and outside
+// this file's control. Raising a number the host ignores is not a fix.
+//
+// So the long work is moved OFF the request. The POST returns in well under
+// a second with status 'pending', the generation continues after the
+// response has been flushed, and the browser polls a cheap GET until the
+// finished report is in the cache. Every individual request is now short,
+// so no proxy in the path can time one out - which is the only thing that
+// actually survives a shared host.
+//
+// fastcgi_finish_request() is what makes "after the response" possible: it
+// hands the response to the web server and lets the script keep running. It
+// exists on PHP-FPM and CGI, which is what shared hosting runs. Where it is
+// missing (mod_php) we fall back to generating synchronously, because a
+// correct-but-slow answer beats a fast one that never arrives.
+$canDetach = function_exists('fastcgi_finish_request');
+@set_time_limit($canDetach ? 300 : 180);
 
 if (!isLoggedIn()) {
     http_response_code(401);
@@ -59,21 +71,63 @@ if (!in_array(getCurrentUserRole(), aiInsightRoles(), true)) {
     echo json_encode(['success' => false, 'message' => 'Forbidden.']);
     exit;
 }
-if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+// GET polls for a finished report (handled below); POST generates one.
+if (!in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET', 'POST'], true)) {
     http_response_code(405);
-    echo json_encode(['success' => false, 'message' => 'POST required.']);
+    echo json_encode(['success' => false, 'message' => 'GET or POST required.']);
     exit;
 }
 
-$input   = json_decode(file_get_contents('php://input'), true) ?: [];
-$filters = $input['filters'] ?? [];
-$force   = !empty($input['force']);
+$isPoll = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET';
+
+if ($isPoll) {
+    $filters = [
+        'month' => isset($_GET['month']) ? (int) $_GET['month'] : (int) date('n'),
+        'year'  => isset($_GET['year'])  ? (int) $_GET['year']  : (int) date('Y'),
+    ];
+    $force   = false;
+} else {
+    $input   = json_decode(file_get_contents('php://input'), true) ?: [];
+    $filters = $input['filters'] ?? [];
+    $force   = !empty($input['force']);
+}
 
 $period = aiInsightPeriod(
     isset($filters['month']) ? (int) $filters['month'] : (int) date('n'),
     isset($filters['year'])  ? (int) $filters['year']  : (int) date('Y')
 );
 
+
+// ── POLL: has the background job finished? ──────────────────────
+//
+// Every call here is a cache read - no upstream call, no re-aggregation of
+// the whole registrar dataset - so it costs about what serving a static file
+// costs. That is what makes polling safe against the very proxy that was
+// timing the long request out: the thing we retry is cheap.
+//
+// A miss answers 'pending', never an error. The browser cannot tell the
+// difference between "still working" and "failed", and guessing wrong the
+// other way would show an error for a report that is thirty seconds from
+// being ready.
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') {
+    try {
+        $pollBuild = aiInsightBuild($period);
+        $stored    = aiReportCacheGet(aiReportCacheKey($period, $pollBuild['facts']));
+
+        echo json_encode(['success' => true, 'data' => $stored === null
+            ? ['status' => 'pending']
+            : [
+                'status'       => 'ready',
+                'report'       => (string) $stored['report'],
+                'model'        => (string) ($stored['model'] ?? ''),
+                'cached'       => true,
+                'generated_at' => (string) ($stored['generated_at'] ?? ''),
+            ]]);
+    } catch (Throwable $e) {
+        echo json_encode(['success' => false, 'message' => 'Unable to check the report.']);
+    }
+    exit;
+}
 
 try {
     $build = aiInsightBuild($period);
@@ -159,6 +213,43 @@ try {
         // timestamp that jumps forward every time someone reopens the page
         // would read as "this is up to date with now".
         $generatedAt = (string) ($cached['generated_at'] ?? '');
+    } elseif ($canDetach && !$force) {
+        // ANSWER NOW, WRITE AFTERWARDS.
+        //
+        // This is the whole 503 fix. Instead of holding a 40-65 second
+        // request open - which the proxy in front of PHP refuses to wait for -
+        // the browser is told "pending" in under a second and the generation
+        // carries on after the response has been handed to the web server.
+        // The browser then polls the GET above, which is a cache read, until
+        // this finishes and writes the report.
+        //
+        // $force is excluded deliberately. It means "re-roll the wording",
+        // and it bypasses the cache on BOTH sides - so a forced generation
+        // would poll against a key nothing will ever be written to, and spin
+        // until it timed out. Forcing stays synchronous; it is a rare,
+        // deliberate act and the user is already braced for a wait.
+        echo json_encode([
+            'success' => true,
+            'data'    => [
+                'status'  => 'pending',
+                'period'  => [
+                    'month'      => $period['month'],
+                    'year'       => $period['year'],
+                    'label'      => $period['label'],
+                    'prev_label' => $period['prev_label'],
+                ],
+            ],
+        ]);
+
+        // Hand the response over now; everything below runs on a timer the
+        // browser is no longer waiting on.
+        if (!headers_sent()) {
+            header('Content-Type: application/json');
+            header('Cache-Control: no-store');
+        }
+        @fastcgi_finish_request();
+        @ob_end_flush();
+        @flush();
     } else {
         $aiText = aiGenerate($systemPrompt, $userPrompt, [
             // Sized for the ANSWER, not the budget. The primary model
