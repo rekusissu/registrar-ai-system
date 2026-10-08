@@ -13,6 +13,12 @@ require_once __DIR__ . '/../shared/database.php';
 // explicitly rather than relying on the chain: a page that silently
 // loses these renders every request as if no receipt were needed.
 require_once __DIR__ . '/../shared/document_process.php';
+// The wizard's vocabulary: the status colours, the "can I still cancel
+// this" rule, and the requirement checklist. Included rather than
+// re-derived, because this page and document-track.php both render a
+// request's status and two hand-written copies of a status table is
+// how the desk and the student list ended up disagreeing.
+require_once __DIR__ . '/../shared/doc_wizard.php';
 // The office's GCash QR, and whether it is actually on this server. The
 // payment screen shows the code, or says it is not set up — never a
 // broken image. See shared/payment_qr.php.
@@ -21,7 +27,8 @@ require_once __DIR__ . '/../shared/payment_qr.php';
 $page_title = 'My Documents';
 $APP_ROOT = '../';
 $ACTIVE_NAV = 'student_documents';
-$extra_css = ['student.css', 'documents.css'];
+$extra_css = ['student.css', 'documents.css', 'docket.css'];
+$body_page = 'docket-list';   // scopes css/docket.css
 
 require_once __DIR__ . '/_guard.php';
 
@@ -46,6 +53,21 @@ $requests = $db->fetchAll(
     [$student['id']]
 );
 
+// ── The open draft ────────────────────────────────────────
+//
+// Surfaced here rather than left for the student to rediscover. A
+// half-finished wizard is invisible work: without this the list shows
+// nothing unusual and a student who abandoned the wizard has no reason
+// to believe they can pick it back up - or that the uploads they made
+// are still saved.
+$openDraft = null;
+foreach ($requests as $r) {
+    if ((string) $r['document_status'] === 'Draft') {
+        $openDraft = $r;
+        break;
+    }
+}
+
 // ── Status events (grouped by request)
 $eventsByRequest = [];
 if ($requests) {
@@ -56,27 +78,20 @@ if ($requests) {
     }
 }
 
-// ── Display maps
-$statusPill = [
-    'Pending_Clearance' => ['pending-clearance', 'fa-triangle-exclamation'],
-    'Awaiting_Payment'  => ['awaiting-payment',  'fa-clock'],
-    'Filed'             => ['filed',             'fa-folder-open'],
-    'Processing'        => ['processing',        'fa-gear'],
-    'Ready'             => ['ready',             'fa-circle-check'],
-    'Shipped'           => ['shipped',           'fa-truck-fast'],
-    'Claimed'           => ['claimed',           'fa-box-check'],
-    'Rejected'          => ['rejected',          'fa-xmark'],
-];
-$statusLabel = [
-    'Pending_Clearance' => 'Pending Clearance',
-    'Awaiting_Payment'  => 'Awaiting Payment',
-    'Filed'             => 'Filed',
-    'Processing'        => 'Being prepared',
-    'Ready'             => 'Ready for collection',
-    'Shipped'           => 'On its way',
-    'Claimed'           => 'Collected',
-    'Rejected'          => 'Rejected',
-];
+// ── Display maps ───────────────────────────────────────────
+//
+// Derived from doc_status_meta() rather than typed out here. This
+// list is the THIRD copy of the status vocabulary (the registrar desk
+// has its own), and it had already drifted: it knew eight statuses and
+// the enum now carries ten, so Draft and Cancelled fell through to the
+// 'awaiting-payment' default and a cancelled request was displayed as
+// one still waiting to be paid. One shared table, three renderers.
+$statusPill = [];
+$statusLabel = [];
+foreach (doc_status_meta() as $key => $meta) {
+    $statusPill[$key] = [$meta['pill'], $meta['icon']];
+    $statusLabel[$key] = $meta['label'];
+}
 // One icon per SKU. This list used to stop at four, so Diploma Replacement,
 // Honorable Dismissal and Course Description all fell through to the same
 // grey placeholder — three of the seven documents a student can pick looked
@@ -109,8 +124,8 @@ function feeLabel($c) {
  * nothing drawn.
  *
  * A request paid at the counter never enters Awaiting_Payment, so the
- * step is never shown to a student who owes nothing. "On its way" is
- * drawn only for a courier request; a pickup request skips it.
+ * step is never shown to a student who owes nothing. The courier leg was
+ * once drawn for a courier request only.
  *
  * There was once a fifth "Clearance" step prepended for exit-clearance
  * documents, so a student could see three offices signing off. Exit
@@ -120,32 +135,43 @@ function feeLabel($c) {
  * report on.
  */
 function renderStepper(string $status): string {
+    // Draft, Cancelled and Rejected are not positions on this track.
+    // Draft is a form nobody has finished, and the other two are
+    // outcomes the request left the track rather than moved along it -
+    // drawing a progress rail for them would imply the document is on
+    // its way somewhere, which is the opposite of what happened.
+    // The caller renders a notice instead.
+    if (in_array($status, ['Draft', 'Cancelled', 'Rejected'], true)) {
+        return '';
+    }
+
     $awaitingPayment = $status === 'Awaiting_Payment';
-    $shipped         = $status === 'Shipped';
 
-    $steps = [
-        ['key' => 'Awaiting_Payment', 'label' => 'Payment',   'icon' => 'fa-credit-card'],
-        ['key' => 'Filed',            'label' => 'Filed',     'icon' => 'fa-file-signature'],
-        ['key' => 'Processing',       'label' => 'In progress','icon' => 'fa-gear'],
-        ['key' => 'Ready',            'label' => 'Ready',     'icon' => 'fa-circle-check'],
-        ['key' => 'Shipped',          'label' => 'On its way','icon' => 'fa-truck-fast'],
-        ['key' => 'Claimed',          'label' => 'Collected', 'icon' => 'fa-box-check'],
-    ];
+    // 'Payment' leads only when money is actually owed. A request paid
+    // at the counter never enters Awaiting_Payment, so it never reaches
+    // this function - but a request whose payment landed shows Filed as
+    // its current station, and the payment step would otherwise be
+    // drawn behind it, reading as "payment still to come".
+    $steps = [];
+    if ($awaitingPayment) {
+        $steps[] = ['key' => 'Awaiting_Payment', 'label' => 'Payment',    'icon' => 'fa-credit-card'];
+    }
+    $steps = array_merge($steps, [
+        ['key' => 'Filed',      'label' => 'Filed',      'icon' => 'fa-file-signature'],
+        ['key' => 'Processing', 'label' => 'In progress','icon' => 'fa-gear'],
+        ['key' => 'Ready',      'label' => 'Ready',      'icon' => 'fa-circle-check'],
+        ['key' => 'Claimed',    'label' => 'Collected',  'icon' => 'fa-box-check'],
+    ]);
 
-    // Drop the steps that do not apply, so a pickup request is not shown a
-    // courier leg it will never take and a paid request is not shown a
-    // payment step it has already cleared.
-    if (!$awaitingPayment) {
-        $steps = array_values(array_filter($steps, fn($s) => $s['key'] !== 'Awaiting_Payment'));
-    }
-    if (!$shipped) {
-        $steps = array_values(array_filter($steps, fn($s) => $s['key'] !== 'Shipped'));
-    }
 
     $activeIdx = null;
     foreach ($steps as $i => $s) {
         if ($s['key'] === $status) { $activeIdx = $i; break; }
     }
+    // A discontinued courier row has no station above. Resolve it to the
+    // one it last sat at, so it draws as 'ready' instead of drawing
+    // nothing at all.
+    if ($activeIdx === null && $status === 'Shipped') $status = 'Ready';
     if ($activeIdx === null) return '';
     $html = '<div class="flow-track">';
     foreach ($steps as $i => $s) {
@@ -159,12 +185,22 @@ function renderStepper(string $status): string {
 
 // ── Counts
 $counts = array_fill_keys(array_keys($statusPill), 0);
+$draftCount = 0;
 foreach ($requests as $r) {
-    if (isset($counts[$r['document_status']])) $counts[$r['document_status']]++;
+    $st = (string) $r['document_status'];
+    // A draft is counted separately and NOT as a request. Counting it
+    // would tell a student they have filed four documents when they have
+    // filed three and started a fourth - which is exactly the confusion
+    // the Draft status exists to prevent.
+    if ($st === 'Draft') {
+        $draftCount++;
+        continue;
+    }
+    if (isset($counts[$st])) $counts[$st]++;
 }
 $isBlocked = $balance > 0;
 $hasHeld = $counts['Pending_Clearance'] > 0;
-$totalRequests = count($requests);
+$totalRequests = count($requests) - $draftCount;
 $awaitingPay = $counts['Awaiting_Payment'];
 $processing  = $counts['Processing'] + $counts['Ready'];
 $claimed     = $counts['Claimed'];
@@ -176,9 +212,36 @@ $claimed     = $counts['Claimed'];
         <header class="header">
             <div class="title"><h1>My Documents</h1><p>Request and track documents from the Registrar.</p></div>
             <div class="header-actions">
-                <button class="btn btn-primary" onclick="openRequestModal()"><i class="fas fa-plus"></i> New Request</button>
+                <?php // The wizard, not the old single-screen modal.
+                      // A link rather than a button opening a dialog: the
+                      // wizard is five screens, so it needs a URL a student
+                      // can bookmark, refresh and come back to - which a
+                      // modal does not. The modal it replaces is still
+                      // reachable from the catalog below for anyone who
+                      // wants the quick single-step path. ?>
+                <a href="<?= $APP_ROOT ?>student/document-request.php" class="btn btn-primary">
+                    <i class="fas fa-wand-magic-sparkles"></i> New Request
+                </a>
             </div>
         </header>
+
+        <?php if ($openDraft): ?>
+        <div class="block-banner" style="border-left:4px solid #7c3aed;">
+            <div class="banner-icon"><i class="fa-solid fa-pen-ruler"></i></div>
+            <div style="flex:1;min-width:0;">
+                <div class="banner-title">
+                    You have an unfinished <?= htmlspecialchars($openDraft['catalog_name'] ?? 'document') ?> request
+                </div>
+                <div class="banner-text">
+                    Nothing has been sent to the Registrar yet, and your uploads are still saved.
+                    Pick up where you left off.
+                </div>
+            </div>
+            <a href="<?= $APP_ROOT ?>student/document-request.php" class="btn btn-sm btn-primary">
+                <i class="fa-solid fa-arrow-right"></i> Resume
+            </a>
+        </div>
+        <?php endif; ?>
 
         <!-- Stats cards -->
         <div class="stats-grid">
@@ -300,11 +363,19 @@ $claimed     = $counts['Claimed'];
             <div class="table-responsive" style="overflow-x:auto;">
                 <table class="table">
                     <thead>
-                        <tr><th>Request</th><th>Fee</th><th>Type</th><th>Fulfillment</th><th>Status</th><th>Submitted</th><th style="text-align:right;">Action</th></tr>
+                        <tr>
+                            <th>No.</th>
+                            <th>Document</th>
+                            <th>Waiting on</th>
+                            <th class="dk-num">Fee</th>
+                            <th>Status</th>
+                            <th class="dk-num">Age</th>
+                            <th style="text-align:right;">What&rsquo;s needed</th>
+                        </tr>
                     </thead>
                     <tbody>
                     <?php if (empty($requests)): ?>
-                        <tr><td colspan="7" class="empty-state"><i class="fa-solid fa-file-lines"></i><p>No document requests yet</p><span>Click "New Request" above to request a document.</span></td></tr>
+                        <tr><td colspan="7" class="empty-state"><i class="fa-solid fa-file-lines"></i><p>No document requests yet</p><span>Nothing has been filed yet. Start a request and we will give it a control number.</span></td></tr>
                     <?php else: foreach ($requests as $r):
                         $pill = $statusPill[$r['document_status']] ?? ['awaiting-payment', 'fa-clock'];
                         $label = $statusLabel[$r['document_status']] ?? str_replace('_', ' ', $r['document_status']);
@@ -320,46 +391,79 @@ $claimed     = $counts['Claimed'];
                         // has to attach one — that is the only state that
                         // shows them the upload button.
                         $needsReceipt = doc_requires_receipt($r);
-                        $receiptState = $needsReceipt ? doc_receipt_state($r) : null;
+                        // Bounded to the live statuses. doc_requires_receipt() is
+                        // true of any row with a fee and an Online payment method,
+                        // which is every fixture here, so an unbounded gate offered
+                        // "Attach receipt" on rows that were withdrawn or refused
+                        // days ago. A closed request owes nothing.
+                        $receiptLive = in_array((string) $r['document_status'],
+                            ['Filed', 'Awaiting_Payment', 'Pending_Clearance', 'Processing'], true);
+                        $receiptState = ($receiptLive && $needsReceipt) ? doc_receipt_state($r) : null;
+                        // The stamp and the sentence beside it.
+                        //
+                        // These were two things in two places: a pill
+                        // badge for the state, and the consequence hidden
+                        // inside a row the student has to expand. doc_waiting_on()
+                        // makes both come from one place, so the badge and
+                        // the sentence cannot disagree.
+                        $st = doc_status((string) $r['document_status']);
+                        $on = doc_waiting_on($r);
+                        // Age, in whole days. A request filed today reads
+                        // "today" rather than "0 days", because a zero is a
+                        // measurement and this is a sentence.
+                        $ageDays = (int) floor((time() - strtotime((string) $r['request_date'])) / 86400);
+                        $age = $ageDays <= 0 ? 'today'
+                            : ($ageDays === 1 ? '1 day' : $ageDays . ' days');
+                        $paid = !empty($r['paid_at']) || ($r['payment_method'] ?? '') === 'Counter'
+                            || (float) ($r['fee_amount'] ?? 0) <= 0;
                     ?>
                         <tr data-doc="<?= (int) $r['id'] ?>" data-status="<?= htmlspecialchars((string) $r['document_status']) ?>" class="doc-row" onclick="toggleDetail(<?= (int) $r['id'] ?>)">
+                            <td><span class="dk-ctl"><?= htmlspecialchars($r['request_id'] ?? '—') ?></span></td>
                             <td>
-                                <div class="student-info">
-                                    <div class="student-avatar" style="background:<?= $ci[0] ?>;"><i class="fa-solid <?= $ci[1] ?>"></i></div>
-                                    <div>
-                                        <div class="student-name"><?= htmlspecialchars($r['catalog_name'] ?? ucwords(str_replace('_', ' ', $r['document_type']))) ?></div>
-                                        <div class="student-sub"><i class="fa-solid fa-hashtag"></i> <?= htmlspecialchars($r['request_id'] ?? '') ?></div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td>
-                                <div style="font-size:13px;font-weight:700;color:#0f172a;">&#8369;<?= number_format((float) ($r['fee_amount'] ?? 0), 2) ?></div>
-                                <?php if ($isCod): ?>
-                                    <div style="font-size:11px;color:#dc2626;"><i class="fa-solid fa-hand-holding-dollar"></i> Cash on delivery</div>
+                                <span class="dk-docname"><?= htmlspecialchars($r['catalog_name'] ?? ucwords(str_replace('_', ' ', (string) $r['document_type']))) ?></span>
+                                <?php if (!empty($r['purpose'])): ?>
+                                    <span class="dk-ledger-sub"><?= htmlspecialchars($r['purpose']) ?></span>
                                 <?php endif; ?>
                             </td>
-                            <td><span class="chip regular"><i class="fa-solid fa-clock"></i> Regular</span></td>
-                            <td><span class="chip pickup"><i class="fa-solid fa-store"></i> Pickup</span></td>
-                            <td><span class="pill <?= $pill[0] ?>"><i class="fa-solid <?= $pill[1] ?>"></i> <?= htmlspecialchars($label) ?></span></td>
-                            <td style="font-size:12px;color:#64748b;"><?= date('M d, Y', strtotime($r['request_date'])) ?></td>
-                            <td style="text-align:right;white-space:nowrap;">
-                                <?php if ($payable): ?>
-                                    <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();openPaymentModal(<?= (int) $r['id'] ?>, '<?= htmlspecialchars($r['request_id']) ?>', <?= (float) $r['fee_amount'] ?>, '<?= htmlspecialchars($r['catalog_name'] ?? '', ENT_QUOTES) ?>');"><i class="fa-solid fa-qrcode"></i> Pay with GCash</button>
+                            <td>
+                                <span class="dk-on">
+                                    <?php if ($on['who'] !== 'nobody'): ?><span class="dk-on-who <?= $on['who'] === 'you' ? 'is-you' : 'is-office' ?>"><?= htmlspecialchars(ucfirst($on['who'])) ?></span><?php endif; ?>
+                                    <span class="dk-on-what<?= $on['who'] === 'nobody' ? ' is-alone' : '' ?>"><?= htmlspecialchars($on['what']) ?></span>
+                                </span>
+                                </span>
+                            </td>
+                            <td class="dk-num">
+                                <span class="dk-num">&#8369;<?= number_format((float) ($r['fee_amount'] ?? 0), 2) ?></span>
+                                <span class="dk-ledger-sub"><?= $paid ? 'Settled' : 'Not yet paid' ?></span>
+                            </td>
+                            <td>
+                                <span class="dk-stamp<?= !empty($st['terminal']) ? ' is-final' : '' ?>" data-s="<?= htmlspecialchars($st['ink']) ?>"><span><?= htmlspecialchars($st['stamp']) ?></span></span>
+                            </td>
+                            <td class="dk-num"><span class="dk-age"><?= htmlspecialchars($age) ?></span></td>
+<td style="text-align:right;">
+                                <?php if ((string) $r['document_status'] === 'Draft'): ?>
+                                    <a href="<?= $APP_ROOT ?>student/document-request.php" class="dk-btn dk-btn--sm dk-btn--go" onclick="event.stopPropagation();">Finish this</a>
+
+                                <?php elseif ($payable): ?>
+                                    <button class="dk-btn dk-btn--sm dk-btn--go" onclick="event.stopPropagation();openPaymentModal(<?= (int) $r['id'] ?>, '<?= htmlspecialchars($r['request_id']) ?>', <?= (float) $r['fee_amount'] ?>, '<?= htmlspecialchars($r['catalog_name'] ?? '', ENT_QUOTES) ?>');">Pay &#8369;<?= number_format((float) $r['fee_amount'], 2) ?></button>
+
                                 <?php elseif ($receiptState === 'none'): ?>
-                                    <!-- Paid, no receipt yet. This button IS the
-                                         next action, so it takes the primary
-                                         styling the Pay button would have used. -->
-                                    <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();openReceiptModal(<?= (int) $r['id'] ?>, '<?= htmlspecialchars($r['request_id']) ?>');"><i class="fa-solid fa-receipt"></i> Attach Receipt</button>
+                                    <button class="dk-btn dk-btn--sm dk-btn--go" onclick="event.stopPropagation();openReceiptModal(<?= (int) $r['id'] ?>, '<?= htmlspecialchars($r['request_id']) ?>');">Attach receipt</button>
+
                                 <?php elseif ($receiptState === 'submitted'): ?>
-                                    <span class="pill awaiting-payment" title="<?= htmlspecialchars($r['payment_receipt_filename'] ?? '') ?>"><i class="fa-solid fa-clock"></i> Receipt sent</span>
+                                    <span class="dk-none">Receipt sent<?= !empty($r['payment_receipt_filename']) ? ' &mdash; ' . htmlspecialchars($r['payment_receipt_filename']) : '' ?></span>
+
                                 <?php elseif ($receiptState === 'verified'): ?>
-                                    <span class="pill processing" title="Checked by the Registrar"><i class="fa-solid fa-circle-check"></i> Receipt OK</span>
+                                    <span class="dk-none">Receipt checked by the Registrar</span>
+
                                 <?php elseif ($receiptState === 'waived'): ?>
-                                    <span class="pill processing" title="Not required &mdash; waived by the Registrar"><i class="fa-solid fa-circle-info"></i> Receipt waived</span>
-                                <?php elseif ($isRejected): ?>
-                                    <span class="pill rejected"><i class="fa-solid fa-xmark"></i> Rejected</span>
+                                    <span class="dk-none">No receipt needed</span>
+
+                                <?php elseif ($on['who'] === 'you'): ?>
+                                    <span class="dk-none">Nothing needed from you</span>
+
                                 <?php else: ?>
-                                    <span style="font-size:12px;color:#94a3b8;"><i class="fa-solid fa-chevron-down"></i></span>
+                                    <a class="dk-link" href="<?= $APP_ROOT ?>student/document-track.php?id=<?= (int) $r['id'] ?>" onclick="event.stopPropagation();">Track</a>
                                 <?php endif; ?>
                             </td>
                         </tr>
@@ -367,7 +471,50 @@ $claimed     = $counts['Claimed'];
                         <tr class="doc-detail-row" id="detail-<?= (int) $r['id'] ?>" style="display:none;">
                             <td colspan="7" style="padding:0;">
                                 <div class="doc-detail" style="padding:18px 22px;background:#f8fafc;border-bottom:1px solid #e2e8f0;">
-                                    <?php if ($isRejected): ?>
+                                    <?php if ((string) $r['document_status'] === 'Draft'): ?>
+                                        <!-- A draft is not on the track at
+                                             all, and there is no timeline
+                                             to show: nothing has happened
+                                             yet. Saying exactly that is
+                                             more useful than an empty
+                                             rail. -->
+                                        <div class="block-banner" style="margin-bottom:12px;">
+                                            <div class="banner-icon"><i class="fa-solid fa-pen-ruler"></i></div>
+                                            <div>
+                                                <div class="banner-title">Not submitted yet</div>
+                                                <div class="banner-text">
+                                                    You have not sent this to the Registrar, so it has no
+                                                    tracking number and nobody at the office can see it.
+                                                    <?php if (!empty($r['purpose'])): ?>
+                                                        <br><br>Purpose: <?= htmlspecialchars($r['purpose']) ?>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <div style="margin-top:12px;">
+                                                    <a href="<?= $APP_ROOT ?>student/document-request.php" class="btn btn-sm btn-primary">
+                                                        <i class="fa-solid fa-arrow-right"></i> Finish this request
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    <?php elseif ((string) $r['document_status'] === 'Cancelled'): ?>
+                                        <!-- Kept on record rather than deleted,
+                                             because money may have been paid
+                                             against it and somebody will
+                                             eventually ask. -->
+                                        <div class="block-banner" style="margin-bottom:12px;">
+                                            <div class="banner-icon"><i class="fa-solid fa-ban"></i></div>
+                                            <div>
+                                                <div class="banner-title">Cancelled<?= $r['cancelled_at'] ? ' on ' . htmlspecialchars(date('M d, Y', strtotime((string) $r['cancelled_at']))) : '' ?></div>
+                                                <div class="banner-text">
+                                                    <?= htmlspecialchars($r['cancellation_reason'] ?? 'You withdrew this request.') ?>
+                                                    <?php if ($r['paid_at'] !== null): ?>
+                                                        <br><br><b>Your fee had already been paid.</b>
+                                                        Raise a refund with the Registrar's Office and quote <?= htmlspecialchars((string) ($r['request_id'] ?? '')) ?>.
+                                                    <?php endif; ?>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    <?php elseif ($isRejected): ?>
                                         <div class="block-banner" style="margin-bottom:12px;">
                                             <div class="banner-icon"><i class="fa-solid fa-xmark"></i></div>
                                             <div>
@@ -388,7 +535,7 @@ $claimed     = $counts['Claimed'];
                                         <?php if (!empty($r['quantity']) && (int) $r['quantity'] > 1): ?>
                                             <div style="font-size:12.5px;color:#475569;"><i class="fa-solid fa-copy"></i> <b>Qty:</b> <?= (int) $r['quantity'] ?></div>
                                         <?php endif; ?>
-                                        <?php if ($r['document_status'] === 'Ready' && $r['fulfillment_type'] === 'Pickup'): ?>
+                                        <?php if ($r['document_status'] === 'Ready'): ?>
                                             <div style="font-size:12.5px;color:#16a34a;"><i class="fa-solid fa-store"></i> <b>Ready for pickup</b> at the Registrar's Office.</div>
                                         <?php endif; ?>
                                         <?php if ($payable): ?>
@@ -496,22 +643,20 @@ $claimed     = $counts['Claimed'];
                 <p class="nq-hint" id="qtyHint">This document is charged per page.</p>
             </div>
             <div class="nq-field">
-                <?php // Fulfillment is no longer a question. The office runs
-                      // no courier and issues no emailed copy, so "Collect at
-                      // the office" was the only reachable answer among three
-                      // — and two of the three promised something the office
-                      // cannot do. A student choosing "Digital copy" would have
-                      // been told to expect an email the registrar has no way
-                      // to send. The choice is now a stated fact, sent as the
-                      // fixed value the API validates, exactly as the desk's
-                      // own form does it. ?>
+                <?php // Collection is no longer a question. The office runs
+                // no courier and issues no emailed copy, so "Collect at
+                // the office" was the only reachable answer among three
+                // - and two of the three promised something the office
+                // cannot do. A student choosing "Digital copy" would have
+                // been told to expect an email the registrar has no way
+                // to send. What is left is the fact stated plainly, with
+                // no field behind it: the API writes the column itself. ?>
                 <div class="nq-facts nq-facts--inline">
                     <div class="nq-fact nq-fact--box">
                         <span class="get-icon get-icon--counter"><i class="fa-solid fa-building-columns"></i></span>
                         <span><b>Collect at the registrar counter</b><small>On your student ID, once it is marked ready</small></span>
                     </div>
                 </div>
-                <input type="hidden" name="fulfillment_type" id="reqFulfillment" value="Pickup">
             </div>
 
             <div class="nq-field">
@@ -787,7 +932,7 @@ function updateFeePreview() {
 }
 document.getElementById('reqQty').addEventListener('input', updateFeePreview);
 
-// Fulfillment is fixed at Pickup, so there is nothing left to synchronise
+// The delivery cards are gone, so there is nothing left to synchronise
 // between a card and a field. What remains here is the one thing the fee
 // ticket's footnote has to keep true: it states when the student pays, and
 // that depends on the payment radio.
@@ -929,12 +1074,10 @@ document.getElementById('requestForm').addEventListener('submit', async function
         // had just clicked — the request was filed as paid at the counter
         // while the screen said GCash.
         //
-        // fulfillment_type and request_type are hidden fields carrying fixed
-        // values, so FormData already has them and they are not re-set here.
-        // delivery_address is gone entirely: with no courier there is nowhere
-        // to send one, and sending an empty string invited the API to store a
-        // blank address against a pickup request.
-        fd.set('payment_method', (document.querySelector('input[name="payment_method"]:checked') || {}).value || 'Online');
+        // request_type is a hidden field carrying a fixed value, so
+        // FormData already has it. fulfillment_type and delivery_address
+        // are gone entirely and are not re-added: the server records how
+        // a request is collected, not what the student typed.
         const res = await fetch('../api/student-documents.php', { method: 'POST', body: fd });
         const d = await res.json();
         if (d.success) { showToast(d.message, d.data && d.data.document_status === 'Pending_Clearance' ? 'warning' : 'success'); setTimeout(() => location.reload(), 900); }

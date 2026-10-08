@@ -19,7 +19,8 @@ Canonical schema is `registrar_ai.sql` (base dump) + `database/registrar_upgrade
 - [[academic_grades]] — per-subject grades under a history record *(Phase 1)*
 - [[health_records]] — medical profile (1:1)
 - [[health_visits]] — clinic visit timeline *(Phase 1)*
-- [[document_requests]] — document request lifecycle
+- [[document_requests]] - document request lifecycle
+- [[document_request_attachments]] - per-SKU upload checklist and the files against it
 - [[documents]] — uploaded files
 - [[rfid_cards]] — issued RFID/QR cards
 - [[student_ids]] — school/library/cafeteria IDs

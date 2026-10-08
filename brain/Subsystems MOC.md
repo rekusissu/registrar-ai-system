@@ -12,7 +12,7 @@ Map of the functional subsystems. Built from `database/registrar_upgrade.sql` (P
 - [[Guardian & Emergency Contact]] — family + emergency contacts
 - [[Academic History]] — Form 137 schooling record + per-subject grades
 - [[Health Records]] — medical profile + clinic visit timeline
-- [[Document Requests]] — form 137 / good moral / transcript / certificate / clearance workflow
+- [[Document Requests]] - the guided request wizard: document, details, uploads, review, payment, tracking
 - [[Digital File Storage]] — uploaded student documents
 - [[Masterlist Generation]] — cached section/course listings
 

@@ -51,32 +51,6 @@ document.addEventListener('DOMContentLoaded', function () {
         pink: '#db2777',
     };
 
-    // ─── PLUGIN · centre readout for the doughnut ─────────────
-    const doughnutCentre = {
-        id: 'doughnutCentre',
-        afterDraw(chart) {
-            const meta = chart.getDatasetMeta(0);
-            if (!meta || !meta.data.length) return;
-            const total = chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
-            const label = chart.$centreLabel || 'Requests';
-            const arc = meta.data[0];
-            const { x, y } = arc;
-            const ctx = chart.ctx;
-            const inner = arc.innerRadius || 40;
-            const big = Math.max(15, Math.min(32, inner * 0.5));
-            const small = Math.max(8, big * 0.34);
-            ctx.save();
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.font = '700 ' + big + "px 'Inter', sans-serif";
-            ctx.fillStyle = '#0f172a';
-            ctx.fillText(chart.$centreValue !== undefined ? chart.$centreValue : total, x, y - small * 0.9);
-            ctx.font = '600 ' + small + "px 'Inter', sans-serif";
-            ctx.fillStyle = '#94a3b8';
-            ctx.fillText(String(label).toUpperCase(), x, y + big * 0.48);
-            ctx.restore();
-        }
-    };
 
     // ─── 1. REVENUE BY DOCUMENT TYPE (bar) ────────────────────
     const revenueEl = document.getElementById('revenueChart');
@@ -267,65 +241,5 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // ─── 3. FULFILLMENT SPLIT (doughnut) ──────────────────────
-    const fulfillEl = document.getElementById('fulfillmentChart');
-    if (fulfillEl) {
-        const labels = getData(fulfillEl, 'labels');
-        const data = getData(fulfillEl, 'data');
-        const total = parseInt(fulfillEl.dataset.total || '0', 10) || 0;
-        const has = hasData(data);
-        const colors = [c.green, c.lightBlue, c.purple];
-
-        const chart = new Chart(fulfillEl.getContext('2d'), {
-            type: 'doughnut',
-            plugins: [doughnutCentre],
-            data: {
-                labels: has ? labels : ['No Data'],
-                datasets: [{
-                    data: has ? data : [1],
-                    backgroundColor: has ? colors : ['#eef2f7'],
-                    borderWidth: 0,
-                    borderRadius: has ? 6 : 0,
-                    spacing: has ? 3 : 0,
-                    hoverOffset: 6,
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: '76%',
-                layout: { padding: { top: 4, bottom: 4 } },
-                animation: { duration: 900, easing: 'easeOutQuart' },
-                plugins: {
-                    legend: {
-                        position: 'bottom',
-                        labels: {
-                            padding: 16,
-                            boxWidth: 7,
-                            boxHeight: 7,
-                            usePointStyle: true,
-                            pointStyle: 'circle',
-                            font: { size: 11, weight: '600' },
-                            color: '#64748b'
-                        }
-                    },
-                    tooltip: Object.assign({}, tooltipStyle, {
-                        callbacks: {
-                            label: function (context) {
-                                if (!has) return 'No data available';
-                                const t = context.dataset.data.reduce((a, b) => a + b, 0);
-                                const pct = t > 0 ? ((context.parsed / t) * 100).toFixed(1) : 0;
-                                return context.label + ' · ' + context.parsed + ' · ' + pct + '%';
-                            }
-                        }
-                    })
-                }
-            }
-        });
-
-        chart.$centreValue = has ? total : '—';
-        chart.$centreLabel = has ? 'Total' : 'No data';
-        chart.update('none');
-    }
 
 });

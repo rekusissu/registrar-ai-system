@@ -1,16 +1,17 @@
 /* ============================================================
    CSS/DOCUMENTS.CSS
    Document Request Module v2 — status pills, catalog cards,
-   workflow timeline, block banner, payment modal, delivery card.
+   workflow timeline, block banner, payment modal.
    Loaded only on the two documents pages ($extra_css).
    ============================================================ */
 
 /* ── Status pills (document_status vocabulary) ────────────────── */
 /* Online lifecycle, restored 2026-10-02:
-      Awaiting_Payment → Filed → Processing → Ready → [Shipped] → Claimed
-   Awaiting_Payment only appears for a request paid through the gateway;
-   Shipped only for a courier one. A counter-paid, pickup-only request
-   never enters either, so neither colour is seen on a walk-in row. */
+      Awaiting_Payment → Filed → Processing → Ready → → Claimed
+   Awaiting_Payment only appears for a request paid through the gateway.
+   There is no Shipped station: the courier leg is withdrawn. The status is
+   kept in doc_status_meta() only so a row already in the table can still be
+   rendered, and doc_stage_position() reports one at the Ready station. A
 .pill.pending-clearance { background: #fee2e2; color: #b91c1c; }
 .pill.awaiting-payment  { background: #fef3c7; color: #b45309; }
 .pill.filed             { background: #fef3c7; color: #b45309; }
@@ -20,12 +21,23 @@
 .pill.claimed           { background: #ccfbf1; color: #0f766e; }
 .pill.rejected          { background: #f1f5f9; color: #475569; }
 
+/* Added with the document-request wizard. Both are states the older
+   single-screen flow could not produce: a request the student started
+   and has not submitted, and one they withdrew. */
+.pill.draft {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px dashed #cbd5e1;
+}
+
+.pill.cancelled {
+  background: #f8fafc;
+  color: #94a3b8;
+  border: 1px solid #e2e8f0;
+}
+
 /* Request type / fulfillment chips */
-.chip.express  { background: #dbeafe; color: #1d4ed8; }
 .chip.regular  { background: #f1f5f9; color: #475569; }
-.chip.digital  { background: #e0f2fe; color: #0369a1; }
-.chip.courier  { background: #ede9fe; color: #6d28d9; }
-.chip.pickup   { background: #dcfce7; color: #15803d; }
 
 /* ── Block notification banner ────────────────────────────────── */
 .block-banner {
@@ -117,24 +129,6 @@
 .timeline li .tl-note { color: #64748b; font-size: 12px; margin-top: 1px; }
 .timeline li .tl-when { color: #94a3b8; font-size: 11px; margin-top: 2px; }
 
-/* ── Delivery card ────────────────────────────────────────────── */
-.delivery-card {
-    background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 12px;
-    padding: 12px 14px; margin-top: 10px; display: flex; gap: 12px; align-items: center;
-}
-.delivery-card .dl-icon {
-    width: 38px; height: 38px; border-radius: 10px; flex: 0 0 auto;
-    background: #ede9fe; color: #6d28d9; display: flex; align-items: center;
-    justify-content: center; font-size: 16px;
-}
-.delivery-card .dl-line { font-size: 12.5px; color: #334155; line-height: 1.5; }
-.delivery-card .dl-line b { color: #1e293b; }
-
-/* ── Payment / gateway modal ──────────────────────────────────── */
-.pay-gateway {
-    background: linear-gradient(135deg, #1e3a8a, #2563eb);
-    border-radius: 14px; color: #fff; padding: 18px; margin: 4px 0 14px;
-}
 .pay-gateway .pay-brand { font-size: 12px; opacity: .85; letter-spacing: .02em; }
 .pay-gateway .pay-amount { font-size: 26px; font-weight: 800; margin-top: 4px; }
 .pay-gateway .pay-row { display: flex; justify-content: space-between; font-size: 12.5px; margin-top: 8px; opacity: .92; }
@@ -231,8 +225,6 @@
     width: 34px; height: 34px; border-radius: 10px; font-size: 14px;
 }
 .get-icon--counter { background: #dbeafe; color: #1d4ed8; }
-.get-icon--courier { background: #ede9fe; color: #6d28d9; }
-.get-icon--digital { background: #e0f2fe; color: #0369a1; }
 .get-icon--online  { background: #dcfce7; color: #15803d; }
 .get-text { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .get-text b { font-weight: 650; font-size: 12.5px; color: #1e293b; line-height: 1.25; }

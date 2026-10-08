@@ -73,6 +73,7 @@ try {
            LEFT JOIN students s ON dr.student_id = s.id
            LEFT JOIN users uv ON uv.id = dr.payment_receipt_verified_by
            LEFT JOIN users uw ON uw.id = dr.payment_receipt_waived_by
+          WHERE dr.document_status <> 'Draft'
           ORDER BY dr.id DESC"
     );
 
@@ -104,6 +105,52 @@ try {
             $eventsByRequest[(int) $ev['request_id']][] = $ev;
         }
     }
+
+    // ── What the student uploaded ────────────────────────────────
+    //
+    // The wizard collects the requirement files and the desk could not
+    // see a single one of them: the page had no reference to
+    // document_request_attachments at all. A clerk was told "ask the
+    // student to bring a school ID" for a request where the student had
+    // already photographed and uploaded one, which is the one question
+    // the upload step exists to answer.
+    //
+    // Fetched in ONE query for every row, not one per request: the desk
+    // reloads on every filter keystroke, and a per-row query turns a
+    // twelve-row table into twelve extra round trips.
+    $attachmentsByRequest = [];
+    if ($requests && db_table_exists('document_request_attachments')) {
+        $ids = array_map('intval', array_column($requests, 'id'));
+        $ph  = implode(',', array_fill(0, count($ids), '?'));
+        foreach ($db->fetchAll(
+            "SELECT id, request_id, requirement_code, original_name, file_path,
+                    mime_type, size_bytes, uploaded_at
+               FROM document_request_attachments
+              WHERE request_id IN ($ph)
+              ORDER BY uploaded_at ASC, id ASC",
+            $ids
+        ) as $att) {
+            $attachmentsByRequest[(int) $att['request_id']][] = $att;
+        }
+    }
+
+    // The per-SKU checklist, also in one pass, so the desk can say which
+    // items are STILL outstanding rather than only what arrived.
+    $checklistByCatalog = [];
+    if (db_table_exists('document_type_requirements')) {
+        foreach ($db->fetchAll(
+            "SELECT catalog_id, code, label, is_required
+               FROM document_type_requirements
+              WHERE is_active = 1
+              ORDER BY catalog_id ASC, sort_order ASC, id ASC"
+        ) as $req) {
+            $checklistByCatalog[(int) $req['catalog_id']][] = [
+                'code'        => (string) $req['code'],
+                'label'       => (string) $req['label'],
+                'is_required' => (int) $req['is_required'] === 1,
+            ];
+        }
+    }
 } catch (Throwable $e) {
     $deskLoadError = $e->getMessage();
     error_log('[documents] desk load failed: ' . $deskLoadError);
@@ -117,8 +164,55 @@ foreach ($requests as &$r) {
     $r['balance']  = $balanceByStudent[(int) ($r['student_id'] ?? 0)] ?? 0.0;
     $r['_blocker'] = doc_blocker($r);
     $r['_age']     = doc_age($r);
+
+    // The paperwork the student supplied, and what is still missing.
+    //
+    // Derived HERE rather than by calling doc_requirement_state() per
+    // row, because that helper runs its own query per request. The desk
+    // already has both lists in memory from the two batched queries
+    // above, so this is arithmetic over them - and the arithmetic is
+    // the same one the helper does, which is why the desk and the
+    // student's own wizard agree on what is outstanding.
+    $rid  = (int) $r['id'];
+    $atts = $attachmentsByRequest[$rid] ?? [];
+
+    // Counted per CHECKLIST ITEM, never per file. A request can carry
+    // loose files from the dropzone that belong to no item, and letting
+    // those satisfy a requirement would tick a box on an unrelated
+    // photograph.
+    $haveByCode = [];
+    foreach ($atts as $a) {
+        $code = (string) ($a['requirement_code'] ?? '');
+        if ($code !== '') {
+            $haveByCode[$code] = ($haveByCode[$code] ?? 0) + 1;
+        }
+    }
+
+    $missingItems = [];
+    foreach ($checklistByCatalog[(int) ($r['catalog_id'] ?? 0)] ?? [] as $item) {
+        if ($item['is_required'] && (int) ($haveByCode[$item['code']] ?? 0) === 0) {
+            $missingItems[] = $item['label'];
+        }
+    }
+
+    $r['_attachments'] = $atts;
+    $r['_missing']      = $missingItems;
+    // "Awaiting paperwork" is a true statement about a FILISHED request
+    // with required items outstanding, and the single most useful thing
+    // to surface on a queue: it is the request that will bounce at the
+    // counter if nobody chases it.
+    $r['_awaiting']     = $missingItems !== []
+        && in_array((string) $r['document_status'], ['Filed', 'Pending_Clearance', 'Awaiting_Payment', 'Processing'], true);
 }
 unset($r);
+
+// Desk-wide counts for the tiles, from the same derivation.
+$awaitingPaperwork = 0;
+$uploadedTotal     = 0;
+foreach ($requests as $r) {
+    if (!empty($r['_awaiting'])) $awaitingPaperwork++;
+    $uploadedTotal += count($r['_attachments'] ?? []);
+}
 
 // -- Read retired event wording in the current language ---------
 //
@@ -185,6 +279,13 @@ foreach ($requests as $r) {
         else $balanceHoldCount++;
     }
     if (!empty($r['_age']['overdue'])) $overdueCount++;
+    // The three the desk can actually work on today.
+    //
+    // NOT doc_actionable_statuses(), which also lists Awaiting_Payment:
+    // that one is waiting on the STUDENT, and api/documents.php refuses
+    // to start work on it until the receipt is checked. Counting it
+    // would put a number on the desk that said the office was behind on
+    // requests nobody had paid for yet.
     if (in_array((string) $r['document_status'], ['Filed', 'Pending_Clearance', 'Processing'], true)) {
         $needsAction++;
     }
@@ -198,7 +299,9 @@ foreach ($requests as $r) {
 
 $tatHours = $db->fetchColumn(
     "SELECT AVG(TIMESTAMPDIFF(HOUR, paid_at, ready_at))
-       FROM document_requests WHERE ready_at IS NOT NULL AND paid_at IS NOT NULL"
+       FROM document_requests
+      WHERE ready_at IS NOT NULL AND paid_at IS NOT NULL
+        AND document_status <> 'Draft'"
 );
 $tatHours = $tatHours !== null ? round((float) $tatHours, 1) : null;
 
@@ -209,7 +312,7 @@ $revenueRows = $db->fetchAll(
             SUM(dr.fee_amount) AS revenue, COUNT(*) AS cnt
        FROM document_requests dr
        LEFT JOIN document_catalog c ON c.id = dr.catalog_id
-      WHERE dr.document_status <> 'Rejected'
+      WHERE dr.document_status NOT IN ('Rejected', 'Cancelled', 'Draft')
         AND COALESCE(dr.paid_at, dr.request_date) BETWEEN ? AND ?
       GROUP BY c.id, dr.document_type ORDER BY revenue DESC",
     [$from . ' 00:00:00', $to . ' 23:59:59']
@@ -229,12 +332,21 @@ $revenueTotal = array_sum(array_map(fn($r) => (float) $r['revenue'], $revenueRow
 // we keep up? Each day stacks the work that has been settled against the
 // work still open, and the outstanding remainder is the backlog. One
 // series carries meaning on every day, including the empty ones.
+// A Draft is excluded entirely, and a Cancelled request counts as
+// SETTLED rather than outstanding.
+//
+// Both exclusions are about the same thing: this chart answers "did we
+// keep up?", and neither an abandoned form nor a withdrawn request is
+// work the office owes. A draft counted as outstanding is the worst of
+// the three errors available here - it would report a backlog nobody
+// has asked for, on a day the desk was fully caught up.
 $volumeRows = $db->fetchAll(
     "SELECT DATE(request_date) AS d,
-            SUM(CASE WHEN document_status IN ('Claimed','Rejected') THEN 1 ELSE 0 END) AS settled,
-            SUM(CASE WHEN document_status IS NULL OR document_status NOT IN ('Claimed','Rejected') THEN 1 ELSE 0 END) AS outstanding
+            SUM(CASE WHEN document_status IN ('Claimed','Rejected','Cancelled') THEN 1 ELSE 0 END) AS settled,
+            SUM(CASE WHEN document_status IN ('Filed','Pending_Clearance','Awaiting_Payment','Processing','Ready','Shipped') THEN 1 ELSE 0 END) AS outstanding
        FROM document_requests
       WHERE request_date >= ?
+        AND document_status <> 'Draft'
       GROUP BY DATE(request_date)",
     [date('Y-m-d', strtotime('-6 days')) . ' 00:00:00']
 );
@@ -275,29 +387,24 @@ $students  = $db->fetchAll(
       ORDER BY name"
 );
 
-$statusPill = [
-    // A student who chose GCash lands here and stays until the receipt is
-    // checked. It is given a real pill rather than falling through to the
-    // 'filed' default, which made an unpaid request look filed on the desk.
-    'Awaiting_Payment'  => ['awaiting-payment', 'fa-clock'],
-    'Pending_Clearance' => ['pending-clearance','fa-triangle-exclamation'],
-    'Filed'             => ['filed','fa-folder-open'],
-    'Processing'        => ['processing','fa-gear'],
-    'Ready'             => ['ready','fa-circle-check'],
-    'Claimed'           => ['claimed','fa-box-check'],
-    'Rejected'          => ['rejected','fa-xmark'],
-];
-$statusLabel = [
-    // "Waiting on payment", not the raw enum and not "Awaiting Payment":
-    // it is what the row is, in the words the person reading it uses.
-    'Awaiting_Payment'  => 'Waiting on payment',
-    'Pending_Clearance' => 'Pending Clearance',
-    'Filed'             => 'Filed',
-    'Processing'        => 'Being prepared',
-    'Ready'             => 'Ready for collection',
-    'Claimed'           => 'Claimed',
-    'Rejected'          => 'Rejected',
-];
+// Read from shared/doc_wizard.php rather than kept here, because this
+// was the second hand-written copy of the status vocabulary and the two
+// had already drifted: the desk knew about Awaiting_Payment and the
+// student list did not. Adding Draft and Cancelled to a third copy
+// would have fixed one portal and broken the other.
+//
+// The desk's own wording is kept where it differs on purpose:
+// "Waiting on payment" rather than "Awaiting payment", because that is
+// what a clerk says at a counter.
+require_once __DIR__ . '/../shared/doc_wizard.php';
+$statusPill = [];
+$statusLabel = [];
+foreach (doc_status_meta() as $key => $meta) {
+    $statusPill[$key] = [$meta['pill'], $meta['icon']];
+    $statusLabel[$key] = $meta['label'];
+}
+$statusLabel['Awaiting_Payment']  = 'Waiting on payment';
+$statusLabel['Pending_Clearance'] = 'Pending Clearance';
 $catIcon = [
     'DOC-TOR'     => ['linear-gradient(135deg,#2563eb,#1d4ed8)','fa-file-invoice'],
     'DOC-COE'     => ['linear-gradient(135deg,#16a34a,#15803d)','fa-certificate'],
@@ -310,10 +417,10 @@ $catIcon = [
 
 $page_title = 'Document Requests';
 $page_description = 'Document requests, workflow actions, and performance metrics';
-$body_page = 'documents';
+$body_page = 'docket-desk';   // scopes css/docket.css
 $APP_ROOT = '../';
 $ACTIVE_NAV = 'documents';
-$extra_css = ['documents.css'];
+$extra_css = ['documents.css', 'docket.css'];
 $use_chart = true;
 // Loads js/documents.js, which builds the revenue and daily-volume
 // charts from the canvases' data-attributes.
@@ -343,10 +450,10 @@ if ($deskLoadError !== null) {
     http_response_code(500);
     $page_title       = 'Document Requests';
     $page_description = 'Document requests, workflow actions, and performance metrics';
-    $body_page        = 'documents';
+    $body_page        = 'docket-desk';   // scopes css/docket.css
     $APP_ROOT         = '../';
     $ACTIVE_NAV       = 'documents';
-    $extra_css        = ['documents.css'];
+    $extra_css        = ['documents.css', 'docket.css'];
     $deskErrorDetail  = $deskLoadError;
     unset($use_chart, $page_scripts);
     include '../includes/header.php';
@@ -825,6 +932,58 @@ tr.is-blocked>td:first-child{box-shadow:inset 3px 0 0 #f59e0b}
 .dq-bring i{margin-top:2px;font-size:10px;color:#94a3b8;flex:0 0 auto}
 .dq-clear i{color:#22c55e}
 
+/* -- Outstanding paperwork, on the row ------------------------
+   Amber rather than red: it is an ask, not a fault. The same
+   reasoning as .dq-bring above, and the same reason it is a separate
+   class from .is-blocked - this request is fully workable, the student
+   simply has not sent the paper yet. */
+.dq-awaiting{margin-top:6px;font-size:11px;font-weight:700;color:#b45309;display:flex;align-items:center;gap:5px;line-height:1.45}
+.dq-awaiting i{font-size:10px;flex:0 0 auto}
+.dq-awaiting.is-clear{color:#15803d;font-weight:600}
+
+/* -- The student's own note ---------------------------------- */
+.dq-note{margin-top:6px;padding:8px 10px;border-left:3px solid #cbd5e1;background:#f8fafc;border-radius:0 7px 7px 0;font-size:12px;line-height:1.6;color:#334155}
+.dq-note.is-cancel{border-left-color:#fca5a5;background:#fef2f2;color:#7f1d1d}
+.dq-note code{font-size:11px}
+
+/* -- Paperwork panel ---------------------------------------- */
+.dq-paper{margin-top:12px;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;background:#fff}
+.dq-paper-head{display:flex;align-items:center;gap:8px;padding:9px 14px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:12px;color:#334155}
+.dq-paper-head i{color:#64748b;font-size:11px}
+
+.dq-check{display:flex;flex-direction:column}
+.dq-check-row{display:flex;align-items:center;gap:9px;padding:8px 14px;border-bottom:1px solid #f1f5f9;font-size:12px;flex-wrap:wrap}
+.dq-check-row:last-child{border-bottom:0}
+.dq-check-row.is-optional{background:#fcfcfd}
+.dq-check-mark{flex:0 0 auto;width:16px;height:16px;border-radius:50%;display:grid;place-items:center;font-size:7px;color:#fff;background:#e2e8f0}
+.dq-check-row.is-met .dq-check-mark{background:#16a34a}
+.dq-check-label{flex:1 1 190px;min-width:0;color:#1e293b}
+.dq-check-row:not(.is-met) .dq-check-label{color:#64748b}
+.dq-check-missing{flex:0 0 auto;font-size:10.5px;color:#b45309;font-weight:700}
+/* An optional item nobody sent. Deliberately NOT amber: amber here
+   means "chase the student for this", and there is nothing to chase -
+   the item said it was optional. */
+.dq-check-skipped{flex:0 0 auto;font-size:10.5px;color:#94a3b8;font-style:italic}
+
+/* A photograph of a school ID is worth more as a thumbnail than as a
+   filename, so images render inline at a size where the name and number
+   are legible. Everything else stays a link. */
+.dq-file{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;color:#334155;font-size:11px;text-decoration:none;max-width:230px}
+.dq-file:hover{border-color:#93c5fd;background:#eff6ff;color:#1d4ed8}
+.dq-file i{font-size:11px;color:#dc2626;flex:0 0 auto}
+.dq-file-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dq-file.is-img{padding:3px}
+/* 54px, not the 38px this started at. The point of the thumbnail is
+   that a clerk recognises a school ID at a glance without opening it -
+   and at 38px the photo is a face-sized blob with no number legible,
+   which fails the actual job. It stays small next to the FILENAME,
+   which is the detail it is not replacing. */
+.dq-file.is-img img{width:54px;height:54px;object-fit:cover;border-radius:5px;display:block}
+
+.dq-loose{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:9px 14px;border-top:1px dashed #e2e8f0;background:#fcfcfd}
+.dq-loose-label{font-size:11px;color:#64748b;font-weight:600}
+.rq-optional{font-size:9.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#94a3b8;margin-left:6px;padding:1px 5px;border:1px solid #e2e8f0;border-radius:4px}
+
 /* Blocked rows recede slightly: the work still matters, but it is
    not the next thing to do. Contrast is never reduced below legible
    ? these are the rows most likely to be scrolled past. */
@@ -973,14 +1132,19 @@ tr.is-blocked:hover{background:#fffbeb}
             <?php // The value is the raw status, because applyFilters() compares it
                   // against tr.dataset.status, which is also the raw status.
                   // The TEXT is the plain-language label, so the enum never
-                  // reaches the screen. ?>
-            <option value="Awaiting_Payment">Waiting on payment</option>
-            <option value="Filed">Filed</option>
-            <option value="Pending_Clearance">Pending Clearance</option>
-            <option value="Processing">Being prepared</option>
-            <option value="Ready">Ready for collection</option>
-            <option value="Claimed">Claimed</option>
-            <option value="Rejected">Rejected</option>
+                  // reaches the screen.
+                  //
+                  // Rendered from doc_status_meta() so a status added to the
+                  // enum cannot be missing from this list - which is how
+                  // Shipped became undrawable on the desk while the column
+                  // existed. Draft is absent on purpose: drafts are the
+                  // student's own unfinished form and are excluded from this
+                  // query entirely, so offering the filter would be a dead
+                  // option that always returns nothing. ?>
+            <?php foreach ($statusLabel as $k => $label): ?>
+                <?php if ($k === 'Draft') { continue; } ?>
+                <option value="<?= htmlspecialchars((string) $k) ?>"><?= htmlspecialchars($label) ?></option>
+            <?php endforeach; ?>
         </select>
         <select id="waitFilter" onchange="applyFilters()" aria-label="Filter by what a request is waiting on">
             <option value="">Anything</option>
@@ -994,11 +1158,18 @@ tr.is-blocked:hover{background:#fffbeb}
     <div class="table-responsive" style="overflow-x:auto;">
     <table class="table">
         <thead>
-            <tr><th>Student</th><th>Request</th><th>Waiting on</th><th>Turnaround</th><th style="text-align:right;">Action</th></tr>
+            <tr>
+                <th>Student</th>
+                <th>Request</th>
+                <th>Status</th>
+                <th>Waiting on</th>
+                <th>Turnaround</th>
+                <th style="text-align:right;">Action</th>
+            </tr>
         </thead>
         <tbody>
             <?php if (empty($requests)): ?>
-                <tr><td colspan="5" class="empty-state"><div class="dq-empty"><i class="fas fa-file-lines"></i><p>No document requests found</p><span>Requests appear here once a student or the registrar submits one.</span></div></td></tr>
+                <tr><td colspan="6" class="empty-state"><div class="dq-empty"><i class="fas fa-file-lines"></i><p>No document requests found</p><span>Requests appear here once a student or the registrar submits one.</span></div></td></tr>
             <?php else: foreach ($requests as $r):
                 $pill = $statusPill[$r['document_status']] ?? ['filed','fa-folder-open'];
                 $label = $statusLabel[$r['document_status']] ?? str_replace('_', ' ', $r['document_status']);
@@ -1197,6 +1368,21 @@ tr.is-blocked:hover{background:#fffbeb}
                         </div>
                         </div>
                     </td>
+                    <?php // The stamp: state, in two words, in the ink
+                          // that matches what should be done about it. Read from the
+                          // same doc_status() the student's row uses, so the two
+                          // portals cannot drift apart. ?>
+                    <td>
+                        <?php $dkStamp = doc_status($st); ?>
+                        <span class="dk-stamp<?= !empty($dkStamp['terminal']) ? ' is-final' : '' ?>"
+                              data-s="<?= htmlspecialchars($dkStamp['ink']) ?>">
+                            <span><?= htmlspecialchars($dkStamp['stamp']) ?></span></span>
+                        <?php if ($blocker && $heldDays !== null): ?>
+                            <span class="dk-ledger-sub">held <?= $heldDays < 1
+                                ? 'since this morning'
+                                : 'for ' . doc_age_label(['days' => $heldDays, 'hours' => 0]) ?></span>
+                        <?php endif; ?>
+                    </td>
                     <!-- What this request is waiting on, and since when. The
                          column that did not exist before, and the reason a
                          three-day request stopped looking identical to a
@@ -1249,6 +1435,24 @@ tr.is-blocked:hover{background:#fffbeb}
                               // actionable. ?>
                         <?php if ($needsNote): ?>
                             <div class="dq-bring"><i class="fa-solid fa-file-import" aria-hidden="true"></i> Bring: <?= htmlspecialchars($needsNote) ?></div>
+                        <?php endif; ?>
+                        <?php // Outstanding paperwork, from the wizard's own
+                              // checklist. Distinct from the note above: that
+                              // is a free-text ask the desk writes, this is a
+                              // count the SYSTEM knows is missing - so it can
+                              // be filtered and counted, which is what makes a
+                              // queue of them actionable rather than a note
+                              // nobody can search for. ?>
+                        <?php if (!empty($r['_awaiting'])): ?>
+                            <div class="dq-awaiting">
+                                <i class="fa-solid fa-file-circle-exclamation" aria-hidden="true"></i>
+                                <?= count($r['_missing']) ?> requirement<?= count($r['_missing']) === 1 ? '' : 's' ?> outstanding
+                            </div>
+                        <?php elseif (!empty($r['_attachments'])): ?>
+                            <div class="dq-awaiting is-clear">
+                                <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                                Paperwork received
+                            </div>
                         <?php endif; ?>
                     </td>
 
@@ -1385,7 +1589,179 @@ tr.is-blocked:hover{background:#fffbeb}
                                 <?php if (!empty($r['ready_at'])): ?><div><strong>Ready:</strong> <?= date('M d, Y h:i A', strtotime($r['ready_at'])) ?></div><?php endif; ?>
                                 <?php if (!empty($r['claimed_at'])): ?><div><strong>Claimed:</strong> <?= date('M d, Y h:i A', strtotime($r['claimed_at'])) ?><?= !empty($r['official_receipt']) ? ' &middot; Receipt ' . htmlspecialchars($r['official_receipt']) : '' ?></div><?php endif; ?>
                                 <?php if (!empty($r['release_date'])): ?><div><strong>Release Date:</strong> <?= htmlspecialchars($r['release_date']) ?></div><?php endif; ?>
-                            </div>
+
+                                <?php // ── What the student told us ──────────────────────
+                                      // The wizard collects a controlled purpose, a
+                                      // free-text reason, optional notes and a
+                                      // payment reference. None of it was
+                                      // displayed here, so a clerk asking "why
+                                      // do they need a TOR, and where is it going?"
+                                      // had to phone the student.
+                                      //
+                                      // Rendered only when there is something to
+                                      // say. A panel of six "—" lines teaches a
+                                      // clerk nothing and buries the fields that
+                                      // are actually filled in. ?>
+                                <?php
+                                $purposeLabel = '';
+                                foreach (doc_purposes() as $p) {
+                                    if ($p['code'] === ($r['purpose_code'] ?? null)) { $purposeLabel = $p['label']; }
+                                }
+                                $payLabel = match ((string) ($r['payment_method'] ?? 'Counter')) {
+                                    'Online'        => 'GCash',
+                                    'Bank_Transfer' => 'Bank transfer',
+                                    default         => 'Paid at the counter',
+                                };
+                                ?>
+                                <div class="dq-fields">
+                                    <div><strong>Filed via:</strong> <?= ($r['source'] ?? 'walk_in') === 'online' ? 'Online (student portal)' : 'Walk-in at the counter' ?></div>
+                                    <div><strong>Payment channel:</strong> <?= htmlspecialchars($payLabel) ?></div>
+                                    <?php if ($purposeLabel !== ''): ?>
+                                        <div><strong>Purpose (stated):</strong> <?= htmlspecialchars($purposeLabel) ?></div>
+                                    <?php endif; ?>
+                                    <?php if (!empty($r['notes'])): ?>
+                                        <?php // The student's own words about this request.
+                                              // Quoted, not summarised, and given its
+                                              // own line - it is frequently the only
+                                              // thing on the record that explains an
+                                              // unusual request. ?>
+                                        <div class="dq-note"><strong>Their note:</strong> <?= nl2br(htmlspecialchars((string) $r['notes'])) ?></div>
+                                    <?php endif; ?>
+                                    <?php if (!empty($r['payment_reference'])): ?>
+                                        <div><strong>Payment reference:</strong> <code><?= htmlspecialchars((string) $r['payment_reference']) ?></code>
+                                            <?php if (($r['payment_method'] ?? '') === 'Bank_Transfer' && empty($r['paid_at'])): ?>
+                                                <span style="color:#b45309;">&middot; not yet confirmed paid</span>
+                                            <?php endif; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                    <?php if (!empty($r['estimated_release_at'])): ?>
+                                        <?php // The date the STUDENT was shown. It was
+                                              // written once at filing so it could be
+                                              // quoted at the counter, which means the
+                                              // desk is being held to it. ?>
+                                        <div><strong>Promised to student:</strong> <?= htmlspecialchars(doc_release_label($r['estimated_release_at'])) ?></div>
+                                    <?php endif; ?>
+                                    <?php if ((string) $r['document_status'] === 'Cancelled'): ?>
+                                        <div class="dq-note is-cancel"><strong>Cancelled by the student<?= !empty($r['cancelled_at']) ? ' on ' . htmlspecialchars(date('M d, Y', strtotime((string) $r['cancelled_at']))) : '' ?>:</strong>
+                                            <?= htmlspecialchars((string) ($r['cancellation_reason'] ?? 'No reason given.')) ?>
+                                            <?php if (!empty($r['paid_at'])): ?>
+                                                <br><b>Fee was already paid</b> &mdash; a refund has to be raised manually.
+                                            <?php endif; ?>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+
+                                <?php // ── Paperwork ──────────────────────────────────────
+                                      // The uploads the student made, and what is
+                                      // still outstanding. This is the panel the desk
+                                      // was missing entirely.
+                                      //
+                                      // Images render inline so a school ID can be
+                                      // checked at a glance; everything else gets a
+                                      // download link. The links go through the
+                                      // authorisation-gated endpoint rather than the
+                                      // uploads path, so the file is never directly
+                                      // web-reachable. ?>
+                                <?php
+                                $atts   = $r['_attachments'] ?? [];
+                                $miss   = $r['_missing'] ?? [];
+                                $checkl = $checklistByCatalog[(int) ($r['catalog_id'] ?? 0)] ?? [];
+                                $byCode = [];
+                                foreach ($atts as $a) {
+                                    $c = (string) ($a['requirement_code'] ?? '');
+                                    if ($c !== '') { $byCode[$c][] = $a; }
+                                }
+                                ?>
+                                <div class="dq-paper">
+                                    <div class="dq-paper-head">
+                                        <i class="fa-solid fa-paperclip" aria-hidden="true"></i>
+                                        <b>Paperwork</b>
+                                        <?php if ($miss): ?>
+                                            <span class="rq-pill is-none"><?= count($miss) ?> outstanding</span>
+                                        <?php elseif (count($atts)): ?>
+                                            <span class="rq-pill is-verified">All received</span>
+                                        <?php else: ?>
+                                            <span class="rq-pill is-none">Nothing required</span>
+                                        <?php endif; ?>
+                                    </div>
+
+                                    <?php if ($checkl): ?>
+                                    <div class="dq-check">
+                                        <?php foreach ($checkl as $item):
+                                            $files = $byCode[$item['code']] ?? [];
+                                            $met   = count($files) > 0;
+                                        ?>
+                                        <div class="dq-check-row<?= $met ? ' is-met' : '' ?><?= !$item['is_required'] ? ' is-optional' : '' ?>">
+                                            <span class="dq-check-mark"><i class="fa-solid <?= $met ? 'fa-check' : 'fa-minus' ?>"></i></span>
+                                            <span class="dq-check-label">
+                                                <?= htmlspecialchars($item['label']) ?>
+                                                <?php if (!$item['is_required']): ?><span class="rq-optional">optional</span><?php endif; ?>
+                                            </span>
+                                            <?php if ($met): ?>
+                                                <?php foreach ($files as $f):
+                                                    $isImg = (bool) preg_match('#^image/#', (string) ($f['mime_type'] ?? ''));
+                                                    $url   = app_url('/api/file-download.php?kind=attachment&attachment=' . (int) $f['id']);
+                                                ?>
+                                                <a class="dq-file<?= $isImg ? ' is-img' : '' ?>" href="<?= htmlspecialchars($url) ?>"
+                                                   target="_blank" rel="noopener"
+                                                   title="<?= htmlspecialchars((string) $f['original_name']) ?> — <?= number_format((int) $f['size_bytes'] / 1024, 0) ?> KB">
+                                                    <?php if ($isImg): ?>
+                                                        <img src="<?= htmlspecialchars($url) ?>" alt="<?= htmlspecialchars($item['label']) ?>">
+                                                    <?php else: ?>
+                                                        <i class="fa-solid fa-file-pdf"></i>
+                                                    <?php endif; ?>
+                                                    <span class="dq-file-name"><?= htmlspecialchars((string) $f['original_name']) ?></span>
+                                                </a>
+                                                <?php endforeach; ?>
+                                            <?php else: ?>
+                                                <?php // An OPTIONAL item nobody supplied is not
+                                                      // a shortfall. It used to say so in
+                                                      // amber, the same colour as a genuinely
+                                                      // required document, which made a settled
+                                                      // request look like it was still waiting
+                                                      // on two things when it was waiting on
+                                                      // none - and contradicted the "ask the
+                                                      // student to bring" line below, which
+                                                      // correctly lists only the required
+                                                      // ones. ?>
+                                                <span class="<?= $item['is_required'] ? 'dq-check-missing' : 'dq-check-skipped' ?>">
+                                                    <?= $item['is_required'] ? 'not supplied' : 'not needed' ?>
+                                                </span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <?php endforeach; ?>
+                                    </div>
+                                    <?php endif; ?>
+
+                                    <?php // Loose files from the dropzone: attached but
+                                          // tied to no checklist item. They still have
+                                          // to be visible - a student who uploaded an
+                                          // extra document is telling us something. ?>
+                                    <?php $loose = array_values(array_filter($atts, fn($a) => empty($a['requirement_code']))); ?>
+                                    <?php if ($loose): ?>
+                                        <div class="dq-loose">
+                                            <span class="dq-loose-label">Also attached:</span>
+                                            <?php foreach ($loose as $f):
+                                                $url = app_url('/api/file-download.php?kind=attachment&attachment=' . (int) $f['id']); ?>
+                                                <a class="dq-file" href="<?= htmlspecialchars($url) ?>" target="_blank" rel="noopener"
+                                                   title="<?= htmlspecialchars((string) $f['original_name']) ?>">
+                                                    <i class="fa-solid fa-paperclip"></i>
+                                                    <span class="dq-file-name"><?= htmlspecialchars((string) $f['original_name']) ?></span>
+                                                </a>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php endif; ?>
+
+                                    <?php if ($miss): ?>
+                                        <div class="rq-ask">
+                                            <b>Ask the student to bring:</b>
+                                            <?= htmlspecialchars(implode(', ', $miss)) ?>.
+                                            Nothing here blocks the request &mdash; the wizard does not hold
+                                            submissions for missing files &mdash; but a document handed over
+                                            without its clearance is a document the student will be back for.
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
                             <?php // The document itself. This was missing
                                   // entirely: the detail panel described the
                                   // request, but nothing on the desk ever
@@ -1477,7 +1853,7 @@ tr.is-blocked:hover{background:#fffbeb}
                                             <?php if (!empty($r['payment_receipt_filename'])): ?>
                                                 File: <span><?= htmlspecialchars($r['payment_receipt_filename']) ?></span><br>
                                             <?php endif; ?>
-                                            Amount claimed: <span>₱<?= number_format((float) ($r['fee_amount'] ?? 0) + (float) ($r['delivery_fee'] ?? 0), 2) ?></span>
+                                            Amount claimed: <span>₱<?= number_format((float) ($r['fee_amount'] ?? 0), 2) ?></span>
                                         </div>
                                         <?php if ($rcpt === 'waived'): ?>
                                             <div class="rq-waived-note">
@@ -1664,6 +2040,29 @@ tr.is-blocked:hover{background:#fffbeb}
                                         <option value="Original document not yet returned"></option>
                                     </datalist>
                                     <p class="nq-hint">Optional. Fill this in only if the desk genuinely cannot start. The request still works &mdash; this records why, and you can change or clear it later.</p>
+                                </div>
+
+                                <?php // Payment is the only choice left on this form. The
+                                // delivery select above it asked how the student would
+                                // receive the document and had exactly one honest answer,
+                                // because the office runs no courier and issues no emailed
+                                // copy. A one-option select is a field that takes up a row
+                                // to say nothing, and the courier fee it could add was the
+                                // one number in this form that changed the total. ?>
+                                <div class="nq-field">
+                                    <label for="nrPayment">How will they pay?</label>
+                                    <select name="payment_method" id="nrPayment" class="form-control">
+                                        <?php foreach (doc_payment_options() as $o): ?>
+                                            <option value="<?= htmlspecialchars($o['value']) ?>"
+                                                <?= $o['value'] === 'Counter' ? 'selected' : '' ?>>
+                                                <?= htmlspecialchars($o['label']) ?> &mdash; <?= htmlspecialchars($o['note']) ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    <p class="nq-hint" id="nrPaymentHint">
+                                        Paid at the counter: nothing is owed until the student collects, so the request is immediately workable.
+                                    </p>
+                                </div>
                                 </div>
                             </div>
                         </div>
@@ -1991,6 +2390,16 @@ function updateNrFee() {
     // without pushing the figure out of the ticket.
     const note = document.getElementById('nrFeePreview');
     const amount = document.getElementById('nrFeeAmount');
+
+
+    const paySel = document.getElementById('nrPayment');
+    const payHint = document.getElementById('nrPaymentHint');
+    if (paySel && payHint) {
+        payHint.textContent = paySel.value === 'Counter'
+            ? 'Paid at the counter: nothing is owed until the student collects, so the request is immediately workable.'
+            : 'Paid outside the office: the request waits in "Waiting on payment" until the money is confirmed here.';
+    }
+
     if (!opt || !opt.value) {
         amount.textContent = peso(0);
         note.textContent = 'Choose a document to see the fee';
@@ -2001,11 +2410,11 @@ function updateNrFee() {
     const fee = parseFloat(opt.dataset.fee || '0');
     const unit = opt.dataset.feeType === 'per_page' ? 'page'
                : opt.dataset.feeType === 'per_syllabus' ? 'syllabus' : '';
-    amount.textContent = peso(fee);
+    const total = fee;
+    amount.textContent = peso(total);
     amount.dataset.unit = unit ? 'per ' + unit : '';
-    note.textContent = unit
-        ? 'per ' + unit + ' \u00B7 take this when the student pays'
-        : 'take this when the student pays';
+    note.textContent = (unit ? 'per ' + unit : 'one-time')
+        + ' \u00B7 take this when the student pays';
     const req = opt.dataset.req;
     if (req) {
         document.getElementById('nrHint').textContent = req;
@@ -2025,7 +2434,6 @@ async function submitNewRequest(e) {
         student_id: document.getElementById('nrStudent').value,
         catalog_id: document.getElementById('nrCatalog').value,
         request_type: document.getElementById('nrPriority').value,
-        fulfillment_type: 'Pickup',
         // payment_method is what decides the request's opening status at the
         // API (api/student-documents.php:307-326). Left unset it defaults to
         // 'Online', which files the request at the stage where it waits for
@@ -2038,7 +2446,12 @@ async function submitNewRequest(e) {
         // modal posts JSON, so it goes in the payload instead - and it has to
         // be sent explicitly rather than left to the API default, because the
         // student standing at the counter is not waiting on a QR code.
-        payment_method: 'Counter',
+        //
+        // Read from the form rather than hardcoded. It used to be the
+        // literal 'Counter', which meant a clerk could not record an
+        // outside payment for a walk-in, and the request was filed saying
+        // something the office was not going to do.
+        payment_method: document.getElementById('nrPayment').value,
         purpose: document.getElementById('nrPurpose').value.trim(),
         // Empty means "nothing is holding this", which is the default and
         // the common case. Sent as an empty string rather than omitted so
@@ -2072,6 +2485,7 @@ async function submitNewRequest(e) {
         btn.innerHTML = '<i class="fa-solid fa-plus"></i> Add Request';
     }
 }
+
 
 // -- Process ----------------------------------------------------
 //

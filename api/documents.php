@@ -731,6 +731,9 @@ try {
                     // identifies it; it does not settle anything, and saying
                     // it does would put a second, later charge in front of a
                     // student who has already paid.
+                    //
+                    // Reachable from Ready only: there is no dispatch
+                    // leg between signing and handing over.
                     if ($cur !== 'Ready') {
                         echo json_encode(['success' => false, 'message' => 'Only requests marked ready can be claimed.']);
                         exit;
@@ -811,7 +814,9 @@ try {
             if ($studentId && $docLabel !== '') {
                 $notifyMap = [
                     'process' => ['Your document is being prepared', 'info'],
-                    'ready'   => ['Your document is ready for pickup', 'success'],
+                    'ready'   => ['Your document is ready', 'success'],
+                    // Two distinct messages, because the student's next
+                    // action genuinely differs: a pickup one says come
                     'reject'  => ['Your document request was rejected', 'error'],
                     'claim'   => ['Your document was released', 'success'],
                 ];
@@ -840,6 +845,9 @@ try {
             // pickup_notified_* columns arrived in a migration, so on a
             // database that has not been migrated this block must simply
             // do nothing rather than fatal on an unknown column.
+            // Every request is collected at the counter, so the gate is
+            // just the action: send the pickup note when a document is
+            // signed.
             if ($v2Action === 'ready') {
                 require_once __DIR__ . '/../shared/mail_client.php';
                 $pickup = ['sent' => 0, 'failed' => 0, 'recipients' => [], 'errors' => [], 'message' => 'Mail module unavailable.'];

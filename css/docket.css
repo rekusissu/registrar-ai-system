@@ -1,0 +1,1836 @@
+/* ============================================================
+   CSS/DOCKET.CSS
+   The document-request module, restyled as paperwork.
+
+   WHY A SEPARATE FILE, AND WHY IT IS SCOPED
+   ------------------------------------------
+   documents.css is shared with the registrar desk and with the
+   analytics pages. Overriding it from here would mean every rule
+   had to be defensible in three portals. So this file adds a
+   parallel layer, loaded LAST on the four document surfaces, and
+   everything is keyed off `body[data-page="docket-*"]`.
+
+   The scope is on BODY rather than on a wrapper class for one
+   reason: the page background has to change, and the body is
+   outside the page's own markup. `data-page` is already the
+   convention here - academic-history.css and status-tracker.css
+   both use it - so this follows a pattern rather than inventing
+   one.
+
+   THE IDEA
+   --------
+   A registrar's office is not a dashboard. Its characteristic
+   objects are a numbered form, a pen, a seal and a counter. So
+   the module is built from:
+
+     - a SHEET of ruled stock, not a floating card
+     - a STUB down the left edge, like the counterfoil of a
+       triplicate form, carrying the facts and the progress
+     - a LEDGER table, hairline rows and a double rule under
+       the header, where the CONTROL NUMBER is the identity
+     - a STAMP for status, because that is how an office records
+       a state - pressed, inked, and terse
+
+   Paper has no rounded corners and no soft drop shadow. Both
+   are dropped deliberately; the rule and the sheet/desk tonal
+   difference do that work instead.
+   ============================================================ */
+
+/* ─────────────────────────────────────────────────────────────
+   1. THE TOKENS
+   ───────────────────────────────────────────────────────────── */
+
+body[data-page^="docket-"] {
+  /* The desk the paper lies on. A cool grey-green - the inside
+     cover of a file folder and cheap office stock, not cream.
+     Replaces the portal's blue-grey gradient outright; a flat
+     tone is the whole point, because a gradient wash behind a
+     document is the single loudest tell of a generic layout. */
+  --dk-desk:      #E7E9E3;
+  --dk-desk-deep: #DDE0D8;
+
+  /* The sheet. Warm-white rather than #fff, so it separates from
+     the desk by temperature as well as by value. */
+  --dk-sheet:     #FCFCFA;
+
+  /* Rules. --dk-rule for a ledger hairline, --dk-rule-heavy for
+     the double rule under a ledger header and for the underline
+     an input sits on. */
+  --dk-rule:      #D6D9D1;
+  --dk-rule-heavy:#A8ADA2;
+
+  /* Ink. Blue-black rather than pure black: fountain pen. */
+  --dk-ink:       #1C2126;
+  --dk-ink-2:     #545C63;
+  --dk-ink-3:     #8B939A;
+
+  /* The one accent, and it is a stamp-pad colour. */
+  --dk-seal:      #96261F;
+  --dk-seal-wash: #F6E9E7;
+
+  /* Two status inks that are not the accent, so "needs you" and
+     "done" never read as the same alarm. */
+  --dk-action:    #A96B0C;
+  --dk-action-wash:#F8F0E1;
+  --dk-cleared:   #2C6E55;
+  --dk-cleared-wash:#E6F0EA;
+
+  background: var(--dk-desk) fixed;
+  background-image: none;
+  color: var(--dk-ink);
+}
+
+body[data-page^="docket-"] .dashboard-container {
+  max-width: 1180px;
+  padding: 30px 24px 64px;
+}
+
+body[data-page^="docket-"] .dashboard-main { background: transparent; }
+
+/* ─────────────────────────────────────────────────────────────
+   2. TYPE
+   ------------------------------------------------------------
+   Three faces, all already in the portal's font payload.
+
+   Fraunces is loaded by includes/header.php and, before this
+   file, was referenced by nothing at all. It is an optical-size
+   old-style serif, and it is spent on exactly one thing: the
+   NAME OF THE DOCUMENT. That is the name of a legal paper, it is
+   the thing being asked for, and a serif says "this is a
+   document" in a way a grotesque cannot.
+
+   JetBrains Mono carries every number a person needs to read
+   accurately and compare across rows - control numbers, dates,
+   amounts, the SKU code. Set large, the SKU reads as a form
+   field code rather than as a heading.
+
+   Inter carries everything structural, because it is the
+   portal's body face and a document module that disagreed with
+   the rest of the portal would read as a different website.
+   ───────────────────────────────────────────────────────────── */
+
+body[data-page^="docket-"] .dk-serif,
+body[data-page^="docket-"] .dk-docname {
+  font-family: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+  font-variation-settings: 'opsz' 120;
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  color: var(--dk-ink);
+}
+
+body[data-page^="docket-"] .dk-mono,
+body[data-page^="docket-"] .dk-ctl,
+body[data-page^="docket-"] .dk-num {
+  font-family: 'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-feature-settings: 'tnum' 1;
+}
+
+/* The SKU as a display object: the code, not the name. */
+body[data-page^="docket-"] .dk-sku {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  color: var(--dk-ink-3);
+  display: block;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   3. THE MASTHEAD
+   ------------------------------------------------------------
+   Replaces the portal's white card header. A masthead on a form
+   carries the form's title and its number; it is not a banner.
+   ───────────────────────────────────────────────────────────── */
+
+body[data-page^="docket-"] .dk-mast {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 28px;
+  flex-wrap: wrap;
+  padding: 0 2px 18px;
+  margin-bottom: 22px;
+  border-bottom: 3px double var(--dk-rule-heavy);
+}
+
+body[data-page^="docket-"] .dk-mast h1 {
+  font-family: 'Fraunces', Georgia, serif;
+  font-variation-settings: 'opsz' 144;
+  font-size: clamp(26px, 3vw, 34px);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.022em;
+  color: var(--dk-ink);
+  margin: 0;
+}
+
+body[data-page^="docket-"] .dk-mast p {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--dk-ink-2);
+  max-width: 62ch;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   4. THE SHEET, AND ITS STUB
+   ───────────────────────────────────────────────────────────── */
+
+body[data-page^="docket-"] .dk-sheet {
+  display: grid;
+  grid-template-columns: 268px minmax(0, 1fr);
+  background: var(--dk-sheet);
+  border: 1px solid var(--dk-rule);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+body[data-page^="docket-"] .dk-stub {
+  background: var(--dk-desk-deep);
+  border-right: 1px solid var(--dk-rule);
+  padding: 22px 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+body[data-page^="docket-"] .dk-body {
+  padding: 26px 30px 30px;
+  min-width: 0;
+}
+
+/* A section inside the sheet body: a rule above, a title, content. */
+body[data-page^="docket-"] .dk-sect { margin: 0 0 30px; }
+body[data-page^="docket-"] .dk-sect:last-child { margin-bottom: 0; }
+
+body[data-page^="docket-"] .dk-sect-h {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--dk-ink);
+  margin: 0 0 3px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--dk-rule);
+}
+
+body[data-page^="docket-"] .dk-sect-sub {
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--dk-ink-2);
+  margin: 9px 0 0;
+  max-width: 66ch;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   5. FACTS - THE STUB'S ENTRIES
+   ------------------------------------------------------------
+   A label above, a value below, ruled between. This is the
+   register a clerk writes in.
+   ───────────────────────────────────────────────────────────── */
+
+body[data-page^="docket-"] .dk-facts { display: flex; flex-direction: column; }
+
+body[data-page^="docket-"] .dk-fact {
+  padding: 9px 0;
+  border-bottom: 1px solid var(--dk-rule);
+}
+
+body[data-page^="docket-"] .dk-fact:last-child { border-bottom: 0; }
+
+body[data-page^="docket-"] .dk-fact-k {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--dk-ink-3);
+  margin-bottom: 3px;
+}
+
+body[data-page^="docket-"] .dk-fact-v {
+  display: block;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--dk-ink);
+  overflow-wrap: anywhere;
+}
+
+/* The control number gets the mono and the size. It is the
+   identity of the request; everything else on the page is
+   context for it. */
+body[data-page^="docket-"] .dk-fact--no .dk-fact-v {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--dk-ink);
+}
+
+body[data-page^="docket-"] .dk-fact--no .dk-fact-v.is-none {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--dk-ink-3);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   6. PROGRESS - THE STEP LIST
+   ------------------------------------------------------------
+   Replaces the horizontal numbered-circle stepper. A form does
+   not track its steps across the top in circles; it carries a
+   checklist down the margin, which is where this now lives.
+   ───────────────────────────────────────────────────────────── */
+
+body[data-page^="docket-"] .dk-prog { list-style: none; margin: 0; padding: 0; }
+
+body[data-page^="docket-"] .dk-prog li {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 9px;
+  align-items: baseline;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--dk-rule);
+  font-size: 13.5px;
+  color: var(--dk-ink-3);
+}
+
+body[data-page^="docket-"] .dk-prog li:last-child { border-bottom: 0; }
+
+body[data-page^="docket-"] .dk-prog .dk-prog-n {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--dk-ink-3);
+}
+
+/* Done: struck through in the cleared ink, because a crossed-off
+   register line is the oldest progress indicator there is. */
+body[data-page^="docket-"] .dk-prog .is-done { color: var(--dk-cleared); }
+body[data-page^="docket-"] .dk-prog .is-done .dk-prog-t { text-decoration: line-through; text-decoration-color: var(--dk-rule-heavy); }
+
+body[data-page^="docket-"] .dk-prog .is-now { color: var(--dk-ink); font-weight: 650; }
+body[data-page^="docket-"] .dk-prog .is-now .dk-prog-n { color: var(--dk-seal); }
+
+body[data-page^="docket-"] .dk-prog .is-now::after {
+  content: '';
+  display: block;
+  grid-column: 1 / -1;
+  height: 2px;
+  margin-top: 6px;
+  background: var(--dk-ink);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   7. RULED FIELDS
+   ------------------------------------------------------------
+   The single strongest signal that this is a FORM and not a
+   card: the inputs are underlined on the rule rather than boxed
+   inside it. Every official form ever printed works this way.
+   ───────────────────────────────────────────────────────────── */
+
+body[data-page^="docket-"] .dk-flds { display: flex; flex-direction: column; }
+
+body[data-page^="docket-"] .dk-fld {
+  display: grid;
+  grid-template-columns: 176px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+  padding: 15px 0;
+  border-bottom: 1px solid var(--dk-rule);
+}
+
+body[data-page^="docket-"] .dk-fld:first-child { padding-top: 4px; }
+body[data-page^="docket-"] .dk-fld:last-child { border-bottom: 0; }
+
+body[data-page^="docket-"] .dk-fld > label,
+body[data-page^="docket-"] .dk-fld-k {
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--dk-ink-2);
+  padding-top: 10px;
+  line-height: 1.35;
+}
+
+body[data-page^="docket-"] .dk-fld-b { min-width: 0; }
+
+/* Required, marked with an asterisk rather than a badge. */
+body[data-page^="docket-"] .dk-req {
+  color: var(--dk-seal);
+  font-weight: 700;
+  margin-left: 2px;
+}
+
+body[data-page^="docket-"] .dk-fld-b input[type="text"],
+body[data-page^="docket-"] .dk-fld-b input[type="number"],
+body[data-page^="docket-"] .dk-fld-b input[type="email"],
+body[data-page^="docket-"] .dk-fld-b select,
+body[data-page^="docket-"] .dk-fld-b textarea {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--dk-rule-heavy);
+  border-radius: 0;
+  background: transparent;
+  padding: 9px 2px 10px;
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--dk-ink);
+  box-shadow: none;
+  transition: border-color 140ms ease;
+}
+
+body[data-page^="docket-"] .dk-fld-b textarea { resize: vertical; min-height: 74px; }
+
+/* The underline carries focus, not a ring - on a form the line
+   IS the target and the line should say so. A visible ring is
+   still drawn for keyboard users who navigate by tabbing. */
+body[data-page^="docket-"] .dk-fld-b input:focus,
+body[data-page^="docket-"] .dk-fld-b select:focus,
+body[data-page^="docket-"] .dk-fld-b textarea:focus {
+  outline: none;
+  border-bottom-color: var(--dk-ink);
+  border-bottom-width: 2px;
+}
+
+body[data-page^="docket-"] .dk-fld-b input:focus-visible,
+body[data-page^="docket-"] .dk-fld-b select:focus-visible,
+body[data-page^="docket-"] .dk-fld-b textarea:focus-visible {
+  outline: 2px solid var(--dk-ink);
+  outline-offset: 3px;
+}
+
+body[data-page^="docket-"] .dk-fld-b input::placeholder,
+body[data-page^="docket-"] .dk-fld-b textarea::placeholder { color: var(--dk-ink-3); }
+
+body[data-page^="docket-"] .dk-fld-hint {
+  margin: 7px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--dk-ink-3);
+  max-width: 60ch;
+}
+
+body[data-page^="docket-"] .dk-fld-hint b { color: var(--dk-ink-2); font-weight: 600; }
+
+/* ─────────────────────────────────────────────────────────────
+   8. CHOICES - DOCUMENT PICKER AND PAYMENT
+   ------------------------------------------------------------
+   A ruled list, not a grid of tiles. Each row is one line in a
+   register: the code on the left, the name and description in
+   the middle, the price right-aligned on the same baseline.
+   ───────────────────────────────────────────────────────────── */
+
+body[data-page^="docket-"] .dk-choices { border-top: 1px solid var(--dk-rule); }
+
+body[data-page^="docket-"] .dk-choice {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: baseline;
+  width: 100%;
+  text-align: left;
+  padding: 17px 4px;
+  border: 0;
+  border-bottom: 1px solid var(--dk-rule);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: background-color 120ms ease;
+}
+
+body[data-page^="docket-"] .dk-choice:hover { background: var(--dk-desk); }
+
+body[data-page^="docket-"] .dk-choice:focus-visible {
+  outline: 2px solid var(--dk-ink);
+  outline-offset: -2px;
+}
+
+body[data-page^="docket-"] .dk-choice[aria-pressed="true"],
+body[data-page^="docket-"] .dk-choice.is-on { background: var(--dk-desk-deep); }
+
+body[data-page^="docket-"] .dk-choice-code {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  color: var(--dk-ink-3);
+}
+
+body[data-page^="docket-"] .dk-choice-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--dk-ink);
+  line-height: 1.3;
+}
+
+body[data-page^="docket-"] .dk-choice-desc {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dk-ink-2);
+  max-width: 58ch;
+}
+
+body[data-page^="docket-"] .dk-choice-fee {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--dk-ink);
+  white-space: nowrap;
+  text-align: right;
+}
+
+body[data-page^="docket-"] .dk-choice-fee small {
+  display: block;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--dk-ink-3);
+  letter-spacing: 0.02em;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   9. THE STAMP
+   ------------------------------------------------------------
+   The one memorable element, and the whole visual thesis of the
+   remake in a single component.
+
+   An office records state by pressing a rubber stamp: outlined
+   for something in progress, flooded for a final state, and
+   never quite straight on the page. The rotation is -1.6deg,
+   not more - a stamp pressed by hand does not read as a design
+   flourish, it reads as a document.
+
+   ALL-CAPS APPEARS HERE AND NOWHERE ELSE IN THE MODULE. That is
+   not a style preference; a rubber stamp is all-caps, so this is
+   the one place on the page where capital letters are
+   diegetic rather than decorative.
+   ───────────────────────────────────────────────────────────── */
+
+body[data-page^="docket-"] .dk-stamp {
+  display: inline-block;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  line-height: 1;
+  padding: 5px 9px 4px;
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+  transform: rotate(-1.6deg);
+  transform-origin: center;
+  white-space: nowrap;
+  color: var(--dk-ink-2);
+  opacity: 0.94;
+}
+
+/* A flooded stamp: pressed hard enough to fill. Terminal states
+   only, so flooding means "this is finished", never "pay now". */
+body[data-page^="docket-"] .dk-stamp.is-final {
+  color: var(--dk-sheet);
+  background: currentColor;
+  border-color: currentColor;
+}
+
+body[data-page^="docket-"] .dk-stamp.is-final span { color: var(--dk-sheet); }
+
+/* Status inks. --s is set per stamp so the flooded variant can
+   use currentColor for both border and fill. */
+body[data-page^="docket-"] .dk-stamp[data-s="filed"]    { --s: var(--dk-ink);      color: var(--dk-ink); }
+body[data-page^="docket-"] .dk-stamp[data-s="working"]  { --s: var(--dk-ink);      color: var(--dk-ink); }
+body[data-page^="docket-"] .dk-stamp[data-s="waiting"]  { --s: var(--dk-action);   color: var(--dk-action); }
+body[data-page^="docket-"] .dk-stamp[data-s="hold"]     { --s: var(--dk-seal);     color: var(--dk-seal); }
+body[data-page^="docket-"] .dk-stamp[data-s="ready"]    { --s: var(--dk-cleared);  color: var(--dk-cleared); }
+body[data-page^="docket-"] .dk-stamp[data-s="done"]     { --s: var(--dk-cleared);  color: var(--dk-cleared); }
+body[data-page^="docket-"] .dk-stamp[data-s="stopped"]  { --s: var(--dk-seal);     color: var(--dk-seal); }
+body[data-page^="docket-"] .dk-stamp[data-s="draft"]    { --s: var(--dk-ink-3);    color: var(--dk-ink-3); }
+
+/* ─────────────────────────────────────────────────────────────
+   10. THE LEDGER
+   ------------------------------------------------------------
+   Hairline rows, no vertical rules, a DOUBLE rule under the
+   header. The double rule is the convention that says "register"
+   rather than "table", and it is the one structural device doing
+   all of that work, so it is used nowhere else.
+   ───────────────────────────────────────────────────────────── */
+
+body[data-page^="docket-"] .dk-ledger {
+  width: 100%;
+  border-collapse: collapse;
+  border: 0;
+  background: transparent;
+}
+
+body[data-page^="docket-"] .dk-ledger thead th {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--dk-ink-2);
+  text-align: left;
+  text-transform: none;
+  letter-spacing: 0;
+  padding: 10px 16px 9px;
+  border: 0;
+  border-bottom: 3px double var(--dk-rule-heavy);
+  white-space: nowrap;
+  background: transparent;
+}
+
+body[data-page^="docket-"] .dk-ledger tbody td {
+  padding: 15px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--dk-rule);
+  background: transparent;
+  vertical-align: top;
+  font-size: 14px;
+  color: var(--dk-ink);
+  line-height: 1.45;
+}
+
+body[data-page^="docket-"] .dk-ledger tbody tr:hover td { background: rgba(28, 33, 38, 0.032); }
+body[data-page^="docket-"] .dk-ledger tbody tr:last-child td { border-bottom: 0; }
+
+/* Numeric columns right-align in the mono so digits stack. */
+body[data-page^="docket-"] .dk-ledger .dk-num,
+body[data-page^="docket-"] .dk-ledger th.dk-num { text-align: right; }
+
+body[data-page^="docket-"] .dk-ledger th.dk-num { padding-right: 16px; }
+body[data-page^="docket-"] .dk-ledger td.dk-num { padding-right: 16px; }
+
+/* The control number, in every row, in the mono. */
+body[data-page^="docket-"] .dk-ctl {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--dk-ink);
+}
+
+body[data-page^="docket-"] .dk-docname {
+  display: block;
+  margin-top: 2px;
+  font-size: 16.5px;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+body[data-page^="docket-"] .dk-ledger-sub {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  color: var(--dk-ink-2);
+  line-height: 1.45;
+}
+
+/* "Waiting on" - the sentence that says whose move it is. The
+   stamp says the state; this says the consequence. Splitting
+   them is what lets the stamp stay terse. */
+body[data-page^="docket-"] .dk-on {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: 13.5px;
+  color: var(--dk-ink);
+}
+
+body[data-page^="docket-"] .dk-on-who {
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+body[data-page^="docket-"] .dk-on-who.is-you { color: var(--dk-seal); }
+body[data-page^="docket-"] .dk-on-who.is-office { color: var(--dk-ink-2); }
+
+body[data-page^="docket-"] .dk-on-what { color: var(--dk-ink-2); }
+
+/* Age, in mono so the column compares down rather than across. */
+body[data-page^="docket-"] .dk-age {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 13px;
+  color: var(--dk-ink-2);
+  white-space: nowrap;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   11. BUTTONS
+   ------------------------------------------------------------
+   Square-ish and inked. The one filled button on a page should
+   be the thing you are being asked to do next, so it is the only
+   element allowed to be solid black - which is also why it does
+   not need a colour to say "important".
+   ───────────────────────────────────────────────────────────── */
+
+body[data-page^="docket-"] .dk-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 12px 20px;
+  border: 1px solid var(--dk-ink);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--dk-ink);
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 130ms ease, color 130ms ease;
+}
+
+body[data-page^="docket-"] .dk-btn:hover { background: rgba(28, 33, 38, 0.06); }
+body[data-page^="docket-"] .dk-btn:focus-visible { outline: 2px solid var(--dk-ink); outline-offset: 2px; }
+
+body[data-page^="docket-"] .dk-btn--go {
+  background: var(--dk-ink);
+  color: var(--dk-sheet);
+}
+
+body[data-page^="docket-"] .dk-btn--go:hover { background: #000; }
+
+body[data-page^="docket-"] .dk-btn[disabled],
+body[data-page^="docket-"] .dk-btn.is-off {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: transparent;
+  color: var(--dk-ink);
+}
+
+body[data-page^="docket-"] .dk-btn--sm { padding: 8px 14px; font-size: 13px; }
+
+/* The row's action, when it is a link rather than a step. */
+body[data-page^="docket-"] .dk-link {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--dk-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--dk-rule-heavy);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+body[data-page^="docket-"] .dk-link:hover { text-decoration-color: var(--dk-ink); }
+body[data-page^="docket-"] .dk-link:focus-visible { outline: 2px solid var(--dk-ink); outline-offset: 3px; }
+
+body[data-page^="docket-"] .dk-none {
+  font-size: 13px;
+  color: var(--dk-ink-3);
+  font-style: italic;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   12. NOTICES
+   ------------------------------------------------------------
+   A left rule in the status ink, never a filled rounded banner.
+   ───────────────────────────────────────────────────────────── */
+
+body[data-page^="docket-"] .dk-note {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  padding: 13px 16px;
+  margin: 0 0 20px;
+  background: var(--dk-desk);
+  border: 0;
+  border-left: 3px solid var(--dk-rule-heavy);
+  border-radius: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--dk-ink-2);
+}
+
+body[data-page^="docket-"] .dk-note b { color: var(--dk-ink); font-weight: 650; }
+body[data-page^="docket-"] .dk-note > i { margin-top: 2px; color: var(--dk-ink-3); font-size: 13px; }
+
+body[data-page^="docket-"] .dk-note.is-you  { border-left-color: var(--dk-seal);   background: var(--dk-seal-wash); }
+body[data-page^="docket-"] .dk-note.is-you > i { color: var(--dk-seal); }
+
+body[data-page^="docket-"] .dk-note.is-wait { border-left-color: var(--dk-action); background: var(--dk-action-wash); }
+body[data-page^="docket-"] .dk-note.is-wait > i { color: var(--dk-action); }
+
+body[data-page^="docket-"] .dk-note.is-done { border-left-color: var(--dk-cleared); background: var(--dk-cleared-wash); }
+body[data-page^="docket-"] .dk-note.is-done > i { color: var(--dk-cleared); }
+
+/* ─────────────────────────────────────────────────────────────
+   13. THE TRAIL - TRACKING
+   ------------------------------------------------------------
+   Not a row of connected circles. A ruled list, read downward,
+   because a request's history is a sequence in time and a
+   downward list is the only layout that says "and then".
+   ───────────────────────────────────────────────────────────── */
+
+body[data-page^="docket-"] .dk-trail { list-style: none; margin: 0; padding: 0; }
+
+body[data-page^="docket-"] .dk-trail li {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: baseline;
+  padding: 15px 0;
+  border-bottom: 1px solid var(--dk-rule);
+  position: relative;
+}
+
+body[data-page^="docket-"] .dk-trail li:last-child { border-bottom: 0; }
+
+/* The spine: a continuous rule down the left, with a node on it.
+   The rule runs through every step so the eye reads one line. */
+body[data-page^="docket-"] .dk-trail li::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 26px;
+  bottom: -16px;
+  width: 1px;
+  background: var(--dk-rule);
+}
+
+body[data-page^="docket-"] .dk-trail li:last-child::before { display: none; }
+
+body[data-page^="docket-"] .dk-trail .dk-trail-n {
+  width: 9px;
+  height: 9px;
+  margin-top: 5px;
+  border-radius: 50%;
+  border: 1.5px solid var(--dk-rule-heavy);
+  background: var(--dk-sheet);
+  position: relative;
+  z-index: 1;
+}
+
+body[data-page^="docket-"] .dk-trail .is-done .dk-trail-n {
+  background: var(--dk-cleared);
+  border-color: var(--dk-cleared);
+}
+
+body[data-page^="docket-"] .dk-trail .is-now .dk-trail-n {
+  background: var(--dk-seal);
+  border-color: var(--dk-seal);
+  box-shadow: 0 0 0 4px var(--dk-seal-wash);
+}
+
+body[data-page^="docket-"] .dk-trail .dk-trail-t { font-size: 15px; font-weight: 600; color: var(--dk-ink); }
+body[data-page^="docket-"] .dk-trail .is-todo .dk-trail-t { color: var(--dk-ink-3); font-weight: 500; }
+
+body[data-page^="docket-"] .dk-trail .dk-trail-n2 {
+  display: block;
+  margin-top: 3px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dk-ink-2);
+}
+
+body[data-page^="docket-"] .dk-trail .dk-trail-when {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--dk-ink-3);
+  white-space: nowrap;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   14. THE FEE TICKET
+   ------------------------------------------------------------
+   A bill, not a summary box. Amounts right-aligned in the mono,
+   a rule above the total, and the total heavier than anything
+   else on the page.
+   ───────────────────────────────────────────────────────────── */
+
+body[data-page^="docket-"] .dk-bill { border-top: 1px solid var(--dk-rule); }
+
+body[data-page^="docket-"] .dk-bill-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--dk-rule);
+}
+
+body[data-page^="docket-"] .dk-bill-k { font-size: 14px; color: var(--dk-ink); font-weight: 550; }
+body[data-page^="docket-"] .dk-bill-d { display: block; font-size: 12.5px; color: var(--dk-ink-3); margin-top: 2px; }
+
+body[data-page^="docket-"] .dk-bill-a {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--dk-ink);
+  white-space: nowrap;
+}
+
+body[data-page^="docket-"] .dk-bill-row.is-total {
+  border-bottom: 3px double var(--dk-rule-heavy);
+  padding: 15px 0;
+}
+
+body[data-page^="docket-"] .dk-bill-row.is-total .dk-bill-k { font-weight: 650; font-size: 15px; }
+body[data-page^="docket-"] .dk-bill-row.is-total .dk-bill-a { font-size: 22px; font-weight: 700; }
+
+/* ─────────────────────────────────────────────────────────────
+   15. ATTACHMENTS - THE CHECKLIST
+   ------------------------------------------------------------
+   A requirement is a line in a checklist with a tick box. The
+   box is drawn as an actual empty square, and filled square,
+   which is what a clerk marks.
+   ───────────────────────────────────────────────────────────── */
+
+body[data-page^="docket-"] .dk-reqs { border-top: 1px solid var(--dk-rule); }
+
+body[data-page^="docket-"] .dk-req-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: start;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--dk-rule);
+}
+
+body[data-page^="docket-"] .dk-req-box {
+  width: 17px;
+  height: 17px;
+  margin-top: 2px;
+  border: 1.5px solid var(--dk-rule-heavy);
+  border-radius: 1px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  color: transparent;
+  background: var(--dk-sheet);
+}
+
+body[data-page^="docket-"] .dk-req-row.is-have .dk-req-box {
+  background: var(--dk-cleared);
+  border-color: var(--dk-cleared);
+  color: var(--dk-sheet);
+}
+
+body[data-page^="docket-"] .dk-req-row.is-opt .dk-req-box { border-style: dashed; }
+
+body[data-page^="docket-"] .dk-req-t { display: block; font-size: 15px; font-weight: 600; color: var(--dk-ink); }
+body[data-page^="docket-"] .dk-req-row.is-missing .dk-req-t { color: var(--dk-seal); }
+
+body[data-page^="docket-"] .dk-req-d { display: block; margin: 4px 0 0; font-size: 13px; color: var(--dk-ink-2); line-height: 1.5; }
+
+body[data-page^="docket-"] .dk-req-flag {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dk-ink-3);
+  vertical-align: 1px;
+}
+
+body[data-page^="docket-"] .dk-req-row.is-missing .dk-req-flag { color: var(--dk-seal); }
+
+/* ─────────────────────────────────────────────────────────────
+   16. CONFIRMATION - THE STAMP LANDS
+   ------------------------------------------------------------
+   The one orchestrated moment in the module. The stamp comes
+   down once, hard, and stops. Nothing else on this screen moves,
+   which is why it lands: a page where everything animates is a
+   page where nothing is animated.
+   ───────────────────────────────────────────────────────────── */
+
+body[data-page^="docket-"] .dk-stamp-land {
+  display: inline-block;
+  animation: dk-press 420ms cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+
+@keyframes dk-press {
+  0%   { opacity: 0; transform: rotate(-7deg) scale(1.55); }
+  55%  { opacity: 1; transform: rotate(-1deg) scale(0.94); }
+  100% { opacity: 0.94; transform: rotate(-1.6deg) scale(1); }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   17. MISCELLANEOUS OVERRIDES
+   ------------------------------------------------------------
+   The portal's shared surfaces, brought onto the module's terms
+   so the page reads as one sheet of paper rather than a form
+   pasted onto a dashboard.
+   ───────────────────────────────────────────────────────────── */
+
+body[data-page^="docket-"] .panel {
+  background: var(--dk-sheet);
+  border: 1px solid var(--dk-rule);
+  border-radius: 3px;
+  box-shadow: none;
+  transition: none;
+}
+
+body[data-page^="docket-"] .panel:hover {
+  box-shadow: none;
+  border-color: var(--dk-rule);
+}
+
+body[data-page^="docket-"] .panel-header h3 {
+  font-family: 'Fraunces', Georgia, serif;
+  font-variation-settings: 'opsz' 90;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--dk-ink);
+}
+
+body[data-page^="docket-"] .panel-title { color: var(--dk-ink); }
+
+/* Inputs anywhere else on the page - the search box, the desk's
+   filters - take the same underline so the page is consistent. */
+body[data-page^="docket-"] .form-control,
+body[data-page^="docket-"] .search-wrap input {
+  border: 1px solid var(--dk-rule-heavy);
+  border-radius: 3px;
+  background: var(--dk-sheet);
+  color: var(--dk-ink);
+  box-shadow: none;
+}
+
+body[data-page^="docket-"] .form-control:focus,
+body[data-page^="docket-"] .search-wrap input:focus {
+  border-color: var(--dk-ink);
+  box-shadow: none;
+  outline: none;
+}
+
+body[data-page^="docket-"] .btn-primary,
+body[data-page^="docket-"] .btn-secondary,
+body[data-page^="docket-"] .btn-light {
+  border-radius: 3px;
+  font-weight: 600;
+  box-shadow: none;
+}
+
+body[data-page^="docket-"] .btn-primary {
+  background: var(--dk-ink);
+  border-color: var(--dk-ink);
+  color: var(--dk-sheet);
+}
+
+body[data-page^="docket-"] .btn-primary:hover { background: #000; border-color: #000; }
+
+body[data-page^="docket-"] .btn-light,
+body[data-page^="docket-"] .btn-secondary {
+  background: transparent;
+  border-color: var(--dk-rule-heavy);
+  color: var(--dk-ink);
+}
+
+body[data-page^="docket-"] .empty-state { color: var(--dk-ink-2); }
+
+/* ─────────────────────────────────────────────────────────────
+   18. RESPONSIVE
+   ------------------------------------------------------------
+   The stub folds to a band above the fields. It does not
+   disappear: on a phone the control number and the progress
+   list are still the two things a person needs.
+   ───────────────────────────────────────────────────────────── */
+
+@media (max-width: 900px) {
+  body[data-page^="docket-"] .dk-sheet { grid-template-columns: minmax(0, 1fr); }
+
+  body[data-page^="docket-"] .dk-stub {
+    border-right: 0;
+    border-bottom: 1px solid var(--dk-rule);
+    padding: 18px 18px 20px;
+  }
+
+  body[data-page^="docket-"] .dk-body { padding: 20px 18px 24px; }
+
+  body[data-page^="docket-"] .dk-fld { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  body[data-page^="docket-"] .dk-fld > label,
+  body[data-page^="docket-"] .dk-fld-k { padding-top: 0; }
+
+  body[data-page^="docket-"] .dk-choice { grid-template-columns: minmax(0, 1fr) auto; gap: 4px 14px; }
+  body[data-page^="docket-"] .dk-choice-code { grid-column: 1 / -1; }
+
+  body[data-page^="docket-"] .dk-mast { align-items: flex-start; }
+}
+
+@media (max-width: 620px) {
+  body[data-page^="docket-"] .dashboard-container { padding: 20px 14px 48px; }
+  body[data-page^="docket-"] .dk-ledger thead { display: none; }
+  body[data-page^="docket-"] .dk-ledger tbody tr {
+    display: block;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--dk-rule);
+  }
+  body[data-page^="docket-"] .dk-ledger tbody td {
+    display: block;
+    padding: 3px 0;
+    border: 0;
+  }
+  body[data-page^="docket-"] .dk-ledger .dk-num { text-align: left; }
+  body[data-page^="docket-"] .dk-trail li { grid-template-columns: 18px minmax(0, 1fr); }
+  body[data-page^="docket-"] .dk-trail .dk-trail-when { grid-column: 2; }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   19. MOTION AND PRINT
+   ------------------------------------------------------------
+   The stamp is the only non-user-triggered motion in the
+   module, and it is suppressed here along with everything else.
+   A print is a document, so the module prints as one: the stub
+   and the sheet side by side, no background fills, no rotation
+   on the stamp - an angled stamp on a printed form looks like a
+   mistake.
+   ───────────────────────────────────────────────────────────── */
+
+/* ─────────────────────────────────────────────────────────────
+   20. THE LEGACY FURNITURE, RE-SKINNED
+   ------------------------------------------------------------
+   The wizard's step bodies kept their old class names; the content is
+   right and only its chrome was from the previous design. These rules
+   move that chrome onto the module's terms.
+
+   The panel is the important one. A rounded white card sitting inside a
+   white sheet is a card inside a card: the sheet already IS the paper, so
+   anything inside it with its own border and shadow is a lie about depth.
+   Flattened here rather than in the markup.
+   ───────────────────────────────────────────────────────────── */
+
+body[data-page^="docket-"] .dk-body .wr-panel {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+  margin: 0 0 30px;
+}
+
+body[data-page^="docket-"] .dk-body .wr-panel:last-child { margin-bottom: 0; }
+
+/* The step head becomes a ruled section title. The icon goes: a
+   decorative glyph beside every step heading is the same class of filler
+   as a badge on every row, and the heading is legible without it. */
+body[data-page^="docket-"] .dk-body .wr-panel-head {
+  padding: 0 0 12px;
+  margin: 0 0 20px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--dk-rule);
+  display: block;
+}
+
+body[data-page^="docket-"] .dk-body .wr-panel-title {
+  font-family: 'Fraunces', Georgia, serif;
+  font-variation-settings: 'opsz' 90;
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.014em;
+  color: var(--dk-ink);
+  margin: 0;
+  padding: 0;
+}
+
+body[data-page^="docket-"] .dk-body .wr-panel-title i { display: none; }
+
+body[data-page^="docket-"] .dk-body .wr-panel-sub {
+  margin: 7px 0 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--dk-ink-2);
+  max-width: 66ch;
+}
+
+/* The old notices become the left-rule form. */
+body[data-page^="docket-"] .dk-body .wr-notice {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  padding: 13px 16px;
+  margin: 0 0 18px;
+  background: var(--dk-desk);
+  border: 0;
+  border-left: 3px solid var(--dk-rule-heavy);
+  border-radius: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--dk-ink-2);
+}
+
+body[data-page^="docket-"] .dk-body .wr-notice i { color: var(--dk-ink-3); }
+body[data-page^="docket-"] .dk-body .wr-notice b { color: var(--dk-ink); display: inline; margin: 0; }
+
+body[data-page^="docket-"] .dk-body .wr-notice.is-warn {
+  background: var(--dk-action-wash); border-left-color: var(--dk-action); color: var(--dk-ink-2);
+}
+body[data-page^="docket-"] .dk-body .wr-notice.is-warn i { color: var(--dk-action); }
+
+body[data-page^="docket-"] .dk-body .wr-notice.is-info {
+  background: var(--dk-desk); border-left-color: var(--dk-rule-heavy);
+}
+body[data-page^="docket-"] .dk-body .wr-notice.is-info i { color: var(--dk-ink-3); }
+
+body[data-page^="docket-"] .dk-body .wr-notice.is-danger {
+  background: var(--dk-seal-wash); border-left-color: var(--dk-seal); color: var(--dk-ink-2);
+}
+body[data-page^="docket-"] .dk-body .wr-notice.is-danger i { color: var(--dk-seal); }
+
+body[data-page^="docket-"] .dk-body .wr-notice.is-ok {
+  background: var(--dk-cleared-wash); border-left-color: var(--dk-cleared); color: var(--dk-ink-2);
+}
+body[data-page^="docket-"] .dk-body .wr-notice.is-ok i { color: var(--dk-cleared); }
+
+/* The drop zone: a dashed rule on the sheet, not a dashed card. */
+body[data-page^="docket-"] .dk-body .wr-drop {
+  border: 1px dashed var(--dk-rule-heavy);
+  border-radius: 3px;
+  background: transparent;
+  padding: 26px 20px;
+  text-align: center;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+body[data-page^="docket-"] .dk-body .wr-drop:hover,
+body[data-page^="docket-"] .dk-body .wr-drop.is-over {
+  background: var(--dk-desk);
+  border-color: var(--dk-ink-3);
+}
+
+body[data-page^="docket-"] .dk-body .wr-drop i { color: var(--dk-ink-3); }
+
+body[data-page^="docket-"] .dk-body .wr-drop-title { color: var(--dk-ink); font-weight: 650; }
+body[data-page^="docket-"] .dk-body .wr-drop-note { color: var(--dk-ink-3); }
+
+/* The search box above the register. */
+body[data-page^="docket-"] .dk-body .wr-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 0 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--dk-rule);
+}
+
+body[data-page^="docket-"] .dk-body .wr-search i { color: var(--dk-ink-3); font-size: 13px; }
+
+body[data-page^="docket-"] .dk-body .wr-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 15px;
+  color: var(--dk-ink);
+  padding: 8px 0;
+  outline: none;
+}
+
+body[data-page^="docket-"] .dk-body .wr-search input::placeholder { color: var(--dk-ink-3); }
+
+/* The register's container: the list's own top rule is drawn by the CSS,
+   so the wrapper must not draw a second one.
+
+   `display: block` is load-bearing, not tidying. doc-request.css sets
+   .wr-doc-grid to a two-column grid of tiles, and a docket row is a single
+   register line spanning the full width. Left as a grid, every row was
+   squeezed into half the sheet: the document name wrapped over three lines
+   and ran straight into its own description.
+
+   Every probe still passed with this broken - they count elements and click
+   them, and a crushed row is still a row. Only the screenshot showed it. */
+body[data-page^="docket-"] .dk-body .wr-doc-grid {
+  display: block;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+
+body[data-page^="docket-"] .dk-body .wr-reqs { border: 0; padding: 0; margin: 0; }
+
+body[data-page^="docket-"] .dk-body .wr-reqs .dk-reqs { border-top: 1px solid var(--dk-rule); }
+
+/* The name and its description are separate lines, which means block, not
+   inline. A span is inline by default and runs them together. */
+body[data-page^="docket-"] .dk-choice-name,
+body[data-page^="docket-"] .dk-choice-desc { display: block; }
+
+/* The action row. Back on the left, the primary on the right, with the
+   spacer between - which is the arrangement the old code already had and
+   which is correct, so it is only re-skinned. */
+body[data-page^="docket-"] .dk-body .wr-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 26px;
+  padding-top: 20px;
+  border-top: 1px solid var(--dk-rule);
+}
+
+body[data-page^="docket-"] .dk-body .wr-actions .wr-spacer { flex: 1; }
+
+body[data-page^="docket-"] .dk-body .wr-actions .btn {
+  border-radius: 3px;
+  box-shadow: none;
+  font-weight: 600;
+}
+
+body[data-page^="docket-"] .dk-body .wr-actions .btn-primary {
+  background: var(--dk-ink);
+  border-color: var(--dk-ink);
+  color: var(--dk-sheet);
+}
+
+body[data-page^="docket-"] .dk-body .wr-actions .btn-primary:hover { background: #000; border-color: #000; }
+
+body[data-page^="docket-"] .dk-body .wr-actions .btn-light {
+  background: transparent;
+  border-color: var(--dk-rule-heavy);
+  color: var(--dk-ink);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   20a. THE BUTTONS, MATCHED WITH !important ON PURPOSE
+   ------------------------------------------------------------
+   WHY THIS SECTION HAS TO USE !important
+   includes/header.php loads registrar-premium.css on EVERY page, including
+   the student portal, and that file declares:
+
+       .btn-primary {
+           background: var(--primary-gradient) !important;
+           color: #fff !important;
+           box-shadow: 0 4px 12px rgba(26,58,140,.25) !important;
+       }
+
+   --primary-gradient is the portal's blue. Because the declaration is
+   important, no amount of specificity beats it: the rules above this point,
+   which outrank components.css comfortably, were all being ignored, and the
+   wizard's Continue button rendered as a blue gradient pill with a 10px
+   radius on a page that is otherwise ink on paper.
+
+   Found by tools/_btn_probe.js, which printed the resolved background and
+   the list of rules that matched. Reading the cascade by eye had twice
+   concluded the rule was winning.
+
+   The alternative is to stop loading registrar-premium.css on student pages.
+   That is the better fix and it is NOT done here, because registrar.css and
+   registrar-premium.css are shared chrome and removing one of them from the
+   student portal would strip styling from every other student page that
+   depends on it. Until that is a deliberate change with its own regression
+   run, matching it inside a module scope is the contained option: it cannot
+   escape body[data-page^="docket-"], so no other page is affected.
+
+   border-radius is grouped in for readability but is NOT important -
+   components.css's .btn is an ordinary declaration, so the scoped rule above
+   beats it on specificity alone.
+   ───────────────────────────────────────────────────────────── */
+
+body[data-page^="docket-"] .btn-primary {
+  background: var(--dk-ink) !important;
+  background-image: none !important;
+  color: var(--dk-sheet) !important;
+  box-shadow: none !important;
+  border-color: var(--dk-ink) !important;
+  border-radius: 3px;
+}
+
+body[data-page^="docket-"] .btn-primary:hover:not(:disabled) {
+  background: #000 !important;
+  background-image: none !important;
+  color: var(--dk-sheet) !important;
+  box-shadow: none !important;
+  transform: none;
+}
+
+body[data-page^="docket-"] .btn-secondary,
+body[data-page^="docket-"] .btn-light {
+  background: transparent !important;
+  background-image: none !important;
+  color: var(--dk-ink) !important;
+  box-shadow: none !important;
+  border-color: var(--dk-rule-heavy) !important;
+  border-radius: 3px;
+}
+
+body[data-page^="docket-"] .btn-secondary:hover:not(:disabled),
+body[data-page^="docket-"] .btn-light:hover:not(:disabled) {
+  background: rgba(28, 33, 38, 0.06) !important;
+  background-image: none !important;
+  color: var(--dk-ink) !important;
+}
+
+/* The disabled state must READ as disabled. A dimmed blue pill still looks
+   pressable; a dimmed ink button does not. */
+body[data-page^="docket-"] .btn-primary:disabled,
+body[data-page^="docket-"] .dk-btn:disabled,
+body[data-page^="docket-"] .dk-btn.is-off {
+  background: transparent !important;
+  background-image: none !important;
+  color: var(--dk-ink-3) !important;
+  border-color: var(--dk-rule-heavy) !important;
+  box-shadow: none !important;
+  border-radius: 3px !important;
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* The review summary: a register of what was entered, so it takes the
+   same ruled-row treatment as the stub's facts. */
+body[data-page^="docket-"] .dk-body .wr-sum { border-top: 1px solid var(--dk-rule); }
+
+body[data-page^="docket-"] .dk-body .wr-sum-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--dk-rule);
+}
+
+body[data-page^="docket-"] .dk-body .wr-sum-key {
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--dk-ink-2);
+  flex: 0 0 auto;
+}
+
+body[data-page^="docket-"] .dk-body .wr-sum-val {
+  font-size: 14.5px;
+  color: var(--dk-ink);
+  text-align: right;
+  min-width: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   21. THE LEDGER, OVER THE PORTAL'S OWN TABLE CSS
+   ------------------------------------------------------------
+   documents.css still styles .table, and its rules win on load order
+   for the columns that matter. Set out here explicitly rather than
+   hoping specificity settles it, because a ledger whose column widths
+   come from an accident is a ledger that breaks when that other file
+   is touched.
+
+   THE COLUMN WIDTHS ARE CONTENT DECISIONS, NOT STYLE ONES
+   No. is narrow because a control number is eleven characters and must
+   never wrap. Document is wide because the name is the longest string on
+   the row and it must not break over three lines. Waiting on takes the
+   slack, because its sentence is the only thing on the row that is
+   allowed to wrap.
+   ───────────────────────────────────────────────────────────── */
+
+body[data-page^="docket-"] .dk-ledger,
+body[data-page^="docket-"] table.table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+body[data-page^="docket-"] .dk-ledger th,
+body[data-page^="docket-"] table.table thead th {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--dk-ink-2);
+  /* registrar.css:141 paints the TABLE itself white, so making the cells
+     transparent is not enough -- the white is underneath them. And :157
+     uppercases the header, which is the one place capitals are spent on
+     something that is not a stamp. */
+  background: transparent;
+  text-transform: none;
+  letter-spacing: 0;
+  border: 0;
+  border-bottom: 3px double var(--dk-rule-heavy);
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+/* The table's own paint, removed. Same reason. */
+body[data-page^="docket-"] .dk-ledger,
+body[data-page^="docket-"] table.table {
+  background: transparent;
+  border-radius: 0;
+}
+
+body[data-page^="docket-"] .dk-ledger td,
+body[data-page^="docket-"] table.table tbody td {
+  padding: 14px;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--dk-rule);
+  vertical-align: top;
+  font-size: 14px;
+  color: var(--dk-ink);
+  line-height: 1.45;
+}
+
+body[data-page^="docket-"] table.table tbody tr:hover td { background: rgba(28, 33, 38, 0.03); }
+body[data-page^="docket-"] table.table tbody tr.doc-row { cursor: pointer; }
+
+/* The widths. Applied to the header cells, so they govern the whole
+   column; colgroup would be tidier but the header is where they read. */
+/* Column widths, as percentages of the table.
+
+   The first attempt used px for six columns and `auto` for the third.
+   Two things went wrong and both are worth recording:
+
+   1. The px values were CONTENT-box. The stylesheets do not set
+      box-sizing on these cells, so each th's real width was its declared
+      width plus 28px of padding. Six of them plus the 30% column came to
+      1082px against a 1002px table.
+   2. In table-layout: fixed, an over-committed table scales the declared
+      columns UP and gives the `auto` column nothing. That is why
+      "Waiting on" rendered at 0px and the Document and Waiting-on text
+      were drawn on top of one another -- the third column had no width at
+      all, so its contents overflowed its neighbour's.
+
+   Percentages that sum to 100 cannot over-commit, and box-sizing makes the
+   padding come out of the declared width rather than on top of it.
+   Measured widths are in the probe's output, not asserted here. */
+body[data-page^="docket-"] table.table th,
+body[data-page^="docket-"] table.table td { box-sizing: border-box; }
+
+body[data-page^="docket-"] table.table th:nth-child(1) { width: 11%; }
+body[data-page^="docket-"] table.table th:nth-child(2) { width: 23%; }
+body[data-page^="docket-"] table.table th:nth-child(3) { width: 24%; }
+body[data-page^="docket-"] table.table th:nth-child(4) { width: 10%; }
+body[data-page^="docket-"] table.table th:nth-child(5) { width: 13%; }
+body[data-page^="docket-"] table.table th:nth-child(6) { width: 6%; }
+body[data-page^="docket-"] table.table th:nth-child(7) { width: 13%; text-align: right; }
+
+/* The document name, at a size that fits the column it is in. */
+body[data-page^="docket-"] table.table .dk-docname {
+  font-family: 'Fraunces', Georgia, serif;
+  font-variation-settings: 'opsz' 90;
+  font-size: 15.5px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  display: block;
+}
+
+body[data-page^="docket-"] table.table .dk-ledger-sub { display: block; }
+
+body[data-page^="docket-"] .dk-ctl { font-size: 12.5px; line-height: 1.3; }
+body[data-page^="docket-"] .dk-age { font-size: 12.5px; }
+body[data-page^="docket-"] .dk-stamp { font-size: 10px; letter-spacing: 0.13em; }
+
+/* A sentence with no party waiting reads better on its own line. */
+body[data-page^="docket-"] .dk-on-what.is-alone { font-style: italic; color: var(--dk-ink-3); }
+
+/* The expanded detail row hangs off the same grid, so it must span all of
+   it, and it takes the sheet's tone rather than a tinted panel. */
+body[data-page^="docket-"] table.table tbody tr.doc-detail-row td {
+  padding: 0;
+  background: var(--dk-desk);
+  border-bottom: 1px solid var(--dk-rule);
+}
+
+body[data-page^="docket-"] table.table tbody tr.doc-detail-row:hover td { background: var(--dk-desk); }
+
+@media (max-width: 1080px) {
+  body[data-page^="docket-"] table.table th:nth-child(2) { width: 24%; }
+  body[data-page^="docket-"] table.table th:nth-child(3) { width: 26%; }
+}
+
+@media (max-width: 620px) {
+  body[data-page^="docket-"] table.table { table-layout: auto; }
+  body[data-page^="docket-"] table.table thead { display: none; }
+  body[data-page^="docket-"] table.table tbody tr { display: block; padding: 14px 0; }
+  body[data-page^="docket-"] table.table tbody td {
+    display: block;
+    padding: 3px 14px;
+    border: 0;
+  }
+  body[data-page^="docket-"] table.table tbody td.dk-num { text-align: left; }
+  body[data-page^="docket-"] table.table tbody td[style*="text-align:right"] { text-align: left !important; }
+  body[data-page^="docket-"] table.table tbody tr.doc-detail-row td { padding: 0 14px; }
+}
+
+
+/* A control number is eleven characters of identity. It never breaks: a
+   reader comparing two of them cannot compare them across a line. */
+body[data-page^="docket-"] .dk-ctl { white-space: nowrap; }
+
+/* A stamp must sit inside its column or it stops reading as a stamp and
+   starts reading as a label running off the edge of a table. The longest
+   one is therefore short (see doc_status_meta) AND clipped rather than
+   allowed to overhang. */
+body[data-page^="docket-"] .dk-stamp {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   22. THE TRACKING PAGE'S TIMELINE, AS A DOCKET TRAIL
+   ------------------------------------------------------------
+   The markup already has the shape a docket trail wants - a node, a
+   label, a time, a note, one per step - so this re-skins the existing
+   .wr-timeline classes rather than the page rewriting them.
+
+   WHAT CHANGES AND WHY
+   The old trail was a vertical line with connected circles and a tick in
+   each, which is the most recognisable timeline there is and means
+   nothing. The new one is a RULED LIST read downward with a node on a
+   continuous spine, because a request's history is a sequence in time and
+   a downward list is the only layout that says "and then".
+
+   The spine is what carries the continuity. The dots alone - a column of
+   identical circles - read as a list, not a journey; a continuous rule
+   running through them reads as one thing progressing.
+   ───────────────────────────────────────────────────────────── */
+
+body[data-page^="docket-"] .wr-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--dk-rule);
+}
+
+body[data-page^="docket-"] .wr-tl-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  gap: 4px 16px;
+  align-items: baseline;
+  padding: 15px 0;
+  border-bottom: 1px solid var(--dk-rule);
+}
+
+/* The spine, continuous through every step. Drawn on the item and
+   extended to the next one, so the eye reads a single unbroken rule. */
+body[data-page^="docket-"] .wr-tl-item::before {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: 30px;
+  bottom: -16px;
+  width: 1px;
+  background: var(--dk-rule);
+}
+
+body[data-page^="docket-"] .wr-tl-item:last-child::before { display: none; }
+
+/* The node, sitting on the spine. A square, not a circle: this is a
+   register, and a register is not made of beads. */
+body[data-page^="docket-"] .wr-tl-dot {
+  grid-row: 1;
+  grid-column: 1;
+  width: 9px;
+  height: 9px;
+  margin-top: 5px;
+  border-radius: 1px;
+  border: 1.5px solid var(--dk-rule-heavy);
+  background: var(--dk-sheet);
+  color: transparent;
+  font-size: 0;
+  position: relative;
+  z-index: 1;
+}
+
+body[data-page^="docket-"] .wr-tl-item.is-done .wr-tl-dot {
+  background: var(--dk-cleared);
+  border-color: var(--dk-cleared);
+}
+
+body[data-page^="docket-"] .wr-tl-item.is-current .wr-tl-dot {
+  background: var(--dk-seal);
+  border-color: var(--dk-seal);
+  box-shadow: 0 0 0 4px var(--dk-seal-wash);
+}
+
+body[data-page^="docket-"] .wr-tl-label {
+  grid-column: 2;
+  font-family: 'Fraunces', Georgia, serif;
+  font-variation-settings: 'opsz' 60;
+  font-size: 15.5px;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--dk-ink);
+  padding: 0;
+  background: none;
+  border: 0;
+}
+
+body[data-page^="docket-"] .wr-tl-item.is-todo .wr-tl-label { color: var(--dk-ink-3); }
+
+body[data-page^="docket-"] .wr-tl-note {
+  grid-column: 2;
+  margin: 3px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--dk-ink-2);
+}
+
+body[data-page^="docket-"] .wr-tl-when {
+  grid-column: 3;
+  grid-row: 1;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--dk-ink-3);
+  white-space: nowrap;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+/* The tracking number. It was a blue dashed box, which is a form field on
+   a web page; it is now the control number set large in the mono, on the
+   rule, which is what a control number looks like on a document. */
+body[data-page^="docket-"] .wr-trackno {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  border: 0;
+  border-bottom: 1px solid var(--dk-rule);
+  border-radius: 0;
+  background: transparent;
+  padding: 0 0 8px;
+}
+
+body[data-page^="docket-"] .wr-trackno-value {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--dk-ink);
+}
+
+body[data-page^="docket-"] .wr-trackno-copy {
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--dk-ink-2);
+  background: none;
+  border: 1px solid var(--dk-rule-heavy);
+  border-radius: 3px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+body[data-page^="docket-"] .wr-trackno-copy:hover { border-color: var(--dk-ink); color: var(--dk-ink); }
+body[data-page^="docket-"] .wr-trackno-copy:focus-visible { outline: 2px solid var(--dk-ink); outline-offset: 2px; }
+
+/* The panels here sit on the sheet, so they lose their own border and
+   shadow exactly as the wizard's do - a card inside a card. */
+body[data-page^="docket-"] .wr-panel {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--dk-rule);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 22px 0;
+}
+
+body[data-page^="docket-"] .wr-panel:first-of-type { padding-top: 4px; }
+
+body[data-page^="docket-"] .wr-panel:last-of-type { border-bottom: 0; }
+
+body[data-page^="docket-"] .wr-panel-head {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0 0 12px;
+  display: block;
+}
+
+body[data-page^="docket-"] .wr-panel-title {
+  font-family: 'Fraunces', Georgia, serif;
+  font-variation-settings: 'opsz' 90;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.014em;
+  color: var(--dk-ink);
+  margin: 0;
+  padding: 0;
+}
+
+body[data-page^="docket-"] .wr-panel-title i { display: none; }
+body[data-page^="docket-"] .wr-panel-sub { color: var(--dk-ink-2); }
+
+/* The header card, on the tracking page, becomes the masthead. */
+body[data-page^="docket-"] .header {
+  background: transparent;
+  border: 0;
+  border-bottom: 3px double var(--dk-rule-heavy);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0 0 16px;
+}
+
+body[data-page^="docket-"] .header h1 {
+  font-family: 'Fraunces', Georgia, serif;
+  font-variation-settings: 'opsz' 144;
+  font-size: clamp(24px, 2.8vw, 32px);
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  color: var(--dk-ink);
+}
+
+body[data-page^="docket-"] .header .title p { color: var(--dk-ink-2); }
+
+body[data-page^="docket-"] .header-actions .btn {
+  border-radius: 3px;
+  background: transparent;
+  border-color: var(--dk-rule-heavy);
+  color: var(--dk-ink);
+  box-shadow: none;
+  font-weight: 600;
+}
+
+/* The blue info boxes and the amber warning box become the left-rule
+   notices, which is the same component the wizard uses. */
+body[data-page^="docket-"] .wr-info,
+body[data-page^="docket-"] .wr-notice {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  padding: 13px 16px;
+  margin: 0 0 16px;
+  background: var(--dk-desk);
+  border: 0;
+  border-left: 3px solid var(--dk-rule-heavy);
+  border-radius: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--dk-ink-2);
+}
+
+body[data-page^="docket-"] .wr-info { background: var(--dk-desk); }
+
+body[data-page^="docket-"] .wr-notice.is-warn {
+  background: var(--dk-action-wash); border-left-color: var(--dk-action);
+}
+body[data-page^="docket-"] .wr-notice.is-ok {
+  background: var(--dk-cleared-wash); border-left-color: var(--dk-cleared);
+}
+body[data-page^="docket-"] .wr-notice.is-danger {
+  background: var(--dk-seal-wash); border-left-color: var(--dk-seal);
+}
+body[data-page^="docket-"] .wr-notice.is-info {
+  background: var(--dk-desk); border-left-color: var(--dk-rule-heavy);
+}
+
+body[data-page^="docket-"] .wr-notice b,
+body[data-page^="docket-"] .wr-info b { color: var(--dk-ink); }
+body[data-page^="docket-"] .wr-notice i,
+body[data-page^="docket-"] .wr-info i { color: var(--dk-ink-3); }
+
+@media (max-width: 620px) {
+  body[data-page^="docket-"] .wr-tl-item { grid-template-columns: 20px minmax(0, 1fr); }
+  body[data-page^="docket-"] .wr-tl-when { grid-column: 2; grid-row: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body[data-page^="docket-"] .dk-stamp-land { animation: none; opacity: 0.94; transform: rotate(-1.6deg); }
+  body[data-page^="docket-"] * { transition-duration: 1ms !important; }
+}
+
+@media print {
+  body[data-page^="docket-"] { background: #fff; }
+  body[data-page^="docket-"] .dashboard-container { max-width: none; padding: 0; }
+  body[data-page^="docket-"] .dk-sheet { border-color: #000; }
+  body[data-page^="docket-"] .dk-stub { background: #fff; }
+  body[data-page^="docket-"] .dk-note { background: #fff; }
+  body[data-page^="docket-"] .dk-stamp { transform: none; }
+  body[data-page^="docket-"] .dk-btn { display: none; }
+}

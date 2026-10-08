@@ -571,7 +571,6 @@ function sendContactInvoice(array $contact, int $requestId, ?int $sentBy = null)
     }
 
     $catalog = $request['catalog_name'] ?? null;
-    $deliveryFee = (float) ($request['delivery_fee'] ?? 0);
     $fee = (float) ($request['fee_amount'] ?? 0);
     if ($fee <= 0) {
         $fee = round((float) ($request['base_fee'] ?? 0) * max(1, (int) ($request['quantity'] ?? 1)), 2);
@@ -582,18 +581,16 @@ function sendContactInvoice(array $contact, int $requestId, ?int $sentBy = null)
         $catalog !== null
             ? ['name' => $catalog, 'sku' => $request['sku'] ?? '', 'base_fee' => (float) ($request['base_fee'] ?? 0)]
             : null,
-        $deliveryFee
     );
 
     $studentName = getStudentFullName($student);
-    $total = $fee + $deliveryFee;
+    $total = $fee;
     $html = '<p>Hello <strong>' . e_($contact['full_name']) . '</strong>,</p>'
         . '<p>A new invoice has been generated for <strong>' . e_($studentName) . '</strong> (Student No. ' . e_($student['student_number'] ?? '—') . '):</p>'
         . '<ul>'
         . '<li>Document: ' . e_($catalog ?: 'Document request') . '</li>'
         . '<li>Request No.: ' . e_($request['request_id'] ?? '—') . '</li>'
         . '<li>Document fee: PHP ' . number_format($fee, 2) . '</li>'
-        . ($deliveryFee > 0 ? '<li>Delivery fee: PHP ' . number_format($deliveryFee, 2) . '</li>' : '')
         . '<li><strong>Total: PHP ' . number_format($total, 2) . '</strong></li>'
         . '</ul>'
         . '<p>The invoice is attached as a secure PDF. It opens with the student’s <strong>ID number</strong> as the password.</p>';

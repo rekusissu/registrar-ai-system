@@ -179,15 +179,15 @@ include '../includes/sidebar.php';
             <p class="nq-fact"><i class="fa-solid fa-building-columns" aria-hidden="true"></i> Collected at the registrar counter</p>
         </div>
 
-        <?php // Priority and fulfillment are sent as fixed values rather than
-              // offered as choices. The API validates both, so the fields must
-              // exist, but a one-option control invites the clerk to wonder
-              // what the other option did. A walk-in is always Regular and
-              // always collected in person. Recipient went the same way: a
-              // walk-in document is collected by the student it was filed
-              // for, so the field asked a question with one possible answer. ?>
+        <?php // Priority is sent as a fixed value rather than offered as a
+              // choice. The API validates it, so the field has to exist, but
+              // a one-option control invites the clerk to wonder what the
+              // other option did. A walk-in is always Regular.
+              //
+              // fulfillment_type went the same way and then further: there is
+              // only one way to hand a document over, so the API records it
+              // itself and this form does not send it at all. ?>
         <input type="hidden" name="request_type" value="Regular">
-        <input type="hidden" name="fulfillment_type" value="Pickup">
         <?php // payment_method is what decides the request's opening status at
               // the API (student-documents.php:320-326). Left unset it
               // defaults to 'Online', which files the request as

@@ -511,11 +511,10 @@ function _pdf_student_name(array $student): string
  * @param array $request  document_requests row (+ catalog join fields)
  * @param array $student  students row (must include student_number)
  * @param array|null $catalog document_catalog row (name/sku/base_fee)
- * @param float $deliveryFee delivery charge to include on the line
  *
  * @return array{bytes: string, filename: string}
  */
-function buildInvoicePdf(array $request, array $student, ?array $catalog, float $deliveryFee = 0.0): array
+function buildInvoicePdf(array $request, array $student, ?array $catalog): array
 {
     $pdf = new \TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
     $pdf->SetCreator('BCP Registrar System');
@@ -553,8 +552,7 @@ function buildInvoicePdf(array $request, array $student, ?array $catalog, float 
     if ($fee <= 0 && $catalog !== null) {
         $fee = round((float) ($catalog['base_fee'] ?? 0) * max(1, (int) ($request['quantity'] ?? 1)), 2);
     }
-    $deliveryFee = max(0.0, $deliveryFee);
-    $total = round($fee + $deliveryFee, 2);
+    $total = round($fee, 2);
 
     $meta = [
         'Invoice No.'   => 'INV-' . ($request['request_id'] ?? '—'),
@@ -601,13 +599,6 @@ function buildInvoicePdf(array $request, array $student, ?array $catalog, float 
     $pdf->Cell(36, 8, number_format($fee / $qty, 2), 0, 0, 'R', true);
     $pdf->Cell(36, 8, number_format($fee, 2), 0, 1, 'R', true);
 
-    if ($deliveryFee > 0) {
-        $pdf->SetFont('helvetica', '', 9.5);
-        $pdf->SetTextColor(30, 41, 59);
-        $pdf->Cell(120, 8, 'Delivery fee', 0, 0, 'L', true);
-        $pdf->Cell(36, 8, '', 0, 0, 'R', true);
-        $pdf->Cell(36, 8, number_format($deliveryFee, 2), 0, 1, 'R', true);
-    }
 
     $pdf->SetDrawColor(203, 213, 225);
     $pdf->SetLineWidth(0.3);

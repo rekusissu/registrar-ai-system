@@ -1,0 +1,946 @@
+/* ============================================================
+   DOC-REQUEST.CSS  (css/)
+   The guided document-request wizard, student side.
+
+   A separate file from documents.css on purpose. documents.css is
+   shared with the registrar desk, which has its own visual language
+   (the dq-* system) and its own status vocabulary; adding wizard
+   rules to it would mean every rule has to be defensible in both
+   portals. This is the student's flow only.
+
+   Naming: wr-* for the wizard shell, and the vocabulary is the one
+   shared/doc_wizard.php defines - so a class name and a PHP function
+   are always about the same thing.
+   ============================================================ */
+
+/* ── The wizard shell ────────────────────────────────────── */
+
+.wr-shell {
+  max-width: 940px;
+  margin: 0 auto;
+}
+
+/* ── The stepper ─────────────────────────────────────────── */
+
+/* The stepper is an <ol> because a list of steps IS ordered content
+   and a screen reader announces the position from it. But the visible
+   position is already drawn by the step numbers in the dots, so the
+   browser's own markers are a second, louder, incorrect set of
+   numbers. Removed here rather than by changing the element, because
+   the semantics are worth keeping. */
+.wr-stepper { list-style: none; margin: 0; }
+
+.wr-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 20px 24px;
+  margin-bottom: 22px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  overflow-x: auto;
+}
+
+.wr-step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 0;
+  min-width: 0;
+  list-style: none;
+}
+
+.wr-step-dot {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text-faint);
+  background: var(--surface-muted);
+  border: 2px solid var(--border);
+  transition: background .18s ease, border-color .18s ease, color .18s ease;
+}
+
+/* Block, not inline: the label and the count are separate spans, and
+   as inline elements they render on one line with no gap between them -
+   "DetailsStep 1 of 4". Flex-column gives each its own line, which is
+   also how the eye reads a two-line step indicator. */
+.wr-step-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.wr-step-label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wr-step-count {
+  display: block;
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+/* The connector between two steps. A rule rather than a chevron,
+   because the point of the row is "how far along am I", and a
+   chevron reads as "where do I go next". */
+.wr-step-link {
+  flex: none;
+  width: 34px;
+  height: 2px;
+  margin: 0 12px;
+  border-radius: 2px;
+  background: var(--border);
+}
+
+/* Done: filled. Current: ringed and tinted. Ahead: hollow. */
+.wr-step.is-done .wr-step-dot {
+  background: var(--success-600, #16a34a);
+  border-color: var(--success-600, #16a34a);
+  color: #fff;
+}
+.wr-step.is-done .wr-step-label { color: var(--text-body); }
+.wr-step.is-done .wr-step-link { background: var(--success-600, #16a34a); }
+
+.wr-step.is-current .wr-step-dot {
+  background: var(--brand-600, #2563eb);
+  border-color: var(--brand-600, #2563eb);
+  color: #fff;
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, .14);
+}
+.wr-step.is-current .wr-step-label { color: var(--text-strong); }
+
+/* ── A wizard panel ──────────────────────────────────────── */
+
+.wr-panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  padding: 26px 28px;
+  margin-bottom: 20px;
+}
+
+.wr-panel-head {
+  margin-bottom: 20px;
+}
+
+.wr-panel-title {
+  margin: 0 0 4px;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -.02em;
+  color: var(--text-strong);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.wr-panel-title i { color: var(--brand-600, #2563eb); }
+
+.wr-panel-sub {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.65;
+  color: var(--text-muted);
+}
+
+/* ── The document picker ─────────────────────────────────── */
+
+.wr-search {
+  position: relative;
+  margin-bottom: 18px;
+}
+
+.wr-search input {
+  width: 100%;
+  padding: 14px 16px 14px 44px;
+  font-size: 15px;
+  border: 1px solid var(--border-strong, #cbd5e1);
+  border-radius: var(--radius-md, 12px);
+  background: var(--surface-subtle, #f8fafc);
+  color: var(--text-strong);
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.wr-search input:focus {
+  outline: none;
+  border-color: var(--brand-500, #3b82f6);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .14);
+  background: var(--surface);
+}
+
+.wr-search > i {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-faint);
+  pointer-events: none;
+}
+
+.wr-doc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 14px;
+}
+
+.wr-doc {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md, 12px);
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+
+.wr-doc:hover {
+  border-color: var(--brand-400, #60a5fa);
+  box-shadow: 0 6px 18px rgba(37, 99, 235, .10);
+  transform: translateY(-1px);
+}
+
+.wr-doc:focus-visible {
+  outline: none;
+  border-color: var(--brand-600, #2563eb);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .18);
+}
+
+.wr-doc[aria-pressed="true"] {
+  border-color: var(--brand-600, #2563eb);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .14);
+}
+
+.wr-doc-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  color: #fff;
+}
+
+.wr-doc-name {
+  font-size: 14.5px;
+  font-weight: 750;
+  color: var(--text-strong);
+  line-height: 1.35;
+}
+
+.wr-doc-desc {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.wr-doc-meta {
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.wr-doc-fee {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-strong);
+  white-space: nowrap;
+}
+
+.wr-doc-sla {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.wr-doc-reqs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.wr-doc-req {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 3px 7px;
+  border-radius: 6px;
+  background: #fef3c7;
+  color: #92400e;
+  white-space: nowrap;
+}
+
+/* A document with no paperwork is the easy case, and saying so
+   saves a student wondering whether something is missing. */
+.wr-doc-req.is-none {
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.wr-doc-empty {
+  grid-column: 1 / -1;
+  padding: 34px 20px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.wr-doc-empty i {
+  font-size: 34px;
+  color: var(--text-faint);
+  display: block;
+  margin-bottom: 10px;
+}
+
+/* ── Form rows ───────────────────────────────────────────── */
+
+.wr-field { margin-bottom: 20px; }
+
+.wr-field > label,
+.wr-label {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.wr-req { color: #dc2626; margin-left: 2px; }
+
+.wr-hint {
+  margin: 7px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+
+/* ── Quantity stepper ────────────────────────────────────── */
+
+.wr-qty {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--border-strong, #cbd5e1);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.wr-qty button {
+  width: 42px;
+  border: 0;
+  background: var(--surface-subtle, #f8fafc);
+  color: var(--text-body);
+  font-size: 16px;
+  cursor: pointer;
+  transition: background .12s ease;
+}
+
+.wr-qty button:hover:not(:disabled) { background: #e2e8f0; }
+
+.wr-qty button:disabled {
+  color: var(--text-faint);
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+.wr-qty input {
+  width: 68px;
+  border: 0;
+  border-left: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  text-align: center;
+  font-size: 15px;
+  font-weight: 750;
+  color: var(--text-strong);
+  padding: 10px 0;
+  background: var(--surface);
+}
+
+.wr-qty input:focus { outline: none; }
+.wr-qty input::-webkit-outer-spin-button,
+.wr-qty input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.wr-qty input[type=number] { -moz-appearance: textfield; }
+
+/* ── Choice cards (payment) ────────────────────── */
+
+.wr-choices { display: grid; gap: 10px; }
+
+.wr-choice {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 14px 16px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md, 12px);
+  cursor: pointer;
+  background: var(--surface);
+  transition: border-color .15s ease, background .15s ease;
+}
+
+.wr-choice:hover { border-color: var(--brand-400, #60a5fa); }
+
+.wr-choice input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.wr-choice:has(input:checked) {
+  border-color: var(--brand-600, #2563eb);
+  background: rgba(37, 99, 235, .045);
+}
+
+.wr-choice:has(input:focus-visible) {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, .18);
+}
+
+.wr-choice-mark {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong, #cbd5e1);
+  display: grid;
+  place-items: center;
+  transition: border-color .15s ease;
+}
+
+.wr-choice:has(input:checked) .wr-choice-mark {
+  border-color: var(--brand-600, #2563eb);
+}
+
+.wr-choice:has(input:checked) .wr-choice-mark::after {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--brand-600, #2563eb);
+}
+
+.wr-choice-icon {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  color: #fff;
+}
+
+.wr-choice-text { min-width: 0; flex: 1; }
+
+.wr-choice-name {
+  font-size: 13.5px;
+  font-weight: 750;
+  color: var(--text-strong);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.wr-choice-note {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.wr-choice-fee {
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.wr-choice-fee.is-free { color: var(--success-700, #15803d); }
+.wr-choice-fee.is-paid { color: #b45309; }
+
+
+.wr-quote-head {
+  padding: 12px 18px;
+  background: var(--surface-subtle, #f8fafc);
+  border-bottom: 1px dashed var(--border);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.wr-quote-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.wr-quote-line:last-of-type { border-bottom: 0; }
+
+.wr-quote-label { font-size: 13px; color: var(--text-body); font-weight: 600; }
+
+.wr-quote-detail {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.wr-quote-amount {
+  font-size: 14px;
+  font-weight: 750;
+  color: var(--text-strong);
+  white-space: nowrap;
+}
+
+.wr-quote-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  background: var(--brand-50, #eff6ff);
+  border-top: 2px solid var(--brand-600, #2563eb);
+}
+
+.wr-quote-total-label {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--brand-800, #1e40af);
+}
+
+/* The one number the student came for, so it is the loudest thing
+   on the screen by a wide margin. */
+.wr-quote-total-amount {
+  font-size: 24px;
+  font-weight: 850;
+  letter-spacing: -.02em;
+  color: var(--brand-800, #1e40af);
+}
+
+/* ── The upload checklist ────────────────────────────────── */
+
+.wr-reqs { display: grid; gap: 10px; }
+
+.wr-req-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md, 12px);
+  background: var(--surface);
+  transition: border-color .15s ease, background .15s ease;
+}
+
+.wr-req-row.is-met {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.wr-req-row.is-optional { background: var(--surface-subtle, #f8fafc); }
+
+.wr-req-icon {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+}
+
+.wr-req-row.is-met .wr-req-icon { background: #dcfce7; color: #15803d; }
+.wr-req-row:not(.is-met) .wr-req-icon { background: #fef3c7; color: #b45309; }
+
+.wr-req-body { flex: 1; min-width: 0; }
+
+.wr-req-name {
+  font-size: 13.5px;
+  font-weight: 750;
+  color: var(--text-strong);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.wr-req-hint {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Optional is spelled out rather than left to the absence of an
+   asterisk, which reads as an oversight rather than a choice. */
+.wr-req-tag {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.wr-req-tag.is-required { background: #fee2e2; color: #991b1b; }
+
+.wr-req-actions { flex: none; display: flex; align-items: center; gap: 8px; }
+
+.wr-req-state {
+  font-size: 11.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.wr-req-state.is-met { color: #15803d; }
+
+/* ── Dropzone ────────────────────────────────────────────── */
+
+/* `display: block` rather than the label's default inline, and a
+   block-level box rather than an inline one that sits on the text
+   baseline. As an inline element the dropzone's own box overlapped the
+   last requirement row above it, because inline boxes do not reserve
+   vertical space for their padding - which is what put the drag hint
+   straight through the "Accounting Clearance" row. */
+.wr-drop {
+  display: block;
+  margin-top: 18px;
+  padding: 30px 22px;
+  border: 2px dashed var(--border-strong, #cbd5e1);
+  border-radius: var(--radius-lg);
+  background: var(--surface-subtle, #f8fafc);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease;
+}
+
+.wr-drop:hover,
+.wr-drop.is-over {
+  border-color: var(--brand-500, #3b82f6);
+  background: rgba(37, 99, 235, .05);
+}
+
+.wr-drop i { font-size: 26px; color: var(--brand-500, #3b82f6); display: block; margin-bottom: 9px; }
+.wr-drop-title { display: block; font-size: 13.5px; font-weight: 750; color: var(--text-strong); }
+.wr-drop-note { display: block; font-size: 11.5px; color: var(--text-muted); margin-top: 4px; }
+
+.wr-drop input[type=file] { display: none; }
+
+/* ── Attachment list ─────────────────────────────────────── */
+
+.wr-files { display: grid; gap: 8px; margin-top: 14px; }
+
+.wr-file {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.wr-file-icon { color: var(--brand-600, #2563eb); font-size: 14px; flex: none; }
+
+.wr-file-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--text-body);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wr-file-size { font-size: 11px; color: var(--text-faint); white-space: nowrap; }
+
+.wr-file-drop {
+  flex: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: color .12s ease, background .12s ease;
+}
+
+.wr-file-drop:hover { color: #dc2626; background: #fef2f2; }
+
+/* ── Notices ─────────────────────────────────────────────── */
+
+.wr-notice {
+  display: flex;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md, 12px);
+  font-size: 13px;
+  line-height: 1.6;
+  margin-bottom: 18px;
+  border: 1px solid;
+}
+
+.wr-notice i { flex: none; margin-top: 2px; }
+.wr-notice b { display: block; margin-bottom: 3px; }
+
+.wr-notice.is-warn { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+.wr-notice.is-info { background: var(--brand-50, #eff6ff); border-color: #bfdbfe; color: #1e40af; }
+.wr-notice.is-danger { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+.wr-notice.is-ok { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+
+/* ── Confirmations ───────────────────────────────────────── */
+
+.wr-certify { display: grid; gap: 10px; }
+
+.wr-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 13px 15px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  background: var(--surface);
+  transition: border-color .15s ease;
+}
+
+.wr-check:hover { border-color: var(--brand-400, #60a5fa); }
+
+.wr-check input { flex: none; margin-top: 2px; width: 16px; height: 16px; accent-color: var(--brand-600, #2563eb); }
+
+.wr-check-text { font-size: 13px; line-height: 1.55; color: var(--text-body); }
+
+/* ── Action bar ──────────────────────────────────────────── */
+
+.wr-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 18px;
+  margin-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.wr-actions .wr-spacer { flex: 1; }
+
+/* ── Summary rows (review + tracking) ────────────────────── */
+
+.wr-sum {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 12px);
+  overflow: hidden;
+}
+
+.wr-sum-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.wr-sum-row:last-child { border-bottom: 0; }
+
+.wr-sum-key { font-size: 12.5px; font-weight: 700; color: var(--text-muted); white-space: nowrap; }
+.wr-sum-val { font-size: 13.5px; font-weight: 650; color: var(--text-strong); text-align: right; }
+.wr-sum-val.is-quiet { font-weight: 500; color: var(--text-muted); }
+
+/* ── Tracking number ─────────────────────────────────────── */
+
+.wr-trackno {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 18px 20px;
+  border: 2px dashed var(--brand-400, #60a5fa);
+  border-radius: var(--radius-lg);
+  background: var(--brand-50, #eff6ff);
+}
+
+.wr-trackno-value {
+  font-size: 22px;
+  font-weight: 850;
+  letter-spacing: .04em;
+  color: var(--brand-800, #1e40af);
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+
+.wr-trackno-copy {
+  border: 1px solid var(--brand-400, #60a5fa);
+  background: var(--surface);
+  color: var(--brand-700, #1d4ed8);
+  border-radius: 9px;
+  padding: 8px 13px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: background .12s ease;
+}
+
+.wr-trackno-copy:hover { background: var(--brand-100, #dbeafe); }
+
+/* ── The status timeline ─────────────────────────────────── */
+
+.wr-timeline { position: relative; margin: 6px 0 0; padding: 0; list-style: none; }
+
+.wr-tl-item {
+  position: relative;
+  padding: 0 0 22px 34px;
+  min-height: 34px;
+}
+
+/* The rail. Drawn on the item so it stops at the last one rather
+   than running past the bottom of the list. */
+.wr-tl-item::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  top: 22px;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+}
+
+.wr-tl-item:last-child { padding-bottom: 0; }
+.wr-tl-item:last-child::before { display: none; }
+
+.wr-tl-dot {
+  position: absolute;
+  left: 3px;
+  top: 4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--border-strong, #cbd5e1);
+  display: grid;
+  place-items: center;
+  font-size: 8px;
+  color: #fff;
+  z-index: 1;
+}
+
+.wr-tl-item.is-done .wr-tl-dot { background: var(--success-600, #16a34a); border-color: var(--success-600, #16a34a); }
+.wr-tl-item.is-done::before { background: var(--success-600, #16a34a); }
+
+.wr-tl-item.is-active .wr-tl-dot {
+  border-color: var(--brand-600, #2563eb);
+  background: var(--brand-600, #2563eb);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, .16);
+}
+
+.wr-tl-item.is-stopped .wr-tl-dot { background: #94a3b8; border-color: #94a3b8; }
+.wr-tl-item.is-stopped::before { background: #e2e8f0; }
+
+.wr-tl-label { font-size: 13.5px; font-weight: 750; color: var(--text-strong); }
+.wr-tl-item.is-pending .wr-tl-label { color: var(--text-faint); font-weight: 600; }
+.wr-tl-item.is-stopped .wr-tl-label { color: var(--text-muted); }
+
+.wr-tl-when { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; }
+.wr-tl-note { font-size: 11.5px; color: var(--text-muted); margin-top: 2px; font-style: italic; }
+
+/* ── Success screen ──────────────────────────────────────── */
+
+.wr-done {
+  text-align: center;
+  padding: 44px 28px;
+}
+
+.wr-done-mark {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 20px;
+  font-size: 32px;
+  color: #fff;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  box-shadow: 0 10px 26px rgba(22, 163, 74, .3);
+}
+
+.wr-done-title {
+  margin: 0 0 8px;
+  font-size: 24px;
+  font-weight: 850;
+  letter-spacing: -.02em;
+  color: var(--text-strong);
+}
+
+.wr-done-text {
+  margin: 0 auto 26px;
+  max-width: 560px;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+
+.wr-next { text-align: left; max-width: 460px; margin: 0 auto 26px; }
+.wr-next li { font-size: 13px; line-height: 1.75; color: var(--text-body); margin-bottom: 5px; }
+
+.wr-done-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+/* ── Mobile ──────────────────────────────────────────────── */
+
+@media (max-width: 720px) {
+  .wr-panel { padding: 20px 18px; border-radius: var(--radius-md, 12px); }
+
+  .wr-stepper { padding: 14px 16px; gap: 0; }
+  .wr-step-body { display: none; }         /* the dot carries the position */
+  .wr-step-link { width: 20px; margin: 0 8px; }
+
+  .wr-doc-grid { grid-template-columns: 1fr; }
+
+  .wr-actions { flex-wrap: wrap; }
+  .wr-actions .wr-spacer { display: none; }
+  .wr-actions .btn { flex: 1 1 auto; }
+
+  .wr-quote-total-amount { font-size: 20px; }
+  .wr-trackno { flex-direction: column; gap: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wr-doc, .wr-req-row, .wr-choice, .wr-drop { transition: none; }
+  .wr-doc:hover { transform: none; }
+}

@@ -208,17 +208,15 @@ function doc_age_label(array $age): string
 }
 
 /**
- * The lifecycle as an ordered track, for the desk's process rail.
+ * Four stations, and there used to be a fifth.
  *
- * A status pill answers "what is this?" — one word, no memory. The
- * question a clerk actually asks is "how far along is it, and what do
- * I do now?", which needs the whole track drawn. So the rail is
- * rendered from this map, and `doc_next_step()` decides which station
- * is the current one — one source of truth, so the drawn track and
- * the offered action cannot disagree.
- *
- * Ordered, because the walk-in lifecycle genuinely is a sequence:
- * filed at the counter, prepared, signed and ready, handed over.
+ * A courier request had a 'Shipped' station spliced in between "Ready"
+ * and "Claimed". Courier is gone, so the parameter that switched it on
+ * goes too -- it had exactly one meaningful value, and a function whose
+ * argument chooses between one track and the same track is a function
+ * with a dead branch. Dropping the signature is the point: while
+ * ?string $fulfillment = null survived, every call site still had to
+ * pass something and the desk still had to read fulfillment_type.
  *
  * @return array<int,array{key:string,label:string,verb:string}>
  */
@@ -246,13 +244,19 @@ function doc_stage_track(): array
  */
 function doc_stage_position(string $status): array
 {
-    if ($status === 'Rejected') {
+    if (in_array($status, ['Rejected', 'Cancelled'], true)) {
         return ['index' => -1, 'stopped' => true];
     }
     foreach (doc_stage_track() as $i => $stage) {
         if ($stage['key'] === $status) {
             return ['index' => $i, 'stopped' => false];
         }
+    }
+    // A legacy 'Shipped' row has no station now that courier is gone. It
+    // reports at the Ready station rather than index 0, so a discontinued
+    // courier row does not draw as though it had never started.
+    if ($status === 'Shipped') {
+        return ['index' => 2, 'stopped' => false];
     }
     return ['index' => 0, 'stopped' => false];
 }
@@ -296,6 +300,7 @@ function doc_next_step(array $row): ?array
             return ['action' => 'claim',   'handler' => 'claimDoc',        'wants' => 'btn',    'label' => 'Claim',             'icon' => 'fa-box-check'];
         case 'Claimed':
         case 'Rejected':
+        case 'Cancelled':
         default:
             return null;
     }
@@ -538,9 +543,10 @@ function doc_set_registrar_hold(int $requestId, string $reason, ?int $userId = n
  */
 function doc_requires_receipt(array $row): bool
 {
-    $fee  = (float) ($row['fee_amount'] ?? 0);
-    $ship = (float) ($row['delivery_fee'] ?? 0);
-    if ($fee + $ship <= 0.0) return false;
+    // The courier fee used to be added here, because a courier request
+    // could be paid online and still owed postage. There is no courier.
+    $fee = (float) ($row['fee_amount'] ?? 0);
+    if ($fee <= 0.0) return false;
     // Only money that actually moved online leaves a GCash reference
     // behind. Cash on delivery is counted in person, at the counter,
     // where the cashier's book is the record.

@@ -168,7 +168,8 @@ $userId = (int) $db->insert('users', [
 // Column names come from `SHOW COLUMNS ON document_requests` (see
 // tests/_cols.php), NOT from registrar_ai.sql. Two reasons that matters:
 //   - `total_amount` / `request_number` / `requested_at` do not exist; the
-//     money is `fee_amount` + `delivery_fee` and the timestamp is the
+//     money is `fee_amount` alone and the timestamp is the
+//     defaulted `request_date`.
 //     defaulted `request_date`.
 //   - `document_type` is an ENUM of codes (form137, good_moral,
 //     transcript, certificate, clearance), not free text, so the readable

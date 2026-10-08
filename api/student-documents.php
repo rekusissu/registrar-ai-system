@@ -215,7 +215,6 @@ if (($input['action'] ?? '') === 'upload_receipt') {
 $catalogId    = (int) ($input['catalog_id'] ?? 0);
 $quantity     = max(1, (int) ($input['quantity'] ?? 1));
 $requestType  = trim($input['request_type'] ?? 'Regular');
-$fulfillment  = trim($input['fulfillment_type'] ?? 'Pickup');
 $purpose      = trim($input['purpose'] ?? '');
 // Recipient is no longer collected by the desk. A walk-in document is
 // always picked up by the student it was filed for, so the field had one
@@ -232,41 +231,12 @@ if (mb_strlen($waitingOn) > 160) {
     echo json_encode(['success' => false, 'message' => 'The waiting-on note is too long (160 characters max).']);
     exit;
 }
-// Fulfillment: Pickup at the counter, Delivery by courier, or a digital
-// copy. 'Courier' is the legacy spelling an older caller sent; it is mapped
-// to the enum's 'Delivery' so a stale client still files a valid request.
-if ($fulfillment === 'Courier') {
-    $fulfillment = 'Delivery';
-}
-$address = trim((string) ($input['delivery_address'] ?? ''));
 
-// Payment method: Online (GCash) or pay at the counter.
-// Keep the canonical DB casing ('Cash_on_Delivery') — do not uppercase, the
-// enum is case-sensitive. 'Counter' is accepted as a friendlier alias for the
-// student-facing label, then mapped to the value the column stores.
-$paymentMethod = trim((string) ($input['payment_method'] ?? 'Online'));
-if ($paymentMethod === 'Counter') {
-    $paymentMethod = 'Cash_on_Delivery';
-}
-
-if (!in_array($requestType, ['Express', 'Regular'], true)) {
-    echo json_encode(['success' => false, 'message' => 'Invalid request type.']);
-    exit;
-}
-if (!in_array($fulfillment, ['Pickup', 'Delivery', 'Digital'], true)) {
-    echo json_encode(['success' => false, 'message' => 'Invalid fulfillment type.']);
-    exit;
-}
 if ($paymentMethod !== 'Online' && $paymentMethod !== 'Cash_on_Delivery') {
     echo json_encode(['success' => false, 'message' => 'Invalid payment method.']);
     exit;
 }
-// A courier leg with nowhere to send it is a request the office cannot
-// fulfil, so the address is required rather than silently dropped.
-if ($fulfillment === 'Delivery' && $address === '') {
-    echo json_encode(['success' => false, 'message' => 'A delivery address is required for courier delivery.']);
-    exit;
-}
+
 if ($purpose === '') {
     echo json_encode(['success' => false, 'message' => 'Purpose is required.']);
     exit;
@@ -289,10 +259,6 @@ try {
     // Fee: flat → base_fee; per_page / per_syllabus → base_fee × quantity.
     $fee = round((float) $catalog['base_fee'] * ($catalog['fee_type'] === 'flat' ? 1 : $quantity), 2);
 
-    // Courier delivery fee — quoted up-front and borne by the student.
-    // Never trust the client's number: the server recomputes the same
-    // deterministic quote the student saw in the fee preview.
-    $deliveryFee = $fulfillment === 'Delivery' ? 150.00 : null;
 
     // Per-year sequence: DOC-2026-0001, DOC-2026-0002, …
     $year = date('Y');
@@ -415,11 +381,9 @@ try {
             'catalog_id'            => $catalogId,
             'quantity'              => $quantity,
             'request_type'          => $requestType,
-            'fulfillment_type'      => $fulfillment,
-            'delivery_address'      => $fulfillment === 'Delivery' ? $address : null,
-            'payment_method'        => $paymentMethod,
-            'delivery_fee'          => $deliveryFee,
-            'document_status'       => $status,
+            'fulfillment_type'      => doc_fulfillment(),
+                        'payment_method'        => $paymentMethod,
+                        'document_status'       => $status,
             'qr_hash'               => $qrHash,
             'requirement_file_path' => $reqFilePath,
             // Filed online, not at a counter. The desk reads this to know
@@ -491,9 +455,9 @@ try {
         ]);
         $filedNote = $paymentMethod === 'Online'
             ? 'Request submitted online (' . $requestId . ') — fee ₱'
-                . number_format($fee + (float) ($deliveryFee ?? 0), 2) . ', awaiting payment'
+                . number_format($fee, 2) . ', awaiting payment'
             : 'Request filed at the counter (' . $requestId . ') — fee ₱'
-                . number_format($fee + (float) ($deliveryFee ?? 0), 2) . ', pay on pickup';
+                . number_format($fee, 2) . ', pay on pickup';
         if ($blockedReason) {
             // Distinguish the two in the log too. "held: <reason>" is
             // accurate for a balance, but for a registrar's own note it
@@ -547,7 +511,7 @@ try {
             . number_format($balance, 2) . ') pending clearance.';
     } elseif ($status === 'Awaiting_Payment') {
         $submitMessage = 'Request submitted. Pay ₱'
-            . number_format($fee + (float) ($deliveryFee ?? 0), 2)
+            . number_format($fee, 2)
             . ' to start processing.';
     } else {
         $submitMessage = 'Document request submitted. Pay at the office when you collect it.';
@@ -557,7 +521,7 @@ try {
         'success' => true,
         'message' => $submitMessage,
         'data' => ['id' => $id, 'request_id' => $requestId, 'document_status' => $status,
-                   'fee' => $fee, 'delivery_fee' => $deliveryFee, 'payment_method' => $paymentMethod],
+                   'fee' => $fee, 'payment_method' => $paymentMethod],
     ]);
 } catch (Throwable $e) {
     json_error($e, 'Unable to submit request. Please check for outstanding balance or account status.');

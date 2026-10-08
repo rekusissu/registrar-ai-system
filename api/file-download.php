@@ -27,6 +27,7 @@
 //      can never execute in the app's origin (stored XSS)
 //
 //  Usage: GET api/file-download.php?id=<documents.id>
+//         GET api/file-download.php?kind=attachment&attachment=<id>
 //        GET api/file-download.php?kind=receipt&request=<document_requests.id>
 //
 //  Note: ?path= is deliberately NOT supported. Resolving straight from a
@@ -77,7 +78,57 @@ $isStaff = in_array($role, ['admin', 'registrar', 'staff'], true);
 // Same id-not-path rule as documents: ownership and existence are read
 // from the row, never inferred from a supplied filename.
 $kind = (string) ($_GET['kind'] ?? '');
-if ($kind === 'receipt') {
+
+// ── 1c. Requirement attachments ─────────────────────────────────
+//
+// A wizard upload (school ID, library clearance, the affidavit). These
+// live in document_request_attachments rather than documents, so they
+// need their own resolution path.
+//
+// Unlike a receipt, these ARE the student's own paperwork and the owner
+// may open them: they attached them, and they need to check they
+// uploaded the right page. Staff may open any of them. The ownership
+// check is against the PARENT request's student_id, read from the
+// database rather than supplied, for the same CWE-639 reason the
+// documents branch below has.
+if ($kind === 'attachment') {
+    if (!($isStaff || $role === 'student')) {
+        jsonFail(403, 'Forbidden.');
+    }
+    $attId = isset($_GET['attachment']) ? (int) $_GET['attachment'] : 0;
+    if ($attId <= 0) {
+        jsonFail(400, 'Nothing requested.');
+    }
+    $att = Database::getInstance()->fetchOne(
+        'SELECT a.request_id, a.original_name, a.file_path, dr.student_id
+           FROM document_request_attachments a
+           JOIN document_requests dr ON dr.id = a.request_id
+          WHERE a.id = ?',
+        [$attId]
+    );
+    // Same wording as the receipt branch above, and for the same
+    // reason: distinguishing "no such file" from "not yours" turns
+    // this endpoint into an id oracle across the whole school.
+    if (!$att) {
+        jsonFail(404, 'That file is not available.');
+    }
+    if (!$isStaff) {
+        $own = getCurrentStudentId();
+        if ($own === null || (int) $own !== (int) $att['student_id']) {
+            error_log('[file-download] denied student uid=' . (int) ($_SESSION['user_id'] ?? 0)
+                . ' attachment=' . $attId);
+            jsonFail(404, 'That file is not available.');
+        }
+    }
+    $docId  = $attId;
+    $doc    = [
+        'student_id' => (int) $att['student_id'],
+        'filename'   => (string) $att['original_name'],
+        'file_path'  => (string) $att['file_path'],
+    ];
+    $isReceipt = false;
+    $isAttachment = true;
+} elseif ($kind === 'receipt') {
     if (!$isStaff) {
         jsonFail(403, 'Forbidden.');
     }
@@ -103,7 +154,8 @@ if ($kind === 'receipt') {
         'filename'   => (string) ($req['payment_receipt_filename'] ?? basename($stored)),
         'file_path'  => $stored,
     ];
-    $isReceipt = true;
+    $isReceipt    = true;
+    $isAttachment = false;
 } else {
     // ── 2. Resolve the requested row ──────────────────────────────
     // Only a documents.id is accepted, so ownership can always be checked
@@ -122,7 +174,8 @@ if ($kind === 'receipt') {
     if (!$doc) {
         jsonFail(404, 'File not found.');
     }
-    $isReceipt = false;
+    $isReceipt    = false;
+    $isAttachment = false;
 }
 
 $stored = (string) ($doc['file_path'] ?? '');
@@ -148,6 +201,17 @@ if ($realAbs === false || $realRoot === false || strpos($realAbs, $realRoot) !==
 }
 
 // ── 4. Authorisation ──────────────────────────────────────────
+//
+// Receipts are already authorised: they fell out of the branch above,
+// which returns early for anyone who is not staff. So this gate covers
+// the `documents` table and the wizard's attachments, and both carry a
+// real student_id on $doc.
+//
+// The ownership comparison is written to fail closed in every direction,
+// including the one that has bitten before: a row whose owner is 0 (no
+// owner recorded at all) must NOT be readable by anybody who happens to
+// resolve to 0 as well. `$own === null ||` catches an unlinked session,
+// and the strict `!==` means a null owner never equals a real id.
 if (!$isStaff && !$isReceipt) {
     if ($role !== 'student') {
         // teacher, or anything else: file storage is not theirs.
@@ -157,9 +221,9 @@ if (!$isStaff && !$isReceipt) {
     // session, never from the request (CWE-639).
     $own   = getCurrentStudentId();
     $owner = (int) ($doc['student_id'] ?? 0);
-    if ($owner === 0 || $own === null || (int) $own !== $owner) {
+    if ($owner <= 0 || $own === null || (int) $own !== $owner) {
         error_log('[file-download] denied student uid=' . (int) ($_SESSION['user_id'] ?? 0)
-            . ' doc=' . $docId . ' owner=' . $owner);
+            . ' doc=' . $docId . ($isAttachment ? ' (attachment)' : '') . ' owner=' . $owner);
         jsonFail(403, 'Forbidden.');
     }
 }
