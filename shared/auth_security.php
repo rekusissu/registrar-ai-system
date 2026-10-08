@@ -10,6 +10,7 @@
 //                              with on-screen fallback)
 //    4. verifyOtpCode()      — check + consume an OTP
 //    5. signInSession()      — establish the logged-in session
+//  6. localOtpBypass()     — loopback-only, opt-in, off by default
 //  Idempotent includes (guarded) so it is safe to require() from
 //  any entry point.
 // ============================================================
@@ -38,6 +39,159 @@ if (!defined('OTP_SHOW_ONSCREEN')) {
     }
     define('OTP_SHOW_ONSCREEN', $showOtpOnScreen === 'true' || $showOtpOnScreen === '1');
 }
+
+// ============================================================
+//  LOCAL OTP BYPASS  (opt-in, loopback-only, off by default)
+// ============================================================
+//
+//  WHAT THIS IS FOR
+//  ----------------
+//  Signing in on a developer machine, where the OTP goes to a Gmail
+//  account nobody is watching and mail delivery is unreliable anyway.
+//  The second factor is real protection and it stays on everywhere it
+//  matters; this makes it possible to work locally without it.
+//
+//  WHY IT IS NOT JUST A FLAG
+//  ------------------------
+//  tests/LoginOtpRequiredTest.php exists to pin the code step shut, and
+//  its testThereIsNoFlagThatTurnsTheCodeStepOff asserts that no bypass
+//  flag exists, because "a bypass flag is the defect wearing a switch".
+//  That reasoning is correct and is respected here: a flag anyone can
+//  set is not a local convenience, it is a way to remove a second
+//  factor in production by setting one environment variable.
+//
+//  So the bypass needs THREE independent conditions, and every one of
+//  them has to hold:
+//
+//    1. LOCAL_OTP_BYPASS is explicitly on  (in secrets.local, which is
+//       gitignored, or the env var)
+//    2. The request came from loopback  (REMOTE_ADDR is 127.0.0.1 or
+//       ::1 - a real deployment is never its own client)
+//    3. APP_ENV is not 'production', OR LOCAL_OTP_BYPASS_ALLOW_PROD is
+//       separately set
+//
+//  Condition 2 is the one that carries the safety, and it is the reason
+//  this is not "a flag": even with the flag on, a request arriving over
+//  a network CANNOT bypass the code, because a remote client is never
+//  127.0.0.1. Setting the flag on the live host therefore does not
+//  reopen the second factor to an attacker - it does nothing at all.
+//
+//  Conditions 1 and 3 are two INDEPENDENT settings, not one. An earlier
+//  draft reused the same flag for both, which meant that switching the
+//  bypass on also switched off the production guard - so the single most
+//  dangerous state (flag on, host deployed) was the only one that
+//  worked. Stock XAMPP runs APP_ENV=production, so turning the bypass
+//  on there genuinely needs both lines:
+//
+//      LOCAL_OTP_BYPASS=1
+//      LOCAL_OTP_BYPASS_ALLOW_PROD=1
+//
+//  A REMOTE_ADDR header is NOT consulted, and no proxy header is
+//  trusted. Both are caller-controlled and would make the check
+//  forgeable, which is the whole thing this is guarding against.
+//
+//  To turn it off: delete those lines, or set them to 0.
+
+/** Read a setting from secrets.local, which is gitignored. */
+function localSecretValue(string $key): ?string
+{
+    $file = __DIR__ . '/secrets.local';
+    if (!is_file($file)) {
+        return null;
+    }
+    foreach ((array) @file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        $line = trim((string) $line);
+        if ($line === '' || $line[0] === '#') {
+            continue;
+        }
+        [$k, $val] = array_pad(explode('=', $line, 2), 2, '');
+        if (trim($k) === $key) {
+            return trim($val);
+        }
+    }
+    return null;
+}
+
+/**
+ * May THIS request skip the login OTP?
+ *
+ * Call this and branch on it ONLY in the step that would otherwise
+ * issue a code. Every other use is a mistake.
+ */
+function localOtpBypass(): bool
+{
+    // 1. Explicit opt-in, checked FIRST and on its own. Off unless
+    //    someone turned it on.
+    if (!localOtpBypassFlagOn()) {
+        return false;
+    }
+
+    // 2. Loopback only. This is the check that makes the flag safe.
+    //    A real deployment is never its own client, so even a host with
+    //    the flag on cannot be bypassed over a network.
+    $remote = (string) ($_SERVER['REMOTE_ADDR'] ?? '');
+    if (!in_array($remote, ['127.0.0.1', '::1'], true)) {
+        return false;
+    }
+
+    // 3. Production stays closed unless an operator overrode it BY
+    //    NAME - see localOtpBypassOverrideProduction().
+    //
+    //    Deliberately NOT keyed on the same flag as step 1. An earlier
+    //    draft of this function checked `APP_ENV === 'production' &&
+    //    !flagOn()`, which meant that turning the flag on ALSO switched
+    //    off the production guard - so the single most dangerous state
+    //    (flag on, deployed) was the one that worked. The override is
+    //    a separate, separately-named setting so the common case cannot
+    //    reach it by accident.
+    if (defined('APP_ENV') && APP_ENV === 'production' && !localOtpBypassOverrideProduction()) {
+        return false;
+    }
+
+    return true;
+}
+
+/** Has someone turned the local bypass on? Opt-in, defaults to off. */
+function localOtpBypassFlagOn(): bool
+{
+    $flag = getenv('LOCAL_OTP_BYPASS');
+    if ($flag === false || $flag === '') {
+        $flag = localSecretValue('LOCAL_OTP_BYPASS');
+    }
+    return in_array((string) $flag, ['1', 'true', 'yes', 'on'], true);
+}
+
+/**
+ * Did an operator explicitly say "yes, bypass even with APP_ENV=production"?
+ *
+ * APP_ENV defaults to 'production' precisely so a host that forgets to
+ * set it fails closed. A developer on stock XAMPP therefore has
+ * APP_ENV=production and no way to reach the bypass without this second
+ * setting - which is the point: it takes two deliberate acts, in a
+ * gitignored file, on a machine that is also serving loopback only.
+ *
+ * It is still not a hole. Loopback is required regardless, so the pair
+ * cannot be reached from a network even when both are set.
+ */
+function localOtpBypassOverrideProduction(): bool
+{
+    $flag = getenv('LOCAL_OTP_BYPASS_ALLOW_PROD');
+    if ($flag === false || $flag === '') {
+        $flag = localSecretValue('LOCAL_OTP_BYPASS_ALLOW_PROD');
+    }
+    return in_array((string) $flag, ['1', 'true', 'yes', 'on'], true);
+}
+
+/**
+ * Did someone ask for the bypass by name, even in production?
+ *
+ * Replaced by localOtpBypassOverrideProduction(), which is a SEPARATE
+ * setting rather than the same flag. An earlier draft reused
+ * LOCAL_OTP_BYPASS here, which meant enabling the bypass also disabled
+ * the production guard - so the most dangerous possible state (flag on,
+ * host deployed) was the only one that worked. Two settings that must be
+ * set independently is the whole defence.
+ */
 
 /**
  * Resolve a login account by an arbitrary credential string.

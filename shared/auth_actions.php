@@ -107,6 +107,33 @@ if ($action === 'login') {
         loginThrottleRecord($credential, $clientIp, true);
         loginThrottleClear($credential, $clientIp);
 
+        // THE LOCAL DEVELOPMENT BYPASS, and the ONLY place it is honoured.
+        //
+        // Placed here deliberately: after the password has been proven,
+        // and after the lockout/throttle bookkeeping, so a bypassed login
+        // is recorded and rate-limited exactly like any other. Before
+        // those, a bypass would also skip the brute-force counters.
+        //
+        // localOtpBypass() is true only when the flag is on AND the
+        // request came from loopback AND production was not left
+        // un-overridden. From a network this line is dead, so the second
+        // factor stands everywhere it is actually load-bearing.
+        if (localOtpBypass()) {
+            $redirect = signInSession($user);
+            logActivity((int) $user['id'], 'login_local_bypass', json_encode([
+                'ip'      => $clientIp,
+                'app_env' => defined('APP_ENV') ? APP_ENV : '?',
+            ]));
+            sendResponse(true, 'Signed in (local development: verification code skipped).', [
+                // A step the client does not recognise, so the normal
+                // "waiting for a code" screen is never shown and the
+                // page redirects on success.
+                'step'    => 'complete',
+                'redirect' => $redirect,
+                'local_bypass' => true,
+            ]);
+        }
+
         // Bind the session to this account before the code goes out, so
         // resend_otp and verify_otp cannot be aimed at a different
         // user_id mid-flow. Without this the pending check in those two

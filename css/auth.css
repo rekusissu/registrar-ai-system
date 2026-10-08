@@ -1,416 +1,862 @@
-/* ── Shared auth page styles (register, register2, signin) ── */
+/* ============================================================================
+   CSS/AUTH.CSS
+   The sign-in screen. Loaded only by login.php.
+
+   THE CONCEPT
+   -----------
+   Bestlink students already carry RFID cards, and this system reads them. So
+   the sign-in page is a card read: the card face is the panel you fill in,
+   and the page dresses it as the thing it represents.
+
+   On a light ground the instrumentation has to be DRAWN, not lit. A dark
+   page can lean on glow; a white one has to earn the technical reading with
+   line work — registration marks at the corners, a readout bar across the
+   top, a folded seam, hairline rules, monospaced labels. So the container
+   carries the tech design, and the form stays quiet inside it.
+
+   WHAT THIS PAGE DELIBERATELY DOES NOT SHOW
+   -----------------------------------------
+   There is no "SECURE · TLS 1.3" badge, no invented node name, no client IP
+   and no staff account count: each was either untrue, invented, useless to a
+   visitor, or an account-enumeration gift. There is no "keep me signed in"
+   checkbox either, because no backend field backs one, and no fake progress
+   theatre, because the backend is a single POST that returns JSON.
+
+   password-field.css is loaded AFTER this file and owns the password field's
+   masking. Nothing here sets -webkit-text-security, so the two cannot fight.
+   ========================================================================= */
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+:root {
+  /* Ground and card */
+  --ground:      #FFFFFF;
+  --card:        #FFFFFF;
+  --card-2:      #F7F9FC;
+  --rule:        #E2E8F1;
+  --rule-2:      #CFD8E4;
+
+  /* Ink.
+     Three steps for text, plus a fourth for instrumentation.
+
+     --ink-3 was #94A3B5, which is 2.57:1 on white. It was carrying the
+     Terms link, input placeholders, the OTP hint and the strip labels, all
+     of which are text somebody has to read — so those moved to a 4.76:1
+     tone.
+
+     --hairline is separate because it is not text but it is also not
+     nothing: the crop marks and the readout pip are instrumentation, and
+     1.4.11 wants 3:1 for graphics that carry meaning. #94A3B5 fell short at
+     2.57:1, so it is darker here and the pip stays quiet rather than
+     invisible. */
+  --ink:         #10192B;
+  --ink-2:       #5B6B82;
+  --ink-3:       #64748B;
+  --hairline:    #7C8B9E;
+
+  /* Accent. Royal blue rather than cyan: cyan on white cannot carry text at
+     12px, and the crest's own blue is royal — the accent is taken from the
+     school mark rather than imposed on it. */
+  --blue:        #1D4ED8;
+  --blue-deep:   #1638A8;
+
+  /* Status */
+  --ok:          #0E8A5F;
+  --ok-bg:       #E6F6EF;
+  --bad:         #B3261E;
+  --bad-bg:      #FDECEA;
+  --warn:        #A4610A;
+
+  --sans:    'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --display: 'Space Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono:    'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --r: 8px;
+  --r-lg: 14px;
+
+  --shadow:
+    0 1px 2px rgba(16, 25, 43, 0.05),
+    0 12px 28px -12px rgba(16, 25, 43, 0.16),
+    0 32px 64px -32px rgba(16, 25, 43, 0.20);
+}
+
 body {
-  font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont,
-               'Helvetica Neue', Arial, sans-serif;
-  background: #cfd8e3;
+  font-family: var(--sans);
+  background: var(--ground);
+  color: var(--ink);
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  padding: 32px 20px;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Outer border used on sign-in */
-.outer {
-  padding: 10px;
-  border: 2px solid #2563eb;
-  border-radius: 22px;
-  background: #fff;
-  box-shadow: 0 6px 32px rgba(0,0,0,0.12);
+
+/* -- The ground ---------------------------------------------------
+   A white page carrying a MESH: plain dark nodes joined by hairline links.
+   Nothing here moves.
+
+   Two elements:
+
+   .ground     the page itself: pure white
+   svg.stellar the mesh, tiled by a <pattern> and masked away from the card
+
+   WHY A REAL SVG AND NOT A BACKGROUND IMAGE
+   ---------------------------------------
+   The field was a data-uri background for most of its life, and in that
+   form the links did not appear to reach the nodes: a flattened tile allows
+   exactly one paint order, and any glow painted over the wires swallowed
+   their last few pixels. The coordinates were always right; they were just
+   hidden. A <pattern> lets the mesh be drawn first and the nodes sit on
+   top of it, which is the only order in which a net looks like a net.
+
+   The tile is 560px around a 420px pattern. The margin is not padding: the
+   pattern has to stop short of the tile edge or the links that touch it are
+   cut and the repeat is visibly seamed.
+
+   NO GRID. A blueprint lattice was tried and removed: on a pure white page it
+   reads as graph paper rather than drafting, because there is nothing else in
+   the field to give it a subject. The mesh is the drawing.
+
+   NO GLOW. Halos and diffraction spikes were tried and removed. They turned
+   the nodes into stars, and stars pull the eye away from the card -- and a
+   64px halo measured 135 -> 227 across six pixels at 1x, which is a soft
+   wash rather than a drawn point. A drawn diagram is made of its lines. */
+
+.ground {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: var(--ground);
 }
 
-.card {
-  display: flex;
-  width: 820px;
-  min-height: 500px;
-  background: #fff;
-  border-radius: 18px;
+/* The mesh. A pattern, so the markup stays small and repetition is free. */
+svg.stellar {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
   overflow: hidden;
-  box-shadow: 0 6px 32px rgba(0,0,0,0.13);
+  /* Masked rather than overlaid with a vignette: masking fades the field
+     itself out from behind the card, so field and card never argue at
+     equal weight. */
+  -webkit-mask-image: radial-gradient(64% 54% at 50% 46%,
+    transparent 0%, rgba(0, 0, 0, 0.34) 50%, #000 88%);
+  mask-image: radial-gradient(64% 54% at 50% 46%,
+    transparent 0%, rgba(0, 0, 0, 0.34) 50%, #000 88%);
 }
 
-/* Sign-in card sits inside .outer so no shadow needed */
-.outer .card {
-  width: 800px;
-  min-height: 520px;
-  border-radius: 14px;
-  box-shadow: none;
+/* The links. Crisp hairlines, deliberately the sharpest thing on the page. */
+.mesh-link {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1;
+  stroke-opacity: 0.21;
+  stroke-linecap: round;
 }
+.mesh-faint { stroke-opacity: 0.11; }
 
-/* ── Left panel ── */
-.left {
-  flex: 1;
-  background: #1a3a8c;
-  border-radius: 14px;
-  margin: 10px;
-  padding: 28px 32px 40px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  color: #fff;
-  min-height: 520px;
+/* The nodes. Plain dark dots in --ink, with the magnitude carried by a
+   per-node opacity in the markup rather than by size -- so the field reads
+   as a diagram of points of differing weight, not as a dot pattern. */
+.mesh-dot {
+  fill: var(--ink);
 }
+/* â”€â”€ The card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   position:relative is load-bearing: it is the containing block for the
+   registration marks and the notch, both of which are positioned outside
+   the card's own box. */
 
-/* Logo + school name — row layout, pinned to the top */
-.left-top {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 12px;
+.plate {
+  position: relative;
+  z-index: 1;
   width: 100%;
+  max-width: 900px;
+  background: var(--card);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow);
 }
 
-.left-logo {
-  width: 52px;
-  height: auto;
-  flex-shrink: 0;
-  object-fit: contain;
+/* Registration marks. Crop marks, set just inside each corner.
+
+   These have been inside, then outside, and are now back inside. Outside
+   fixed the occlusion problem, but it read as a mismatch against the rest
+   of the card, and a card that represents itself should carry its marks
+   like a printed sheet carries them.
+
+   Inside they need an explicit stacking level, which is the part that was
+   actually broken the first time: the readout bar covers the two top marks
+   and the panel backgrounds cover the two bottom two, because all of them
+   are declared later. They were in the DOM and correctly sized the whole
+   time, so a DOM assertion passed while none of them was on screen.
+
+   All four are identical and mirrored, and nothing else touches the
+   corners â€” the notch is gone, because a chamfer on one corner made the
+   top right not match the top left. */
+.regmark {
+  position: absolute;
+  z-index: 4;
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+  border-color: var(--hairline);
+  border-style: solid;
+  border-width: 0;
+}
+.regmark-tl { top: 10px;    left: 10px;   border-top-width: 1.5px;    border-left-width: 1.5px; }
+.regmark-tr { top: 10px;    right: 10px;  border-top-width: 1.5px;    border-right-width: 1.5px; }
+.regmark-bl { bottom: 10px; left: 10px;   border-bottom-width: 1.5px; border-left-width: 1.5px; }
+.regmark-br { bottom: 10px; right: 10px;  border-bottom-width: 1.5px; border-right-width: 1.5px; }
+
+/* One mark is on blue, and only one.
+
+   The card is two-tone: the readout bar and the form panel are paper, and
+   the brand panel is royal blue. Three of the four corners therefore land on
+   a light surface and the bottom-left one lands on blue, where a #94A3B5
+   hairline drops to about 2.7:1 and effectively disappears.
+
+   Rather than compromise the other three â€” darkening them enough to read on
+   blue would leave them muddy on paper â€” this one is cut in the panel's own
+   ink. The geometry stays identical and mirrored; only the ink follows the
+   surface, which is what a two-tone card asks for. */
+.regmark-bl { border-color: rgba(255, 255, 255, 0.80); }
+
+/* The notch is gone.
+
+   It was a payment-card chamfer on the top-right corner and it looked like
+   a rendering fault rather than a detail: the top-right corner then had a
+   cut in it and the top-left had nothing, so the card's four corners no
+   longer matched. Four identical crop marks carry the "this is a
+   technician's object" idea more evenly than one chamfer did. */
+
+/* â”€â”€ Readout bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+   The one piece of chrome above the content. It is the card's own status
+   line, and it reports real state: the pip is blue idle, amber while a
+   request is in flight, green on success, red on a refused attempt. */
+
+.readout {
+  position: relative;
+  /* Explicit stacking level. The card's children all position against
+     .plate, so without this the readout and the notch race on source order
+     alone and the notch loses. */
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: 38px;
+  /* The right padding clears the corner notch. At 20px the label ran under
+     the chamfer and looked clipped rather than set out. */
+  padding: 0 38px 0 20px;
+  border-bottom: 1px solid var(--rule);
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  background: var(--card-2);
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  overflow: hidden;
 }
 
-.left-school {
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: #c8d8f5;
-  letter-spacing: 0.01em;
-  line-height: 1.35;
-  text-align: left;
+.readout-left  { display: flex; align-items: center; gap: 10px; min-width: 0; }
+/* The name must never wrap. At narrow widths the two halves of the bar do
+   not fit on one line, and a wrapped readout clipped mid-phrase reads as a
+   broken component rather than as a tight layout. */
+.readout-left > span:last-child {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+.readout-right { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
 
-/* Main text block — centered, grows to fill remaining space */
-.left-body {
-  flex: 1;
+/* A live pip. Blue when idle, green when the last request succeeded, amber
+   while one is in flight. Driven by a class on the card, so it reports the
+   page's actual state rather than animating on a timer. */
+.pip {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  background: var(--hairline);
+}
+.plate.is-busy   .pip { background: var(--warn); }
+.plate.is-ok     .pip { background: var(--ok); }
+.plate.is-rejected .pip { background: var(--bad); }
+
+.plate-body { display: flex; }
+
+.plate-brand {
+  flex: 1 1 43%;
+  position: relative;
+  z-index: 1;
+  padding: 34px 34px 30px;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  background:
+    linear-gradient(158deg, #2450DE 0%, #1D4ED8 42%, #1636A6 100%);
+  border-right: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+/* The fading tile field.
+   A grid of 88px squares, built from a conic gradient so it is real blocks
+   rather than lines, plus a 44px hairline lattice on top of it. The whole
+   lot is masked by a radial so it is strongest in the upper left â€” where
+   there is no text â€” and gone by the lower right, where the description
+   sits. Without the mask the tiles ran under the copy and the panel read as
+   texture-on-text.
+
+   The mask is on ::after rather than on a background layer because
+   mask-image on the element itself would clip the panel's own edges, and
+   the panel's rounded corner is half of why the card reads as a card. */
+.plate-brand::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(90deg, rgba(255, 255, 255, 0.10) 1px, transparent 1px),
+    linear-gradient(rgba(255, 255, 255, 0.10) 1px, transparent 1px),
+    conic-gradient(from 90deg at 50% 50%,
+      rgba(255, 255, 255, 0.085) 25%,
+      transparent 0 50%,
+      rgba(255, 255, 255, 0.085) 75%,
+      transparent 0);
+  background-size: 44px 44px, 44px 44px, 88px 88px;
+  -webkit-mask-image: radial-gradient(125% 95% at 22% 12%,
+    #000 0%, rgba(0, 0, 0, 0.55) 42%, transparent 82%);
+  mask-image: radial-gradient(125% 95% at 22% 12%,
+    #000 0%, rgba(0, 0, 0, 0.55) 42%, transparent 82%);
+}
+
+/* Everything in the panel sits above the tile field. */
+.plate-brand > * { position: relative; z-index: 1; }
+
+/* The soft shadow the fold casts onto the card face. Carries the white half
+   of the seam, which the green accent above deliberately does not try to,
+   because no colour reads on both a royal blue panel and white paper. */
+.plate-form {
+  flex: 1 1 57%;
+  position: relative;
+  padding: 30px 40px 28px;
+  display: flex;
+  flex-direction: column;
+
+  /* Centred vertically.
+
+     The brand panel is set by the card's tallest side, and a sign-in form is
+     shorter than it. Left-aligned, the form's whole shortfall pooled into
+     one void beneath the Terms link, which read as a half-finished panel.
+     Centred, the same slack is split above and below.
+
+     Safe across all four screens: the OTP, forgot and reset forms are all
+     shorter than this one, so none of them is pushed off-centre by it. */
   justify-content: center;
-  align-items: center;
-  text-align: center;
 }
 
-/* Signin left — remove fixed width so it matches the shared flex: 1 rule */
-.outer .left {
-  border-radius: 12px;
-  margin: 0;
+.plate-form::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  pointer-events: none;
+  background: var(--hairline);
 }
 
-.left h1 {
-  font-size: 1.55rem;
-  font-weight: 700;
-  line-height: 1.3;
-  margin-bottom: 14px;
+/* The crest appears in the form ONLY where the brand panel is gone. Side by
+   side at the same height on desktop, two identical crests read as a
+   duplication mistake rather than as a design. */
+.form-crest { display: none; }
+
+/* ── The crest, framed ──────────────────────────────────────────────
+   A card's printed area is inset behind a border, with a hairline above the
+   name. The crest sits in that well rather than floating on the panel. */
+
+.crest {
+  width: 84px;
+  height: 84px;
+  flex: 0 0 auto;
+  object-fit: contain;
+  background: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 6px;
+  padding: 8px;
+  box-shadow: 0 4px 14px rgba(6, 18, 48, 0.30);
 }
 
-.left .subtitle {
-  color: #4da6ff;
-  font-size: 0.85rem;
+.brand-name {
+  margin-top: 20px;
+  font-family: var(--display);
+  font-size: 1.44rem;
   font-weight: 600;
-  margin-bottom: 8px;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  color: #FFFFFF;
 }
 
-.left p {
-  font-size: 0.75rem;
-  color: #c5d3f0;
-  line-height: 1.6;
+.brand-sub {
+  margin-top: 8px;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #9BE8F5;
 }
 
-.left p span { color: #4da6ff; }
+.brand-rule {
+  height: 1px;
+  margin: 20px 0 17px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.34) 0%, transparent 100%);
+}
 
-/* ── Right panel ── */
-.right {
-  flex: 1;
-  padding: 28px 40px 40px;
+/* A description of the office used to sit between the rule and this list.
+   It was better copy, and it made this panel about 130px taller than a
+   sign-in form, which stretched the card to roughly 660px and left the form
+   adrift in the middle of a very tall box. Gone, along with its rules. */
+
+/* The capability list is the real module map, read off the registrar
+   sidebar — not a decorative feature list. */
+.caps {
+  list-style: none;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  min-height: 520px;
+  gap: 6px;
 }
 
-.bcp-logo {
-  width: 82px;
-  height: 92px;
-  margin-bottom: 14px;
-  object-fit: contain;
-}
-
-h2 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #111;
-  margin-bottom: 22px;
-}
-
-/* ── Form fields ── */
-.form-group {
-  width: 100%;
-  margin-bottom: 16px;
-}
-
-.form-group label {
+.caps li {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.78rem;
-  color: #555;
-  margin-bottom: 5px;
+  gap: 9px;
+  font-size: 0.815rem;
+  color: rgba(255, 255, 255, 0.88);
+  line-height: 1.5;
+}
+
+/* A tick, not a decorative checkmark emoji. */
+.caps li::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #9BE8F5;
+}
+
+.brand-foot {
+  margin-top: auto;
+  padding-top: 18px;
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.04em;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.78);
+  /* Two deliberate lines, set by the <br> in the markup and nothing else.
+     A max-width added here to force the break wrapped it to three lines
+     instead — the full college name is ~34 characters and fits the panel at
+     this size, so the only thing to decide was where to put the break. */
+}
+
+/* ── Form ─────────────────────────────────────────────────────────── */
+
+.plate-title {
+  font-family: var(--display);
+  font-size: 1.34rem;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  color: var(--ink);
+  margin-bottom: 20px;
+}
+
+.auth-form { display: flex; flex-direction: column; gap: 16px; width: 100%; }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+
+/* Monospaced small caps: the label reads as an engraved field name on an
+   instrument rather than as a form caption. */
+.field label {
+  font-family: var(--mono);
+  font-size: 0.65rem;
   font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-2);
 }
 
-.form-group input {
+.field-box { position: relative; }
+
+.field-box > i {
+  position: absolute;
+  left: 13px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.8rem;
+  color: var(--ink-3);
+  pointer-events: none;
+}
+
+.field-box input {
   width: 100%;
-  height: 44px;
-  border: 1.5px solid #d0d7e2;
-  border-radius: 6px;
-  padding: 0 14px;
-  font-size: 0.9rem;
-  outline: none;
-  transition: border-color 0.2s;
-  background: #fff;
-}
-
-.form-group input:focus { border-color: #2563eb; }
-
-/* Ensure the text cursor (caret) is always visible while typing */
-.form-group input {
-  caret-color: #0f172a;
+  height: 46px;
+  padding: 0 14px 0 38px;
+  background: var(--card);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 0.92rem;
+  caret-color: var(--blue);
   -webkit-text-fill-color: currentColor;
 }
 
-/* ── Buttons ── */
-.btn-done,
+.field-box input:hover { border-color: var(--ink-3); }
+
+/* The placeholder is information — "6 digits", "you@bestlink.edu.ph" — so
+   it is held to text contrast, not to the decoration standard. */
+.field-box input::placeholder { color: var(--ink-3); }
+
+.field-box input:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(29, 78, 216, 0.15);
+}
+.field-box:focus-within > i { color: var(--blue); }
+
+/* ── Chrome's autofill ───────────────────────────────────────────────
+   A filled ID field goes grey and stays grey, and it is not this
+   stylesheet doing it.
+
+   Measured, to be sure: with the value typed in, the computed colour is
+   rgb(16,25,43) on white at 17.6:1, and the painted pixels in the field come
+   out near-black. Nothing about filling a field by hand changes anything —
+   tools/_login_field.js samples every colour-affecting property before and
+   after typing and the pair is identical.
+
+   So the grey is painted by the browser. On a sign-in page the one thing
+   that paints over a field like that is Chrome's autofill: it fills in a
+   saved credential and lays its own background and text colour on top. That
+   background is not reachable from an author `background` rule — which is
+   why it survived every earlier pass at this page.
+
+   Two parts, and both are needed:
+     1. A 1000px inset box-shadow in the field's own colour paints over
+        Chrome's highlight.
+     2. The absurd `transition` is the workaround for a long-standing
+        Chrome bug where the highlight is never re-evaluated after load. It
+        does nothing visually; it gives the browser something to transition
+        so it stops reasserting the highlight.
+
+   `:focus` is re-stated separately because part 1 replaces box-shadow
+   wholesale, and without this an autofilled field would also lose its focus
+   ring — trading one defect for a worse one.
+
+   Verified structurally, not by pixels: Chrome will not autofill in a
+   headless browser, so this state cannot be reproduced here. The probe
+   asserts the rules are present, that they paint the field's own colour,
+   and that focus still gets a ring. */
+.field-box input:-webkit-autofill,
+.field-box input:-webkit-autofill:hover {
+  -webkit-text-fill-color: var(--ink);
+  caret-color: var(--ink);
+  -webkit-box-shadow: 0 0 0 1000px var(--card) inset;
+  box-shadow: 0 0 0 1000px var(--card) inset;
+  transition: background-color 600000s 0s;
+}
+
+.field-box input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--ink);
+  caret-color: var(--blue);
+  border-color: var(--blue);
+  -webkit-box-shadow: 0 0 0 1000px var(--card) inset, 0 0 0 3px rgba(29, 78, 216, 0.15);
+  box-shadow: 0 0 0 1000px var(--card) inset, 0 0 0 3px rgba(29, 78, 216, 0.15);
+  transition: background-color 600000s 0s;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 7px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  color: var(--ink-3);
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.password-toggle-btn:hover { color: var(--blue); background: rgba(29, 78, 216, 0.07); }
+.password-toggle-btn:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+
+/* ── The sign-in button ─────────────────────────────────────────────── */
+
 .btn-signin {
+  position: relative;
   width: 100%;
   height: 48px;
-  margin-top: 8px;
-  background: #2563eb;
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
+  margin-top: 2px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
-  transition: background 0.2s;
-  letter-spacing: 0.02em;
-}
-
-.btn-done:hover,
-.btn-signin:hover { background: #1d4ed8; }
-
-/* ── OTP resend link ── */
-.resend {
-  font-size: 0.78rem;
-  color: #555;
-  align-self: flex-start;
-  margin-bottom: 14px;
+  border: none;
+  border-radius: var(--r);
+  background: var(--blue);
+  color: #FFFFFF;
+  font-family: var(--display);
+  font-size: 0.93rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   cursor: pointer;
+  overflow: hidden;
 }
 
-.resend:hover { text-decoration: underline; color: #2563eb; }
+   a real interaction, so it is allowed to move. */
+.btn-signin:hover { background: var(--blue-deep); box-shadow: 0 6px 18px rgba(29, 78, 216, 0.28); transform: translateY(-1px); }
+.btn-signin:active { transform: translateY(0); }
+.btn-signin:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
 
-/* ── Register link under sign-in ── */
-.register-link {
-  margin-top: 16px;
+.btn-signin:disabled {
+  cursor: progress;
+  background: var(--ink-3);
+  transform: none;
+  box-shadow: none;
+}
+.btn-signin:disabled::before { display: none; }
+
+/* ── Notices ──────────────────────────────────────────────────────── */
+
+.auth-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  width: 100%;
+  padding: 11px 13px;
+  border-radius: var(--r);
+  border: 1px solid;
+  font-size: 0.83rem;
+  line-height: 1.5;
+  margin-bottom: 15px;
+}
+
+.auth-error   { background: var(--bad-bg);  border-color: #F3C4C0; color: #8C1D18; }
+.auth-success { background: var(--ok-bg);   border-color: #B7E3CF; color: #0A6B4A; }
+.auth-notice i { margin-top: 2px; flex: 0 0 auto; font-size: 0.82rem; }
+/* ── One-time code ────────────────────────────────────────────────── */
+
+.otp-note {
   font-size: 0.8rem;
-  color: #666;
+  color: var(--ink-2);
+  line-height: 1.6;
+  margin-bottom: 14px;
+}
+.otp-note strong { color: var(--blue); font-weight: 600; }
+.otp-note .warn { display: block; color: var(--warn); margin-top: 5px; font-size: 0.78rem; }
+.otp-note .hint { display: block; color: var(--ink-3); margin-top: 3px; font-size: 0.78rem; }
+
+.otp-box input {
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 1.3rem;
+  font-weight: 600;
+  letter-spacing: 0.5em;
+
+  /* Half the letter-spacing, NOT all of it — and that is measured, not
+     derived.
+
+     letter-spacing puts a gap after the final character as well as between
+     characters, so a centred value is dragged left by half a gap. Half a
+     gap back is the obvious fix, and it overshoots by exactly as much:
+     text-indent shifts the line's start, which re-centres the whole line,
+     so X of indent moves the glyphs by only X/2. Verified in Chromium with
+     tools/_css_probe.js:
+         indent 0      -> -5.3px      indent 5.28px ->  0.0px
+         indent 10.56px-> +5.3px      indent -5.28px-> -10.6px
+     5.28px is 0.25em at this font size. */
+  text-indent: 0.25em;
+
+  /* Plain field padding: the code field has no leading icon, so the
+     .field-box rule's 38px gutter would push the digits off centre. */
+  padding-left: 14px;
 }
 
-.register-link a { color: #2563eb; text-decoration: none; }
-.register-link a:hover { text-decoration: underline; }
+/* ── Links ────────────────────────────────────────────────────────── */
 
-/* ── Wider card for the registration form (more fields) ── */
-.register-card {
-  width: 900px;
-  min-height: 560px;
-}
-
-/* ── Two-column name row ── */
 .form-row {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
   gap: 12px;
-  width: 100%;
+  margin-top: -3px;
+  font-size: 0.82rem;
 }
 
-.form-row .form-group { flex: 1; }
+.link-btn {
+  background: none;
+  border: none;
+  padding: 4px 0;
+  color: var(--blue);
+  font-family: var(--sans);
+  font-size: 0.82rem;
+  cursor: pointer;
+  text-decoration: none;
+}
+.link-btn:hover { text-decoration: underline; }
+.link-btn:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; border-radius: 3px; }
 
-/* ── Inline select for role ── */
-.form-group select {
+.form-foot {
+  margin-top: 15px;
+  padding-top: 13px;
+  border-top: 1px solid var(--rule);
+  text-align: center;
+}
+.form-foot a { color: var(--ink-3); font-size: 0.76rem; text-decoration: none; }
+.form-foot a:hover { color: var(--ink-2); text-decoration: underline; }
+.form-foot a:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; border-radius: 3px; }
+
+/* ── Terms modal ──────────────────────────────────────────────────── */
+
+.tc-modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(16, 25, 43, 0.42);
+  backdrop-filter: blur(4px);
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.tc-modal-overlay.active { display: flex; }
+
+.tc-modal {
+  display: flex;
+  flex-direction: column;
   width: 100%;
-  height: 44px;
-  border: 1.5px solid #d0d7e2;
+  max-width: 680px;
+  max-height: 85vh;
+  background: var(--card);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  box-shadow: 0 30px 70px rgba(16, 25, 43, 0.28);
+}
+
+.tc-modal-header {
+  padding: 17px 24px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--card-2);
+}
+.tc-modal-header h2 {
+  font-family: var(--display);
+  font-size: 1.04rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.tc-modal-header i { color: var(--blue); font-size: 0.88rem; }
+
+.tc-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 22px 24px;
+  font-size: 0.88rem;
+  line-height: 1.72;
+  color: var(--ink-2);
+}
+
+.tc-modal-body h3 {
+  font-family: var(--display);
+  font-size: 0.93rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 20px 0 8px;
+}
+.tc-modal-body h3:first-child { margin-top: 0; }
+.tc-modal-body p { margin-bottom: 12px; }
+.tc-modal-body ul { margin: 0 0 12px 18px; }
+.tc-modal-body li { margin-bottom: 7px; }
+.tc-modal-body strong { color: var(--ink); }
+
+.tc-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 13px 24px;
+  border-top: 1px solid var(--rule);
+  background: var(--card-2);
+}
+
+.tc-modal-btn {
+  padding: 9px 22px;
+  border: 1px solid var(--rule-2);
   border-radius: 6px;
-  padding: 0 14px;
-  font-size: 0.9rem;
-  outline: none;
-  background: #fff;
-  transition: border-color 0.2s;
+  background: var(--card);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 0.84rem;
+  font-weight: 600;
   cursor: pointer;
 }
-.form-group select:focus { border-color: #2563eb; }
+.tc-modal-btn:hover { border-color: var(--blue); background: rgba(29, 78, 216, 0.05); }
+.tc-modal-btn:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 
-/* ── Error / success banners ── */
-.auth-error,
-.auth-success {
-  width: 100%;
-  padding: 10px 14px;
-  border-radius: 7px;
-  font-size: 0.82rem;
-  font-weight: 500;
-  margin-bottom: 14px;
-  line-height: 1.4;
-}
+/* ============================================================================
+   RESPONSIVE
+   The brand panel is dropped below 900px rather than stacked. Stacking would
+   push the form under a tall masthead, and on a phone the only thing anyone
+   came for is the form.
+   ========================================================================= */
 
-.auth-error {
-  background: #fee2e2;
-  color: #dc2626;
-  border: 1px solid #fca5a5;
-}
-
-.auth-success {
-  background: #dcfce7;
-  color: #16a34a;
-  border: 1px solid #86efac;
-}
-
-/* ════════════════════════════════════════════════════════════
-   RESPONSIVE — MOBILE-FIRST (UPDATED)
-════════════════════════════════════════════════════════════ */
-
-/* ── Small Mobile (≤ 480px) ── */
-@media (max-width: 480px) {
-  body { padding: 0; background: #fff; }
-
-  .outer {
-    width: 100%;
-    border: none;
-    border-radius: 0;
-    box-shadow: none;
-    padding: 0;
-  }
-
-  .card,
-  .outer .card,
-  .register-card {
-    flex-direction: column;
-    width: 100%;
-    min-height: unset;
-    border-radius: 0;
-    box-shadow: none;
-    padding: 0;
-  }
-
-  .left {
-    display: none;
-  }
-
-  .right {
-    min-height: unset;
-    padding: 24px 20px 32px;
-    border-radius: 0;
-    width: 100%;
-  }
-
-  .bcp-logo {
-    width: 60px;
-    height: auto;
-    margin-bottom: 10px;
-  }
-
-  h2 {
-    font-size: 1.2rem;
-    margin-bottom: 16px;
-  }
-
-  .form-group input,
-  .form-group select {
-    height: 48px;
-    font-size: 1rem;
-    padding: 0 12px;
-  }
-
-  .btn-done,
-  .btn-signin {
-    height: 52px;
-    font-size: 1rem;
-    margin-top: 12px;
-  }
-
-  .form-row {
-    flex-direction: column;
-    gap: 0;
-  }
-
-  .register-link {
-    font-size: 0.75rem;
-  }
-
-  .left-school {
-    font-size: 0.7rem;
-  }
-}
-
-/* ── Tablet/Mobile (≤ 768px) ── */
-@media (max-width: 768px) {
-  body { align-items: flex-start; padding: 16px 0; }
-
-  .outer {
-    width: 95vw;
-    padding: 8px;
-    border-radius: 16px;
-    margin: 0 auto;
-  }
-
-  .card,
-  .outer .card,
-  .register-card {
-    flex-direction: column;
-    width: 100%;
-    min-height: unset;
-    border-radius: 12px;
-  }
-
-  .left {
-    display: none;
-  }
-
-  .right {
-    min-height: unset;
-    padding: 24px 20px 32px;
-    border-radius: 10px;
-  }
-
-  .bcp-logo {
-    width: 64px;
-    height: auto;
-    margin-bottom: 10px;
-  }
-
-  h2 { font-size: 1.25rem; margin-bottom: 18px; }
-
-  .form-row { flex-direction: column; gap: 0; }
-}
-
-/* ── Medium Screens (≤ 900px) ── */
 @media (max-width: 900px) {
-  .card,
-  .outer .card,
-  .register-card {
-    width: 95vw;
-    min-height: unset;
-  }
+  body { padding: 20px 16px; }
+  .plate { max-width: 520px; }
+  .plate-brand { display: none; }
+  .plate-form { flex: 1 1 100%; padding: 28px 26px 24px; }
+  /* The seam divides two panels. With the brand panel dropped there is
+     only one, and the rule would run down the inside of the card with
+     nothing across it. */
+  .plate-form::before { display: none; }
+  /* With the brand panel gone, the card face is the only place the school
+     can be identified — so the crest comes back here, at every width. */
+  .form-crest { display: block; }
 }
 
-/* ── Large Screens (≥ 1200px) ── */
-@media (min-width: 1200px) {
-  .outer {
-    padding: 14px;
-    border-radius: 28px;
-  }
-  
-  .card {
-    width: 900px;
-    min-height: 560px;
-  }
+/* Narrow phones.
+   The card is NOT stretched to fill the viewport. A first pass set
+   min-height:100dvh, which left the form floating between two large voids
+   and hid the ground entirely, so on a phone the page was a featureless
+   grey slab. Letting the card take its own height keeps the grid visible
+   around it. */
+@media (max-width: 420px) {
+  body { padding: 16px 14px; }
+  .plate-form { padding: 22px 20px 20px; }
+  .regmark { width: 10px; height: 10px; }
+  .regmark-tl, .regmark-tr { top: 7px; }
+  .regmark-bl, .regmark-br { bottom: 7px; }
+  .regmark-tl, .regmark-bl { left: 7px; }
+  .regmark-tr, .regmark-br { right: 7px; }
+  .form-crest { width: 62px; height: 62px; padding: 6px; margin-bottom: 16px; }
+  .plate-title { font-size: 1.2rem; margin-bottom: 17px; }
+  .readout { height: 34px; padding: 0 30px 0 14px; font-size: 0.6rem; letter-spacing: 0.1em; }
+  /* The office label is the half that goes. It is the same fact as the
+     crest and the college name two inches below, and it is what pushed the
+     app name onto a second clipped line. */
+  .readout-right { display: none; }
+  .field-box input { height: 50px; font-size: 1rem; }
+  .btn-signin { height: 50px; }
+  .otp-box input { font-size: 1.15rem; letter-spacing: 0.38em; text-indent: 0.19em; padding-left: 12px; }
 }
+

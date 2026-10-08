@@ -87,6 +87,32 @@ if ($method === 'POST' && $action === 'login') {
         loginThrottleRecord($credential, $clientIp, true);
         loginThrottleClear($credential, $clientIp);
 
+        // The local development bypass, mirrored from
+        // shared/auth_actions.php so the two endpoints cannot drift
+        // again - which is the exact bug the comment above records.
+        //
+        // After the password and after the throttle bookkeeping, so a
+        // bypassed login is counted and rate-limited like any other.
+        // Loopback-only: from a network this is unreachable and the
+        // second factor stands. See shared/auth_security.php.
+        if (localOtpBypass()) {
+            $redirect = signInSession($user);
+            logActivity((int) $user['id'], 'login_local_bypass', json_encode([
+                'ip'      => $clientIp,
+                'app_env' => defined('APP_ENV') ? APP_ENV : '?',
+            ]));
+            echo json_encode([
+                'success' => true,
+                'message' => 'Signed in (local development: verification code skipped).',
+                'data' => [
+                    'step'         => 'complete',
+                    'redirect'     => $redirect,
+                    'local_bypass' => true,
+                ],
+            ]);
+            exit;
+        }
+
         $_SESSION['otp_user_id'] = (int) $user['id'];
         $_SESSION['otp_purpose'] = 'login';
 

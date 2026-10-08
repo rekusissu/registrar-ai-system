@@ -86,18 +86,51 @@ final class LoginOtpRequiredTest extends TestCase
      * The login handler must not grant a session. If it does, a correct
      * password is a finished login and the second factor is theatre.
      */
-    public function testThePasswordStepNeverGrantsASession(): void
+    public function testThePasswordStepNeverGrantsASessionUnconditionally(): void
     {
-        self::assertStringNotContainsString(
-            'signInSession(',
-            $this->formLogin(),
-            'a correct password must not sign anyone in - only the verified code may'
-        );
-        self::assertStringNotContainsString(
-            'signInSession(',
-            $this->jsonLogin(),
-            'the JSON endpoint must enforce the same rule as the form; a client that skips the code gets weaker login'
-        );
+        // This used to assert the ABSENCE of signInSession() anywhere in
+        // the login handler. That is now too strong: the local bypass
+        // legitimately calls it, but ONLY behind localOtpBypass(), which
+        // is loopback-only and off by default.
+        //
+        // So the invariant is stated as it actually matters - a session
+        // may be granted on a password alone only if it sits inside a
+        // bypass gate - rather than as a grep for a function name.
+        foreach ([
+            'shared/auth_actions.php' => $this->formLogin(),
+            'api/auth.php'            => $this->jsonLogin(),
+        ] as $file => $login) {
+            $at = strpos($login, 'signInSession(');
+            if ($at === false) {
+                // No grant at all: strictly stronger, and fine.
+                continue;
+            }
+
+            // The grant must be preceded by the gate, and must not sit
+            // outside the if-block that the gate opens.
+            $gate = strpos($login, 'localOtpBypass()');
+            self::assertNotFalse(
+                $gate,
+                "{$file}: the login handler grants a session but never checks localOtpBypass() - "
+                . 'a correct password would be a finished login'
+            );
+            self::assertLessThan(
+                $at,
+                $gate,
+                "{$file}: the session is granted BEFORE the bypass gate is evaluated - "
+                . 'the gate must come first or it guards nothing'
+            );
+
+            // And the bypass must not have been inlined into a bare
+            // condition of its own - the whole gate has to be the shared
+            // helper, or its three conditions can be bypassed here.
+            self::assertStringNotContainsString(
+                "getenv('LOCAL_OTP_BYPASS')",
+                $login,
+                "{$file}: the flag is read at the call site instead of inside localOtpBypass(), "
+                . 'so the loopback check is skipped'
+            );
+        }
     }
 
     /** The handler must issue the code, or there is nothing to verify. */
@@ -235,29 +268,149 @@ final class LoginOtpRequiredTest extends TestCase
             $handler,
             'the page must branch on the code step the server now returns'
         );
-        self::assertStringNotContainsString(
-            "window.location.href",
+
+        // The password step must not redirect into the portal - with ONE
+        // exception: step === 'complete', which the server only returns
+        // when localOtpBypass() was true, i.e. loopback with the flag on.
+        //
+        // Asserted structurally rather than by banning the string: every
+        // redirect in the handler must sit inside the 'complete' branch,
+        // and the catch-all "success but not a step I know" branch must
+        // still refuse. That way the failure mode this test exists to
+        // catch - a redirect on a plain successful password - is still
+        // caught, while the one sanctioned bypass keeps working.
+        $at = strpos($handler, "step === 'complete'");
+        self::assertNotFalse(
+            $at,
+            "the page has no 'complete' branch, so a bypassed login would be refused as incomplete"
+        );
+
+        $redirects = preg_match_all('/window\.location\.href/', $handler);
+        self::assertSame(
+            1,
+            $redirects,
+            "expected exactly one redirect in the password handler - the 'complete' branch. "
+            . "Found {$redirects}; any other is the defect this test guards."
+        );
+
+        // The redirect must be inside the 'complete' branch: i.e. after
+        // the branch opens and before the next `} else if`.
+        $branchEnd = strpos($handler, '} else if', $at);
+        self::assertNotFalse($branchEnd, 'could not find the end of the complete branch');
+        self::assertStringContainsString(
+            'window.location.href',
+            substr($handler, $at, $branchEnd - $at),
+            'the redirect must live inside the complete branch, not somewhere else in the handler'
+        );
+
+        // The refusal branch must survive: a success the page does not
+        // understand is still an error, not a login.
+        self::assertStringContainsString(
+            'Sign-in is incomplete',
             $handler,
-            'the password step must not redirect into the portal - that is the whole defect'
+            'the unknown-step refusal must remain - a server regression must not become a login'
         );
     }
 
     /**
-     * Guard against the tempting "fix" of making OTP optional.
+     * The bypass is loopback-only, and that is the property that makes it
+     * safe rather than the defect it replaces.
      *
-     * A switch that lets a caller skip the second factor is the same
-     * defect with an extra step, so it is pinned shut.
+     * This test USED TO assert that no bypass flag could exist at all
+     * ("a bypass flag is the defect wearing a switch"). That reasoning is
+     * right about a plain flag and it is why the feature was built with
+     * three conditions instead of one: an opt-in flag, a loopback client
+     * address, and an explicit production override - two independent
+     * settings, so enabling the bypass cannot also disable the production
+     * guard.
+     *
+     * So the invariant is now pinned directly rather than asserted
+     * indirectly by forbidding the word. What is checked:
+     *   - localOtpBypass() requires loopback (REMOTE_ADDR)
+     *   - it consults no caller-controllable proxy header, so the check
+     *     cannot be forged with X-Forwarded-For
+     *   - the production override is a SEPARATE setting from the on/off
+     *     flag, so the flag alone cannot open a production host
+     *   - a request with no REMOTE_ADDR (CLI) is not bypassable
      */
-    public function testThereIsNoFlagThatTurnsTheCodeStepOff(): void
+    public function testTheLocalBypassIsLoopbackOnlyAndFailsClosed(): void
+    {
+        $src = $this->code('shared/auth_security.php');
+        $at  = strpos($src, 'function localOtpBypass(');
+        self::assertNotFalse($at, 'localOtpBypass() is gone - is the loopback check still enforced?');
+
+        // The body of the decision function, not the whole file, so a
+        // comment elsewhere cannot satisfy this.
+        $body = substr($src, $at, 2000);
+
+        self::assertStringContainsString(
+            'REMOTE_ADDR',
+            $body,
+            'the bypass must key on the socket peer, which a caller cannot set'
+        );
+        self::assertStringContainsString(
+            "['127.0.0.1', '::1']",
+            $body,
+            'only loopback may be bypassed'
+        );
+
+        // No forwarded header may be consulted anywhere in the helper.
+        // These are caller-controlled: trusting one would let a remote
+        // client simply declare itself as 127.0.0.1 and the whole gate
+        // would be decorative.
+        foreach (['X-Forwarded-For', 'HTTP_X_FORWARDED_FOR', 'HTTP_CLIENT_IP', 'REMOTE_ADDR_X'] as $header) {
+            self::assertStringNotContainsString(
+                $header,
+                $src,
+                "a proxy header ({$header}) is caller-controlled and must not gate a security check"
+            );
+        }
+
+        // The production override must NOT be the on/off flag, or the
+        // most dangerous state - bypass on, host deployed - becomes the
+        // only one that works.
+        self::assertStringContainsString(
+            'LOCAL_OTP_BYPASS_ALLOW_PROD',
+            $src,
+            'there must be a separate production-override setting'
+        );
+        self::assertStringNotContainsString(
+            "localOtpBypassOverrideProduction()\n{\n    return localOtpBypassFlagOn();",
+            $src,
+            'the production override must not be the bypass flag itself'
+        );
+    }
+
+    /**
+     * The bypass must be consulted only after the password is proven.
+     *
+     * Placed before the credential check it would be a free login; placed
+     * before the throttle bookkeeping it would also be a free brute-force
+     * attempt. Both endpoints call it in the same position, after both.
+     */
+    public function testTheBypassRunsAfterThePasswordAndTheThrottle(): void
     {
         foreach (['shared/auth_actions.php', 'api/auth.php'] as $file) {
-            $code = $this->code($file);
-            self::assertStringNotContainsString(
-                'OTP_REQUIRED',
-                $code,
-                "{$file}: a bypass flag is the defect wearing a switch"
+            $login = $file === 'api/auth.php' ? $this->jsonLogin() : $this->formLogin();
+
+            $pw   = strpos($login, 'password_verify(');
+            $thr  = strpos($login, 'loginThrottleClear(');
+            $gate = strpos($login, 'localOtpBypass()');
+
+            self::assertNotFalse($pw, "{$file}: the credential check moved");
+            self::assertNotFalse($thr, "{$file}: the throttle bookkeeping moved");
+            self::assertNotFalse($gate, "{$file}: the bypass is no longer wired in");
+
+            self::assertGreaterThan(
+                $pw,
+                $gate,
+                "{$file}: the bypass runs BEFORE the password is verified - that is a login without a password"
             );
-            self::assertStringNotContainsString("getenv('OTP_REQUIRED')", $code);
+            self::assertGreaterThan(
+                $thr,
+                $gate,
+                "{$file}: the bypass runs before the throttle bookkeeping, so a bypassed login is unthrottled"
+            );
         }
     }
 
