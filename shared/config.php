@@ -94,6 +94,7 @@ if (APP_ENV === 'production' && PHP_SAPI !== 'cli' && PHP_SAPI !== 'phpdbg') {
     if (!$allowInsecure) {
         if ($pass === '')     { $missingDb[] = 'DB_PASSWORD (or DB_PASS) is empty'; }
         if ($user === 'root') { $missingDb[] = 'DB_USER is still the default "root"'; }
+        if ($host === 'localhost') { $missingDb[] = 'DB_HOST is still the default "localhost"'; }
     }
     if ($missingDb) {
         error_log('[config] FAILING CLOSED: ' . implode('; ', $missingDb)

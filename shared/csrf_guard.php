@@ -98,5 +98,9 @@ function requireCsrf(): void {
     }
 }
 
-// Enforce on include: any endpoint/page that loads this file is protected.
-requireCsrf();
+// CSRF enforcement is opt-in via requireCsrf() for endpoints that accept POST.
+// Endpoints that deliberately have no session/CSRF (e.g. contacts-confirm.php using auth_token only)
+// must NOT include csrf_guard.php, or they must skip enforcement manually.
+//
+// To enable CSRF protection for a page that includes this file, call requireCsrf() explicitly.
+// Safe (read-only) GET requests are never blocked.

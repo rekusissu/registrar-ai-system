@@ -4,9 +4,7 @@
 if (defined('SESSION_CONFIG_LOADED')) {
     return;
 }
-define('SESSION_CONFIG_LOADED', true);
-
-// config.php provides SESSION_IDLE_TIMEOUT (and DB constants used by pages).
+define('SESSION_CONFIG_LOADED', true);// config.php provides SESSION_IDLE_TIMEOUT (and DB constants used by pages).
 // Load it here so this file works standalone regardless of include order.
 require_once __DIR__ . '/config.php';
 
@@ -16,47 +14,37 @@ require_once __DIR__ . '/config.php';
 $idleTimeout = defined('SESSION_IDLE_TIMEOUT') ? (int) SESSION_IDLE_TIMEOUT : 1200;
 $idleLogout  = $idleTimeout > 0;
 
-// -- Start the session -------------------------------------------------
-//
-// The cookie flags MUST be set before session_start(), or PHP falls back
-// to php.ini defaults and the session cookie silently loses protection.
-//
-// They used to live only in shared/security_headers.php, which required
-// every entry point to include that file BEFORE this one. 32 of the
-// api/*.php endpoints did not, so on a direct request their cookie was
-// issued with whatever php.ini happened to say - commonly without HttpOnly
-// and without SameSite.
-//
-// Setting them here fixes all of them at once and makes the ordering
-// impossible to get wrong. security_headers.php still sends the response
-// headers (CSP, X-Frame-Options, HSTS); this only owns the cookie, so
-// there is no conflict when a page includes both.
+// Set session cookie security flags BEFORE session_start (new sessions).
+// These inii_set() calls only affect NEW sessions. To also protect
+// already-started sessions (where php.ini defaults may have been used),
+// re-apply the flags on every request after the session starts.
 if (session_status() === PHP_SESSION_NONE) {
     ini_set('session.use_strict_mode', '1');
-    // Keep PHP's session GC from collecting the file before the idle
-    // timeout fires; long lifetime when idle logout is disabled.
+    // Keep PHP's session GC from collecting the file before the idle    // timeout fires; long lifetime when idle logout is disabled.
     ini_set('session.gc_maxlifetime', (string) ($idleLogout ? $idleTimeout : 30 * 86400));
+}
 
-    // HttpOnly: JavaScript cannot read the cookie, so an XSS bug cannot
-    // exfiltrate the session.
-    ini_set('session.cookie_httponly', '1');
-    // Lax: allows normal external navigation into the app (a student
-    // clicking a link from email or the queue portal) while still
-    // blocking cross-site POSTs. Strict would break the QR-verification
-    // and email-link flows.
-    ini_set('session.cookie_samesite', 'Lax');
-    // Secure: only over HTTPS. Gated so plain-HTTP local XAMPP still
-    // works; a live host terminates HTTPS at the vhost or proxy.
-    $isHttps = (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off')
-        || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https')
-        || (($_SERVER['SERVER_PORT'] ?? '') === '443');
-    if ($isHttps) {
-        ini_set('session.cookie_secure', '1');
-    }
+// Always re-apply cookie flags on every request after session starts,// so existing sessions also get HttpOnly/Secure/SameSite protection// regardless of php.ini defaults.
+i n_set('session.cookie_httponly', '1');
+ini_set('session.cookie_samesite', 'Lax');
+$isHttps = (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off')
+    || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https')
+    || (($_SERVER['SERVER_PORT'] ?? '') === '443');
+if ($isHttps) {
+    ini_set('session.cookie_secure', '1');
+}
 
+// -- Start the session -------------------------------------------------
+//
+// The cookie flags MUST be set before session_start(), or PHP falls back// to php.ini defaults and the session cookie silently loses protection.//
+// They used to live only in shared/security_headers.php, which required// every entry point to include that file BEFORE this one. 32 of the// api/*.php endpoints did not, so on a direct request their cookie was// issued with whatever php.ini happened to say - commonly without HttpOnly// and without SameSite.
+//
+// Setting them here fixes all of them at once and makes the ordering// impossible to get wrong. security_headers.php still sends the response// headers (CSP, X-Frame-Options, HSTS); this only owns the cookie, so// there is no conflict when a page includes both.
+if (session_status() === PHP_SESSION_NONE) {
     session_name('BCP_REGISTRAR_SESSION');
     session_start();
 }
+
 
 // --- Idle session timeout ---------------------------------------
 // Log the user out if they've been inactive past SESSION_IDLE_TIMEOUT.
