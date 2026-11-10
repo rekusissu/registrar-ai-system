@@ -207,7 +207,8 @@ include '../includes/sidebar.php';
 .fs-gone-btn:focus-visible{outline:2px solid #dc2626;outline-offset:1px}
 </style>
 
-<main class="dashboard-main">
+<link rel="stylesheet" href="../css/file-storage-modern.css?v=20261110-1">
+<main class="dashboard-main storage-page">
     <div class="dashboard-container">
         <header class="storage-header">
             <div>
@@ -243,7 +244,7 @@ include '../includes/sidebar.php';
             </div>
         <?php endif; ?>
 
-        <div class="panel" style="margin-bottom:18px;">
+        <div class="panel storage-library" style="margin-bottom:18px;">
             <div class="panel-toolbar" style="flex-direction:column;align-items:stretch;border-bottom:none;padding-bottom:0;margin-bottom:0;">
                 <div class="fs-toolbar">
                     <!-- Left: title + count -->
@@ -275,45 +276,34 @@ include '../includes/sidebar.php';
             <div class="table-responsive">
             <table class="table">
                 <thead><tr>
-                    <th>Student ID</th><th>Student Name</th><th>Files</th><th>Status</th><th>Actions</th>
+                    <th>Student</th><th>File library</th><th>Document status</th><th>Actions</th>
                 </tr></thead>
                 <tbody id="studentTableBody">
                 <?php if (empty($sortedStudents)): ?>
-                    <tr><td colspan="5" style="text-align:center;padding:32px;color:#94a3b8;">No student files yet.</td></tr>
+                    <tr><td colspan="4" style="text-align:center;padding:32px;color:#94a3b8;">No student files yet.</td></tr>
                 <?php else: foreach ($sortedStudents as $stu):
                     $mc = $stu['missing_count'];
                     $searchStr = strtolower($stu['student_name'] . ' ' . $stu['student_number']);
                     $docTypes = implode(' ', $stu['types_present']);
                 ?>
                     <tr data-search="<?= htmlspecialchars($searchStr) ?>" data-doctypes="<?= htmlspecialchars(strtolower($docTypes)) ?>" data-student-id="<?= $stu['id'] ?>">
-                        <td><span style="font-weight:600;font-size:13px;"><?= htmlspecialchars($stu['student_number']) ?></span></td>
-                        <td><div style="font-weight:600;font-size:13px;"><?= htmlspecialchars($stu['student_name']) ?></div></td>
-                        <td><span style="font-weight:600;"><?= count($stu['files']) ?></span></td>
-                        <td>
-                            <?php if ($mc === 0): ?>
-                                <span class="pill approved"><i class="fas fa-check" style="font-size:10px;"></i> Complete</span>
-                            <?php else: ?>
-                                <span class="pill denied"><i class="fas fa-times" style="font-size:10px;"></i> Missing (<?= $mc ?>)</span>
-                            <?php endif; ?>
-                        </td>
-                        <td><div class="action-group">
-                            <button class="action-btn view" onclick="toggleFiles(<?= $stu['id'] ?>)" title="View Files"><i class="fas fa-folder-open"></i></button>
-                            <button class="action-btn download" onclick="quickUpload(<?= $stu['id'] ?>)" title="Upload to student"><i class="fas fa-upload"></i></button>
+                        <td><div class="fs-student"><span class="fs-avatar" aria-hidden="true"><?= htmlspecialchars(mb_substr($stu['student_name'],0,1)) ?></span><div><strong><?= htmlspecialchars($stu['student_name']) ?></strong><small><?= htmlspecialchars($stu['student_number']) ?></small></div></div></td>
+                        <td><div class="fs-library-count"><i class="fas fa-folder-open" aria-hidden="true"></i><strong><?= count($stu['files']) ?> <?= count($stu['files']) === 1 ? 'file' : 'files' ?></strong></div><small class="fs-subtext"><?= count($stu['types_present']) ?> document <?= count($stu['types_present']) === 1 ? 'type' : 'types' ?> uploaded</small></td>
+                        <td><span class="fs-status <?= $mc === 0 ? 'complete' : 'incomplete' ?>"><i class="fas <?= $mc === 0 ? 'fa-circle-check' : 'fa-circle-exclamation' ?>"></i> <?= $mc === 0 ? 'Complete' : $mc . ' required missing' ?></span><small class="fs-subtext"><?= count($requiredTypes) - $mc ?> of <?= count($requiredTypes) ?> required types</small></td>
+                        <td><div class="action-group fs-student-actions">
+                            <button class="fs-view-btn" onclick="toggleFiles(<?= $stu['id'] ?>)" aria-expanded="false" aria-controls="files-<?= $stu['id'] ?>"><i class="fas fa-folder-open"></i> <span>View files</span><i class="fas fa-chevron-down fs-chevron"></i></button>
+                            <button class="fs-upload-btn" onclick="quickUpload(<?= $stu['id'] ?>)" title="Upload to student" aria-label="Upload files for <?= htmlspecialchars($stu['student_name']) ?>"><i class="fas fa-upload"></i></button>
                         </div></td>
                     </tr>
                     <tr class="file-expand-tr" id="files-<?= $stu['id'] ?>" style="display:none;">
-                        <td colspan="5" style="padding:0;">
+                        <td colspan="4" style="padding:0;">
                             <div class="file-expand open">
-                            <?php if ($mc > 0): ?>
-                                <div style="padding:6px 0 10px;">
-                                    <span style="font-size:11px;font-weight:600;color:#dc2626;"><i class="fas fa-triangle-exclamation"></i> Missing:</span>
-                                    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;">
-                                        <?php foreach ($stu['missing_types'] as $mt): ?>
-                                            <span class="pill at-risk"><?= ucfirst(htmlspecialchars($mt)) ?></span>
-                                        <?php endforeach; ?>
-                                    </div>
-                                </div>
-                            <?php endif; ?>
+                            <div class="fs-checklist"><div class="fs-section-heading"><strong>Required documents</strong><span>Track each student's document set</span></div><div class="fs-type-list">
+                            <?php foreach ($requiredTypes as $mt): $present = in_array($mt, $stu['types_present'], true); ?>
+                                <span class="fs-type <?= $present ? 'present' : 'absent' ?>"><i class="fas <?= $present ? 'fa-circle-check' : 'fa-circle-minus' ?>"></i><?= ucfirst(htmlspecialchars($mt)) ?><small><?= $present ? 'Uploaded' : 'Missing' ?></small></span>
+                            <?php endforeach; ?>
+                            </div></div>
+                            <div class="fs-section-heading fs-files-heading"><strong>Uploaded files</strong><span><?= count($stu['files']) ?> in this library</span></div>
                             <?php foreach ($stu['files'] as $f):
                                 $ext = strtolower(pathinfo($f['filename'], PATHINFO_EXTENSION));
                                 $ic = $iconMap[$ext] ?? 'fa-file';
@@ -365,16 +355,16 @@ include '../includes/sidebar.php';
                                         <?php elseif ($av === 0): ?>
                                             <span class="action-btn" style="color:#dc2626;cursor:default;background:#fef2f2;" title="AI Flagged: <?= htmlspecialchars($f['ai_validation_note'] ?? 'Invalid document') ?>"><i class="fas fa-triangle-exclamation"></i></span>
                                         <?php else: ?>
-                                            <button class="action-btn" onclick="aiValidate(this)" data-id="<?= (int)$f['id'] ?>" title="AI Validate this document" style="color:#8b5cf6;"><i class="fas fa-robot"></i></button>
+                                            <button class="action-btn" onclick="aiValidate(this)" data-id="<?= (int)$f['id'] ?>" title="AI Validate this document" style="color:#8b5cf6;"><i class="fas fa-robot"></i><span>Validate</span></button>
                                         <?php endif; ?>
                                         <?php if ($fileGone): ?>
                                             <span class="action-btn" style="color:#94a3b8;cursor:default;" title="Preview unavailable &mdash; the file is not on this server"><i class="fas fa-eye-slash"></i></span>
                                             <span class="action-btn" style="color:#94a3b8;cursor:default;" title="Download unavailable &mdash; the file is not on this server"><i class="fas fa-download"></i></span>
                                         <?php else: ?>
-                                            <button class="action-btn view" onclick="previewFile(this.closest('.file-expand-row'))" title="Preview"><i class="fas fa-eye"></i></button>
-                                            <a class="action-btn download" href="<?= htmlspecialchars($fileUrl) ?>" title="Download" download><i class="fas fa-download"></i></a>
+                                            <button class="action-btn view" onclick="previewFile(this.closest('.file-expand-row'))" title="Preview"><i class="fas fa-eye"></i><span>Preview</span></button>
+                                            <a class="action-btn download" href="<?= htmlspecialchars($fileUrl) ?>" title="Download" download><i class="fas fa-download"></i><span>Download</span></a>
                                         <?php endif; ?>
-                                        <button class="action-btn delete" onclick="deleteFile(this.closest('.file-expand-row'))" title="Delete"><i class="fas fa-trash-alt"></i></button>
+                                        <button class="action-btn delete" onclick="deleteFile(this.closest('.file-expand-row'))" title="Delete" aria-label="Delete file"><i class="fas fa-trash-alt"></i></button>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
@@ -511,7 +501,10 @@ document.addEventListener('keydown', function(e) {
 function toggleFiles(studentId) {
     var row = document.getElementById('files-' + studentId);
     if (!row) return;
-    row.style.display = row.style.display === 'none' ? '' : 'none';
+    var expanded = row.style.display === 'none';
+    row.style.display = expanded ? '' : 'none';
+    var button = document.querySelector('[aria-controls="files-' + studentId + '"]');
+    if (button) { button.setAttribute('aria-expanded', String(expanded)); button.querySelector('span').textContent = expanded ? 'Hide files' : 'View files'; }
 }
 
 // ─── QUICK UPLOAD (pre-select student) ────────────────────

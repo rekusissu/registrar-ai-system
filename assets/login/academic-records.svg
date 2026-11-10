@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="240" viewBox="0 0 480 240" fill="none">
+<defs>
+ <linearGradient id="facade" x1="80" y1="80" x2="280" y2="220" gradientUnits="userSpaceOnUse"><stop stop-color="#57b3ff" stop-opacity=".42"/><stop offset="1" stop-color="#2471d9" stop-opacity=".12"/></linearGradient>
+ <linearGradient id="paper" x1="306" y1="130" x2="420" y2="227" gradientUnits="userSpaceOnUse"><stop stop-color="#80c7ff" stop-opacity=".68"/><stop offset="1" stop-color="#2c7ce1" stop-opacity=".2"/></linearGradient>
+ <linearGradient id="roof" x1="72" y1="87" x2="282" y2="87" gradientUnits="userSpaceOnUse"><stop stop-color="#75c6ff" stop-opacity=".8"/><stop offset="1" stop-color="#4396f4" stop-opacity=".32"/></linearGradient>
+</defs>
+<!-- Upright academic building: raised parapet, facade, columns and side wall. -->
+<g stroke="#8dcfff" stroke-width="2" stroke-linejoin="round">
+ <path d="M80 110 276 64 352 103v103l-76-29-196 43Z" fill="url(#facade)"/>
+ <path d="M276 64v113l76 29V103Z" fill="#3485df" fill-opacity=".18"/>
+ <path d="M112 118 145 110v82l-33 8Zm65-15 32-8v82l-32 7Zm65-15 24-6v82l-24 6Z" fill="#083575" fill-opacity=".7"/>
+ <path d="M98 119v83m63-98v84m64-99v85M293 91v93m28-80v91" stroke-opacity=".7"/>
+ <path d="m51 111 225-54 91 46v17l-91-43-225 53Z" fill="url(#roof)"/>
+ <path d="m77 72 199-45 73 36v24l-73-36L77 97Z" fill="url(#roof)" stroke="#b9e7ff"/>
+ <path d="M276 27v24m0 6v20" stroke="#e4f6ff"/>
+ <path d="m69 209 207-46 83 35-207 45Z" fill="#3c8fe9" fill-opacity=".3"/>
+</g>
+<!-- Stacked registrar documents in the foreground. -->
+<g stroke="#92d0ff" stroke-width="2" stroke-linejoin="round">
+ <path d="m318 111 69-8q11-1 9 10l-24 100-90 6 25-98q2-9 11-10Z" fill="url(#paper)"/>
+ <path d="m335 126 71-6q11-1 8 10l-22 91-91 4 24-89q2-9 10-10Z" fill="url(#paper)"/>
+ <path d="m351 141 75-3q12 0 9 11l-18 75q-2 9-12 9l-88-4 24-78q2-10 10-10Z" fill="url(#paper)" stroke="#bce5ff"/>
+ <path d="m356 164 50 1m-56 17 51 1m-56 17 50 1m-56 16 35 1" stroke-width="4" stroke-linecap="round"/>
+</g>
+<path d="M0 226c85-67 151-22 236 2s146-30 244-22v34H0Z" fill="#3689ed" fill-opacity=".24"/>
+<path d="M0 226c85-67 151-22 236 2s146-30 244-22" stroke="#66b5ff" stroke-opacity=".5" stroke-width="2"/>
+</svg>

@@ -9,6 +9,7 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../shared/config.php';
 corsSameOrigin();
 require_once __DIR__ . '/../shared/database.php';
+require_once __DIR__ . '/../shared/stored_file.php';
 require_once __DIR__ . '/../shared/ai_client.php';
 require_once __DIR__ . '/../shared/session_config.php';
 require_once __DIR__ . '/../shared/csrf_guard.php';
@@ -401,6 +402,11 @@ try {
             [$id]
         );
         if ($card) {
+            header('Cache-Control: no-store, private');
+            $card['photo_url'] = storedFileDiskPath($card['id_photo'] ?? '')
+                ? '../api/student-photo.php?student_id=' . (int)$card['student_id'] : '';
+            $photoDisk = storedFileDiskPath($card['id_photo'] ?? '');
+            if ($card['photo_url'] !== '' && $photoDisk) $card['photo_url'] .= '&v=' . filemtime($photoDisk);
             echo json_encode(['success' => true, 'data' => $card]);
         } else {
             echo json_encode(['success' => false, 'message' => 'RFID card not found.']);

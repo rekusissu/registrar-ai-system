@@ -1177,7 +1177,9 @@ $bootstrap = [
 
         var body = $('wrPayBody');
 
-        if (r.status_tone === 'warning' && r.receipt_state === 'none') {
+        if (!r.requirements_reviewed_at && ['Filed','Pending_Clearance'].indexOf(r.document_status) !== -1) {
+            body.innerHTML = '<div class="wr-notice"><i class="fa-solid fa-clipboard-check"></i><div><b>Requirements review comes first</b>Your request is now with the Registrar. Do not pay yet. Track your request for approval and payment instructions.</div></div>';
+        } else if (r.status_tone === 'warning' && r.receipt_state === 'none') {
             // Still owed money. The channel is chosen here, and the
             // request waits for it - which is why the screen leads
             // with the amount rather than with the buttons.

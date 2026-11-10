@@ -154,6 +154,7 @@ function doc_payload(array $row, array $catalog = null): array
         'id'            => (int) $row['id'],
         'request_id'    => (string) ($row['request_id'] ?? ''),
         'document_status' => (string) $row['document_status'],
+        'requirements_reviewed_at' => $row['requirements_reviewed_at'] ?? null,
         'status_label'  => $status['label'],
         'status_tone'   => $status['tone'],
         'status_icon'   => $status['icon'],
@@ -669,23 +670,8 @@ if ($action === 'submit') {
 
     $balance   = (float) ($db->fetchColumn('SELECT balance FROM finance WHERE student_id = ?', [$studentId]) ?? 0.00);
 
-    // Starting stage.
-    //
-    // An unpaid balance outranks the payment gate: the office cannot
-    // issue against an unpaid account whatever the document fee is
-    // being settled by, so the request is held and says so.
-    if ($balance > 0) {
-        $status = 'Pending_Clearance';
-    } elseif ($payment === 'Online' || $payment === 'Bank_Transfer') {
-        // Both channels expect money to arrive from outside the office,
-        // so both wait for it. They differ in what is asked of the
-        // student afterwards, not in whether the request can start.
-        $status = 'Awaiting_Payment';
-    } else {
-        // Pay at the cashier: nothing is owed until they are standing
-        // there, so the request is immediately workable.
-        $status = 'Filed';
-    }
+    // Review requirements before requesting any document fee.
+    $status = $balance > 0 ? 'Pending_Clearance' : 'Filed';
 
     // The legacy document_type column, kept for the older readers.
     // Mapped by SKU because the enum cannot hold every value the
@@ -815,7 +801,7 @@ if ($action === 'submit') {
             : ($status === 'Pending_Clearance'
                 ? 'Submitted, but you have an outstanding balance of PHP ' . number_format($balance, 2)
                     . ' that has to be settled first.'
-                : 'Submitted. Pay at the office when you collect.'),
+                : 'Submitted for requirements review. Wait for Registrar approval before paying.'),
         'data'    => [
             'request'   => doc_payload($fresh),
             'quote'     => $quote,

@@ -1,0 +1,119 @@
+
+/* Responsive BCP login. Shared authentication styles remain untouched. */
+*,*::before,*::after{box-sizing:border-box}body,h1,h2,p,ul{margin:0}button,input{font:inherit}a,button,input{-webkit-tap-highlight-color:transparent}
+:root{color-scheme:light;--sans:Inter,'Segoe UI',sans-serif;--display:var(--sans);--card:#fff;--card-2:#f5f8ff;--rule:#dbe3f0;--rule-2:#c5d0e3;--ink:#0b1630;--ink-2:#536078;--blue:#073bdb;--r-lg:22px}
+body{min-height:100vh;min-height:100dvh;padding:48px 24px 28px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:36px;font-family:var(--sans);color:var(--ink);background:radial-gradient(ellipse at 8% 85%,#dfeeff 0,transparent 46%),radial-gradient(ellipse at 95% 5%,#e3efff 0,transparent 48%),#f7faff;-webkit-font-smoothing:antialiased}
+.plate{width:100%;max-width:1200px;border:1px solid #cfd9eb;border-radius:24px;overflow:hidden;background:#fff;box-shadow:0 22px 65px -25px #204c8d55}.plate-body{display:grid;grid-template-columns:46% 54%}.plate-brand{padding:44px 38px 38px;background:radial-gradient(ellipse at 5% 40%,#174eb4,transparent 76%),linear-gradient(135deg,#103b94,#061f5b);color:#fff;display:flex;flex-direction:column}.brand-header{display:flex;align-items:center;gap:20px}.crest{width:60px;height:70px;object-fit:contain;flex-shrink:0}.brand-header>div{border-left:1px solid #ffffff70;padding-left:20px}.college-name{font-size:18px;font-weight:600;line-height:1.45}.system-name{font-size:12px;letter-spacing:2.3px;text-transform:uppercase;margin-top:7px;color:#d4e6ff;font-weight:600}.brand-story{display:flex;flex:1;flex-direction:column}.brand-story h1{font-size:clamp(30px,3.1vw,44px);line-height:1.16;letter-spacing:-1.5px;margin-top:38px;font-weight:700}.brand-story>p{font-size:18px;line-height:1.5;color:#b6d9ff;margin-top:20px}.brand-illustration{width:100%;height:auto;display:block;margin:16px 0 20px}.services{display:flex;list-style:none;padding:0;margin-top:auto;gap:18px}.services li{display:flex;align-items:center;gap:12px;font-size:12px;line-height:1.4;flex:1}.services li+li{border-left:1px solid #70a0e5;padding-left:18px}.services i{font-size:25px;color:#9dccff}
+.plate-form{padding:48px 54px;min-width:0;display:flex;flex-direction:column;justify-content:center}.form-eyebrow{text-transform:uppercase;letter-spacing:2px;font-weight:700;font-size:12px;color:var(--blue);margin-bottom:20px}.plate-title{font-size:40px;line-height:1.15;letter-spacing:-1.3px;font-weight:700;margin-bottom:12px}.form-intro{color:var(--ink-2);font-size:17px;line-height:1.5;margin-bottom:30px}.form-intro[hidden]{display:none}.auth-form{display:flex;flex-direction:column;gap:22px;width:100%}.field{display:flex;flex-direction:column;gap:9px}.field label{font-size:14px;font-weight:600}.field-box{position:relative}.field-box>i{position:absolute;left:17px;top:50%;transform:translateY(-50%);color:#66738a;font-size:18px;pointer-events:none}.field-box input{width:100%;height:54px;border:1px solid var(--rule-2);border-radius:9px;background:#fff;color:var(--ink);padding:0 48px 0 46px;font-size:16px;min-width:0}.field-box input::placeholder{color:#657086;opacity:1}input:focus{outline:0;border-color:var(--blue);box-shadow:0 0 0 3px #073bdb20}.password-toggle-btn{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:44px;height:44px;display:grid;place-items:center;border:0;border-radius:6px;background:none;color:#66738a;cursor:pointer}.password-toggle-btn:hover{background:#eef3ff;color:var(--blue)}input:-webkit-autofill{-webkit-text-fill-color:var(--ink);box-shadow:0 0 0 1000px #fff inset}input:-webkit-autofill:focus{box-shadow:0 0 0 1000px #fff inset,0 0 0 3px #073bdb20}
+.btn-signin{width:100%;min-height:56px;border:0;border-radius:9px;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;gap:12px;font-weight:600;font-size:18px;cursor:pointer}.btn-signin:hover{background:#062eb0}.btn-signin:disabled{background:#6a7caa;cursor:wait}.form-row{display:flex;justify-content:space-between;align-items:center;gap:12px}.forgot-row{justify-content:flex-end;margin-top:-10px}.link-btn{border:0;background:none;color:var(--blue);cursor:pointer;min-height:44px;padding:8px 0;font-size:14px}.link-btn:hover,a:hover{text-decoration:underline}a:focus-visible,button:focus-visible{outline:3px solid #4082f5;outline-offset:4px}.form-help{margin-top:32px;padding-top:22px;border-top:1px solid var(--rule)}.form-help a{display:flex;justify-content:center;align-items:center;gap:12px;min-height:44px;text-decoration:none;font-size:14px;color:var(--ink-2)}.form-help i{font-size:21px}.page-footer{text-align:center;font-size:14px;line-height:1.6}.page-footer p{font-weight:600;margin-bottom:10px}.page-footer a{display:inline-flex;align-items:center;min-height:32px;color:var(--blue);font-size:13px;text-underline-offset:4px}
+.auth-notice{padding:12px 14px;border:1px solid;border-radius:9px;display:flex;gap:9px;margin-bottom:18px;font-size:14px;line-height:1.5}.auth-error{background:#fff0ef;border-color:#f0b8b5;color:#962d25}.auth-success{background:#eaf8ef;border-color:#b4ddc1;color:#1c6838}.otp-note{font-size:14px;line-height:1.7;color:var(--ink-2)}.otp-note .hint,.otp-note .warn{display:block;margin-top:8px}.warn{color:#92540b}.otp-box input{text-align:center;padding:0 16px;letter-spacing:.4em;font-size:24px}
+.tc-modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(16, 25, 43, 0.42);
+  backdrop-filter: blur(4px);
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.tc-modal-overlay.active { display: flex; }
+
+.tc-modal {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 680px;
+  max-height: 85vh;
+  background: var(--card);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  box-shadow: 0 30px 70px rgba(16, 25, 43, 0.28);
+}
+
+.tc-modal-header {
+  padding: 17px 24px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--card-2);
+}
+.tc-modal-header h2 {
+  font-family: var(--display);
+  font-size: 1.04rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.tc-modal-header i { color: var(--blue); font-size: 0.88rem; }
+
+.tc-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 22px 24px;
+  font-size: 0.88rem;
+  line-height: 1.72;
+  color: var(--ink-2);
+}
+
+.tc-modal-body h3 {
+  font-family: var(--display);
+  font-size: 0.93rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 20px 0 8px;
+}
+.tc-modal-body h3:first-child { margin-top: 0; }
+.tc-modal-body p { margin-bottom: 12px; }
+.tc-modal-body ul { margin: 0 0 12px 18px; }
+.tc-modal-body li { margin-bottom: 7px; }
+.tc-modal-body strong { color: var(--ink); }
+
+.tc-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: 13px 24px;
+  border-top: 1px solid var(--rule);
+  background: var(--card-2);
+}
+
+.tc-modal-btn {
+  padding: 9px 22px;
+  border: 1px solid var(--rule-2);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tc-modal-btn:hover { border-color: var(--blue); background: rgba(29, 78, 216, 0.05); }
+.tc-modal-btn:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+@media(max-width:900px){body{padding:28px 20px;gap:28px;justify-content:flex-start}.plate{max-width:520px;border:0;border-radius:0;background:none;box-shadow:none;overflow:visible}.plate-body{display:flex;flex-direction:column;gap:24px}.plate-brand{padding:22px 24px;border-radius:20px}.brand-header{gap:16px}.brand-header>div{padding-left:16px}.crest{width:44px;height:56px}.college-name{font-size:15px}.system-name{font-size:10px;letter-spacing:1.5px}.brand-story{display:none}.plate-form{border:1px solid #cfd9eb;background:#fff;border-radius:20px;padding:28px 24px;box-shadow:0 14px 35px -20px #204c8d55}.form-eyebrow{font-size:11px;letter-spacing:1.7px;margin-bottom:16px}.plate-title{font-size:34px}.form-intro{font-size:15px;margin-bottom:28px}.auth-form{gap:20px}.field label{font-size:14px}.form-help{margin-top:24px;padding-top:16px}.page-footer{max-width:520px;font-size:13px}.page-footer p{margin-bottom:4px}}
+@media(max-width:360px){body{padding:20px 12px}.plate-form{padding:24px 20px}.plate-brand{padding:18px 16px}.college-name{font-size:13px}.system-name{font-size:9px;letter-spacing:1px}.plate-title{font-size:30px}.form-eyebrow{font-size:10px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+
+/* Compact desktop composition; mobile keeps its touch-friendly sizing. */
+@media(min-width:901px){
+ body{padding:28px 24px 20px;gap:24px}
+ .plate{max-width:1000px;border-radius:20px}
+ .plate-brand{padding:30px 28px 28px}
+ .brand-header{gap:14px}.brand-header>div{padding-left:14px}
+ .crest{width:48px;height:58px}.college-name{font-size:15px}
+ .system-name{font-size:10px;letter-spacing:1.7px}
+ .brand-story h1{font-size:34px;letter-spacing:-1px;margin-top:28px}
+ .brand-story>p{font-size:15px;margin-top:16px}
+ .brand-illustration{width:92%;max-width:350px;align-self:center;margin:16px 0 18px}
+ .services{gap:12px}.services li{gap:9px;font-size:11px}
+ .services li+li{padding-left:12px}.services i{font-size:22px}
+ .plate-form{padding:32px 40px}.form-eyebrow{font-size:11px;margin-bottom:15px}
+ .plate-title{font-size:34px;margin-bottom:10px}
+ .form-intro{font-size:15px;margin-bottom:25px}
+ .auth-form{gap:17px}.field{gap:8px}.field-box input{height:50px}
+ .btn-signin{min-height:50px;font-size:16px}
+ .form-help{margin-top:24px;padding-top:16px}
+ .page-footer{font-size:13px}.page-footer p{margin-bottom:4px}
+}

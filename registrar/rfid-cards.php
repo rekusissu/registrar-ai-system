@@ -914,66 +914,7 @@ foreach ($cards as $i => $c) {
 #qrModalOverlay .qr-modal-close { border:none; background:#f1f5f9; border-radius:10px; padding:8px 20px; font-size:13px; font-weight:600; cursor:pointer; color:#475569; }
 #qrModalOverlay .qr-modal-close:hover { background:#e2e8f0; }
 /* â”€â”€ ID card (view modal) &mdash; 3D flip card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-.idcard-flip { width:340px; height:430px; margin:0 auto; perspective:1400px; }
-.idcard-inner { position:relative; width:100%; height:100%; transform-style:preserve-3d; transition:transform .8s cubic-bezier(.4,.15,.2,1); }
-.idcard-flip.flipped .idcard-inner { transform:rotateY(180deg); }
-.idcard, .idcard-back {
-    position:absolute; inset:0; width:100%; height:100%; margin:0;
-    border-radius:18px; overflow:hidden; background:#fff;
-    border:1px solid #e2e8f0; box-shadow:0 12px 32px rgba(15,23,42,.12);
-    display:flex; flex-direction:column;
-    backface-visibility:hidden; -webkit-backface-visibility:hidden;
-}
-.idcard-head { background:linear-gradient(135deg,#1a3a8c 0%,#2563eb 100%); color:#fff; padding:14px 18px; display:flex; align-items:center; gap:11px; position:relative; overflow:hidden; }
-.idcard-head::after { content:''; position:absolute; right:-30px; top:-30px; width:110px; height:110px; border-radius:50%; background:radial-gradient(circle,rgba(255,255,255,.18),transparent 70%); }
-.idcard-head img { width:34px; height:34px; border-radius:8px; background:#fff; object-fit:contain; position:relative; z-index:1; }
-.idcard-head .school { font-size:12.5px; font-weight:800; letter-spacing:.3px; position:relative; z-index:1; }
-.idcard-head .school small { display:block; font-size:9.5px; font-weight:500; opacity:.85; margin-top:1px; }
-.idcard-photo-wrap { display:flex; justify-content:center; padding-top:16px; position:relative; z-index:2; }
-.idcard-photo { width:86px; height:86px; border-radius:50%; object-fit:cover; background:#e2e8f0; border:4px solid #fff; box-shadow:0 4px 12px rgba(15,23,42,.18); display:block; }
-.idcard-initials { width:86px; height:86px; border-radius:50%; background:linear-gradient(135deg,#e2e8f0,#cbd5e1); border:4px solid #fff; box-shadow:0 4px 12px rgba(15,23,42,.18); display:flex; align-items:center; justify-content:center; font-size:26px; font-weight:800; color:#475569; }
-.idcard-center { text-align:center; padding:10px 20px 0; }
-.idcard-name { font-size:16px; font-weight:800; color:#0f172a; margin-top:4px; line-height:1.3; }
-.idcard-meta { font-size:11.5px; color:#64748b; margin-top:3px; }
-.idcard-sec { display:flex; align-items:flex-start; gap:14px; margin:14px 18px 0; padding:12px 14px; background:#f8fafc; border:1px solid #eef2f7; border-radius:14px; }
-.idcard-fields { flex:1; min-width:0; }
-.idcard-field { margin-bottom:7px; }
-.idcard-field:last-child { margin-bottom:0; }
-.idcard-field .k { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.6px; color:#94a3b8; }
-.idcard-field .v { font-size:12.5px; font-weight:700; color:#0f172a; }
-.idcard-field .v.mono { font-family:'JetBrains Mono',monospace; letter-spacing:.5px; }
-.idcard-qrbox { text-align:center; flex-shrink:0; }
-.idcard-qrbox img { width:78px; height:78px; background:#fff; padding:4px; border-radius:10px; border:1px solid #e2e8f0; display:block; }
-.idcard-qrbox .cap { font-size:8.5px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#94a3b8; margin-top:3px; }
-.idcard-qrbox .cap.ok { color:#16a34a; }
-.idcard-foot { margin-top:auto; background:#f8fafc; border-top:1px solid #eef2f7; padding:12px 20px; text-align:center; font-size:9px; color:#94a3b8; line-height:1.5; }
-/* â”€â”€ Card back â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-.idcard-back {
-    position:absolute; inset:0; width:100%; height:100%; margin:0;
-    border-radius:18px; overflow:hidden; background:#fff;
-    border:1px solid #e2e8f0; box-shadow:0 12px 32px rgba(15,23,42,.12);
-    display:flex; flex-direction:column;
-    backface-visibility:hidden; -webkit-backface-visibility:hidden;
-    transform:rotateY(180deg);
-}
-.idcard-back-head { background:#0f172a; color:#fff; padding:10px 18px; display:flex; align-items:center; justify-content:space-between; }
-.idcard-back-head .b-school { font-size:10.5px; font-weight:800; letter-spacing:.4px; }
-.idcard-back-head .b-school small { display:block; font-size:8.5px; font-weight:500; color:#94a3b8; margin-top:1px; }
-.idcard-back-sec { padding:12px 18px 4px; }
-.idcard-back-sec + .idcard-back-sec { padding-top:0; }
-.idcard-sec-title { display:flex; align-items:center; gap:6px; font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.7px; color:#94a3b8; margin-bottom:6px; }
-.idcard-sec-title i { color:#2563eb; font-size:10px; }
-.idcard-emg-row { display:flex; align-items:flex-start; gap:9px; padding:6px 0; }
-.idcard-emg-row + .idcard-emg-row { border-top:1px dashed #eef2f7; }
-.idcard-emg-ico { width:26px; height:26px; border-radius:8px; background:#fef2f2; color:#dc2626; display:flex; align-items:center; justify-content:center; font-size:11px; flex-shrink:0; }
-.idcard-emg-name { font-size:12px; font-weight:700; color:#0f172a; }
-.idcard-emg-sub { font-size:10.5px; color:#64748b; margin-top:1px; }
-.idcard-addr { font-size:11.5px; color:#334155; line-height:1.55; background:#f8fafc; border:1px solid #eef2f7; border-radius:10px; padding:8px 12px; }
-.idcard-addr em { color:#94a3b8; }
-.idcard-sig { text-align:center; padding:4px 24px 14px; }
-.idcard-sig .line { border-top:1px solid #334155; margin:0 24px 4px; }
-.idcard-sig .who { font-size:8.5px; color:#475569; text-transform:uppercase; letter-spacing:.5px; }
-.idcard-back-foot { margin-top:auto; background:#f8fafc; border-top:1px solid #eef2f7; padding:8px 20px; text-align:center; font-size:9px; color:#94a3b8; line-height:1.5; }
+/* Card preview and print design: assets/id-card/student-id.css. */
 /* ── Print-only ID card styles ──────────────────────── */
 #printArea{display:none;}
 @media print{
@@ -1619,7 +1560,8 @@ body[data-page="rfid"] td.rc-empty span{display:block}
                         // a file this host does not have yields '', so a missing
                         // photograph produces initials rather than a broken-image
                         // glyph and a 404.
-                        $avatarUrl = studentPhotoUrl($card, $APP_ROOT);
+                        $avatarUrl = storedFileDiskPath($card['photo_path'] ?? '')
+                            ? $APP_ROOT . 'api/student-photo.php?student_id=' . (int)$card['student_id'] : '';
                     ?>
                         <tr data-card='<?= htmlspecialchars(json_encode($card), ENT_QUOTES, 'UTF-8') ?>'
                             data-retired="<?= $isRetired ? '1' : '0' ?>"
@@ -2161,85 +2103,27 @@ body[data-page="rfid"] td.rc-empty span{display:block}
 </div>
 
 <!-- â”€â”€ View ID Card Modal â”€â”€ -->
-<div class="modal-overlay" id="idCardModal">
-    <div class="modal-content" style="max-width:400px;">
+<link rel="stylesheet" href="../assets/id-card/student-id.css?v=20261110-qr-label-top">
+<div class="modal-overlay" id="idCardModal" role="dialog" aria-modal="true" aria-label="Student ID card preview">
+    <div class="modal-content" style="max-width:420px;">
         <div class="modal-header"><h3><i class="fas fa-id-card" style="color:#2563eb;"></i> Student ID Card</h3><button class="modal-close" onclick="document.getElementById('idCardModal').classList.remove('active'); document.body.style.overflow='';"><i class="fas fa-times"></i></button></div>
         <div class="modal-body">
-            <div class="idcard-flip" id="cardFlip">
-              <div class="idcard-inner">
-                <div class="idcard">
-                    <div class="idcard-head">
-                        <img src="../assets/images/BCP_LOGO.png" alt="BCP" onerror="this.style.display='none'">
-                        <div class="school">BESTLINK COLLEGE OF THE PHILIPPINES<small>Official Student Identification</small></div>
-                    </div>
-                    <div class="idcard-photo-wrap">
-                        <?php // No src attribute, and no inline onerror.
-                              //
-                              // This used to read:
-                              //     <img id="cardPhoto" src="" onerror="showIdInitialsFallback()">
-                              // An empty src is not "no source" - the browser resolves it to
-                              // the document URL, fails to decode the result as an image, and
-                              // fires error WHILE PARSING. That is long before the <script>
-                              // at the bottom of this file has run, so the handler called a
-                              // function that did not exist yet:
-                              //     Uncaught ReferenceError: showIdInitialsFallback is not defined
-                              // display:none did not help - a hidden image is still fetched.
-                              //
-                              // The handler is attached in viewIdCard(), immediately before
-                              // the src is assigned, which is the only moment a real load
-                              // failure can happen and the only moment the function is
-                              // certain to be defined. ?>
-                        <img class="idcard-photo" id="cardPhoto" alt="photo" style="display:none;">
-                        <div class="idcard-initials" id="cardInitials" style="display:none;">&mdash;</div>
-                    </div>
-                    <div class="idcard-center">
-                        <div class="idcard-name" id="cardName">&mdash;</div>
-                    </div>
-                    <div class="idcard-sec">
-                        <div class="idcard-fields">
-                            <div class="idcard-field"><div class="k">Course</div><div class="v" id="cardCourse">&mdash;</div></div>
-                            <div class="idcard-field"><div class="k">Student ID</div><div class="v mono" id="cardNumber">&mdash;</div></div>
-                            <div style="display:flex;gap:16px;">
-                                <div class="idcard-field" style="flex:1;"><div class="k">Issued</div><div class="v" id="cardIssued">&mdash;</div></div>
-                                <div class="idcard-field" style="flex:1;"><div class="k">Valid Until</div><div class="v" id="cardExpiry">&mdash;</div></div>
-                            </div>
-                        </div>
-                        <div class="idcard-qrbox">
-                            <img id="cardQr" src="" alt="QR">
-                            <div class="cap" id="cardQrCap">Scan to verify</div>
-                        </div>
-                    </div>
-                    <div class="idcard-foot">This ID is property of Bestlink College of the Philippines.<br>If found, please return to the Registrar's Office.</div>
-                </div>
-
-                <div class="idcard-back">
-                    <div class="idcard-back-head">
-                        <div class="b-school">BESTLINK COLLEGE OF THE PHILIPPINES<small>Registrar's Office</small></div>
-                    </div>
-                    <div class="idcard-back-sec">
-                        <div class="idcard-sec-title"><i class="fa-solid fa-triangle-exclamation"></i> In case of emergency, please contact</div>
-                        <div id="cardBackEmg"></div>
-                    </div>
-                    <div class="idcard-back-sec">
-                        <div class="idcard-sec-title"><i class="fa-solid fa-house"></i> Address</div>
-                        <div class="idcard-addr" id="cardBackAddr"><em>Not on file</em></div>
-                    </div>
-                    <div class="idcard-back-sec">
-                        <div class="idcard-sec-title"><i class="fa-solid fa-file-shield"></i> Reminders</div>
-                        <div class="idcard-addr" style="font-size:10.5px;">
-                            &bull; This card is non-transferable and must be worn at all times inside the campus.<br>
-                            &bull; Not valid without the signature of the Registrar.<br>
-                            &bull; Report lost cards immediately to the Registrar's Office.
-                        </div>
-                    </div>
-                    <div class="idcard-sig">
-                        <div class="line"></div>
-                        <div class="who">Signature of Student &mdash; Not valid without signature</div>
-                    </div>
-                    <div class="idcard-back-foot">If this card is found, please return to the Registrar's Office or call the school hotline.</div>
-                </div>
-              </div>
-            </div>
+            <div class="idcard-flip" id="cardFlip"><div class="idcard-scale"><div class="idcard-inner"><div class="idcard" aria-label="Student ID front">
+ <div class="idcard-head"><img src="../assets/images/BCP_LOGO.png" alt="Bestlink College crest"><div class="school">BESTLINK COLLEGE<br>OF THE PHILIPPINES<small>STUDENT IDENTIFICATION</small></div></div>
+ <div class="idcard-photo-wrap"><div class="idcard-photo-frame"><img class="idcard-photo" id="cardPhoto" alt="Student portrait" style="display:none"><div class="idcard-initials" id="cardInitials" style="display:none">—</div></div></div>
+ <div class="idcard-center"><div class="idcard-name" id="cardName">—</div><div class="idcard-number" id="cardNumber">—</div></div>
+ <div class="idcard-program"><div class="k">PROGRAM</div><div class="v" id="cardCourse">—</div></div>
+ <div class="idcard-sec"><div class="idcard-fields"><div class="idcard-field"><div class="k">ISSUED</div><div class="v" id="cardIssued">—</div></div><div class="idcard-field"><div class="k">VALID UNTIL</div><div class="v" id="cardExpiry">—</div></div></div><div class="idcard-qrbox"><img id="cardQr" alt="Student verification QR code"><div class="cap" id="cardQrCap">Scan to verify</div></div></div>
+ <div class="idcard-foot"></div>
+</div><div class="idcard-back" aria-label="Student ID back">
+ <div class="idcard-head idcard-back-head"><img src="../assets/images/BCP_LOGO.png" alt="Bestlink College crest"><div class="school">BESTLINK COLLEGE<br>OF THE PHILIPPINES<small>Registrar's Office</small></div></div>
+ <div class="idcard-back-content">
+ <section class="idcard-back-sec"><div class="idcard-sec-title"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> In case of emergency, please contact</div><div id="cardBackEmg" class="idcard-emergency"></div></section>
+ <section class="idcard-back-sec"><div class="idcard-sec-title"><i class="fa-solid fa-house" aria-hidden="true"></i> Address</div><div class="idcard-addr" id="cardBackAddr">Not on file</div></section>
+ <section class="idcard-back-sec"><div class="idcard-sec-title"><i class="fa-solid fa-file-lines" aria-hidden="true"></i> Reminders</div><div class="idcard-reminders"><ul><li>This card is non-transferable and must be worn at all times inside the campus.</li><li>Not valid without the signature of the Registrar.</li><li>Report lost cards immediately to the Registrar's Office.</li></ul></div></section>
+ <div class="idcard-sig"><div class="line"></div><div class="who">SIGNATURE OF STUDENT</div><div class="idcard-signature-note">NOT VALID WITHOUT SIGNATURE</div></div>
+ </div><div class="idcard-back-foot">If found, please return this card to the Registrar's Office or call the school hotline.</div>
+</div></div></div></div>
             <div style="text-align:center;margin-top:14px;">
                 <button type="button" class="btn btn-light" onclick="document.getElementById('cardFlip').classList.toggle('flipped')" style="min-width:150px;"><i class="fas fa-rotate"></i> Flip Card</button>
             </div>
@@ -3068,6 +2952,7 @@ document.querySelectorAll('[data-close-modal]').forEach(el => {
 // â”€â”€ ID Card View (3D flip) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const CARD_EXTRAS = <?= json_encode($cardExtras ?: new stdClass(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 let idCardData = null;
+let idPhotoRequest = 0;
 
 function normalizePhotoPath(p) {
     if (!p) return '';
@@ -3147,7 +3032,7 @@ function viewIdCard(btn) {
     else { img.style.display = 'none'; ini.textContent = idInitialsOf(d.name); ini.style.display = 'flex'; }
     document.getElementById('cardName').textContent = d.name || '—';
     document.getElementById('cardCourse').textContent = d.course || '—';
-    document.getElementById('cardNumber').textContent = d.idnumber || '—';
+    document.getElementById('cardNumber').textContent = d.idnumber || d.studentNumber || '—';
     document.getElementById('cardIssued').textContent = d.issued ? new Date(d.issued).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
     document.getElementById('cardExpiry').textContent = d.expiry ? new Date(d.expiry).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'No expiry';
     const qrImg = document.getElementById('cardQr');
@@ -3167,7 +3052,32 @@ function viewIdCard(btn) {
     fillIdCardBack(d.studentId);
     document.getElementById('cardFlip').classList.remove('flipped');
     document.getElementById('idCardModal').classList.add('active');
+    fitIdCardPreview();
+    refreshIdPhotoFromStorage(d.id, d.studentId);
     document.body.style.overflow = 'hidden';
+}
+
+// Re-read Digital File Storage on every preview, including uploads made since page load.
+async function refreshIdPhotoFromStorage(cardId, studentId) {
+    const request = ++idPhotoRequest;
+    if (!cardId) return;
+    try {
+        const response = await fetch('../api/rfid.php?id=' + encodeURIComponent(cardId), {cache:'no-store', credentials:'same-origin'});
+        const result = await response.json();
+        if (!response.ok || !result.success || !result.data || request !== idPhotoRequest) return;
+        if (String(result.data.student_id) !== String(studentId)) return;
+        const src = result.data.photo_url || '';
+        const img = document.getElementById('cardPhoto');
+        if (!src) { img.removeAttribute('src'); showIdInitialsFallback(); return; }
+        img.onerror = function () { this.onerror = null; this.removeAttribute('src'); showIdInitialsFallback(); };
+        img.onload = function () {
+            if (request !== idPhotoRequest) return;
+            document.getElementById('cardInitials').style.display = 'none';
+            this.style.display = 'block';
+        };
+        img.src = src;
+        idCardData.photo = src;
+    } catch (_) { /* Keep the last resolved photo if the network is unavailable. */ }
 }
 
 function fillIdCardBack(studentId) {
@@ -3189,50 +3099,39 @@ function fillIdCardBack(studentId) {
     addrBox.innerHTML = extras.address ? extras.address.replace(/</g,'&lt;') : '<em>Not on file</em>';
 }
 
-function printIdCard() {
-    var area = document.getElementById('printArea');
-    var flip = document.getElementById('cardFlip');
-    if (!flip || !area) { showToast('Card elements not found.','error'); return; }
-    var frontEl = flip.querySelector('.idcard');
-    var backEl = flip.querySelector('.idcard-back');
-    if (!frontEl || !backEl) { showToast('Card faces not found.','error'); return; }
-
-    /*
-     * Standard RFID/credit card (CR80): 85mm wide × 55mm tall
-     * Screen card: 340px wide × 430px tall
-     * Portrait orientation on card: 55mm wide × 85mm tall
-     * At 96 DPI: 340px = 89.42mm, 430px = 113.90mm
-     * Scale to fit width: 55 / 89.42 = 0.615
-     * Resulting height: 113.90 × 0.615 = 70.05mm (fits within 85mm)
-     */
-    var targetWmm = 55;  // mm
-    var pxPerMm = 96 / 25.4;
-    var scale = (targetWmm * pxPerMm) / 340;
-
-    var fClone = frontEl.cloneNode(true);
-    var bClone = backEl.cloneNode(true);
-    [fClone, bClone].forEach(function(el) {
-        el.style.position = 'relative';
-        el.style.inset = 'auto';
-        el.style.width = '340px';
-        el.style.height = '430px';
-        el.style.transform = 'none';
-        el.style.backfaceVisibility = 'visible';
-        el.style.webkitBackfaceVisibility = 'visible';
-        el.style.margin = '0 auto 4mm';
-        el.style.pageBreakInside = 'avoid';
-        el.style.zoom = scale;
-    });
-    bClone.style.transform = 'none';
-
-    area.innerHTML = '';
-    area.appendChild(fClone);
-    area.appendChild(bClone);
-
-    window.print();
-    area.innerHTML = '';
+function fitIdCardPreview() {
+    const flip = document.getElementById('cardFlip');
+    if (!flip) return;
+    const width = Math.min(340, flip.parentElement.clientWidth);
+    flip.style.width = width + 'px';
+    flip.style.height = (width * 539 / 340) + 'px';
+    flip.style.setProperty('--idcard-scale', width / 340);
 }
+window.addEventListener('resize', fitIdCardPreview);
 
+async function printIdCard() {
+    const area = document.getElementById('printArea');
+    const flip = document.getElementById('cardFlip');
+    if (!flip || !area) return;
+    const faces = [flip.querySelector('.idcard'), flip.querySelector('.idcard-back')];
+    if (faces.some(face => !face)) return;
+    area.replaceChildren();
+    // Portrait CR80: 53.98 × 85.60 mm; retain the same designed aspect ratio.
+    for (const face of faces) {
+        const sheet = document.createElement('div');
+        sheet.className = 'idcard-print-face';
+        const clone = face.cloneNode(true);
+        clone.removeAttribute('id');
+        clone.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
+        sheet.appendChild(clone);
+        area.appendChild(sheet);
+    }
+    try {
+        await document.fonts.ready;
+        await Promise.all(Array.from(area.querySelectorAll('img')).map(img => img.decode().catch(() => {})));
+        window.print();
+    } finally { area.replaceChildren(); }
+}
 
 // Wire up ID card modal close-on-overlay + Esc
 document.getElementById('idCardModal')?.addEventListener('click', function(e) {

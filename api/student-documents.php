@@ -28,6 +28,7 @@ require_once __DIR__ . '/../shared/session_config.php';
 require_once __DIR__ . '/../shared/csrf_guard.php';
 require_once __DIR__ . '/../shared/functions.php';
 require_once __DIR__ . '/../shared/document_process.php';
+require_once __DIR__ . '/../shared/doc_wizard.php';
 require_once __DIR__ . '/../shared/schema.php';
 
 if (!isLoggedIn()) {
@@ -132,6 +133,7 @@ if (($input['action'] ?? '') === 'upload_receipt') {
         }
         // Ownership above is checked against the resolved $studentId, which
         // is the session's student — never a student_id from the body.
+        if (doc_review_pending($row)) { $dropStoredFile(); echo json_encode(['success'=>false,'message'=>'Wait for the Registrar to approve your requirements before paying or uploading a receipt.']); exit; }
         if (!doc_requires_receipt($row)) {
             $dropStoredFile();
             echo json_encode([
@@ -232,7 +234,9 @@ if (mb_strlen($waitingOn) > 160) {
     exit;
 }
 
-if ($paymentMethod !== 'Online' && $paymentMethod !== 'Cash_on_Delivery') {
+$paymentMethod = trim((string)($input['payment_method'] ?? 'Counter'));
+if ($paymentMethod === 'Cash_on_Delivery') $paymentMethod = 'Counter';
+if (!in_array($paymentMethod, ['Online','Counter','Bank_Transfer'], true)) {
     echo json_encode(['success' => false, 'message' => 'Invalid payment method.']);
     exit;
 }
@@ -286,7 +290,7 @@ try {
     if ($balance > 0) {
         $status = 'Pending_Clearance';
     } elseif ($paymentMethod === 'Online') {
-        $status = 'Awaiting_Payment';
+        $status = 'Filed';
     } else {
         $status = 'Filed';
     }
@@ -438,7 +442,7 @@ try {
 
         // Cash on Delivery — record the amount owed up front so there is a
         // payment trail; it is marked completed when the document is claimed.
-        
+
 
         // Initial status event. Say plainly what this request is waiting
         // on, if anything — an event log that records only the label
@@ -514,7 +518,7 @@ try {
             . number_format($fee, 2)
             . ' to start processing.';
     } else {
-        $submitMessage = 'Document request submitted. Pay at the office when you collect it.';
+        $submitMessage = 'Request submitted for requirements review. Wait for Registrar approval before paying.';
     }
 
     echo json_encode([

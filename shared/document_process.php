@@ -290,6 +290,12 @@ function doc_stage_position(string $status): array
  */
 function doc_next_step(array $row): ?array
 {
+    $stage = (string)($row['document_status'] ?? '');
+    if (in_array($stage, ['Filed','Pending_Clearance','Awaiting_Payment'], true)) {
+        if (empty($row['requirements_reviewed_at'])) return ['action'=>'review_requirements','handler'=>'reviewRequirements','label'=>'Review requirements','icon'=>'fa-clipboard-check'];
+        if (($row['payment_method'] ?? 'Counter') === 'Counter' && (float)($row['fee_amount'] ?? 0) > 0 && empty($row['paid_at'])) return ['action'=>'counter_payment','handler'=>'recordCounterPayment','label'=>'Record payment','icon'=>'fa-receipt'];
+        if ($stage === 'Awaiting_Payment') return null;
+    }
     switch ((string) ($row['document_status'] ?? '')) {
         case 'Filed':
         case 'Pending_Clearance':
@@ -543,6 +549,7 @@ function doc_set_registrar_hold(int $requestId, string $reason, ?int $userId = n
  */
 function doc_requires_receipt(array $row): bool
 {
+    if (doc_review_pending($row)) return false;
     // The courier fee used to be added here, because a courier request
     // could be paid online and still owed postage. There is no courier.
     $fee = (float) ($row['fee_amount'] ?? 0);
@@ -550,7 +557,7 @@ function doc_requires_receipt(array $row): bool
     // Only money that actually moved online leaves a GCash reference
     // behind. Cash on delivery is counted in person, at the counter,
     // where the cashier's book is the record.
-    return ($row['payment_method'] ?? '') === 'Online';
+    return in_array(($row['payment_method'] ?? ''), ['Online','Bank_Transfer'], true);
 }
 
 /** Allowed receipt extensions. Shared by the validator and the student UI. */
@@ -603,10 +610,10 @@ function doc_receipt_gate(array $row): array
     }
     $state = doc_receipt_state($row);
     return [
-        'ok'     => $state !== 'none',
+        'ok'     => in_array($state, ['verified','waived'], true),
         'state'  => $state,
-        'reason' => $state === 'none'
-            ? 'Waiting on the GCash receipt. Ask the student to attach it in Document Requests.'
+        'reason' => !in_array($state, ['verified','waived'], true)
+            ? 'Confirm the uploaded payment receipt or record a waiver before preparation.'
             : null,
     ];
 }
@@ -699,3 +706,11 @@ function doc_receipt_ref(string $ref): array
 }
 
 
+
+/** Review and payment are separate recorded decisions. */
+function doc_review_pending(array $row): bool {
+    return in_array((string)($row['document_status'] ?? ''), ['Filed','Pending_Clearance','Awaiting_Payment'], true) && empty($row['requirements_reviewed_at']);
+}
+function doc_payment_pending(array $row): bool {
+    return !doc_review_pending($row) && (float)($row['fee_amount'] ?? 0)>0 && empty($row['paid_at']) && empty($row['payment_receipt_waived_at']);
+}

@@ -26,6 +26,7 @@ require_once __DIR__ . '/../shared/session_config.php';
 require_once __DIR__ . '/../shared/csrf_guard.php';
 require_once __DIR__ . '/../shared/functions.php';
 require_once __DIR__ . '/../shared/document_process.php';
+require_once __DIR__ . '/../shared/doc_wizard.php';
 require_once __DIR__ . '/../shared/stored_file.php';   // storedFileDiskPath()
 
 // Require login
@@ -327,7 +328,7 @@ try {
     // ─── GET ALL DOCUMENT REQUESTS ─────────────────────────────
     if ($method === 'GET' && !$id) {
         $documents = $db->fetchAll("
-            SELECT 
+            SELECT
                 dr.*,
                 CONCAT(s.first_name, ' ', s.last_name) AS student_name,
                 s.student_number,
@@ -344,7 +345,7 @@ try {
     // ─── GET SINGLE DOCUMENT REQUEST ───────────────────────────
     if ($method === 'GET' && $id) {
         $document = $db->fetchOne(
-            "SELECT 
+            "SELECT
                 dr.*,
                 CONCAT(s.first_name, ' ', s.last_name) AS student_name,
                 s.student_number,
@@ -366,7 +367,7 @@ try {
     // ─── CREATE DOCUMENT REQUEST ───────────────────────────────
     if ($method === 'POST') {
         $input = json_decode(file_get_contents('php://input'), true);
-        
+
         $studentId = $input['student_id'] ?? null;
         $documentType = $input['document_type'] ?? null;
         $purpose = $input['purpose'] ?? null;
@@ -503,6 +504,54 @@ try {
             ]);
             exit;
         }
+        if ($v2Action === 'hold') {
+            $req=$db->fetchOne('SELECT * FROM document_requests WHERE id = ?',[$id]);
+            $reason=trim((string)($input['reason']??''));
+            if (!$req || !in_array($req['document_status'],['Filed','Pending_Clearance','Awaiting_Payment','Processing'],true) || $reason==='' || mb_strlen($reason)>160) {echo json_encode(['success'=>false,'message'=>'An open request and a correction reason are required.']);exit;}
+            doc_set_registrar_hold((int)$id,$reason,(int)$_SESSION['user_id']);
+            echo json_encode(['success'=>true,'message'=>'Request placed on hold with your correction note.']);exit;
+        }
+        if (in_array($v2Action, ['review_requirements','counter_payment'], true)) {
+            $pdo = $db->getConnection();
+            $pdo->beginTransaction();
+            try {
+                $req = $db->fetchOne('SELECT * FROM document_requests WHERE id = ? FOR UPDATE', [$id]);
+                if (!$req || !in_array($req['document_status'], ['Filed','Pending_Clearance','Awaiting_Payment'], true)) throw new RuntimeException('This request is not in the review or payment queue.');
+                $now = date('Y-m-d H:i:s'); $userId=(int)$_SESSION['user_id'];
+                if ($v2Action === 'review_requirements') {
+                    if (!empty($req['requirements_reviewed_at'])) throw new RuntimeException('Requirements have already been reviewed. Refresh the desk.');
+                    if (empty($input['confirm_review'])) throw new RuntimeException('Confirm you reviewed the requirements before approving.');
+                    $note = trim((string)($input['review_note'] ?? ''));
+                    if (strlen($note)>1500) throw new RuntimeException('Review note must be under 1500 characters.');
+                    $requirements = doc_requirement_state((int)$id, (int)($req['catalog_id'] ?? 0));
+                    if (!empty($requirements['missing']) && $note === '') throw new RuntimeException('Required uploads are missing. Put the request on hold, or record why the requirements were accepted in person.');
+                    $status = in_array($req['payment_method'], ['Online','Bank_Transfer'], true) && (float)$req['fee_amount']>0 && empty($req['paid_at']) ? 'Awaiting_Payment' : 'Filed';
+                    $db->update('document_requests', ['requirements_reviewed_at'=>$now,'requirements_reviewed_by'=>$userId,'requirements_review_note'=>$note,'document_status'=>$status], 'id = ?', [$id]);
+                    if (($req['blocked_source']??'')==='registrar') doc_set_registrar_hold((int)$id,'',$userId);
+                    $event = 'Requirements reviewed and approved' . ($note!=='' ? ' — '.$note : '') . ($status==='Awaiting_Payment' ? '. Payment is now requested.' : '. Proceed to payment or preparation.');
+                } else {
+                    if (empty($req['requirements_reviewed_at'])) throw new RuntimeException('Review the requirements before collecting payment.');
+                    if ($req['payment_method'] !== 'Counter') throw new RuntimeException('Use receipt verification for online payments.');
+                    if (!empty($req['paid_at'])) throw new RuntimeException('Payment is already recorded.');
+                    if ((float)$req['fee_amount']<=0) throw new RuntimeException('This request has no fee to collect.');
+                    $receipt=trim((string)($input['official_receipt'] ?? ''));
+                    if ($receipt==='' || strlen($receipt)>40) throw new RuntimeException('Enter an official receipt number, up to 40 characters.');
+                    $status='Filed';
+                    $db->update('document_requests',['paid_at'=>$now,'official_receipt'=>$receipt,'document_status'=>$status],'id = ?',[$id]);
+                    $event='Counter payment confirmed — OR '.$receipt;
+                }
+                $db->insert('document_request_events',['request_id'=>$id,'status'=>$status,'note'=>mb_substr($event,0,250),'created_by'=>$userId,'created_at'=>$now]);
+                $pdo->commit();
+                if (function_exists('notifyStudent')) {
+                    try { notifyStudent((int)$req['student_id'], $v2Action==='review_requirements'?'Requirements approved':'Payment recorded', $event, 'info', (int)$id, $userId); }
+                    catch(Throwable $notifyError){error_log('[review-notification] '.$notifyError->getMessage());}
+                }
+                logActivity($userId,'document_request_'.$v2Action,null,'document_requests',$id);
+                echo json_encode(['success'=>true,'message'=>$event]);
+            } catch (Throwable $e) { if($pdo->inTransaction())$pdo->rollBack(); echo json_encode(['success'=>false,'message'=>$e->getMessage()]); }
+            exit;
+        }
+
         // ── Verify / waive the GCash receipt ──────────────────────
         // The two signals a registrar needs are kept apart on purpose.
         // The gateway callback says money moved; the screenshot's GCash
@@ -520,6 +569,9 @@ try {
             if (!$req) {
                 echo json_encode(['success' => false, 'message' => 'Document request not found.']);
                 exit;
+            }
+            if ($v2Action !== 'reset_receipt' && doc_review_pending($req)) {
+                echo json_encode(['success'=>false,'message'=>'Review and approve requirements before confirming payment.']); exit;
             }
             $now     = date('Y-m-d H:i:s');
             $userId  = $_SESSION['user_id'];
@@ -673,6 +725,8 @@ try {
             $approvalReason = null; $releaseDate = null; $receipt = null;
             switch ($v2Action) {
                 case 'process':
+                    if (doc_review_pending($req)) { echo json_encode(['success'=>false,'message'=>'Review the requirements first.']); exit; }
+                    if (doc_payment_pending($req)) { echo json_encode(['success'=>false,'message'=>'Confirm payment before preparing the document.']); exit; }
                     // Filed and Pending_Clearance are both actionable by the
                     // registrar: the first has no block, the second has been
                     // cleared of its balance since it was filed.
@@ -907,6 +961,8 @@ try {
             exit;
         }
 
+        // All request transitions must use the audited workflow actions above.
+        if (isset($input['status'])) { echo json_encode(['success'=>false,'message'=>'Use the review, payment, preparation and release actions to update this request.']); exit; }
         $status = $input['status'] ?? null;
         $denialReason = $input['denial_reason'] ?? null;
 

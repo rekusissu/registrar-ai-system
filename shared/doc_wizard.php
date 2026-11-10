@@ -247,7 +247,7 @@ function doc_payment_options(): array
         [
             'value'   => 'Counter',
             'label'   => 'Pay at the cashier',
-            'note'    => 'Bring your reference number and pay at the Registrar when you collect.',
+            'note'    => 'After requirements approval, pay at the Registrar before preparation.',
             'icon'    => 'fa-hand-holding-dollar',
             'brand'   => 'counter',
             'settles' => true,    // paid in person, at the counter, at the end
@@ -393,6 +393,8 @@ function doc_status(string $status): array
  */
 function doc_waiting_on(array $row): array
 {
+    if (doc_review_pending($row)) return ['who'=>'office','what'=>'Reviewing requirements before payment','urgent'=>false];
+    if (doc_payment_pending($row) && ($row['payment_method']??'')==='Counter') return ['who'=>'you','what'=>'Pay the approved fee at the Registrar before preparation','urgent'=>true];
     // An unpaid fee the office cannot see. Bounded to the live statuses on
     // purpose: doc_requires_receipt() is true of any row with a fee and an
     // Online payment method, and doc_receipt_state() is "none" for every row
@@ -852,16 +854,16 @@ function doc_track_timeline(array $row, array $events): array
             'note'  => 'Tracking number ' . (string) ($row['request_id'] ?? ''),
         ],
         [
-            'key'   => 'payment',
-            'label' => 'Payment received',
-            'at'    => $row['paid_at'] ?? ($row['payment_receipt_verified_at'] ?? null),
-            'note'  => $row['paid_at'] ? null : 'Waiting on your payment',
+            'key'   => 'queued',
+            'label' => 'Requirements reviewed',
+            'at'    => $row['requirements_reviewed_at'] ?? (in_array($status,['Processing','Ready','Claimed','Shipped'],true) ? ($reached['Processing']??$row['ready_at']??null) : null),
+            'note'  => doc_review_pending($row) ? 'Registrar checking your request and supporting documents' : ($row['requirements_review_note']??null),
         ],
         [
-            'key'   => 'queued',
-            'label' => 'Queued at the Registrar',
-            'at'    => $reached['Filed'] ?? null,
-            'note'  => null,
+            'key'   => 'payment',
+            'label' => 'Payment confirmed',
+            'at'    => $row['paid_at'] ?? ($row['payment_receipt_verified_at'] ?? null),
+            'note'  => doc_review_pending($row) ? 'Payment follows requirements review' : null,
         ],
         [
             'key'   => 'preparing',
@@ -924,12 +926,11 @@ function doc_track_timeline(array $row, array $events): array
     // not paid yet. Here the request is held at its true first step and
     // the payment step is the one labelled as what they owe.
     if ($status === 'Awaiting_Payment') {
-        $steps[0]['state'] = 'done';
-        $steps[1]['state'] = 'active';
-        $steps[1]['note']  = 'Waiting on you';
-        for ($i = 2; $i < count($steps); $i++) {
-            $steps[$i]['state'] = 'pending';
-        }
+        $steps[0]['state']='done';
+        $steps[1]['state']=doc_review_pending($row)?'active':'done';
+        $steps[2]['state']=doc_review_pending($row)?'pending':'active';
+        $steps[2]['note']=doc_review_pending($row)?'Wait for requirements approval':'Pay and attach your receipt';
+        for($i=3;$i<count($steps);$i++)$steps[$i]['state']='pending';
         return $steps;
     }
 
@@ -942,12 +943,12 @@ function doc_track_timeline(array $row, array $events): array
     // owed money while the box directly above it said they did not, and
     // the student has no way to tell which of the two to believe. It is
     // drawn as a later step instead, and labelled with when it happens.
-    if (($row['payment_method'] ?? '') === 'Counter' && empty($row['paid_at'])) {
-        $steps[1]['note'] = 'Pay at the counter when you collect';
+    if (($row['payment_method'] ?? '') === 'Counter' && empty($row['paid_at']) && doc_review_pending($row)) {
+        $steps[2]['note'] = 'Pay at the counter after requirements approval';
         // Suppress its timestamp entirely so the generic walk cannot
         // treat it as the current position.
-        $steps[1]['at']   = null;
-        $steps[1]['deferred'] = true;
+        $steps[2]['at']   = null;
+        $steps[2]['deferred'] = true;
     }
 
     // A request that has been COLLECTED is finished, whatever the
@@ -1030,6 +1031,9 @@ unset($s);
  */
 function doc_next_expectation(array $row): array
 {
+    if (doc_review_pending($row)) return ['headline'=>'Requirements under review','detail'=>'The Registrar is checking your request and supporting documents. Wait for approval before paying.'];
+    if (doc_payment_pending($row)) return ['headline'=>'Requirements approved — payment next','detail'=>'Pay the document fee using your selected channel. The Registrar will confirm payment before preparation.'];
+
     switch ((string) ($row['document_status'] ?? '')) {
         case 'Draft':
             return ['headline' => 'Your draft is saved', 'detail' => 'Finish the request and submit it to get a tracking number.'];

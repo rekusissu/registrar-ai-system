@@ -1402,7 +1402,7 @@ function render(data) {
     else if (PAGE === 'dashboard') {
         function loadWidget() {
             fetchJson(API_AUTH + '?action=state').then(function (d) {
-                if (!d.success || !d.data) return;
+                if (!d.success || !d.data) throw new Error('Queue data unavailable');
                 var el = document.getElementById('liveQueueWidget');
                 if (!el) return;
                 var st = d.data.stats || {};
@@ -1416,7 +1416,13 @@ function render(data) {
                     '<div class="lq-row"><span>Completed today</span><strong>' + (st.completed || 0) + '</strong></div>';
                 if (serving) html += '<div class="lq-row"><span style="color:#64748b;">' + esc(serving.student_name) + '</span></div>';
                 el.innerHTML = html;
-            }).catch(function (e) { reportQueueError(e, 'dashboard widget'); });
+                var statusEl = document.getElementById('queueWidgetStatus');
+                if (statusEl) statusEl.textContent = 'Updated ' + new Date().toLocaleTimeString('en-PH', {hour:'2-digit',minute:'2-digit',second:'2-digit',timeZone:'Asia/Manila'});
+            }).catch(function (e) { var statusEl = document.getElementById('queueWidgetStatus');
+                if (statusEl) statusEl.textContent = 'Queue refresh unavailable. Retrying automatically.';
+                var widget = document.getElementById('liveQueueWidget');
+                if (widget && !widget.querySelector('.lq-row')) widget.textContent = 'Queue data is unavailable.';
+                reportQueueError(e, 'dashboard widget'); });
         }
         loadWidget();
         startPoll(loadWidget, 5000);

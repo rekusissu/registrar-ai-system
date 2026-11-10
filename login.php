@@ -5,21 +5,7 @@
 //   Forgot password: reveal email → OTP → set new password
 //   10-min lockout after 5 failed attempts (handled server-side).
 //   CSRF tokens are enforced on every POST (see shared/csrf_guard.php).
-//
-// Two things are worth knowing before editing the markup.
-//
-// 1. This page renders; it does not authenticate. Every submit below posts
-//    to shared/auth_actions.php through post(). There is no PHP branch that
-//    grants a session here, so a reviewer reading this file cannot conclude
-//    that a credential check happens server-side in front of the user.
-//
-// 2. The strip at the bottom reports only what PHP can genuinely observe.
-//    Transport, PHP build, database reachability, Manila clock. There is no
-//    "SECURE · TLS 1.3" badge, because this page is served over plain HTTP
-//    on the development box and a false security claim on a sign-in screen
-//    is the one defect that must not ship. On plain transport the strip says
-//    PLAIN HTTP, because a registrar should know when they are typing a
-//    staff password across an unencrypted link.
+// Authentication requests are handled by shared/auth_actions.php.
 
 require_once __DIR__ . '/shared/security_headers.php';
 require_once __DIR__ . '/shared/session_config.php';
@@ -34,22 +20,13 @@ if (isLoggedIn()) {
 
 $timeout = isset($_GET['timeout']) ? true : false;
 
-// ── Real module list ────────────────────────────────────────────────────
-// The reader's capability list is read off what the registrar sidebar
-// actually offers, so the page cannot advertise a module the system lacks.
-$modules = ['Student records', 'Document requests', 'RFID cards', 'Masterlist', 'Academic history'];
-
-// The readout bar's own label. APP_VERSION is the real constant, not a
-// design-document number: a badge claiming a version the code does not have
-// is the same class of lie as a fake TLS badge, only less obvious.
-$appLabel = APP_NAME . ' · v' . APP_VERSION;
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="dark" />
+    <meta name="color-scheme" content="light" />
     <title>Sign In · BCP Registrar</title>
 
     <meta name='csrf-token' content='<?= htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8') ?>' />
@@ -59,13 +36,9 @@ $appLabel = APP_NAME . ' · v' . APP_VERSION;
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Space Grotesk over Orbitron: the brief offered both, and Space
-         Grotesk carries the technical letterforms without the sci-fi title
-         treatment, which reads unserious on a college tool that staff open
-         all day. JetBrains Mono is the codebase's existing data face. -->
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-    <link rel="stylesheet" href="css/auth.css" />
+    <link rel="stylesheet" href="assets/login/login.css?v=20261110b" />
     <!-- One show/hide control per password field. Shared because login.php,
          settings.php and registrar/users.php all had their own copy of these
          rules, and they had drifted apart - which is how two of them ended up
@@ -79,96 +52,28 @@ $appLabel = APP_NAME . ' · v' . APP_VERSION;
 </head>
 <body>
 
-<div class="ground" aria-hidden="true"></div>
-
-<svg class="stellar" aria-hidden="true" focusable="false" width="100%" height="100%">
-  <defs>
-    <!-- One 560px tile around a 420px pattern. The margin is not padding:
-         the pattern has to stop short of the tile edge or the links that
-         touch it are cut, and the repeat is visibly seamed. -->
-    <pattern id="meshTile" width="560" height="560" patternUnits="userSpaceOnUse">
-      <g class="mesh">
-        <path class="mesh-link" d="M70 248L166 202M166 202L258 128M258 128L400 162M166 202L246 306M246 306L128 328M246 306L332 238M332 238L400 162M332 238L458 356M458 356L382 442M382 442L198 456M128 328L198 456M490 248L332 238M282 70L246 306M282 490L382 442"/>
-        <path class="mesh-link mesh-faint" d="M166 202L198 456M400 162L128 328"/>
-      </g>
-        <g class="star" opacity="0.35"><circle class="mesh-dot" cx="98" cy="116" r="2.2"/></g>
-        <g class="star" opacity="0.43"><circle class="mesh-dot" cx="166" cy="202" r="3.4"/></g>
-        <g class="star" opacity="0.32"><circle class="mesh-dot" cx="258" cy="128" r="2"/></g>
-        <g class="star" opacity="0.46"><circle class="mesh-dot" cx="332" cy="238" r="4"/></g>
-        <g class="star" opacity="0.38"><circle class="mesh-dot" cx="128" cy="328" r="2.6"/></g>
-        <g class="star" opacity="0.35"><circle class="mesh-dot" cx="246" cy="306" r="2.2"/></g>
-        <g class="star" opacity="0.42"><circle class="mesh-dot" cx="400" cy="162" r="3"/></g>
-        <g class="star" opacity="0.36"><circle class="mesh-dot" cx="458" cy="356" r="2.4"/></g>
-        <g class="star" opacity="0.43"><circle class="mesh-dot" cx="382" cy="442" r="3.2"/></g>
-        <g class="star" opacity="0.32"><circle class="mesh-dot" cx="198" cy="456" r="2"/></g>
-        <g class="star" opacity="0.35"><circle class="mesh-dot" cx="70" cy="248" r="2.2"/></g>
-        <g class="star" opacity="0.35"><circle class="mesh-dot" cx="490" cy="248" r="2.2"/></g>
-        <g class="star" opacity="0.38"><circle class="mesh-dot" cx="282" cy="70" r="2.4"/></g>
-        <g class="star" opacity="0.38"><circle class="mesh-dot" cx="282" cy="490" r="2.4"/></g>
-    </pattern>
-  </defs>
-  <rect width="100%" height="100%" fill="url(#meshTile)"/>
-</svg>
-
 <main class="plate" id="plate">
-    <!-- Crop marks at the four corners. The container is drawn as a card
-         being prepared for print, which is the whole instrumentation idea:
-         on a light ground, line work carries the technical reading that glow
-         carried on a dark one. -->
-    <span class="regmark regmark-tl" aria-hidden="true"></span>
-    <span class="regmark regmark-tr" aria-hidden="true"></span>
-    <span class="regmark regmark-bl" aria-hidden="true"></span>
-    <span class="regmark regmark-br" aria-hidden="true"></span>
-
-    <!-- ── Readout bar ─────────────────────────────────────────────────
-         The card's status line, and the only place on the page where a
-         light moves. The pip reflects real state: amber while a request is
-         in flight, green after one succeeds, red after a failure. It is
-         driven by a class on the card, not by a timer. -->
-    <div class="readout">
-        <span class="readout-left">
-            <span class="pip" id="pip" aria-hidden="true"></span>
-            <span><?= htmlspecialchars($appLabel) ?></span>
-        </span>
-        <span class="readout-right">
-            <span>Office of the Registrar</span>
-        </span>
-        </div>
-
-    <div class="plate-body">
-    <!-- ── Card back ────────────────────────────────────────────────── -->
-    <section class="plate-brand">
-        <img src="assets/images/BCP_LOGO.png" alt="Bestlink College of the Philippines crest"
-             class="crest" width="84" height="84" />
-
-        <h1 class="brand-name">Registrar<br />Management System</h1>
-        <p class="brand-sub">Records · Documents · Cards</p>
-
-        <div class="brand-rule"></div>
-
-        <?php // The real module map, read off the registrar sidebar, so the
-              // page cannot advertise a module the system lacks.
-
-              // A description of the office sat here for a while. It was
-              // better copy, and it made the left panel roughly 130px
-              // taller than a sign-in form, which stretched the card and
-              // left the form floating in the middle of a very tall box. So
-              // it is gone: this list is what the space is for. ?>
-        <ul class="caps">
-            <?php foreach ($modules as $m): ?>
-                <li><?= htmlspecialchars($m) ?></li>
-            <?php endforeach; ?>
+  <div class="plate-body">
+    <section class="plate-brand" aria-label="BCP Registrar System">
+      <div class="brand-header">
+        <img src="assets/images/BCP_LOGO.png" alt="Bestlink College crest" class="crest" width="64" height="72" />
+        <div><p class="college-name">Bestlink College of the Philippines</p><p class="system-name">BCP Registrar System</p></div>
+      </div>
+      <div class="brand-story">
+        <h1>Your academic<br />journey, organized.</h1>
+        <p>Secure access to records, documents,<br class="desktop-break" /> and student services.</p>
+        <img class="brand-illustration" src="assets/login/bestlink-campus.png?v=1" alt="" width="1760" height="896" />
+        <ul class="services">
+          <li><i class="fa-regular fa-rectangle-list" aria-hidden="true"></i><span>Student<br />records</span></li>
+          <li><i class="fa-regular fa-file-lines" aria-hidden="true"></i><span>Document<br />requests</span></li>
+          <li><i class="fa-solid fa-id-card" aria-hidden="true"></i><span>RFID<br />cards</span></li>
         </ul>
-
-        <p class="brand-foot">Bestlink College of the Philippines<br>est. 2002</p>
+      </div>
     </section>
-
-    <!-- ── Card face ────────────────────────────────────────────────── -->
-    <section class="plate-form" id="plateForm">
-        <img src="assets/images/BCP_LOGO.png" alt="" class="crest form-crest"
-             width="62" height="62" style="margin-bottom:18px;" aria-hidden="true" />
-
-        <h2 class="plate-title" id="formTitle">Sign in</h2>
+    <section class="plate-form" id="plateForm" aria-labelledby="formTitle">
+      <p class="form-eyebrow">Office of the Registrar</p>
+      <h2 class="plate-title" id="formTitle">Welcome back</h2>
+      <p class="form-intro" id="formIntro">Sign in to your registrar account.</p>
 
         <?php if ($timeout): ?>
             <div class="auth-notice auth-error" id="timeoutMsg">
@@ -187,7 +92,7 @@ $appLabel = APP_NAME . ' · v' . APP_VERSION;
                 <div class="field-box">
                     <i class="fa-solid fa-id-badge" aria-hidden="true"></i>
                     <input type="text" id="credential" autocomplete="username"
-                           spellcheck="false" autocapitalize="off" required />
+                           placeholder="Enter your ID or username" name="username" spellcheck="false" autocapitalize="off" required />
                 </div>
             </div>
 
@@ -203,7 +108,7 @@ $appLabel = APP_NAME . ' · v' . APP_VERSION;
                          kept so password managers still recognise it. -->
                     <i class="fa-solid fa-lock" aria-hidden="true"></i>
                     <input type="text" id="password" data-masked="1"
-                           autocomplete="current-password" name="password" required />
+                           autocomplete="current-password" name="password" placeholder="Enter your password" required />
                     <button type="button" class="password-toggle-btn" id="togglePassword"
                             title="Show password" aria-label="Show password" aria-pressed="false">
                         <i class="fa-solid fa-eye" aria-hidden="true"></i>
@@ -211,20 +116,17 @@ $appLabel = APP_NAME . ' · v' . APP_VERSION;
                 </div>
             </div>
 
+            <div class="form-row forgot-row">
+                <button type="button" class="link-btn" id="forgotLink">Forgot password?</button>
+            </div>
             <button type="submit" class="btn-signin" id="btnSignin">
                 <i class="fa-solid fa-arrow-right-to-bracket" aria-hidden="true"></i>
                 Sign in
             </button>
 
-            <div class="form-row">
-                <button type="button" class="link-btn" id="forgotLink">Forgot password?</button>
-            </div>
 
-            <div class="form-foot">
-                <a href="terms-and-conditions.php" id="tcLink" target="_blank" rel="noopener">
-                    <i class="fa-solid fa-file-contract" aria-hidden="true"></i> Terms and conditions
-                </a>
-            </div>
+
+
         </form>
 
         <!-- STEP 2: OTP -->
@@ -309,9 +211,11 @@ $appLabel = APP_NAME . ' · v' . APP_VERSION;
                 Save new password
             </button>
         </form>
+      <div class="form-help"><a href="mailto:registrar@bestlink.edu.ph"><i class="fa-solid fa-headset" aria-hidden="true"></i><span>Contact the Registrar</span></a></div>
     </section>
-    </div>
+  </div>
 </main>
+<footer class="page-footer"><p>Bestlink College of the Philippines</p><a href="terms-and-conditions.php" id="tcLink" target="_blank" rel="noopener">Terms and conditions</a></footer>
 
 <!-- Terms and Conditions Modal -->
 <div class="tc-modal-overlay" id="tcModal" role="dialog" aria-modal="true" aria-labelledby="tcModalTitle">
@@ -503,12 +407,13 @@ function showForm(which) {
     // for rather than which step it is. A user who arrives at the code
     // screen by resend does not think in terms of "step 2".
     const titles = {
-        step1:  'Sign in',
+        step1:  'Welcome back',
         otp:    'Enter your code',
         forgot: 'Reset your password',
         reset:  'Choose a new password'
     };
     $('formTitle').textContent = titles[which] || titles.step1;
+    $('formIntro').hidden = which !== 'step1';
 }
 
 function showError(msg) {

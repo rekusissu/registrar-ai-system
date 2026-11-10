@@ -417,10 +417,10 @@ $catIcon = [
 
 $page_title = 'Document Requests';
 $page_description = 'Document requests, workflow actions, and performance metrics';
-$body_page = 'docket-desk';   // scopes css/docket.css
+$body_page = 'documents';   // scopes css/docket.css
 $APP_ROOT = '../';
 $ACTIVE_NAV = 'documents';
-$extra_css = ['documents.css', 'docket.css'];
+$extra_css = ['documents.css'];
 $use_chart = true;
 // Loads js/documents.js, which builds the revenue and daily-volume
 // charts from the canvases' data-attributes.
@@ -450,10 +450,10 @@ if ($deskLoadError !== null) {
     http_response_code(500);
     $page_title       = 'Document Requests';
     $page_description = 'Document requests, workflow actions, and performance metrics';
-    $body_page        = 'docket-desk';   // scopes css/docket.css
+    $body_page        = 'documents';   // scopes css/docket.css
     $APP_ROOT         = '../';
     $ACTIVE_NAV       = 'documents';
-    $extra_css        = ['documents.css', 'docket.css'];
+    $extra_css        = ['documents.css'];
     $deskErrorDetail  = $deskLoadError;
     unset($use_chart, $page_scripts);
     include '../includes/header.php';
@@ -925,7 +925,7 @@ tr.is-blocked>td:first-child{box-shadow:inset 3px 0 0 #f59e0b}
    per line. */
 .dq-clear{font-size:11.5px;color:#94a3b8;display:flex;align-items:center;gap:5px}
 /* The advisory ask. Visually a footnote to the status line, not a
-   banner: same weight as "Nothing ? start it", because that is exactly
+   banner: same weight as "Next step", because that is exactly
    what it is. Amber and dashed would read as a warning, and a hold is
    what the desk already uses those for. */
 .dq-bring{margin-top:6px;font-size:11px;color:#64748b;display:flex;align-items:flex-start;gap:5px;line-height:1.45}
@@ -1008,19 +1008,24 @@ tr.is-blocked:hover{background:#fffbeb}
 @media(max-width:600px){.dq-head{padding:21px 18px}.dq-head h1{font-size:25px}.dq-head .header-actions{flex-direction:column;align-items:stretch}.dq-head .btn{justify-content:center}.dq-strip{grid-template-columns:1fr}.dq-metric{border-right:0;border-bottom:1px solid #e2e8f0}.dq-metric:last-child{border-bottom:0}.dq-search,.dq-filters select{width:100%}.dq-range{width:100%}.dq-range input[type="date"]{flex:1 1 0;width:auto}}
 @media(prefers-reduced-motion:reduce){.row-actions .btn{transition:none}}
 </style>
+<link rel="stylesheet" href="../css/document-desk-modern.css?v=20261110-compact">
+<link rel="stylesheet" href="../css/document-system-match.css?v=4">
 <main class="dashboard-main">
 <div class="dashboard-container">
 
 <header class="dq-head">
     <div>
-        <div class="dq-kicker"><i class="fa-solid fa-file-circle-check"></i> Registrar desk</div>
+        <div class="dq-kicker"><i class="fa-solid fa-file-circle-check"></i> Document services</div>
         <h1>Document Requests</h1>
-        <p>File, prepare and release documents at the counter. Track where each request stands.</p>
+        <p>Review requirements, confirm payments, and keep every request moving toward release.</p>
     </div>
-    <div class="header-actions">
-        <button class="btn btn-primary" onclick="openNewRequest()"><i class="fas fa-plus"></i> New Request</button>
-    </div>
+
 </header>
+<div class="doc-actionbar">
+ <div class="doc-action-group"><span class="doc-action-label">Request intake</span><div class="doc-action-buttons"><button type="button" class="btn btn-primary" onclick="openNewRequest()"><i class="fa-solid fa-file-circle-plus" aria-hidden="true"></i> New Request</button><button type="button" class="btn btn-secondary" onclick="document.getElementById('workflowFilter').value='review';applyFilters();document.getElementById('workflowFilter').closest('.panel').scrollIntoView({behavior:'smooth',block:'start'})"><i class="fa-solid fa-clipboard-check" aria-hidden="true"></i> Review queue</button></div></div>
+ <div class="doc-action-group"><span class="doc-action-label">Document tools</span><div class="doc-action-buttons"><button type="button" class="btn btn-secondary" onclick="const reports=document.querySelector('.desk-analytics');reports.open=!reports.open;if(reports.open)reports.scrollIntoView({behavior:'smooth',block:'start'})"><i class="fa-solid fa-chart-simple" aria-hidden="true"></i> Activity reports</button><button type="button" class="btn btn-secondary" onclick="['docSearch','typeFilter','workflowFilter','statusFilter','waitFilter'].forEach(id=>{const e=document.getElementById(id);if(e)e.value=''});applyFilters()"><i class="fa-solid fa-filter-circle-xmark" aria-hidden="true"></i> Clear filters</button></div></div>
+</div>
+
 
 <!-- -- The four numbers that change what you do next ----------- -->
 <!-- Each tile answers a question a clerk asks on arrival, and each
@@ -1067,7 +1072,7 @@ tr.is-blocked:hover{background:#fffbeb}
 </div>
 
 <!-- -- Charts ------------------------------------------------- -->
-<div class="dq-split">
+<details class="desk-analytics"><summary><span><i class="fa-solid fa-chart-simple" aria-hidden="true"></i> Activity &amp; reports</span><span class="desk-analytics-hint">Revenue and daily intake <i class="fa-solid fa-chevron-down" aria-hidden="true"></i></span></summary><div class="desk-analytics-body"><div class="dq-split">
     <div class="panel">
         <div class="panel-toolbar">
             <div class="panel-title"><i class="fa-solid fa-chart-bar"></i> Revenue by Document Type</div>
@@ -1109,6 +1114,7 @@ tr.is-blocked:hover{background:#fffbeb}
 </div>
 
 <!-- -- Request Table ------------------------------------------- -->
+</div></details>
 <div class="panel">
     <div class="panel-toolbar">
         <div class="panel-title"><i class="fa-solid fa-list"></i> Document Requests</div>
@@ -1127,6 +1133,8 @@ tr.is-blocked:hover{background:#fffbeb}
             <option value="">All Requests</option>
             <option value="Regular">Regular</option>
         </select>
+
+        <select id="workflowFilter" onchange="applyFilters()" aria-label="Filter by processing stage"><option value="">All processing stages</option><option value="review">Requirements review</option><option value="payment">Payment confirmation</option><option value="prepare">Preparation</option><option value="release">Ready for release</option><option value="closed">Closed</option></select>
         <select id="statusFilter" onchange="applyFilters()" aria-label="Filter by status">
             <option value="">All Statuses</option>
             <?php // The value is the raw status, because applyFilters() compares it
@@ -1162,14 +1170,13 @@ tr.is-blocked:hover{background:#fffbeb}
                 <th>Student</th>
                 <th>Request</th>
                 <th>Status</th>
-                <th>Waiting on</th>
-                <th>Turnaround</th>
+                <th>Filed</th>
                 <th style="text-align:right;">Action</th>
             </tr>
         </thead>
         <tbody>
             <?php if (empty($requests)): ?>
-                <tr><td colspan="6" class="empty-state"><div class="dq-empty"><i class="fas fa-file-lines"></i><p>No document requests found</p><span>Requests appear here once a student or the registrar submits one.</span></div></td></tr>
+                <tr><td colspan="5" class="empty-state"><div class="dq-empty"><i class="fas fa-file-lines"></i><p>No document requests found</p><span>Requests appear here once a student or the registrar submits one.</span></div></td></tr>
             <?php else: foreach ($requests as $r):
                 $pill = $statusPill[$r['document_status']] ?? ['filed','fa-folder-open'];
                 $label = $statusLabel[$r['document_status']] ?? str_replace('_', ' ', $r['document_status']);
@@ -1227,7 +1234,7 @@ tr.is-blocked:hover{background:#fffbeb}
                             : ''
                     );
             ?>
-                <tr data-doc="<?= (int) $r['id'] ?>" data-status="<?= htmlspecialchars($st) ?>"
+                <tr data-workflow="<?= doc_review_pending($r) ? 'review' : (doc_payment_pending($r) ? 'payment' : (in_array($st,['Filed','Pending_Clearance','Processing'],true)?'prepare':($st==='Ready'?'release':'closed'))) ?>" data-doc="<?= (int) $r['id'] ?>" data-status="<?= htmlspecialchars($st) ?>"
                     data-reqtype="<?= htmlspecialchars((string) $r['request_type']) ?>"
                     data-counter="<?= (int) ($r['counter'] ?? 1) ?>"
                     data-blocked="<?= $blocker ? '1' : '0' ?>"
@@ -1259,658 +1266,29 @@ tr.is-blocked:hover{background:#fffbeb}
                     $avatarPalette = ['blue', 'green', 'purple', 'orange', 'pink'];
                     $avatarCls = $avatarPalette[abs(crc32((string) ($r['student_id'] ?? $r['id']))) % count($avatarPalette)];
                     ?>
-                    <td><div class="student-info"><?php if ($avatarUrl !== ''): ?><img class="student-avatar" src="<?= htmlspecialchars($avatarUrl) ?>" alt="" style="object-fit:cover;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';this.onerror=null;"><?php endif; ?><div class="student-avatar <?= $avatarCls ?>" style="<?= $avatarUrl !== '' ? 'display:none;' : '' ?>"><?= htmlspecialchars($avatarIni) ?></div><div><div class="student-name"><?= htmlspecialchars((string) $r['student_name']) ?></div><div class="student-sub"><?= htmlspecialchars((string) $r['student_number']) ?></div></div></div></td>
-                    <?php // Status and fee folded in here. Both are facts ABOUT
-                          // the request, and giving each its own column spent
-                          // horizontal space on numbers a clerk reads once,
-                          // while pushing the actionable columns off screen. ?>
-                    <td>
-                        <div class="student-info">
-                            <div class="student-avatar" style="background:<?= $ci[0] ?>;"><i class="fa-solid <?= $ci[1] ?>"></i></div>
-                            <div>
-                                <div class="student-name"><?= htmlspecialchars($r['catalog_name'] ?? ucwords(str_replace('_', ' ', (string) $r['document_type']))) ?></div>
-                                <div class="student-sub"><i class="fa-solid fa-hashtag"></i> <?= htmlspecialchars($r['request_id'] ?? '') ?> &middot; <span class="dq-fee">&#8369;<?= number_format((float) ($r['fee_amount'] ?? 0), 2) ?></span></div>
-                            </div>
-                        </div>
-                        <?php // A lollipop per stage, a line to the next, and
-                              // the current station named. The other three stage
-                              // names are not rendered: they are identical on
-                              // every row, and the "Waiting on" column beside this
-                              // already states the condition in words. The full
-                              // track is still announced, via the screen-reader
-                              // sentence below.
-                              //
-                              // It REPLACES the status pill rather than sitting
-                              // under it: the pill said "Being prepared" and the
-                              // rail says the same thing, so keeping both meant
-                              // two indicators for one fact and the clerk having
-                              // to check they agreed. ?>
-                        <ol class="dq-rail">
-                            <li class="dq-rail-sr"><?= htmlspecialchars($railStory) ?></li>
-                            <?php $tallyStop = $pos['stopped']; ?>
-                            <?php foreach ($track as $i => $stage):
-                                $cls = '';
-                                if ($tallyStop) {
-                                    // Off the track entirely: nothing was
-                                    // reached, so no stage is "now".
-                                    $cls = 'is-stopped';
-                                } elseif ($i < $pos['index']) {
-                                    $cls = 'is-done';
-                                } elseif ($i === $pos['index']) {
-                                    // Held and current are different facts.
-                                    // A hold re-inks the dot red; it does not
-                                    // move it, and does not become a state.
-                                    $cls = $blocker ? 'is-now is-held' : 'is-now';
-                                }
-                                // A request on the LAST stage is not "on" it
-                                // any more, it is through it. Painting it amber
-                                // left a finished request ending on the one
-                                // colour on the rail that means "still being
-                                // worked", with a heartbeat still pulsing, so
-                                // the single most settled thing in the column
-                                // was the only thing that looked live. The
-                                // last stage inks green like the rest and the
-                                // rail ends solid.
-                                //
-                                // A hold is exempt: held is a present-tense
-                                // fact about work outstanding, whatever stage
-                                // it lands on, so it stays red.
-                                if ($cls === 'is-now' && $i === count($track) - 1) {
-                                    $cls = 'is-done';
-                                }
-                            ?>
-                                <?php // --i staggers the line-draw and the pop, so
-                                      // the rail inks left to right like a hand
-                                      // moving along it rather than all at once.
-                                      //
-                                      // aria-current keys off the POSITION, not
-                                      // off is-now: the last stage is painted
-                                      // is-done above, but it is still where
-                                      // this request stands, and a screen
-                                      // reader announcing the rail should say
-                                      // so rather than skipping it. ?>
-                                <li class="dq-station <?= $cls ?>" style="--i:<?= (int) $i ?>"<?= !$tallyStop && $i === $pos['index'] ? ' aria-current="step"' : '' ?>>
-                                    <span class="dq-dot" aria-hidden="true"></span>
-                                </li>
-                            <?php endforeach; ?>
-                            <?php // The single word. A rejected request has no
-                                  // station, so it names the departure instead of
-                                  // implying one was reached.
-                                  //
-                                  // The word is green once the request is
-                                  // through, for the same reason the last
-                                  // dot is: it sits beside that dot, and an
-                                  // amber word next to a green dot would
-                                  // contradict it. ?>
-                            <li class="dq-stage-word <?= $tallyStop ? 'is-stopped' : ($blocker ? 'is-held' : ($pos['index'] === count($track) - 1 ? 'is-done' : 'is-now')) ?>"><?= htmlspecialchars($tallyStop ? 'Rejected' : $track[$pos['index']]['label']) ?></li>
-                        </ol>
-                        <?php // Hidden on narrow screens, where four dots and a
-                              // word cannot stay legible together. Falls back to
-                              // the plain status rather than dropping the fact.
-                              //
-                              // It has to carry BOTH facts, because at this width
-                              // the rail's only surviving signal - position - is
-                              // gone. "Filed" alone is ambiguous: it is both the
-                              // name of the second station and a request sitting
-                              // HELD at the second station, and those two want
-                              // opposite actions from the clerk. So a held request
-                              // says it is held, and a rejected one says it left
-                              // the track, each in the same colour the rail used. ?>
-                        <div class="dq-rail-fallback <?= $tallyStop ? 'is-stopped' : ($blocker ? 'is-held' : '') ?>">
-                            <i class="fa-solid <?= $pill[1] ?>" aria-hidden="true"></i>
-                            <span class="dq-rail-fb-state"><?= htmlspecialchars($tallyStop ? 'Rejected' : $track[$pos['index']]['label']) ?></span>
-                            <?php if ($tallyStop): ?>
-                                <span class="dq-rail-fb-note">left the track</span>
-                            <?php elseif ($blocker): ?>
-                                <span class="dq-rail-fb-note">held</span>
-                            <?php endif; ?>
-                        </div>
-                        </div>
-                        </div>
-                    </td>
-                    <?php // The stamp: state, in two words, in the ink
-                          // that matches what should be done about it. Read from the
-                          // same doc_status() the student's row uses, so the two
-                          // portals cannot drift apart. ?>
-                    <td>
-                        <?php $dkStamp = doc_status($st); ?>
-                        <span class="dk-stamp<?= !empty($dkStamp['terminal']) ? ' is-final' : '' ?>"
-                              data-s="<?= htmlspecialchars($dkStamp['ink']) ?>">
-                            <span><?= htmlspecialchars($dkStamp['stamp']) ?></span></span>
-                        <?php if ($blocker && $heldDays !== null): ?>
-                            <span class="dk-ledger-sub">held <?= $heldDays < 1
-                                ? 'since this morning'
-                                : 'for ' . doc_age_label(['days' => $heldDays, 'hours' => 0]) ?></span>
-                        <?php endif; ?>
-                    </td>
-                    <!-- What this request is waiting on, and since when. The
-                         column that did not exist before, and the reason a
-                         three-day request stopped looking identical to a
-                         three-hour one. -->
-                    <td>
-                        <?php $byRegistrar = ($r['blocked_source'] ?? null) === 'registrar'; ?>
-                        <?php if ($blocker): ?>
-                            <div class="dq-wait">
-                                <div class="dq-wait-line">
-                                    <i class="fa-solid fa-hourglass-half"></i>
-                                    <span><?= htmlspecialchars($blocker['reason']) ?></span>
-                                </div>
-                                <?php if ($heldDays !== null): ?>
-                                    <span class="dq-wait-since">held <?= $heldDays < 1 ? 'since this morning' : 'for ' . doc_age_label(['days' => $heldDays, 'hours' => 0]) ?></span>
-                                <?php endif; ?>
-                            </div>
-                            <?php // Re-check re-derives the BALANCE. On a hold a
-                                  // registrar set it cannot change the answer ?
-                                  // the office holding the affidavit is not
-                                  // something a query can resolve ? so offering
-                                  // the button there is a control that provably
-                                  // does nothing. Replaced by a plain note
-                                  // saying the hold is theirs to lift. ?>
-                            <?php if ($byRegistrar): ?>
-                                <?php // A decision a person made has to be
-                                      // reversible by a person. This button is
-                                      // the reason that is true, and it is the
-                                      // control the banner below points at. ?>
-                                <button class="dq-lift" onclick="event.stopPropagation();liftHold(<?= (int) $r['id'] ?>)" title="Clear the hold you set and put this back on the queue">
-                                    <i class="fa-solid fa-lock-open"></i> Lift hold
-                                </button>
-                            <?php else: ?>
-                                <button class="dq-recheck" onclick="event.stopPropagation();recheckDoc(<?= (int) $r['id'] ?>)" title="Check again whether this is still held">
-                                    <i class="fa-solid fa-rotate"></i> Re-check
-                                </button>
-                            <?php endif; ?>
-                        <?php elseif ($st === 'Ready'): ?>
-                            <div class="dq-clear"><i class="fa-solid fa-check"></i> With the student</div>
-                        <?php elseif (in_array($st, ['Claimed', 'Rejected'], true)): ?>
-                            <div class="dq-clear"><i class="fa-solid fa-check"></i> Settled</div>
-                        <?php else: ?>
-                            <div class="dq-clear"><i class="fa-solid fa-circle-check"></i> Nothing ? start it</div>
-                        <?php endif; ?>
-                        <?php // A named requirement is an ask, not a hold. It
-                              // used to render above with an hourglass and a
-                              // "held since" date, which asserted a decision
-                              // the registrar had not made. It now reads as
-                              // what it is: something to mention to the
-                              // student, with the request still fully
-                              // actionable. ?>
-                        <?php if ($needsNote): ?>
-                            <div class="dq-bring"><i class="fa-solid fa-file-import" aria-hidden="true"></i> Bring: <?= htmlspecialchars($needsNote) ?></div>
-                        <?php endif; ?>
-                        <?php // Outstanding paperwork, from the wizard's own
-                              // checklist. Distinct from the note above: that
-                              // is a free-text ask the desk writes, this is a
-                              // count the SYSTEM knows is missing - so it can
-                              // be filtered and counted, which is what makes a
-                              // queue of them actionable rather than a note
-                              // nobody can search for. ?>
-                        <?php if (!empty($r['_awaiting'])): ?>
-                            <div class="dq-awaiting">
-                                <i class="fa-solid fa-file-circle-exclamation" aria-hidden="true"></i>
-                                <?= count($r['_missing']) ?> requirement<?= count($r['_missing']) === 1 ? '' : 's' ?> outstanding
-                            </div>
-                        <?php elseif (!empty($r['_attachments'])): ?>
-                            <div class="dq-awaiting is-clear">
-                                <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
-                                Paperwork received
-                            </div>
-                        <?php endif; ?>
-                    </td>
+                    <td><div class="registry-student"><span class="registry-initials"><?= htmlspecialchars($avatarIni) ?></span><div><strong><?= htmlspecialchars($r['student_name']) ?></strong><small><?= htmlspecialchars($r['student_number']) ?></small></div></div></td>
+ <td><div class="registry-document"><strong><?= htmlspecialchars($r['catalog_name']??ucwords(str_replace('_',' ',$r['document_type']))) ?></strong><small><?= htmlspecialchars($r['request_id']??('#'.$r['id'])) ?><span>·</span>₱<?= number_format((float)$r['fee_amount'],2) ?></small></div></td>
+ <td><span data-state="<?= htmlspecialchars($st) ?>" class="registry-status<?= $blocker?' is-held':'' ?>"><?= htmlspecialchars($blocker?'On hold':(doc_review_pending($r)?'For review':(doc_payment_pending($r)?'Payment pending':($st==='Processing'?'Preparing':($st==='Ready'?'Ready for release':$label))))) ?></span></td>
+ <td><div class="registry-date"><?= htmlspecialchars(date('M j, Y',strtotime($r['request_date']))) ?><small><?= htmlspecialchars(date('g:i A',strtotime($r['request_date']))) ?></small></div></td>
+ <td style="text-align:right"><button class="registry-view" type="button" onclick="toggleDetail(<?= (int)$r['id'] ?>);event.stopPropagation()" aria-haspopup="dialog">View request <i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></button></td>
+ </tr>
 
-                    <!-- Turnaround: the request's own promise, drawn. The bar
-                         is filled for time used and the tick sits at the
-                         target, so "nearly late" is visible before it is
-                         late - the one thing a bare date cannot show. -->
-                    <td>
-                        <div class="dq-clock<?= !empty($age['overdue']) && !$settled ? ' is-late' : '' ?><?= $settled ? ' is-done' : '' ?>">
-                            <div class="dq-clock-bar">
-                                <div class="dq-clock-fill" style="width:<?= (float) $clockPct ?>%"></div>
-                                <?php if ($age['target'] !== null): ?>
-                                    <div class="dq-clock-tick" style="left:66.667%"></div>
-                                <?php endif; ?>
-                            </div>
-                            <div class="dq-clock-when">
-                                <?php if ($age['target'] === null): ?>
-                                    <b><?= htmlspecialchars(doc_age_label($age)) ?></b> open
-                                <?php elseif (!empty($age['overdue']) && !$settled): ?>
-                                    <b><?= htmlspecialchars(doc_age_label($age)) ?></b> &middot; <?= (int) $age['target'] ?>d target
-                                <?php elseif ($settled): ?>
-                                    done in <b><?= htmlspecialchars(doc_age_label($age)) ?></b>
-                                <?php else: ?>
-                                    <b><?= htmlspecialchars(doc_age_label($age)) ?></b> of <?= (int) $age['target'] ?>d
-                                <?php endif; ?>
-                            </div>
-                        </div>
-                    </td>
-
-                    <td><div class="row-actions">
-                        <?php // The forward step, offered in full strength.
-                              // Every blocker on this desk is the clerk's
-                              // own to clear, so there is no state where
-                              // the step is unavailable. ?>
-                        <?php if ($next !== null): ?>
-                            <button class="btn btn-sm btn-primary" onclick="<?= htmlspecialchars($next['handler']) ?>(<?= (int) $r['id'] ?><?= ($next['wants'] ?? '') === 'btn' ? ', this' : '' ?>);event.stopPropagation()"><i class="fa-solid <?= $next['icon'] ?>"></i> <?= htmlspecialchars($next['label']) ?></button>
-                            <?php if ($next['action'] !== 'claim'): ?>
-                                <button class="btn btn-sm btn-danger" onclick="rejectDoc(<?= (int) $r['id'] ?>);event.stopPropagation()"><i class="fa-solid fa-xmark"></i> Reject</button>
-                            <?php endif; ?>
-                        <?php endif; ?>
-                        <?php // View is available on EVERY row, not only the
-                              // settled ones. It used to render only when there
-                              // was no next step, so on a working desk ? where
-                              // nothing is collected yet ? it never appeared at
-                              // all, and the only way to see a request's detail
-                              // was to guess that the row itself was clickable.
-                              // A real <button>, so it is keyboard reachable
-                              // and announces itself, where a bare span is
-                              // neither. ?>
-                        <button class="btn btn-sm btn-light dq-view" data-doc="<?= (int) $r['id'] ?>" onclick="toggleDetail(<?= (int) $r['id'] ?>);event.stopPropagation()" aria-expanded="false" aria-controls="detail-<?= (int) $r['id'] ?>">
-                            <i class="fa-solid fa-chevron-down"></i> View
-                        </button>
-                    </div></td>
-                </tr>
-
-                <tr class="doc-detail-row" id="detail-<?= (int) $r['id'] ?>" style="display:none;">
-                    <td colspan="5" style="padding:0;">
-                        <div class="doc-detail" style="padding:18px 22px;border-bottom:1px solid #e2e8f0;">
-                            <?php if ($st === 'Rejected'): ?>
-                                <div class="block-banner" style="margin-bottom:12px;">
-                                    <div class="banner-icon"><i class="fa-solid fa-xmark"></i></div>
-                                    <div><div class="banner-title">Request rejected</div><div class="banner-text"><?= htmlspecialchars($r['rejection_reason'] ?? 'No reason provided.') ?></div></div>
-                                </div>
-                            <?php endif; ?>
-                            <?php if ($blocker): ?>
-                                <?php // Say whose call this is. A balance is
-                                      // something the system worked out and
-                                      // anyone can clear by paying; a note the
-                                      // registrar typed is a decision, and
-                                      // clicking Re-check will NOT remove it.
-                                      // Without this line the two look identical
-                                      // and the next clerk wastes a morning
-                                      // re-checking a hold that was never going
-                                      // to move. ?>
-                                <div class="block-banner is-hold" style="margin-bottom:12px;">
-                                    <div class="banner-icon"><i class="fa-solid fa-hourglass-half"></i></div>
-                                    <div>
-                                        <div class="banner-title">Waiting on <?= htmlspecialchars($blocker['reason']) ?></div>
-                                        <div class="banner-text">
-                                            Held since <?= date('M d, Y', strtotime((string) $blocker['since'])) ?>.
-                                            <?php if (($r['blocked_source'] ?? null) === 'registrar'): ?>
-                                                Set by the registrar, so re-checking will not clear it. Use <b>Lift hold</b> on the row once the reason has passed.
-                                            <?php else: ?>
-                                                Derived from the student&rsquo;s balance. It clears itself once the balance is settled.
-                                            <?php endif; ?>
-                                        </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            <?php endif; ?>
-                            <div class="dq-fields">
-                                <div><strong>Purpose:</strong> <?= htmlspecialchars($r['purpose'] ?: '?') ?></div>
-                                <?php // Recipient is gone from the desk's vocabulary:
-                                      // a walk-in document is always collected by
-                                      // the student it was filed for, so the field
-                                      // had one possible answer. The column is
-                                      // still in the schema because student intake
-                                      // writes it; the desk no longer displays
-                                      // or asks for it. ?>
-                                <div><strong>Qty:</strong> <?= (int) ($r['quantity'] ?? 1) ?></div>
-                                <?php // Was hardcoded "Paid at the counter", which is
-                                      // false for every GCash request — the exact
-                                      // request kind the student portal now creates.
-                                      // A clerk reading that on an unpaid request
-                                      // would believe the money had been taken in
-                                      // when it had not. Stated from the columns. ?>
-                                <div><strong>Payment:</strong>
-                                    <?php
-                                    $rcptState = doc_requires_receipt($r) ? doc_receipt_state($r) : null;
-                                    $paidAt    = !empty($r['paid_at']) ? date('M d, Y', strtotime($r['paid_at'])) : null;
-                                    if (($r['payment_method'] ?? 'Online') === 'Cash_on_Delivery') {
-                                        echo $paidAt ? 'Cash at the counter on ' . htmlspecialchars($paidAt)
-                                                     : 'Cash at the counter on collection';
-                                    } elseif ($r['document_status'] === 'Awaiting_Payment') {
-                                        echo 'GCash &mdash; not paid yet';
-                                    } elseif ($rcptState === 'submitted') {
-                                        echo 'GCash &mdash; receipt sent, awaiting check'
-                                           . (!empty($r['payment_receipt_ref'])
-                                               ? ' (ref ' . htmlspecialchars($r['payment_receipt_ref']) . ')' : '');
-                                    } else {
-                                        echo 'GCash &mdash; paid'
-                                           . ($paidAt ? ' on ' . htmlspecialchars($paidAt) : '');
-                                    }
-                                    ?>
-                                </div>
-                                <div><strong>Target:</strong> <?= $age['target'] !== null ? (int) $age['target'] . ' day' . ($age['target'] === 1 ? '' : 's') : '?' ?></div>
-                                <div><strong>Requested:</strong> <?= date('M d, Y h:i A', strtotime($r['request_date'])) ?></div>
-                                <?php // What to ask the student for. An ask, not a
-                                      // hold: the registrar decides whether this
-                                      // is worth chasing, and the request stays
-                                      // workable either way. ?>
-                                <?php if ($needsNote): ?><div><strong>Ask for:</strong> <?= htmlspecialchars($needsNote) ?></div><?php endif; ?>
-                                <?php if (!empty($r['paid_at'])): ?><div><strong>Paid:</strong> <?= date('M d, Y h:i A', strtotime($r['paid_at'])) ?></div><?php endif; ?>
-                                <?php if (!empty($r['ready_at'])): ?><div><strong>Ready:</strong> <?= date('M d, Y h:i A', strtotime($r['ready_at'])) ?></div><?php endif; ?>
-                                <?php if (!empty($r['claimed_at'])): ?><div><strong>Claimed:</strong> <?= date('M d, Y h:i A', strtotime($r['claimed_at'])) ?><?= !empty($r['official_receipt']) ? ' &middot; Receipt ' . htmlspecialchars($r['official_receipt']) : '' ?></div><?php endif; ?>
-                                <?php if (!empty($r['release_date'])): ?><div><strong>Release Date:</strong> <?= htmlspecialchars($r['release_date']) ?></div><?php endif; ?>
-
-                                <?php // ── What the student told us ──────────────────────
-                                      // The wizard collects a controlled purpose, a
-                                      // free-text reason, optional notes and a
-                                      // payment reference. None of it was
-                                      // displayed here, so a clerk asking "why
-                                      // do they need a TOR, and where is it going?"
-                                      // had to phone the student.
-                                      //
-                                      // Rendered only when there is something to
-                                      // say. A panel of six "—" lines teaches a
-                                      // clerk nothing and buries the fields that
-                                      // are actually filled in. ?>
-                                <?php
-                                $purposeLabel = '';
-                                foreach (doc_purposes() as $p) {
-                                    if ($p['code'] === ($r['purpose_code'] ?? null)) { $purposeLabel = $p['label']; }
-                                }
-                                $payLabel = match ((string) ($r['payment_method'] ?? 'Counter')) {
-                                    'Online'        => 'GCash',
-                                    'Bank_Transfer' => 'Bank transfer',
-                                    default         => 'Paid at the counter',
-                                };
-                                ?>
-                                <div class="dq-fields">
-                                    <div><strong>Filed via:</strong> <?= ($r['source'] ?? 'walk_in') === 'online' ? 'Online (student portal)' : 'Walk-in at the counter' ?></div>
-                                    <div><strong>Payment channel:</strong> <?= htmlspecialchars($payLabel) ?></div>
-                                    <?php if ($purposeLabel !== ''): ?>
-                                        <div><strong>Purpose (stated):</strong> <?= htmlspecialchars($purposeLabel) ?></div>
-                                    <?php endif; ?>
-                                    <?php if (!empty($r['notes'])): ?>
-                                        <?php // The student's own words about this request.
-                                              // Quoted, not summarised, and given its
-                                              // own line - it is frequently the only
-                                              // thing on the record that explains an
-                                              // unusual request. ?>
-                                        <div class="dq-note"><strong>Their note:</strong> <?= nl2br(htmlspecialchars((string) $r['notes'])) ?></div>
-                                    <?php endif; ?>
-                                    <?php if (!empty($r['payment_reference'])): ?>
-                                        <div><strong>Payment reference:</strong> <code><?= htmlspecialchars((string) $r['payment_reference']) ?></code>
-                                            <?php if (($r['payment_method'] ?? '') === 'Bank_Transfer' && empty($r['paid_at'])): ?>
-                                                <span style="color:#b45309;">&middot; not yet confirmed paid</span>
-                                            <?php endif; ?>
-                                        </div>
-                                    <?php endif; ?>
-                                    <?php if (!empty($r['estimated_release_at'])): ?>
-                                        <?php // The date the STUDENT was shown. It was
-                                              // written once at filing so it could be
-                                              // quoted at the counter, which means the
-                                              // desk is being held to it. ?>
-                                        <div><strong>Promised to student:</strong> <?= htmlspecialchars(doc_release_label($r['estimated_release_at'])) ?></div>
-                                    <?php endif; ?>
-                                    <?php if ((string) $r['document_status'] === 'Cancelled'): ?>
-                                        <div class="dq-note is-cancel"><strong>Cancelled by the student<?= !empty($r['cancelled_at']) ? ' on ' . htmlspecialchars(date('M d, Y', strtotime((string) $r['cancelled_at']))) : '' ?>:</strong>
-                                            <?= htmlspecialchars((string) ($r['cancellation_reason'] ?? 'No reason given.')) ?>
-                                            <?php if (!empty($r['paid_at'])): ?>
-                                                <br><b>Fee was already paid</b> &mdash; a refund has to be raised manually.
-                                            <?php endif; ?>
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-
-                                <?php // ── Paperwork ──────────────────────────────────────
-                                      // The uploads the student made, and what is
-                                      // still outstanding. This is the panel the desk
-                                      // was missing entirely.
-                                      //
-                                      // Images render inline so a school ID can be
-                                      // checked at a glance; everything else gets a
-                                      // download link. The links go through the
-                                      // authorisation-gated endpoint rather than the
-                                      // uploads path, so the file is never directly
-                                      // web-reachable. ?>
-                                <?php
-                                $atts   = $r['_attachments'] ?? [];
-                                $miss   = $r['_missing'] ?? [];
-                                $checkl = $checklistByCatalog[(int) ($r['catalog_id'] ?? 0)] ?? [];
-                                $byCode = [];
-                                foreach ($atts as $a) {
-                                    $c = (string) ($a['requirement_code'] ?? '');
-                                    if ($c !== '') { $byCode[$c][] = $a; }
-                                }
-                                ?>
-                                <div class="dq-paper">
-                                    <div class="dq-paper-head">
-                                        <i class="fa-solid fa-paperclip" aria-hidden="true"></i>
-                                        <b>Paperwork</b>
-                                        <?php if ($miss): ?>
-                                            <span class="rq-pill is-none"><?= count($miss) ?> outstanding</span>
-                                        <?php elseif (count($atts)): ?>
-                                            <span class="rq-pill is-verified">All received</span>
-                                        <?php else: ?>
-                                            <span class="rq-pill is-none">Nothing required</span>
-                                        <?php endif; ?>
-                                    </div>
-
-                                    <?php if ($checkl): ?>
-                                    <div class="dq-check">
-                                        <?php foreach ($checkl as $item):
-                                            $files = $byCode[$item['code']] ?? [];
-                                            $met   = count($files) > 0;
-                                        ?>
-                                        <div class="dq-check-row<?= $met ? ' is-met' : '' ?><?= !$item['is_required'] ? ' is-optional' : '' ?>">
-                                            <span class="dq-check-mark"><i class="fa-solid <?= $met ? 'fa-check' : 'fa-minus' ?>"></i></span>
-                                            <span class="dq-check-label">
-                                                <?= htmlspecialchars($item['label']) ?>
-                                                <?php if (!$item['is_required']): ?><span class="rq-optional">optional</span><?php endif; ?>
-                                            </span>
-                                            <?php if ($met): ?>
-                                                <?php foreach ($files as $f):
-                                                    $isImg = (bool) preg_match('#^image/#', (string) ($f['mime_type'] ?? ''));
-                                                    $url   = app_url('/api/file-download.php?kind=attachment&attachment=' . (int) $f['id']);
-                                                ?>
-                                                <a class="dq-file<?= $isImg ? ' is-img' : '' ?>" href="<?= htmlspecialchars($url) ?>"
-                                                   target="_blank" rel="noopener"
-                                                   title="<?= htmlspecialchars((string) $f['original_name']) ?> — <?= number_format((int) $f['size_bytes'] / 1024, 0) ?> KB">
-                                                    <?php if ($isImg): ?>
-                                                        <img src="<?= htmlspecialchars($url) ?>" alt="<?= htmlspecialchars($item['label']) ?>">
-                                                    <?php else: ?>
-                                                        <i class="fa-solid fa-file-pdf"></i>
-                                                    <?php endif; ?>
-                                                    <span class="dq-file-name"><?= htmlspecialchars((string) $f['original_name']) ?></span>
-                                                </a>
-                                                <?php endforeach; ?>
-                                            <?php else: ?>
-                                                <?php // An OPTIONAL item nobody supplied is not
-                                                      // a shortfall. It used to say so in
-                                                      // amber, the same colour as a genuinely
-                                                      // required document, which made a settled
-                                                      // request look like it was still waiting
-                                                      // on two things when it was waiting on
-                                                      // none - and contradicted the "ask the
-                                                      // student to bring" line below, which
-                                                      // correctly lists only the required
-                                                      // ones. ?>
-                                                <span class="<?= $item['is_required'] ? 'dq-check-missing' : 'dq-check-skipped' ?>">
-                                                    <?= $item['is_required'] ? 'not supplied' : 'not needed' ?>
-                                                </span>
-                                            <?php endif; ?>
-                                        </div>
-                                        <?php endforeach; ?>
-                                    </div>
-                                    <?php endif; ?>
-
-                                    <?php // Loose files from the dropzone: attached but
-                                          // tied to no checklist item. They still have
-                                          // to be visible - a student who uploaded an
-                                          // extra document is telling us something. ?>
-                                    <?php $loose = array_values(array_filter($atts, fn($a) => empty($a['requirement_code']))); ?>
-                                    <?php if ($loose): ?>
-                                        <div class="dq-loose">
-                                            <span class="dq-loose-label">Also attached:</span>
-                                            <?php foreach ($loose as $f):
-                                                $url = app_url('/api/file-download.php?kind=attachment&attachment=' . (int) $f['id']); ?>
-                                                <a class="dq-file" href="<?= htmlspecialchars($url) ?>" target="_blank" rel="noopener"
-                                                   title="<?= htmlspecialchars((string) $f['original_name']) ?>">
-                                                    <i class="fa-solid fa-paperclip"></i>
-                                                    <span class="dq-file-name"><?= htmlspecialchars((string) $f['original_name']) ?></span>
-                                                </a>
-                                            <?php endforeach; ?>
-                                        </div>
-                                    <?php endif; ?>
-
-                                    <?php if ($miss): ?>
-                                        <div class="rq-ask">
-                                            <b>Ask the student to bring:</b>
-                                            <?= htmlspecialchars(implode(', ', $miss)) ?>.
-                                            Nothing here blocks the request &mdash; the wizard does not hold
-                                            submissions for missing files &mdash; but a document handed over
-                                            without its clearance is a document the student will be back for.
-                                        </div>
-                                    <?php endif; ?>
-                                </div>
-                            <?php // The document itself. This was missing
-                                  // entirely: the detail panel described the
-                                  // request, but nothing on the desk ever
-                                  // linked to the rendered document, so a clerk
-                                  // had no way to check what they were about
-                                  // to sign off on. api/document-preview.php
-                                  // already renders the real thing ? it was
-                                  // simply unreachable from the page. Rejected
-                                  // rows are excluded: there is nothing to sign.
-                                  //
-                                  // One button, not two. Print used to sit
-                                  // beside Preview and opened a separate
-                                  // window, so the clerk approved one render
-                                  // and printed a second ? a different code
-                                  // path, which is how the two drifted apart.
-                                  // Printing from inside the preview prints the
-                                  // sheet the clerk has already read.
-                                  ?>
-                            <?php if ($st !== 'Rejected'): ?>
-                            <div class="dq-detail-actions">
-                                <!-- Primary, not light. The row this sits in is
-                                     mostly grey-on-white, so a white button was
-                                     the least visible control in the panel and
-                                     the one a clerk most needs: it is the only
-                                     way to see what they are signing off on.
-                                     Same blue as Print in the preview footer. -->
-                                <button class="btn btn-sm btn-primary" onclick="openPreview(<?= (int) $r['id'] ?>);event.stopPropagation()">
-                                    <i class="fa-solid fa-eye"></i> Preview &amp; print
-                                </button>
-                            </div>
-                            <?php endif; ?>
-                            <?php // -- GCash receipt ---------------------------------
-                                  // The registrar has to be able to SEE the
-                                  // screenshot before releasing, so it renders
-                                  // inline and is clickable to enlarge: a GCash
-                                  // reference number is unreadable at thumbnail
-                                  // size, and the reference number is the thing
-                                  // actually being checked against the gateway
-                                  // callback. The src is the authorisation-gated
-                                  // endpoint, never the uploads path, so the file
-                                  // is not directly web-reachable. ?>
-                            <?php $rcpt = doc_receipt_state($r); $rq = doc_requires_receipt($r); ?>
-                            <?php if ($rq): ?>
-                            <div class="dq-receipt">
-                                <div class="dq-receipt-head">
-                                    <i class="fa-solid fa-receipt" aria-hidden="true"></i>
-                                    <b>GCash Receipt</b>
-                                    <span class="rq-pill is-<?= htmlspecialchars($rcpt) ?>">
-                                        <?= $rcpt === 'submitted' ? 'Awaiting check'
-                                          : ($rcpt === 'verified' ? 'Verified'
-                                          : ($rcpt === 'waived' ? 'Waived' : 'Missing')) ?>
-                                    </span>
-                                    <span class="rq-meta">
-                                        <?php if ($rcpt === 'verified'): ?>
-                                            Checked by <?= htmlspecialchars($r['payment_receipt_verified_by_name'] ?? 'staff') ?>
-                                            on <?= date('M d, Y', strtotime((string) $r['payment_receipt_verified_at'])) ?>
-                                        <?php elseif ($rcpt === 'waived'): ?>
-                                            Waived by <?= htmlspecialchars($r['payment_receipt_waived_by_name'] ?? 'staff') ?>
-                                            on <?= date('M d, Y', strtotime((string) $r['payment_receipt_waived_at'])) ?>
-                                        <?php elseif ($rcpt === 'submitted'): ?>
-                                            Uploaded <?= date('M d, Y h:i A', strtotime((string) $r['payment_receipt_uploaded_at'])) ?>
-                                        <?php else: ?>
-                                            Not attached yet
-                                        <?php endif; ?>
-                                    </span>
-                                </div>
-                                <?php if ($rcpt === 'none'): ?>
-                                    <div class="rq-ask">
-                                        No receipt on file. Ask the student to attach the GCash screenshot in
-                                        Document Requests, or waive it with a reason below.
-                                    </div>
-                                <?php else: ?>
-                                <div class="dq-receipt-body">
-                                    <?php // A waived receipt has no screenshot left to
-                                          // show, so the thumbnail is suppressed
-                                          // rather than rendered broken. ?>
-                                    <?php if ($rcpt !== 'waived'): ?>
-                                    <img class="rq-thumb" alt="GCash payment receipt"
-                                         src="api/file-download.php?type=payment_receipt&amp;request_id=<?= (int) $r['id'] ?>"
-                                         onclick="rqZoom(this)" title="Click to enlarge">
-                                    <?php endif; ?>
-                                    <div class="rq-side">
-                                        <div class="rq-meta">
-                                            <?php /* The stored column is payment_receipt_filename — there is no
-                                       payment_receipt_original_name and no alias
-                                       supplies one, so reading that key silently
-                                       yielded null and the filename never appeared
-                                       on the panel. */ ?>
-                                            <?php if (!empty($r['payment_receipt_filename'])): ?>
-                                                File: <span><?= htmlspecialchars($r['payment_receipt_filename']) ?></span><br>
-                                            <?php endif; ?>
-                                            Amount claimed: <span>₱<?= number_format((float) ($r['fee_amount'] ?? 0), 2) ?></span>
-                                        </div>
-                                        <?php if ($rcpt === 'waived'): ?>
-                                            <div class="rq-waived-note">
-                                                <?php /* payment_receipt_waived_reason is the real column name. The
-                                       panel was reading payment_receipt_waive_reason,
-                                       which nothing defines — so every waived receipt
-                                       rendered "No reason recorded." regardless of
-                                       what the registrar typed, which is the one
-                                       thing a waiver exists to capture. */ ?>
-                                                <?= htmlspecialchars($r['payment_receipt_waived_reason'] ?: 'No reason recorded.') ?>
-                                            </div>
-                                        <?php endif; ?>
-                                        <?php /* Buttons change with the state, because the
-                                                 action that makes sense is not the same one twice:
-                                                 submitted → check it or waive it; missing →
-                                                 only waive it; verified/waived → undo it, since
-                                                 a wrongly-verified receipt would otherwise be
-                                                 permanent and unchallengeable. */ ?>
-                                        <div class="rq-actions">
-                                            <?php if ($rcpt === 'submitted'): ?>
-                                                <button type="button" class="btn btn-success btn-sm"
-                                                        onclick="rqVerify(<?= (int) $r['id'] ?>)">
-                                                    <i class="fa-solid fa-circle-check" aria-hidden="true"></i> Confirm payment
-                                                </button>
-                                            <?php endif; ?>
-                                            <?php if ($rcpt !== 'verified' && $rcpt !== 'waived'): ?>
-                                                <button type="button" class="btn btn-outline btn-sm"
-                                                        onclick="rqWaive(<?= (int) $r['id'] ?>)">
-                                                    <i class="fa-solid fa-circle-minus" aria-hidden="true"></i> Waive receipt
-                                                </button>
-                                            <?php else: ?>
-                                                <button type="button" class="btn btn-outline btn-sm"
-                                                        onclick="rqReset(<?= (int) $r['id'] ?>)">
-                                                    <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
-                                                    <?= $rcpt === 'verified' ? 'Undo confirmation' : 'Undo waiver' ?>
-                                                </button>
-                                            <?php endif; ?>
-                                        </div>
-                                    </div>
-                                </div>
-                                <?php endif; ?>
-                            </div>
-                            <?php endif; ?>
-                            <?php if (!empty($reqEvents)): ?>
-                                <div class="dq-log">
-                                    <div class="dq-log-head">Activity Log</div>
-                                    <?php foreach ($reqEvents as $ev): ?>
-                                        <div class="dq-log-row">
-                                            <time datetime="<?= htmlspecialchars(date('c', strtotime($ev['created_at']))) ?>"><?= date('M d, h:i A', strtotime($ev['created_at'])) ?></time>
-                                            <span><?= htmlspecialchars(doc_readable_event_note($ev)) ?></span>
-                                        </div>
-                                    <?php endforeach; ?>
-                                </div>
-                            <?php endif; ?>
-                        </div>
-                    </td>
-                </tr>
+                <tr class="doc-detail-row" id="detail-<?= (int)$r['id'] ?>" style="display:none;">
+ <td colspan="5"><section class="rd-detail" aria-label="Request details">
+ <?php $rdChannel=match((string)($r['payment_method']??'Counter')){'Online'=>'GCash','Bank_Transfer'=>'Bank transfer',default=>'Registrar counter'}; $rdReceipt=doc_receipt_state($r); $rdPayment=!empty($r['paid_at'])?'Payment confirmed':($rdReceipt==='waived'?'Receipt requirement waived':(doc_review_pending($r)?'Not requested — review comes first':($rdReceipt==='submitted'?'Receipt awaiting verification':((float)$r['fee_amount']<=0?'No fee required':'Awaiting payment')))); ?>
+ <header class="rd-header"><div><span class="rd-eyebrow">REQUEST DETAILS</span><h3><?= htmlspecialchars($r['catalog_name']??ucwords(str_replace('_',' ',$r['document_type']))) ?></h3><p><?= htmlspecialchars($r['request_id']??('#'.$r['id'])) ?> <span>·</span> <?= htmlspecialchars($r['student_name']) ?></p></div><?php if($st!=='Rejected'): ?><button class="btn btn-secondary btn-sm" onclick="openPreview(<?= (int)$r['id'] ?>);event.stopPropagation()"><i class="fa-regular fa-file-lines" aria-hidden="true"></i> Preview &amp; print</button><?php endif; ?></header>
+ <?php if($blocker): ?><div class="rd-hold"><span class="rd-hold-icon"><i class="fa-solid fa-pause" aria-hidden="true"></i></span><div><strong>Request on hold</strong><p><?= htmlspecialchars($blocker['reason']) ?></p><small>Since <?= htmlspecialchars(date('M j, Y',strtotime((string)$blocker['since']))) ?> · <?= ($r['blocked_source']??'')==='registrar'?'Registrar review needed to lift this hold':'Pending account or payment clearance' ?></small></div><?php if(($r['blocked_source']??'')==='registrar'): ?><button class="btn btn-sm btn-secondary" onclick="liftHold(<?= (int)$r['id'] ?>);event.stopPropagation()">Lift hold</button><?php endif; ?></div><?php endif; ?>
+ <?php if($st==='Rejected'): ?><div class="rd-hold is-rejected"><div><strong>Request rejected</strong><p><?= htmlspecialchars($r['rejection_reason']??'No reason recorded') ?></p></div></div><?php endif; ?>
+ <div class="rd-grid"><div class="rd-main">
+  <section class="rd-section"><div class="rd-section-title"><i class="fa-regular fa-file-lines" aria-hidden="true"></i><h4>Request information</h4></div><dl class="rd-facts"><div class="rd-wide"><dt>Purpose</dt><dd><?= htmlspecialchars($r['purpose']?:'Not specified') ?></dd></div><div><dt>Quantity</dt><dd><?= (int)($r['quantity']??1) ?> <?= (int)($r['quantity']??1)===1?'copy':'copies' ?></dd></div><div><dt>Document fee</dt><dd>₱<?= number_format((float)$r['fee_amount'],2) ?></dd></div><div><dt>Submitted</dt><dd><?= htmlspecialchars(date('M j, Y · g:i A',strtotime($r['request_date']))) ?></dd></div><div><dt>Request source</dt><dd><?= ($r['source']??'walk_in')==='online'?'Student portal':'Registrar counter' ?></dd></div><div><dt>Target turnaround</dt><dd><?= $age['target']!==null?(int)$age['target'].' day'.($age['target']===1?'':'s'):'Not configured' ?></dd></div><div><dt>Collection</dt><dd>Registrar counter</dd></div></dl><?php if(!empty($r['notes'])): ?><div class="rd-student-note"><span>Student note</span><p><?= nl2br(htmlspecialchars($r['notes'])) ?></p></div><?php endif; ?></section>
+  <section class="rd-section"><div class="rd-section-title"><i class="fa-solid fa-clipboard-check" aria-hidden="true"></i><h4>Requirements review</h4><span class="rd-tag"><?= !empty($r['requirements_reviewed_at'])?'Approved':(doc_review_pending($r)?'Pending review':'Already in progress') ?></span></div><p class="rd-description"><?= !empty($r['requirements_reviewed_at'])?'Reviewed on '.htmlspecialchars(date('M j, Y · g:i A',strtotime($r['requirements_reviewed_at']))):'Check supporting documents before requesting payment.' ?></p><?php if(!empty($r['requirements_review_note'])): ?><p class="rd-review-note"><?= nl2br(htmlspecialchars($r['requirements_review_note'])) ?></p><?php endif; ?>
+  <?php if(!empty($r['_attachments'])): ?><div class="rd-files"><?php foreach($r['_attachments'] as $a): ?><a href="../api/file-download.php?kind=attachment&amp;attachment=<?= (int)$a['id'] ?>" target="_blank" rel="noopener"><i class="fa-solid fa-paperclip" aria-hidden="true"></i><span><?= htmlspecialchars($a['original_name']) ?></span><i class="fa-solid fa-arrow-up-right-from-square" aria-hidden="true"></i></a><?php endforeach; ?></div><?php else: ?><div class="rd-empty"><i class="fa-regular fa-folder-open" aria-hidden="true"></i><span>No supporting files uploaded</span></div><?php endif; ?>
+  <?php if(!empty($r['_missing'])): ?><p class="rd-missing"><strong>Still needed:</strong> <?= htmlspecialchars(implode(', ',$r['_missing'])) ?></p><?php endif; ?></section>
+  <section class="rd-section"><div class="rd-section-title"><i class="fa-solid fa-receipt" aria-hidden="true"></i><h4>Payment</h4><span class="rd-tag"><?= htmlspecialchars($rdPayment) ?></span></div><dl class="rd-facts"><div><dt>Payment channel</dt><dd><?= htmlspecialchars($rdChannel) ?></dd></div><div><dt>Amount</dt><dd>₱<?= number_format((float)$r['fee_amount'],2) ?></dd></div><?php if(!empty($r['official_receipt'])): ?><div><dt>Official receipt</dt><dd><?= htmlspecialchars($r['official_receipt']) ?></dd></div><?php endif; ?><?php if(!empty($r['paid_at'])): ?><div><dt>Confirmed on</dt><dd><?= htmlspecialchars(date('M j, Y · g:i A',strtotime($r['paid_at']))) ?></dd></div><?php endif; ?></dl>
+  <?php if(doc_requires_receipt($r)): ?><div class="rd-payment-actions"><?php if(!empty($r['payment_receipt_path']) && $rdReceipt!=='waived'): ?><a class="btn btn-secondary btn-sm" href="../api/file-download.php?kind=receipt&amp;request=<?= (int)$r['id'] ?>" target="_blank" rel="noopener">Open payment receipt</a><?php endif; ?><?php if($rdReceipt==='submitted'): ?><button class="btn btn-primary btn-sm" onclick="rqVerify(<?= (int)$r['id'] ?>)">Confirm payment</button><?php endif; ?><?php if(in_array($rdReceipt,['verified','waived'],true)): ?><button class="btn btn-secondary btn-sm" onclick="rqReset(<?= (int)$r['id'] ?>)">Undo <?= $rdReceipt==='verified'?'confirmation':'waiver' ?></button><?php else: ?><button class="btn btn-secondary btn-sm" onclick="rqWaive(<?= (int)$r['id'] ?>)">Waive receipt</button><?php endif; ?></div><?php endif; ?></section>
+ </div><aside class="rd-section rd-history"><div class="rd-section-title"><i class="fa-regular fa-clock" aria-hidden="true"></i><h4>Activity timeline</h4></div><?php if($reqEvents): ?><ol><?php foreach(array_reverse($reqEvents) as $ev): ?><li><time datetime="<?= htmlspecialchars(date('c',strtotime($ev['created_at']))) ?>"><?= htmlspecialchars(date('M j · g:i A',strtotime($ev['created_at']))) ?></time><p><?= htmlspecialchars(doc_readable_event_note($ev)) ?></p></li><?php endforeach; ?></ol><?php else: ?><p class="rd-description">No activity recorded yet.</p><?php endif; ?></aside></div>
+ <footer class="rd-workflow-actions"><span>Next action for this request</span><div><?php if($next!==null): ?><button type="button" class="btn btn-primary" onclick="closeRequestView();<?= htmlspecialchars($next['handler']) ?>(<?= (int)$r['id'] ?><?= ($next['wants']??'')==='btn'?',this':'' ?>)"><i class="fa-solid <?= htmlspecialchars($next['icon']) ?>" aria-hidden="true"></i> <?= htmlspecialchars($next['label']) ?></button><?php endif; ?><?php if(!in_array($st,['Claimed','Rejected','Cancelled'],true)): ?><button type="button" class="btn btn-secondary" onclick="closeRequestView();rejectDoc(<?= (int)$r['id'] ?>)">Reject request</button><?php endif; ?></div></footer>
+ </section></td></tr>
             <?php endforeach; endif; ?>
             <tr id="docNoMatch" style="display:none;"><td colspan="5" class="empty-state"><div class="dq-empty"><i class="fas fa-magnifying-glass"></i><p>No requests match your search</p><span>Try a different name, ID number, document, or clear the filters.</span></div></td></tr>
         </tbody>
@@ -1921,43 +1299,24 @@ tr.is-blocked:hover{background:#fffbeb}
 </div>
 </main>
 
+<div class="modal-overlay" id="requestViewModal" role="dialog" aria-modal="true" aria-labelledby="requestViewTitle"><div class="modal-content"><div class="modal-header"><div><span class="rv-kicker">REGISTRAR DESK</span><h3 id="requestViewTitle">Document request</h3></div><button type="button" class="modal-close" aria-label="Close request details" onclick="closeRequestView()"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div><div id="requestViewBody" class="modal-body"></div></div></div>
 <!-- --- NEW REQUEST MODAL --------------------------------------- -->
-<div class="modal-overlay" id="newRequestModal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <div class="nq-mark"><i class="fa-solid fa-file-circle-plus"></i></div>
-            <div>
-                <h3>New Document Request</h3>
-                <p>Raise a request on behalf of a student.</p>
-            </div>
-            <button class="modal-close" onclick="closeModal('newRequestModal')" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-        <div class="modal-body">
-            <form id="newRequestForm" onsubmit="submitNewRequest(event)">
-
-                <!-- The form is a sequence, so it is numbered. The clerk
-                     works top to bottom under a queue of other students, and
-                     the numbers say which field comes next without making
-                     them read four uppercase headings. -->
-                <ol class="nq-steps">
-                    <li class="nq-step">
-                        <div class="nq-step-mark" aria-hidden="true">1</div>
-                        <div class="nq-step-body">
-                            <div class="nq-step-label" id="nrStudentLabel">Student</div>
-                            <select name="student_id" id="nrStudent" class="form-control" data-searchable required aria-labelledby="nrStudentLabel">
+<div class="modal-overlay" id="newRequestModal" role="dialog" aria-modal="true" aria-labelledby="nrWizardTitle">
+ <div class="modal-content">
+  <div class="modal-header"><div class="nq-mark"><i class="fa-solid fa-file-circle-plus" aria-hidden="true"></i></div><div><h3 id="nrWizardTitle">New document request</h3><p>A guided intake for the registrar counter.</p></div><button type="button" class="modal-close" onclick="closeModal('newRequestModal')" aria-label="Close new request"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button></div>
+  <form id="newRequestForm" onsubmit="submitNewRequest(event)" novalidate>
+   <nav class="nr-progress" aria-label="Request intake progress"><ol><li data-nr-nav="0"><b>1</b><span>Student</span></li><li data-nr-nav="1"><b>2</b><span>Document</span></li><li data-nr-nav="2"><b>3</b><span>Details</span></li><li data-nr-nav="3"><b>4</b><span>Review</span></li></ol></nav>
+   <div class="modal-body">
+    <p id="nrWizardError" class="nr-error" role="alert" hidden></p>
+    <div id="nrWizardIntro" class="nr-intro"><span>STEP 1 OF 4</span><h4>Select the student</h4><p>Find the student this document will be issued to.</p></div>
+    <ol class="nq-steps">
+     <li class="nq-step"><div class="nq-step-body"><label class="nq-step-label" id="nrStudentLabel" for="nrStudent">Student</label><select name="student_id" id="nrStudent" class="form-control" data-searchable required aria-labelledby="nrStudentLabel">
                                 <option value="">Search or select a student&hellip;</option>
                                 <?php foreach ($students as $s): ?>
                                     <option value="<?= (int) $s['id'] ?>"><?= htmlspecialchars($s['student_number']) ?> &mdash; <?= htmlspecialchars($s['name']) ?></option>
                                 <?php endforeach; ?>
-                            </select>
-                        </div>
-                    </li>
-
-                    <li class="nq-step">
-                        <div class="nq-step-mark" aria-hidden="true">2</div>
-                        <div class="nq-step-body">
-                            <div class="nq-step-label" id="nrDocLabel">Document</div>
-                            <select name="catalog_id" id="nrCatalog" class="form-control" required onchange="updateNrFee()" aria-labelledby="nrDocLabel">
+                            </select></div></li>
+     <li class="nq-step" hidden><div class="nq-step-body"><label class="nq-step-label" id="nrDocLabel" for="nrCatalog">Document catalog</label><div id="nrCatalogCards" class="nr-catalog-grid" role="group" aria-label="Choose a document"></div><select name="catalog_id" id="nrCatalog" class="form-control" required onchange="updateNrFee()" aria-labelledby="nrDocLabel">
                                 <option value="">Select a document&hellip;</option>
                                 <?php foreach ($catalog as $c):
                                     // The enum already carries its own preposition
@@ -1986,119 +1345,24 @@ tr.is-blocked:hover{background:#fffbeb}
                                         <?= htmlspecialchars($c['name']) ?> (<?= $feeTxt ?>)
                                     </option>
                                 <?php endforeach; ?>
-                            </select>
-                            <!-- A requirement is a fact about the document, not
-                                 an error. It appears under the field it belongs
-                                 to, in the amber the rest of the app uses for
-                                 "attention", and it never blocks the form. -->
-                            <div id="nrHint" class="req-hint" role="status"></div>
-                        </div>
-                    </li>
-
-                    <li class="nq-step">
-                        <div class="nq-step-mark" aria-hidden="true">3</div>
-                        <div class="nq-step-body">
-                            <div class="nq-step-label" id="nrDetailLabel">Why it is needed</div>
-                            <div class="nq-fields">
-                                <div class="nq-field">
-                                    <label for="nrPurpose">Purpose<span class="nq-req">*</span></label>
-                                    <input type="text" name="purpose" id="nrPurpose" class="form-control" placeholder="Employment requirement" required>
-                                </div>
-                                <div class="nq-field">
-                                    <?php // Recipient used to sit here. A walk-in
-                                          // document is always collected by the
-                                          // student it was filed for ? the office
-                                          // runs no courier ? so the field asked a
-                                          // question with exactly one possible
-                                          // answer, and its presence implied a
-                                          // delivery option that does not exist.
-                                          // The column stays in the schema
-                                          // (student intake still writes it); what
-                                          // is gone is the desk asking.
-                                          //
-                                          // Its slot is taken by the one thing
-                                          // this form could not record: what the
-                                          // clerk knows that the system cannot
-                                          // derive. Left empty the request is
-                                          // simply actionable, which is the right
-                                          // default. ?>
-                                    <label for="nrWaitingOn">Waiting on</label>
-                                    <input type="text" name="waiting_on" id="nrWaitingOn" class="form-control"
-                                           list="nrWaitingOnPresets" maxlength="160"
-                                           placeholder="Nothing &mdash; ready to start">
-                                    <?php // Offered, not forced. These are reasons
-                                          // this desk actually sees; the field stays
-                                          // free text because the real ones are
-                                          // specific ("Dean's office has the
-                                          // affidavit") and a fixed list would
-                                          // force an imprecise pick. ?>
-                                    <datalist id="nrWaitingOnPresets">
-                                        <option value="Dean&rsquo;s office approval"></option>
-                                        <option value="Outstanding balance"></option>
-                                        <option value="Student ID being reprinted"></option>
-                                        <option value="Guidance Office signature"></option>
-                                        <option value="Original document not yet returned"></option>
-                                    </datalist>
-                                    <p class="nq-hint">Optional. Fill this in only if the desk genuinely cannot start. The request still works &mdash; this records why, and you can change or clear it later.</p>
-                                </div>
-
-                                <?php // Payment is the only choice left on this form. The
-                                // delivery select above it asked how the student would
-                                // receive the document and had exactly one honest answer,
-                                // because the office runs no courier and issues no emailed
-                                // copy. A one-option select is a field that takes up a row
-                                // to say nothing, and the courier fee it could add was the
-                                // one number in this form that changed the total. ?>
-                                <div class="nq-field">
-                                    <label for="nrPayment">How will they pay?</label>
-                                    <select name="payment_method" id="nrPayment" class="form-control">
+                            </select><div class="nr-quantity"><label for="nrQuantity">Quantity <span id="nrQuantityUnit">copies</span></label><input type="number" id="nrQuantity" name="quantity" value="1" min="1" max="100" inputmode="numeric"><small id="nrQuantityHelp">The final fee is calculated from the document catalog.</small></div><div id="nrHint" class="req-hint" role="status"></div></div></li>
+     <li class="nq-step" hidden><div class="nq-step-body"><div class="nq-fields"><div class="nq-field"><label for="nrPurpose">Purpose <span class="nq-req">*</span></label><input type="text" name="purpose" id="nrPurpose" class="form-control" placeholder="Employment, further studies, or another purpose" maxlength="255" required></div><div class="nq-field"><label for="nrWaitingOn">Hold or correction note <span class="nr-optional">Optional</span></label><input type="text" name="waiting_on" id="nrWaitingOn" class="form-control" maxlength="160" placeholder="e.g. Waiting for original clearance"><p class="nq-hint">Record a known issue for requirements review.</p></div><div class="nq-field"><label for="nrPayment">Payment preference</label><div id="nrPaymentChoices" class="nr-payment-choices" role="group" aria-label="Payment preference"></div><select name="payment_method" id="nrPayment" class="form-control">
                                         <?php foreach (doc_payment_options() as $o): ?>
                                             <option value="<?= htmlspecialchars($o['value']) ?>"
                                                 <?= $o['value'] === 'Counter' ? 'selected' : '' ?>>
                                                 <?= htmlspecialchars($o['label']) ?> &mdash; <?= htmlspecialchars($o['note']) ?>
                                             </option>
                                         <?php endforeach; ?>
-                                    </select>
-                                    <p class="nq-hint" id="nrPaymentHint">
-                                        Paid at the counter: nothing is owed until the student collects, so the request is immediately workable.
-                                    </p>
-                                </div>
-                                </div>
-                            </div>
-                        </div>
-                    </li>
-                </ol>
-
-                <!-- Pickup was never a choice the clerk made - the field was
-                     readonly and the API only accepts Pickup. It sat in its own
-                     "Handling" section as a disabled-looking box, which read as
-                     a setting that had gone wrong. It is now a single stated
-                     fact, in the same position as the fee: things that are
-                     true about this request rather than things to fill in. -->
-                <div class="nq-facts">
-                    <div class="nq-fee">
-                        <div>
-                            <div class="nq-fee-cap">Fee due at filing</div>
-                            <div class="nq-fee-note" id="nrFeePreview">&#8369;0.00 &middot; take this when the student pays</div>
-                        </div>
-                        <div class="nq-fee-amount" id="nrFeeAmount">&#8369;0.00</div>
-                    </div>
-                    <p class="nq-fact"><i class="fa-solid fa-building-columns" aria-hidden="true"></i> Collected at the registrar counter</p>
-                </div>
-
-                <!-- Priority is sent as a fixed value rather than offered as a
-                     choice. The API validates request_type, so the field has to
-                     exist, but a single-option control invites the clerk to
-                     wonder what the other option did. -->
-                <input type="hidden" name="request_type" id="nrPriority" value="Regular">
-
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('newRequestModal')">Cancel</button>
-                    <button type="submit" class="btn btn-primary" id="nrSubmitBtn"><i class="fa-solid fa-plus"></i> Add Request</button>
-                </div>
-            </form>
-        </div>
-    </div>
+                                    </select><p class="nq-hint" id="nrPaymentHint">Payment follows requirements approval.</p></div></div></div></li>
+     <li class="nq-step nr-review-step" hidden><div class="nq-step-body"><div id="nrReviewSummary" class="nr-review-summary"></div><div class="nr-review-notice"><i class="fa-solid fa-clipboard-check" aria-hidden="true"></i><p>This submits a request for requirements review. Payment is collected only after the Registrar approves the requirements.</p></div><label class="nr-confirm"><input type="checkbox" id="nrConfirmDetails"> I have checked the student, document, and request details.</label></div></li>
+    </ol>
+    <div class="nq-facts"><div class="nq-fee"><div><div class="nq-fee-cap">Estimated document fee</div><div class="nq-fee-note" id="nrFeePreview">Choose a document to see the fee</div></div><div class="nq-fee-amount" id="nrFeeAmount">&#8369;0.00</div></div><p class="nq-fact"><i class="fa-solid fa-building-columns" aria-hidden="true"></i> Collection at the registrar counter</p></div>
+   </div>
+   <input type="hidden" name="request_type" id="nrPriority" value="Regular">
+   <div class="modal-footer"><button type="button" class="btn btn-secondary" id="nrBackBtn" onclick="nrPreviousStep()">Cancel</button><span class="nr-footer-note">Saved only when you submit</span><button type="button" class="btn btn-primary" id="nrNextBtn" onclick="nrNextStep()">Continue <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></button><button type="submit" class="btn btn-primary" id="nrSubmitBtn" hidden><i class="fa-solid fa-check" aria-hidden="true"></i> Submit for review</button></div>
+  </form>
+  <section id="nrSuccess" class="nr-success" hidden role="status"><span class="nr-success-icon"><i class="fa-solid fa-check" aria-hidden="true"></i></span><span class="nr-success-kicker">REQUEST CREATED</span><h4>Submitted for review</h4><p id="nrSuccessReference"></p><p>The request is now in the requirements-review queue. Review the supporting documents before requesting payment.</p><div class="nr-success-actions"><button type="button" class="btn btn-secondary" onclick="openNewRequest()">Create another request</button><a class="btn btn-primary" href="documents.php">Return to requests <i class="fa-solid fa-arrow-right" aria-hidden="true"></i></a></div></section>
+ </div>
 </div>
 
 <!-- --- SIGN & MARK READY MODAL --------------------------------- -->
@@ -2203,6 +1467,18 @@ tr.is-blocked:hover{background:#fffbeb}
     </div>
 </div>
 
+
+<div class="modal-overlay review-dialog" id="requirementsReviewModal" role="dialog" aria-modal="true" aria-labelledby="requirementsReviewTitle">
+ <div class="modal-content" style="max-width:640px"><div class="modal-header"><h3 id="requirementsReviewTitle">Review requirements</h3><button type="button" class="modal-close" onclick="closeModal('requirementsReviewModal')" aria-label="Close review">&times;</button></div>
+ <div class="modal-body"><p>Check the student's request and supporting documents before asking them to pay.</p><div id="requirementsReviewSummary" style="margin:16px 0"></div>
+ <label for="requirementsReviewNote">Review note / reason for accepting documents in person</label><textarea id="requirementsReviewNote" rows="3" maxlength="1500" style="width:100%;margin:8px 0 16px" placeholder="Record any missing uploads accepted at the counter, or explain what needs correction."></textarea>
+ <label style="display:flex;gap:10px;align-items:flex-start"><input type="checkbox" id="requirementsReviewConfirmed"> I have reviewed the requirements and confirmed they are acceptable.</label>
+ <p id="requirementsReviewError" role="alert" style="color:#a12c24;margin-top:12px"></p></div>
+ <div class="modal-footer"><button class="btn btn-secondary" type="button" onclick="holdReviewRequest()">Put on hold</button><button class="btn btn-primary" type="button" id="approveRequirementsButton" onclick="approveRequirements()">Approve requirements</button></div></div>
+</div>
+<div class="modal-overlay review-dialog" id="counterPaymentModal" role="dialog" aria-modal="true" aria-labelledby="counterPaymentTitle"><div class="modal-content" style="max-width:460px"><div class="modal-header"><h3 id="counterPaymentTitle">Record counter payment</h3></div><div class="modal-body"><p>Confirm the fee has been received. This records the payment time and official receipt.</p><label for="counterOfficialReceipt">Official receipt number</label><input id="counterOfficialReceipt" maxlength="40" style="width:100%;margin:12px 0"><p id="counterPaymentError" role="alert" style="color:#a12c24"></p></div><div class="modal-footer"><button class="btn btn-secondary" type="button" onclick="closeModal('counterPaymentModal')">Cancel</button><button class="btn btn-primary" type="button" id="counterPaymentButton" onclick="confirmCounterPayment()">Confirm payment</button></div></div></div>
+<script type="application/json" id="reviewRequestsData"><?= json_encode(array_map(static function($r){return ['id'=>(int)$r['id'],'student'=>$r['student_name'],'document'=>$r['catalog_name'] ?? $r['document_type'],'fee'=>(float)$r['fee_amount'],'files'=>array_map(static function($a){return ['id'=>(int)$a['id'],'name'=>$a['original_name']];},$r['_attachments']??[])];},$requests),JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT) ?></script>
+<script src="../js/document-review.js?v=1"></script>
 <script>
 // The API base, resolved by the server. The desk lives at /registrar/,
 // so a bare relative "api/..." resolves to /registrar/api/... and 404s ?
@@ -2340,152 +1616,7 @@ async function rqReset(id) {
 }
 
 // -- New Request Modal ------------------------------------------
-// The three steps, in the order they are filled. Completion drives the
-// numerals, so the clerk can see at a glance whether the request is
-// finished or whether the tail of the form is still empty.
-function paintNrSteps() {
-    const filled = [
-        !!document.getElementById('nrStudent').value,
-        !!document.getElementById('nrCatalog').value,
-        !!document.getElementById('nrPurpose').value.trim()
-    ];
-    const firstOpen = filled.indexOf(false);
-    document.querySelectorAll('#newRequestModal .nq-step').forEach((s, i) => {
-        s.classList.toggle('is-done', filled[i]);
-        // "active" is the first step still empty, or the last one once
-        // they are all answered - so the highlight never sits on a
-        // field the clerk has already dealt with.
-        s.classList.toggle('is-active', i === (firstOpen === -1 ? 2 : firstOpen));
-    });
-}
-
-// The steps repaint as the clerk answers them, so the numerals are a
-// progress read-out rather than decoration. Bound here rather than with
-// inline oninput= so the markup stays free of behaviour.
-['nrStudent', 'nrCatalog', 'nrPurpose'].forEach(function (id) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.addEventListener('input', paintNrSteps);
-    el.addEventListener('change', paintNrSteps);
-});
-
-function openNewRequest() {
-    document.getElementById('newRequestForm').reset();
-    document.getElementById('nrHint').textContent = '';
-    document.getElementById('nrHint').classList.remove('visible');
-    document.getElementById('nrFeeAmount').textContent = '\u20B10.00';
-    document.getElementById('nrFeePreview').textContent = '\u20B10.00 \u00B7 take this when the student pays';
-    paintNrSteps();
-    openModal('newRequestModal');
-}
-
-function peso(n) {
-    return '\u20B1' + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function updateNrFee() {
-    const opt = document.getElementById('nrCatalog').selectedOptions[0];
-    // The amount and its note are separate elements now: the note carries
-    // the unit ("per page"), which the old single field could not show
-    // without pushing the figure out of the ticket.
-    const note = document.getElementById('nrFeePreview');
-    const amount = document.getElementById('nrFeeAmount');
-
-
-    const paySel = document.getElementById('nrPayment');
-    const payHint = document.getElementById('nrPaymentHint');
-    if (paySel && payHint) {
-        payHint.textContent = paySel.value === 'Counter'
-            ? 'Paid at the counter: nothing is owed until the student collects, so the request is immediately workable.'
-            : 'Paid outside the office: the request waits in "Waiting on payment" until the money is confirmed here.';
-    }
-
-    if (!opt || !opt.value) {
-        amount.textContent = peso(0);
-        note.textContent = 'Choose a document to see the fee';
-        document.getElementById('nrHint').classList.remove('visible');
-        paintNrSteps();
-        return;
-    }
-    const fee = parseFloat(opt.dataset.fee || '0');
-    const unit = opt.dataset.feeType === 'per_page' ? 'page'
-               : opt.dataset.feeType === 'per_syllabus' ? 'syllabus' : '';
-    const total = fee;
-    amount.textContent = peso(total);
-    amount.dataset.unit = unit ? 'per ' + unit : '';
-    note.textContent = (unit ? 'per ' + unit : 'one-time')
-        + ' \u00B7 take this when the student pays';
-    const req = opt.dataset.req;
-    if (req) {
-        document.getElementById('nrHint').textContent = req;
-        document.getElementById('nrHint').classList.add('visible');
-    } else {
-        document.getElementById('nrHint').classList.remove('visible');
-    }
-    paintNrSteps();
-}
-
-async function submitNewRequest(e) {
-    e.preventDefault();
-    const btn = document.getElementById('nrSubmitBtn');
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Adding\u2026';
-    const data = {
-        student_id: document.getElementById('nrStudent').value,
-        catalog_id: document.getElementById('nrCatalog').value,
-        request_type: document.getElementById('nrPriority').value,
-        // payment_method is what decides the request's opening status at the
-        // API (api/student-documents.php:307-326). Left unset it defaults to
-        // 'Online', which files the request at the stage where it waits for
-        // its fee - a stage the walk-in track does not have, so
-        // doc_next_step() returned null and the row sat on the desk with no
-        // action button and no way forward. 'Counter' is mapped to
-        // Cash_on_Delivery and starts at Filed.
-        //
-        // documents-add.php sends the same value as a hidden form field. This
-        // modal posts JSON, so it goes in the payload instead - and it has to
-        // be sent explicitly rather than left to the API default, because the
-        // student standing at the counter is not waiting on a QR code.
-        //
-        // Read from the form rather than hardcoded. It used to be the
-        // literal 'Counter', which meant a clerk could not record an
-        // outside payment for a walk-in, and the request was filed saying
-        // something the office was not going to do.
-        payment_method: document.getElementById('nrPayment').value,
-        purpose: document.getElementById('nrPurpose').value.trim(),
-        // Empty means "nothing is holding this", which is the default and
-        // the common case. Sent as an empty string rather than omitted so
-        // the intent is explicit at the API.
-        waiting_on: document.getElementById('nrWaitingOn').value.trim()
-    };
-    if (!data.student_id || !data.catalog_id || !data.purpose) {
-        showToast('Please fill all required fields.', 'error');
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-plus"></i> Add Request';
-        return;
-    }
-    try {
-        const res = await fetch('../api/student-documents.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        const result = await res.json();
-        if (result.success) {
-            closeModal('newRequestModal');
-            showToast(result.message || 'Document request created.', 'success');
-            setTimeout(() => location.reload(), 600);
-        } else {
-            showToast(result.message || 'Failed to create request.', 'error');
-        }
-    } catch (err) {
-        showToast('Network error.', 'error');
-    } finally {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-plus"></i> Add Request';
-    }
-}
-
+// Guided intake logic lives in js/document-intake.js.
 
 // -- Process ----------------------------------------------------
 //
@@ -2822,6 +1953,7 @@ function toggleDetail(id) {
 function applyFilters() {
     const q = (document.getElementById('docSearch').value || '').trim().toLowerCase();
     const st = document.getElementById('statusFilter').value;
+    const stage = document.getElementById('workflowFilter').value;
     const rt = document.getElementById('typeFilter').value;
     const wf = document.getElementById('waitFilter').value;
     let visible = 0;
@@ -2837,7 +1969,7 @@ function applyFilters() {
             || (wf === 'actionable' && tr.dataset.actionable === '1')
             || (wf === 'blocked'     && tr.dataset.blocked === '1')
             || (wf === 'late'        && tr.dataset.late === '1');
-        const show = matchQ && matchS && matchR && matchW;
+        const show = matchQ && matchS && matchR && matchW && (!stage || tr.dataset.workflow === stage);
         tr.style.display = show ? '' : 'none';
         const detail = document.getElementById('detail-' + tr.dataset.doc);
         if (detail) detail.style.display = 'none';
@@ -2859,6 +1991,8 @@ function applyRevFilter() {
 }
 </script>
 
+<script src="../js/request-view-modal.js?v=1"></script>
+<script src="../js/document-intake.js?v=20261110-payment-choices"></script>
 <?php include '../includes/footer.php'; ?>
 
 

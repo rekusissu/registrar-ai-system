@@ -26,7 +26,7 @@ $__csrfToken = htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8');
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes" />
+    <meta name="viewport" content="<?= ($body_page ?? '') === 'dashboard' ? 'width=device-width, initial-scale=1.0' : 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes' ?>" />
     <meta name="description" content="<?= htmlspecialchars($page_description) ?>" />
     <meta name="theme-color" content="#1a3a8c" />
     <meta name="mobile-web-app-capable" content="yes" />

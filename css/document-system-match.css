@@ -1,0 +1,54 @@
+
+/* Registrar document page aligned to the Students page's shared BCP system. */
+body[data-page="documents"] .dashboard-main{padding:24px clamp(18px,2.5vw,38px) 40px;background:linear-gradient(180deg,#eef4ff 0,#f8faff 300px,#f8faff 100%)}
+body[data-page="documents"] .dq-head{display:block;margin:0 0 16px;padding:25px 27px;border:1px solid #c7d7fe;border-radius:19px;background:linear-gradient(120deg,#eff6ff,#fff 68%);box-shadow:0 10px 30px rgba(37,99,235,.08)}
+body[data-page="documents"] .dq-head h1{margin:0 0 5px;font-size:28px;line-height:1.1;letter-spacing:-.03em;color:#172554}
+body[data-page="documents"] .dq-head p{margin:0;max-width:620px;font-size:12.5px;line-height:1.5;color:#64748b}
+body[data-page="documents"] .dq-kicker{display:flex;align-items:center;gap:7px;margin-bottom:7px;color:#1d4ed8;font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+body[data-page="documents"] .dq-kicker i{display:inline-block;color:#2359de}
+.doc-actionbar{display:flex;align-items:stretch;gap:12px;flex-wrap:wrap;margin:0 0 16px;padding:12px 14px;border:1px solid #dbeafe;border-radius:16px;background:#fff;box-shadow:0 7px 24px rgba(15,23,42,.04)}
+.doc-action-group{flex:1 1 300px;min-width:0;display:flex;flex-direction:column;gap:8px;padding:11px 13px;border:1px solid #e2e8f0;border-radius:13px;background:#f8faff}
+.doc-action-label{padding-left:2px;color:#1d4ed8;font-size:9.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase}
+.doc-action-buttons{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+body[data-page="documents"] .doc-action-buttons .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:36px;padding:0 13px;font-size:12px;border-radius:10px;font-weight:650}
+body[data-page="documents"] .doc-action-buttons .btn-primary{background:linear-gradient(110deg,#1e3d95,#245df0);border-color:#2455cd;box-shadow:0 4px 10px #2149ac24;color:#fff}
+body[data-page="documents"] .doc-action-buttons .btn-secondary{background:#f0f4fb;border:1px solid #dce5f3;color:#2b61e3}
+body[data-page="documents"] .dq-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:0 0 16px;padding:0;background:#fff;border:1px solid #dbeafe;border-radius:16px;box-shadow:0 6px 22px rgba(15,23,42,.04);overflow:hidden}
+body[data-page="documents"] .dq-metric,body[data-page="documents"] .dq-metric:first-child{position:relative;padding:16px 20px 18px;border:0;border-right:1px solid #e2e8f0}
+body[data-page="documents"] .dq-metric:last-child{border-right:0}
+body[data-page="documents"] .dq-metric:after{content:'';display:block;position:absolute;left:20px;right:20px;bottom:0;height:3px;background:#2457e9}
+body[data-page="documents"] .dq-metric:nth-child(2):after{background:#e5a039}body[data-page="documents"] .dq-metric:nth-child(3):after{background:#df7750}body[data-page="documents"] .dq-metric:nth-child(4):after{background:#22a27c}
+body[data-page="documents"] .dq-metric .dq-label{font-size:9.5px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#64748b}
+body[data-page="documents"] .dq-metric .dq-value{font-size:27px;line-height:1.2;font-weight:750;color:#0f172a;margin:6px 0 10px;letter-spacing:-.7px}
+body[data-page="documents"] .dq-metric-note{padding-top:10px;border-top:1px solid #eef2f8;font-size:10px;line-height:1.5;color:#8293ad}
+body[data-page="documents"] .desk-analytics{border:1px solid #dbeafe;border-radius:13px;background:#fff;box-shadow:0 4px 14px #274f9906;margin-bottom:16px}
+body[data-page="documents"] .desk-analytics>summary{padding:15px 20px}
+body[data-page="documents"] .panel{border-color:#dbeafe;border-radius:16px;box-shadow:0 5px 20px #244d9205}
+@media(max-width:1050px){body[data-page="documents"] .dq-strip{grid-template-columns:repeat(2,minmax(0,1fr))}body[data-page="documents"] .dq-metric:nth-child(2){border-right:0}body[data-page="documents"] .dq-metric:nth-child(-n+2){border-bottom:1px solid #e2e8f0}}
+@media(max-width:768px){body[data-page="documents"] .dashboard-main{padding:74px 16px 28px}body[data-page="documents"] .dq-head{padding:22px 20px}body[data-page="documents"] .dq-head h1{font-size:25px}.doc-actionbar{padding:12px}.doc-action-group{flex-basis:100%}body[data-page="documents"] .doc-action-buttons .btn{min-height:44px}body[data-page="documents"] .dq-metric,body[data-page="documents"] .dq-metric:first-child{padding:16px}body[data-page="documents"] .dq-metric:after{left:16px;right:16px}}
+/* Clean intake details: grouped form sections and readable payment choices. */
+#nrPayment{position:absolute;width:1px!important;height:1px!important;clip:rect(0,0,0,0);overflow:hidden;padding:0!important;border:0!important}
+body[data-page="documents"] #newRequestModal .nq-fields{display:flex;flex-direction:column;gap:22px}
+body[data-page="documents"] #newRequestModal .nq-field{padding:0;min-width:0}
+body[data-page="documents"] #newRequestModal .nq-field:nth-child(2){order:3;padding-top:20px;border-top:1px solid #e5edf8}
+body[data-page="documents"] #newRequestModal .nq-field:nth-child(3){order:2}
+body[data-page="documents"] #newRequestModal .nq-field>label{display:block;margin-bottom:10px;font-size:12px;font-weight:650;color:#36547d}
+.nr-payment-choices{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+body[data-page="documents"] #newRequestModal .nr-payment-choice{display:flex;align-items:flex-start;gap:10px;position:relative;padding:15px 13px;min-height:110px;border:1px solid #d9e4f3;border-radius:10px;background:#fff;text-align:left;color:#466a9f;font-family:Inter,sans-serif;cursor:pointer;box-shadow:none}
+body[data-page="documents"] #newRequestModal .nr-payment-choice:hover{border-color:#96b7ed;background:#f8fbff}
+body[data-page="documents"] #newRequestModal .nr-payment-choice[aria-pressed="true"]{background:#eef4ff;border-color:#5685e1;box-shadow:inset 0 0 0 1px #5685e1}
+.nr-payment-choice>i{font-size:15px;color:#7292be;margin-top:2px;flex-shrink:0}.nr-payment-choice[aria-pressed="true"]>i{color:#2359de}
+.nr-payment-choice strong{display:block;font-size:12px;line-height:1.5;color:#305078;font-weight:650;padding-right:8px}.nr-payment-choice small{display:block;font-size:10px;line-height:1.6;color:#8094b0;margin-top:7px}
+.nr-choice-mark{position:absolute;top:10px;right:10px;width:9px;height:9px;border:1px solid #c7d5e9;border-radius:50%}.nr-payment-choice[aria-pressed="true"] .nr-choice-mark{background:#2359de;border-color:#2359de;box-shadow:0 0 0 2px #eef4ff}
+body[data-page="documents"] #nrPaymentHint{margin:12px 0 0;font-size:11px;color:#8396b2;line-height:1.6}
+body[data-page="documents"] #newRequestModal .nq-facts{margin-top:2px;padding:14px 18px;background:#f5f8fd;border-color:#e2eaf6}
+body[data-page="documents"] #newRequestModal .nq-fee-note{max-width:350px}body[data-page="documents"] #newRequestModal .nq-fee-amount{font-size:23px}
+body[data-page="documents"] #newRequestModal .nr-intro{padding-top:22px}body[data-page="documents"] #newRequestModal .nr-intro h4{font-size:20px}
+@media(max-width:560px){.nr-payment-choices{grid-template-columns:1fr}body[data-page="documents"] #newRequestModal .nr-payment-choice{min-height:78px;padding:14px}.nr-payment-choice small{margin-top:4px}}
+/* Small confirmations sit above the request viewer, without inheriting its width. */
+body[data-page="documents"] #confirmActionModal .modal-content.ca-shell{width:420px;max-width:calc(100vw - 32px);min-width:0;padding:0;flex:0 1 420px;border-radius:14px;max-height:80dvh;box-shadow:0 20px 65px #10285035}
+body[data-page="documents"] #confirmActionModal .modal-header{padding:18px 20px;gap:12px}
+body[data-page="documents"] #confirmActionModal .modal-header h3{font-size:16px;line-height:1.4}
+body[data-page="documents"] #confirmActionModal .modal-body{padding:20px;font-size:13px;line-height:1.7}
+body[data-page="documents"] #confirmActionModal .modal-footer{padding:14px 20px;gap:9px;flex-direction:row}
+body[data-page="documents"] #confirmActionModal .modal-footer .btn{min-height:38px;flex:0 0 auto;padding:8px 15px;font-size:12px}
