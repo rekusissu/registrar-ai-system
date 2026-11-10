@@ -2103,11 +2103,13 @@ body[data-page="rfid"] td.rc-empty span{display:block}
 </div>
 
 <!-- â”€â”€ View ID Card Modal â”€â”€ -->
-<link rel="stylesheet" href="../assets/id-card/student-id.css?v=20261110-qr-label-top">
+<link rel="stylesheet" href="../assets/id-card/student-id.css?v=20261110-tech-options">
+<link rel="stylesheet" href="../assets/id-card/student-id-tech.css?v=20261110-8">
 <div class="modal-overlay" id="idCardModal" role="dialog" aria-modal="true" aria-label="Student ID card preview">
     <div class="modal-content" style="max-width:420px;">
         <div class="modal-header"><h3><i class="fas fa-id-card" style="color:#2563eb;"></i> Student ID Card</h3><button class="modal-close" onclick="document.getElementById('idCardModal').classList.remove('active'); document.body.style.overflow='';"><i class="fas fa-times"></i></button></div>
         <div class="modal-body">
+            <fieldset class="id-design-picker"><legend>Card design</legend><label><input type="radio" name="idDesign" value="classic"><span><i class="id-design-dot classic"></i>Classic</span></label><label><input type="radio" name="idDesign" value="light" checked><span><i class="id-design-dot light"></i>Tech Light</span></label><label><input type="radio" name="idDesign" value="dark"><span><i class="id-design-dot dark"></i>Tech Dark</span></label></fieldset>
             <div class="idcard-flip" id="cardFlip"><div class="idcard-scale"><div class="idcard-inner"><div class="idcard" aria-label="Student ID front">
  <div class="idcard-head"><img src="../assets/images/BCP_LOGO.png" alt="Bestlink College crest"><div class="school">BESTLINK COLLEGE<br>OF THE PHILIPPINES<small>STUDENT IDENTIFICATION</small></div></div>
  <div class="idcard-photo-wrap"><div class="idcard-photo-frame"><img class="idcard-photo" id="cardPhoto" alt="Student portrait" style="display:none"><div class="idcard-initials" id="cardInitials" style="display:none">—</div></div></div>
@@ -2117,6 +2119,7 @@ body[data-page="rfid"] td.rc-empty span{display:block}
  <div class="idcard-foot"></div>
 </div><div class="idcard-back" aria-label="Student ID back">
  <div class="idcard-head idcard-back-head"><img src="../assets/images/BCP_LOGO.png" alt="Bestlink College crest"><div class="school">BESTLINK COLLEGE<br>OF THE PHILIPPINES<small>Registrar's Office</small></div></div>
+ <div class="id-tech-wordmark" aria-hidden="true"><svg viewBox="0 0 296 76" xmlns="http://www.w3.org/2000/svg" fill="none"><g class="bcp-lettering" stroke="currentColor" stroke-width="1.25" stroke-linejoin="miter" transform="translate(45 0) scale(.82 1) skewX(-6)"><path d="M6 7H61L74 19V29L65 37L74 45V57L61 69H6Z M22 20H54L58 24V28L54 31H22Z M22 45H54L58 49V53L54 57H22Z"/><path d="M112 7H163L176 19L164 31L156 22H120L111 31V46L120 55H156L164 46L176 58L163 69H112L94 51V25Z"/><path d="M196 7H250L264 21V39L250 53H213V69H196Z M213 22V38H243L248 33V27L243 22Z"/></g><g class="bcp-circuits" stroke="currentColor" stroke-width="1"><path d="M0 18H8L16 26H24M0 32H7L15 40H22M0 58H9L17 50H22M277 26H281L289 18H296M277 40H283L291 32H296M277 50H281L289 58H296M39 75H98M160 1H204"/></g><g fill="currentColor"><circle cx="24" cy="26" r="1.7"/><circle cx="22" cy="40" r="1.7"/><circle cx="22" cy="50" r="1.7"/><circle cx="277" cy="26" r="1.7"/><circle cx="277" cy="40" r="1.7"/><circle cx="277" cy="50" r="1.7"/><circle cx="39" cy="75" r="1.5"/><path d="M4 65H9L4 71H0ZM12 65H17L12 71H7ZM283 65H288L283 71H278ZM291 65H296L291 71H286Z"/></g></svg></div>
  <div class="idcard-back-content">
  <section class="idcard-back-sec"><div class="idcard-sec-title"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> In case of emergency, please contact</div><div id="cardBackEmg" class="idcard-emergency"></div></section>
  <section class="idcard-back-sec"><div class="idcard-sec-title"><i class="fa-solid fa-house" aria-hidden="true"></i> Address</div><div class="idcard-addr" id="cardBackAddr">Not on file</div></section>
@@ -2951,6 +2954,131 @@ document.querySelectorAll('[data-close-modal]').forEach(el => {
 
 // â”€â”€ ID Card View (3D flip) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const CARD_EXTRAS = <?= json_encode($cardExtras ?: new stdClass(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+let currentIdDesign = 'light';
+try { const savedDesign = localStorage.getItem('bcp-id-design'); currentIdDesign = ['classic', 'light', 'dark'].includes(savedDesign) ? savedDesign : 'light'; } catch (_) {}
+let idBuildAnimations = [];
+let idBuildOverlay = null;
+function stopIdConstruction() {
+    idBuildAnimations.forEach(animation => animation.cancel());
+    idBuildAnimations = [];
+    if (idBuildOverlay) { idBuildOverlay.remove(); idBuildOverlay = null; }
+}
+function constructIdDesign(preview) {
+    const overlay = document.createElement('div');
+    overlay.className = 'id-build-overlay';
+    overlay.setAttribute('aria-hidden', 'true');
+    overlay.innerHTML = '<div class="id-build-grid"></div><svg class="id-build-frame" viewBox="0 0 340 539"><rect x="2" y="2" width="336" height="535" rx="18" pathLength="1"/></svg><div class="id-build-outline"></div><div class="id-build-scan"></div><div class="id-build-cross-scan"></div><div class="id-build-shimmer"></div><div class="id-build-readout"><span></span><b>ASSEMBLING CREDENTIAL</b><i></i></div>';
+    for (let i = 0; i < 16; i++) {
+        const fragment = document.createElement('span');
+        fragment.className = 'id-build-fragment';
+        fragment.style.left = (15 + (i * 71) % 310) + 'px';
+        fragment.style.top = (35 + (i * 113) % 465) + 'px';
+        overlay.appendChild(fragment);
+    }
+    preview.querySelector('.idcard-scale').appendChild(overlay);
+    idBuildOverlay = overlay;
+    const play = (element, frames, options) => {
+        const animation = element.animate(frames, { fill: 'both', ...options });
+        idBuildAnimations.push(animation);
+        return animation;
+    };
+    play(overlay, [{ opacity: 0 }, { opacity: 1, offset: .08 }, { opacity: 1, offset: .94 }, { opacity: 0 }], { duration: 3100 });
+    const scanDuration = 2450;
+    play(overlay.querySelector('.id-build-scan'), [
+        { transform: 'translateY(0)', opacity: 1 },
+        { transform: 'translateY(539px)', opacity: 1 }
+    ], { duration: scanDuration, easing: 'linear' });
+    // Build individual components around their real position on the card,
+    // rather than their DOM order. Each piece locks in as the scan passes.
+    const buildParts = [];
+    preview.querySelectorAll('.idcard, .idcard-back').forEach(face => {
+        const faceRect = face.getBoundingClientRect();
+        const scale = faceRect.height / 539 || 1;
+        [...face.children].forEach(part => {
+            if (!part.getClientRects().length) return;
+            const bounds = [part, ...part.querySelectorAll('*')]
+                .map(node => node.getBoundingClientRect())
+                .filter(rect => rect.width > 0 && rect.height > 0);
+            if (!bounds.length) return;
+            const top = Math.max(0, (Math.min(...bounds.map(rect => rect.top)) - faceRect.top) / scale);
+            const bottom = Math.min(539, (Math.max(...bounds.map(rect => rect.bottom)) - faceRect.top) / scale);
+            const finish = Math.min(scanDuration, Math.max(360, bottom / 539 * scanDuration));
+            const duration = Math.min(800, Math.max(420, (bottom - top) / 539 * scanDuration));
+            buildParts.push({ part, delay: Math.max(0, finish - duration), duration });
+        });
+    });
+    // Never clip component bounds: the QR caption and ribbon deliberately
+    // extend beyond their parent boxes.
+    // Measure everything before starting animations so early parts cannot
+    // distort the position calculations of later components.
+    buildParts.forEach(({ part, delay, duration }, index) => {
+        const direction = index % 2 ? 1 : -1;
+        play(part, [
+            { opacity: 0, transform: `translate(${direction * 12}px, 8px) scale(.97)` },
+            { opacity: .8, transform: `translate(${direction * 2}px, 1px) scale(.995)`, offset: .7 },
+            { opacity: 1, transform: 'translateY(0)' }
+        ], { delay, duration, easing: 'cubic-bezier(.2,.7,.3,1)' });
+    });
+    play(overlay.querySelector('.id-build-frame rect'), [
+        { strokeDashoffset: '1', opacity: .2 },
+        { strokeDashoffset: '0', opacity: 1 }
+    ], { duration: 950, easing: 'cubic-bezier(.2,.65,.3,1)' });
+    play(overlay.querySelector('.id-build-grid'), [
+        { opacity: 0, transform: 'scale(1.08)' },
+        { opacity: .9, transform: 'scale(1)', offset: .25 },
+        { opacity: .65, offset: .8 }, { opacity: 0 }
+    ], { duration: 2900 });
+    play(overlay.querySelector('.id-build-cross-scan'), [
+        { transform: 'translateX(0)', opacity: 0 },
+        { opacity: .7, offset: .1 },
+        { transform: 'translateX(340px)', opacity: 0 }
+    ], { delay: 200, duration: 1800, easing: 'linear' });
+    overlay.querySelectorAll('.id-build-fragment').forEach((fragment, i) => {
+        play(fragment, [
+            { opacity: 0, transform: `translate(${i % 2 ? 32 : -32}px, -18px) rotate(45deg) scale(.3)` },
+            { opacity: .8, offset: .35 },
+            { opacity: 0, transform: 'translate(0, 0) rotate(0deg) scale(1)' }
+        ], { delay: 100 + (i * 137) % 1600, duration: 650, easing: 'ease-out' });
+    });
+    play(overlay.querySelector('.id-build-readout i'), [
+        { transform: 'scaleX(0)' }, { transform: 'scaleX(1)' }
+    ], { duration: scanDuration, easing: 'linear' });
+    play(overlay.querySelector('.id-build-readout b'), [
+        { opacity: 1 }, { opacity: 1, offset: .78 }, { opacity: 0 }
+    ], { duration: 2600 });
+    const ready = document.createElement('strong');
+    ready.textContent = 'DESIGN READY';
+    overlay.querySelector('.id-build-readout').appendChild(ready);
+    play(ready, [{ opacity: 0 }, { opacity: 1 }], { delay: 2550, duration: 150 });
+    play(overlay.querySelector('.id-build-shimmer'), [
+        { transform: 'translateX(-130%) skewX(-18deg)', opacity: 0 },
+        { opacity: .7, offset: .2 },
+        { transform: 'translateX(450%) skewX(-18deg)', opacity: 0 }
+    ], { delay: 2450, duration: 600, easing: 'ease-out' });
+    const completion = play(overlay.querySelector('.id-build-outline'), [
+        { opacity: 0 }, { opacity: 0, offset: .79 },
+        { opacity: .85, offset: .86 }, { opacity: 0 }
+    ], { duration: 3100 });
+    completion.finished.then(() => {
+        if (idBuildOverlay === overlay) stopIdConstruction();
+    }).catch(() => {});
+}
+function applyIdDesign(design, animate = false) {
+    const previousDesign = currentIdDesign;
+    currentIdDesign = ['classic', 'light', 'dark'].includes(design) ? design : 'light';
+    document.querySelectorAll('#cardFlip .idcard, #cardFlip .idcard-back').forEach(face => {
+        face.classList.toggle('id-tech', currentIdDesign !== 'classic');
+        face.dataset.design = currentIdDesign;
+    });
+    document.querySelectorAll('[name="idDesign"]').forEach(input => { input.checked = input.value === currentIdDesign; });
+    try { localStorage.setItem('bcp-id-design', currentIdDesign); } catch (_) {}
+    stopIdConstruction();
+    const preview = document.getElementById('cardFlip');
+    if (animate && previousDesign !== currentIdDesign && preview && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        constructIdDesign(preview);
+    }}
+document.querySelectorAll('[name="idDesign"]').forEach(input => input.addEventListener('change', () => applyIdDesign(input.value, true)));
+applyIdDesign(currentIdDesign);
 let idCardData = null;
 let idPhotoRequest = 0;
 
@@ -3050,6 +3178,7 @@ function viewIdCard(btn) {
         else { qrImg.style.display = 'none'; cap.textContent = ''; }
     }
     fillIdCardBack(d.studentId);
+    applyIdDesign(currentIdDesign);
     document.getElementById('cardFlip').classList.remove('flipped');
     document.getElementById('idCardModal').classList.add('active');
     fitIdCardPreview();
@@ -3110,6 +3239,7 @@ function fitIdCardPreview() {
 window.addEventListener('resize', fitIdCardPreview);
 
 async function printIdCard() {
+    stopIdConstruction();
     const area = document.getElementById('printArea');
     const flip = document.getElementById('cardFlip');
     if (!flip || !area) return;

@@ -19,7 +19,7 @@ require_once __DIR__ . '/../shared/status_evidence.php';
 require_once __DIR__ . '/../shared/stored_file.php';
 
 // Who needs a decision today, found by the same contradiction rules the
-// "Check what I missed" button runs — computed here so the first screen
+// "Scan records" button runs — computed here so the first screen
 // answers that question without a click, and so the count is not a
 // client-side guess. A source that is missing is reported rather than
 // counted as zero findings.
@@ -326,225 +326,16 @@ $page_description = 'Student status monitoring and activity tracker';
 $body_page = 'status-tracker';
 $APP_ROOT   = '../';
 $ACTIVE_NAV = 'tracker';
-$extra_css = ['status-tracker.css'];
+$extra_css = ['status-tracker.css', 'status-workflow.css', 'status-desk-v2.css'];
 include '../includes/header.php';
 include '../includes/sidebar.php';
 ?>
-<main class="dashboard-main">
-<!--
-  The house header. Every other registrar page (documents, queue, users,
-  academic history) uses a card: bordered, rounded, a soft blue gradient
-  and align-items:flex-end, with the kicker above a 28px title. This page
-  was using the plain global .header, which is why it read as a different
-  screen from the ones beside it in the sidebar. Values below are copied
-  from .q-head in registrar/queue.php so they match exactly rather than
-  approximately.
--->
-<header class="st-head">
-    <div>
-        <div class="st-kicker"><i class="fas fa-chart-line"></i> Registrar intelligence</div>
-        <h1>Status Tracker</h1>
-        <p>Monitor student status changes, review activity, and identify students who need attention.</p>
-    </div>
-    <div class="header-actions">
-        <span class="st-head-chip <?= $queueHigh > 0 ? 'warn' : 'ok' ?>">
-            <i class="fas <?= $queueHigh > 0 ? 'fa-triangle-exclamation' : 'fa-circle-check' ?>"></i>
-            <b><?= $queueHigh ?></b> need<?= $queueHigh === 1 ? 's' : '' ?> a decision
-        </span>
-    </div>
-</header>
-<div class="st-wrap">
-<!--
-  One row, two columns. The directory is the page; the rail is the work
-  that makes it worth opening.
-
-  This replaced six full-width bands stacked above the table - work
-  queue, KPI strip, review-tool bar, distribution bar, status pill grid,
-  recent activity - which came to roughly 1400px of scrolling before a
-  single student was visible. Three of those six were the same fact set:
-  a distribution bar, four count tiles and eight status pills all
-  describing one column of data. The counts are now the filter list, so
-  they are readable and clickable rather than decorative.
--->
-<div class="st-desk-grid">
-  <!-- Left rail: the work -->
-  <aside class="st-rail" aria-label="Students needing a decision">
-    <!-- st-queue carries the state: a red top edge while there is work,
-         green once there is none. -->
-    <section class="st-rail-sec st-queue<?= $queueRows ? '' : ' clear' ?>">
-      <div class="st-rail-head">
-        <h2>Needs a decision<?php if ($queueHigh > 0): ?> <span class="st-rail-n"><?= $queueHigh ?></span><?php endif; ?></h2>
-        <button type="button" class="st-rail-check" id="btnAIMissed"
-                title="Re-read every record for contradictions"><i class="fas fa-rotate"></i> Check what I missed</button>
-      </div>
-      <?php if (!$queueRows): ?>
-        <p class="st-rail-clear">
-          <i class="fas fa-circle-check"></i>
-          <?= number_format((int) ($queue['scanned'] ?? 0)) ?> students checked. Nothing contradicts itself.
-        </p>
-      <?php else: ?>
-        <ul class="st-rail-list">
-          <?php foreach (array_slice($queueRows, 0, 12) as $q): $m = $STATUS_META[$q['current_status']] ?? $STATUS_META['inactive']; ?>
-            <li>
-              <button type="button" class="st-rail-item"
-                      onclick="openStudentModal(<?= (int)$q['student_id'] ?>,'<?= htmlspecialchars(addslashes($q['student_name'])) ?>','<?= htmlspecialchars($q['student_number']) ?>')">
-                <span class="st-rail-item-top">
-                  <span class="st-rail-item-name"><?= htmlspecialchars($q['student_name']) ?></span>
-                  <span class="st-rail-item-badge" style="background:<?= $m['bg'] ?>;color:<?= $m['color'] ?>"><?= htmlspecialchars($q['current_status'] ?: 'unset') ?></span>
-                </span>
-                <span class="st-rail-item-why"><?= htmlspecialchars(implode(' · ', array_column($q['issues'], 'title'))) ?></span>
-              </button>
-            </li>
-          <?php endforeach; ?>
-        </ul>
-        <?php if (count($queueRows) > 12): ?>
-          <p class="st-rail-more"><?= count($queueRows) - 12 ?> more flagged. Use <strong>Check what I missed</strong>.</p>
-        <?php endif; ?>
-      <?php endif; ?>
-      <?php if (!empty($queue['errors'])): ?>
-        <p class="st-rail-partial" title="<?= htmlspecialchars(implode(' | ', $queue['errors'])) ?>">
-          <i class="fas fa-triangle-exclamation"></i> Some records could not be read
-        </p>
-      <?php endif; ?>
-    </section>
-
-    <!--
-      Counts and filters in one list, and the proportion bar that used to
-      be a separate band above the table.
-
-      Two decisions the content makes here. Each row leads with the status
-      glyph in a tinted square rather than a 7px dot, because the dot was
-      too small to carry the status colour into a scan and the glyph is
-      the same vocabulary the table badges and the case panel already use.
-      And the count is stated as a number and a share, since the fill bar
-      implies a proportion that nothing otherwise quantified.
-
-      Statuses with nobody in them are collapsed to a footnote. On a
-      hundred-student roster that is usually half the list, and eight rows
-      reading 0 buried the two that mattered. The active filter is always
-      shown even at zero, or selecting it would appear to do nothing.
-    -->
-    <?php
-    // Each row carries the status key itself. $STATUS_META is keyed by
-    // status and holds only colour, background and glyph, so the id has
-    // to be added explicitly or every $r['id'] below reads undefined.
-    $statusRows = [];
-    $emptyRows  = [];
-    foreach ($STATUSES as $s) {
-        $row = ['id' => $s] + $STATUS_META[$s] + [
-            'count' => $counts[$s],
-            'pct'   => (float) ($distData[$s] ?? 0),
-        ];
-        if ($counts[$s] > 0 || $filterStatus === $s) {
-            $statusRows[] = $row;
-        } else {
-            $emptyRows[] = $row;
-        }
-    }
-    ?>
-    <!--
-      Composition, then the breakdown.
-
-      The card leads with one large figure and a single stacked bar, which
-      is what actually answers "what is this roster made of" in a glance
-      at a 268px column. A list of rows cannot: it has to be read. The bar
-      was previously the thing this rework deleted, and the right answer
-      was not to drop the idea but to move it above the list where it
-      carries the composition and the list carries the numbers.
-
-      The per-row proportion fills that replaced it are gone. A bar per row
-      and a bar for the whole say the same thing twice; the stacked bar is
-      the honest one, and the rows are left free to be a clean key with a
-      colour chip, a name, a count and a share.
-
-      Statuses with nobody in them are named at the foot rather than given
-      rows. On a hundred-student roster that is usually half the list. The
-      active filter is always rendered even at zero, or selecting it would
-      appear to do nothing.
-    -->
-    <?php
-    // Every status is always listed. This is a filter control, not a
-    // report, and hiding a status with nobody in it made an available
-    // filter indistinguishable from a missing one — a registrar about to
-    // move a student to "Graduated" could not see that the filter was
-    // there. Empty statuses are shown dimmed rather than removed, so the
-    // control stays complete and the visual weight stays on the rows that
-    // have students in them.
-    //
-    // $STATUS_META is keyed by status and holds only colour, background
-    // and glyph, so the id is added explicitly or $r['id'] is undefined.
-    $statusRows = [];
-    foreach ($STATUSES as $s) {
-        $statusRows[] = ['id' => $s] + $STATUS_META[$s] + [
-            'count' => $counts[$s],
-            'pct'   => (float) ($distData[$s] ?? 0),
-        ];
-    }
-    // Only populated statuses get a segment in the composition bar. A
-    // zero-width segment would be a 3px stub that reads as a category.
-    $barRows = array_values(array_filter($statusRows, static fn($r) => $r['count'] > 0));
-    ?>
-    <section class="st-rail-sec st-filters">
-      <div class="st-rail-head">
-        <h2>By status</h2>
-        <span class="st-rail-head-n"><?= count($barRows) ?> in use</span>
-      </div>
-
-      <div class="st-comp">
-        <div class="st-comp-figure">
-          <b><?= number_format($totalStudents) ?></b>
-          <span><?= $totalStudents === 1 ? 'student' : 'students' ?> on the roster</span>
-        </div>
-        <?php if ($barRows): ?>
-          <div class="st-comp-bar" role="img"
-               aria-label="<?= htmlspecialchars(implode(', ', array_map(
-                   static fn($r) => $r['id'] . ' ' . rtrim(rtrim(number_format($r['pct'], 1), '0'), '.') . '%',
-                   $barRows
-               ))) ?>">
-            <?php foreach ($barRows as $r): ?>
-              <span class="st-comp-seg<?= $filterStatus === $r['id'] ? ' on' : '' ?>"
-                    style="--seg:<?= $r['pct'] ?>%;background:<?= $r['color'] ?>"
-                    title="<?= htmlspecialchars(ucwords(str_replace('-', ' ', $r['id'])) . ' — ' . number_format($r['count']) . ' (' . rtrim(rtrim(number_format($r['pct'], 1), '0'), '.') . '%)') ?>"></span>
-            <?php endforeach; ?>
-          </div>
-        <?php else: ?>
-          <div class="st-comp-bar st-comp-bar-empty"></div>
-        <?php endif; ?>
-      </div>
-
-      <ul class="st-rail-flist">
-        <li>
-          <a class="st-rail-f st-rail-fall<?= $filterStatus === '' ? ' on' : '' ?>"
-             href="<?= htmlspecialchars($dirUrl(['status' => null, 'page' => 1])) ?>">
-            <span class="st-rail-fbody">
-              <span class="st-rail-fname">All students</span>
-              <span class="st-rail-fpct">everyone on the roster</span>
-            </span>
-            <span class="st-rail-fnum"><?= number_format($totalStudents) ?></span>
-          </a>
-        </li>
-        <?php foreach ($statusRows as $r): $empty = $r['count'] === 0; ?>
-          <li>
-            <a class="st-rail-f<?= $empty ? ' is-empty' : '' ?><?= $filterStatus === $r['id'] ? ' on' : '' ?>"
-               style="--status:<?= $r['color'] ?>"
-               href="<?= htmlspecialchars($dirUrl(['status' => $r['id'], 'page' => 1])) ?>">
-              <span class="st-rail-chip" style="background:<?= $empty ? 'var(--border-strong)' : $r['color'] ?>"></span>
-              <span class="st-rail-fbody">
-                <span class="st-rail-fname"><?= htmlspecialchars(ucwords(str_replace('-', ' ', $r['id']))) ?></span>
-                <span class="st-rail-fpct"><?= $empty
-                    ? 'no students yet'
-                    : rtrim(rtrim(number_format($r['pct'], 1), '0'), '.') . '%' ?></span>
-              </span>
-              <span class="st-rail-fnum"><?= $empty ? '—' : number_format($r['count']) ?></span>
-            </a>
-          </li>
-        <?php endforeach; ?>
-      </ul>
-    </section>
-  </aside>
-
-  <!-- Centre: the directory -->
-  <div class="st-directory">
+<main class="dashboard-main status-desk-v2">
+<header class="st-head"><div><div class="st-kicker"><i class="fas fa-user-check"></i> STUDENT STANDING</div><h1>Status Tracker</h1><p>One place to review student records and record approved status changes.</p></div><button type="button" class="sv-primary" id="btnAIMissed"><i class="fas fa-arrows-rotate"></i> Scan records</button></header>
+<div class="sv-summary"><div><span class="sv-metric-icon blue"><i class="fas fa-users"></i></span><div><small>Students on record</small><strong><?= number_format($totalStudents) ?></strong></div></div><div><span class="sv-metric-icon amber"><i class="fas fa-flag"></i></span><div><small>Need review</small><strong><?= $queueHigh ?></strong></div></div><div><span class="sv-metric-icon green"><i class="fas fa-clock-rotate-left"></i></span><div><small>Changes this month</small><strong><?= $changesThisMonth ?></strong></div></div><div class="sv-summary-note"><i class="fas fa-shield-halved"></i><p>Every change has a reason and a recorded author.</p></div></div>
+<?php if ($queueRows || !empty($queue['errors'])): ?><details class="sv-attention"><summary><span><i class="fas fa-circle-exclamation"></i> <?= $queueHigh ?> students to review</span><span>Open review queue <i class="fas fa-chevron-down"></i></span></summary><div class="sv-attention-list"><?php foreach ($queueRows as $q): ?><button type="button" onclick='openStudentModal(<?= (int)$q['student_id'] ?>,<?= htmlspecialchars(json_encode($q['student_name']),ENT_QUOTES) ?>,<?= htmlspecialchars(json_encode($q['student_number']),ENT_QUOTES) ?>)'><strong><?= htmlspecialchars($q['student_name']) ?></strong><span><?= htmlspecialchars(implode(' · ',array_column($q['issues'],'title'))) ?></span><i class="fas fa-arrow-right"></i></button><?php endforeach; ?><?php if(!empty($queue['errors'])): ?><p>Some source records could not be read. Review results may be incomplete.</p><?php endif; ?></div></details><?php endif; ?>
+<section class="sv-roster"><div class="sv-roster-heading"><div><h2>Student directory</h2><p>Select a student to review their standing and history.</p></div><span><?= number_format($matchedTotal) ?> <?= $matchedTotal === 1 ? 'student' : 'students' ?></span></div>
+<nav class="sv-status-tabs" aria-label="Filter student status"><a class="<?= $filterStatus === '' ? 'selected' : '' ?>" href="<?= htmlspecialchars($dirUrl(['status'=>null,'page'=>1])) ?>">All students <b><?= $totalStudents ?></b></a><?php foreach($STATUSES as $st): ?><a class="<?= $filterStatus === $st ? 'selected' : '' ?>" href="<?= htmlspecialchars($dirUrl(['status'=>$st,'page'=>1])) ?>"><i style="background:<?= $STATUS_META[$st]['color'] ?>"></i><?= htmlspecialchars($STATUS_META[$st]['label']) ?> <b><?= $counts[$st] ?></b></a><?php endforeach; ?></nav>
     <form class="st-dirbar" method="get" action="status-tracker.php">
       <?php if ($filterStatus !== ''): ?>
         <input type="hidden" name="status" value="<?= htmlspecialchars($filterStatus) ?>">
@@ -634,165 +425,13 @@ include '../includes/sidebar.php';
       <?php endif; ?>
     </form>
 
-    <div class="st-table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Student</th>
-            <th>Program</th>
-            <th>Year</th>
-            <th>Status</th>
-            <th>Last change</th>
-            <th>Attention</th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php if (!$students): ?>
-            <tr><td colspan="6">
-              <div class="st-empty">
-                <i class="fas fa-inbox"></i>
-                <strong>No students match</strong>
-                <span><?php // Name the filters that actually emptied the table. With four
-                      // facets the old two-branch guess (year? program?)
-                      // silently blamed whichever it checked first. The
-                      // sentence is built here rather than in the markup,
-                      // because four ticked values across four columns is
-                      // already too much punctuation to assemble inline. ?>
-                  <?php if ($activeFacets):
-                      $sentences = [];
-                      foreach ($activeFacets as $af) {
-                          $sentences[] = ($facetOptions[$af['key']][$af['value']]['label'] ?? $af['value'])
-                                       . ' (' . $facetMeta[$af['key']] . ')';
-                      }
-                      $list = count($sentences) === 1 ? $sentences[0]
-                             : implode(', ', array_slice($sentences, 0, -1)) . ' and ' . end($sentences);
-                  ?>
-                    No student matches <?= htmlspecialchars($list) ?>.
-                  <?php elseif ($search !== ''): ?>
-                    Nothing found for &ldquo;<?= htmlspecialchars($search) ?>&rdquo;.
-                  <?php else: ?>
-                    No student has that status.
-                  <?php endif; ?>
-                </span>
-                <a href="status-tracker.php">Show all students</a>
-              </div>
-            </td></tr>
-          <?php endif; ?>
-          <?php foreach ($students as $s):
-            $meta = $STATUS_META[$s['status']] ?? $STATUS_META['inactive'];
-            $flag = isset($queueRank[(int) $s['id']]);
-            // The photograph, from Digital File Storage. This avatar was two
-            // letters built with mb_substr() and a tint taken from the status
-            // colour - and the query selected s.photo for nothing. So a student
-            // with a photograph on file looked exactly like one without, on the
-            // one screen whose whole job is telling two records apart.
-            //
-            // studentPhotoUrl() checks the disk, so a record whose photo was
-            // never deployed here falls back to initials rather than a broken
-            // image in the attention queue. The status tint is kept for the
-            // fallback, where it still carries meaning: it is the fastest read
-            // in the column.
-            $avatarUrl = studentPhotoUrl($s, '../');
-            $initials = studentInitials((string) $s['first_name'], (string) $s['last_name']);
-          ?>
-            <tr class="<?= $flag ? 'st-flagged' : '' ?>"
-                onclick="openStudentModal(<?= (int) $s['id'] ?>,'<?= htmlspecialchars(addslashes(trim($s['first_name'].' '.$s['last_name']))) ?>','<?= htmlspecialchars($s['student_number']) ?>')"
-                tabindex="0"
-                onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
-              <td>
-                <div class="st-cell-id">
-                  <?php // Both layers are always rendered and the photograph
-                        // covers the initials. If the file is deleted between
-                        // render and paint, onerror uncovers the initials rather
-                        // than leaving a broken-image glyph in the queue. ?>
-                  <?php if ($avatarUrl !== ''): ?><img class="st-avatar" src="<?= htmlspecialchars($avatarUrl) ?>" alt="" style="object-fit:cover;" onerror="this.style.display='none';this.nextElementSibling.style.display='grid';this.onerror=null;"><?php endif; ?>
-                  <span class="st-avatar" style="background:<?= $meta['color'] ?>22;color:<?= $meta['color'] ?><?= $avatarUrl !== '' ? ';display:none;' : '' ?>"><?= htmlspecialchars($initials) ?></span>
-                  <span class="st-cell-who">
-                    <span class="st-cell-name"><?= htmlspecialchars(trim($s['first_name'].' '.$s['last_name'])) ?></span>
-                    <span class="st-cell-num"><?= htmlspecialchars($s['student_number'] ?: 'No ID assigned') ?></span>
-                  </span>
-                  <?php if ($flag): ?><span class="st-flagdot" title="This record contradicts itself"></span><?php endif; ?>
-                </div>
-              </td>
-              <?php // The program, abbreviated. Printed in full it takes most
-                    // of the cell and pushes status and attention off to
-                    // the right. The full name stays in the title, so the
-                    // acronym compresses the column without discarding
-                    // what the record actually says.
-              $acronym = courseAcronym($s['course'] ?? ''); ?>
-              <td>
-                <?php if ($acronym === ''): ?>
-                  <span class="st-muted">&mdash;</span>
-                <?php else: ?>
-                  <span class="st-prog" title="<?= htmlspecialchars(trim((string) $s['course'])) ?>"><?= htmlspecialchars($acronym) ?></span>
-                <?php endif; ?>
-              </td>
-              <td>
-                <?php // The year level sits beside the program rather than
-                      // instead of it: filtering by year while the results
-                      // hide the year makes a mis-set filter look like
-                      // missing data. ?>
-                <?php $yl = (int) ($s['year_level'] ?? 0); ?>
-                <?php if ($yl > 0): ?>
-                  <?php // Same ordinal suffix as the filter, so a row and the
-                        // control that produced it read identically. Guarded
-                        // because year_level is a plain int column: a value
-                        // above 4 would be an undefined index, and the ?? would
-                        // not stop the notice that comes first. ?>
-                  <span class="st-yr"><?= $yl ?><?= (['', 'st', 'nd', 'rd', 'th'][$yl] ?? 'th') ?></span>
-                <?php else: ?>
-                  <span class="st-muted" title="No year level on file">&mdash;</span>
-                <?php endif; ?>
-              </td>
-              <td><span class="st-badge" style="background:<?= $meta['bg'] ?>;color:<?= $meta['color'] ?>"><?= htmlspecialchars(ucwords(str_replace('-', ' ', (string) $s['status']))) ?></span></td>
-              <td class="st-cell-when"><?= $s['last_change']
-                    ? date('M j, Y', strtotime((string) $s['last_change']))
-                    : '<span class="st-muted">No history</span>' ?></td>
-              <td><span class="st-rdot loading" data-student-id="<?= (int) $s['id'] ?>"></span></td>
-            </tr>
-          <?php endforeach; ?>
-        </tbody>
-      </table>
-    </div>
 
-    <!-- Paging. The count is of what matched, not of the whole roster,
-         so a filtered view never claims 100 students in a three-row
-         result. -->
-    <div class="st-pager">
-      <span class="st-pager-info">
-        <?php if ($matchedTotal === 0): ?>
-          No matches
-        <?php else: ?>
-          <?= ($offset + 1) ?>&ndash;<?= min($offset + $PER_PAGE, $matchedTotal) ?> of <?= number_format($matchedTotal) ?>
-        <?php endif; ?>
-      </span>
-      <?php if ($totalPages > 1): ?>
-        <nav class="st-pager-nav" aria-label="Directory pages">
-          <?php if ($pageNum > 1): ?>
-            <a href="<?= htmlspecialchars($dirUrl(['page' => $pageNum - 1])) ?>" rel="prev" aria-label="Previous page">&lsaquo;</a>
-          <?php else: ?><span class="off" aria-hidden="true">&lsaquo;</span><?php endif; ?>
-          <?php for ($i = 1; $i <= $totalPages; $i++):
-            if ($i === 1 || $i === $totalPages || abs($i - $pageNum) <= 1): ?>
-              <a class="<?= $i === $pageNum ? 'on' : '' ?>" href="<?= htmlspecialchars($dirUrl(['page' => $i])) ?>"
-                 <?= $i === $pageNum ? 'aria-current="page"' : '' ?>><?= $i ?></a>
-            <?php elseif ($i === 2 || $i === $totalPages - 1): ?>
-              <span class="gap" aria-hidden="true">&hellip;</span>
-            <?php endif;
-          endfor; ?>
-          <?php if ($pageNum < $totalPages): ?>
-            <a href="<?= htmlspecialchars($dirUrl(['page' => $pageNum + 1])) ?>" rel="next" aria-label="Next page">&rsaquo;</a>
-          <?php else: ?><span class="off" aria-hidden="true">&rsaquo;</span><?php endif; ?>
-        </nav>
-      <?php endif; ?>
-    </div>
-  </div>
-</div><!-- /st-desk-grid -->
-
-<!--
-  Review output opens as a slide-over rather than pushing the directory
-  down. An inline panel meant the table moved every time a check ran, so
-  the row you were reading was never in the same place twice.
--->
+<div class="sv-table-scroll"><table class="sv-table"><thead><tr><th>Student</th><th>Academic details</th><th>Current standing</th><th>Last recorded change</th><th></th></tr></thead><tbody>
+<?php foreach($students as $s): $sid=(int)$s['id'];$meta=studentStatusMeta($s['status']);$flag=isset($queueRank[$sid]);$name=trim($s['first_name'].' '.$s['last_name']);$photo=studentPhotoUrl($s,'../'); ?>
+<tr id="sv-student-<?= $sid ?>"><td><div class="sv-person"><span class="sv-person-avatar"><?php if($photo): ?><img src="<?= htmlspecialchars($photo) ?>" alt="" onerror="this.remove()"><?php endif; ?><span><?= htmlspecialchars(studentInitials($s['first_name'],$s['last_name'])) ?></span></span><div><strong><?= htmlspecialchars($name) ?></strong><small><?= htmlspecialchars($s['student_number']) ?></small></div></div></td><td><strong class="sv-program"><?= htmlspecialchars($s['course'] ?: 'Program not set') ?></strong><small class="sv-muted"><?= (int)$s['year_level'] > 0 ? 'Year '.(int)$s['year_level'] : 'Year not set' ?><?= !empty($s['section']) ? ' · '.htmlspecialchars($s['section']) : '' ?></small></td><td><span class="sv-standing" style="--standing:<?= $meta['color'] ?>;--standing-bg:<?= $meta['bg'] ?>"><i class="<?= $meta['icon'] ?>"></i><?= htmlspecialchars($meta['label'] ?: 'Unset') ?></span><?php if($flag): ?><small class="sv-review-needed"><i class="fas fa-flag"></i> Review needed</small><?php endif; ?></td><td><?php if($s['last_change']): ?><strong class="sv-date"><?= date('M j, Y',strtotime($s['last_change'])) ?></strong><small class="sv-muted">Recorded in history</small><?php else: ?><span class="sv-no-history">No changes recorded</span><?php endif; ?></td><td><button class="sv-review" type="button" onclick='openStudentModal(<?= $sid ?>,<?= htmlspecialchars(json_encode($name),ENT_QUOTES) ?>,<?= htmlspecialchars(json_encode($s['student_number']),ENT_QUOTES) ?>)'>Review student <i class="fas fa-arrow-right"></i></button></td></tr>
+<?php endforeach; ?>
+<?php if(!$students): ?><tr><td colspan="5"><div class="sv-empty"><i class="fas fa-user-magnifying-glass"></i><strong>No students found</strong><p>Try a different search or clear the filters.</p><a href="status-tracker.php">Clear filters</a></div></td></tr><?php endif; ?>
+</tbody></table></div><footer class="sv-pagination"><span><?= $matchedTotal ? ($offset+1).'–'.min($offset+$PER_PAGE,$matchedTotal).' of '.number_format($matchedTotal).' students' : 'No matching students' ?></span><div><?php if($pageNum>1): ?><a href="<?= htmlspecialchars($dirUrl(['page'=>$pageNum-1])) ?>">Previous</a><?php endif; ?><span>Page <?= $pageNum ?> of <?= $totalPages ?></span><?php if($pageNum<$totalPages): ?><a href="<?= htmlspecialchars($dirUrl(['page'=>$pageNum+1])) ?>">Next</a><?php endif; ?></div></footer></section>
 <div class="st-drawer" id="stDrawer" role="dialog" aria-modal="true" aria-labelledby="stDrawerTitle" hidden>
   <div class="st-drawer-scrim" onclick="closeDrawer()"></div>
   <div class="st-drawer-panel">
@@ -805,12 +444,10 @@ include '../includes/sidebar.php';
     </div>
   </div>
 </div>
-</div><!-- /st-wrap -->
-</div><!-- /st-wrap -->
-</main><!-- /dashboard-main -->
+</main>
 
 <!-- History Modal -->
-<div class="st-modal-overlay" id="studentModal">
+<div class="st-modal-overlay sv-review-modal" id="studentModal" role="dialog" aria-modal="true" aria-labelledby="modalName">
   <div class="st-modal">
     <div class="st-modal-header">
       <div class="st-modal-header-info">
@@ -818,7 +455,7 @@ include '../includes/sidebar.php';
         <div><div class="st-modal-header-name" id="modalName"></div><div class="st-modal-header-num" id="modalNumber"></div></div>
       </div>
       <div class="st-modal-header-actions">
-        <button class="st-btn-sm st-btn-apply" id="btnModalCase" onclick="assembleCase()"><i class="fas fa-folder-open"></i> Assemble case</button>
+        <button class="st-btn-sm st-btn-apply" id="btnModalCase" onclick="assembleCase()"><i class="fas fa-folder-open"></i> Refresh review</button>
         <button class="st-modal-close" onclick="closeModal()" aria-label="Close student status history"><i class="fas fa-xmark"></i></button>
       </div>
     </div>
@@ -829,19 +466,21 @@ include '../includes/sidebar.php';
       panel on purpose: a status change is made in the form below it, by
       the person, with a reason attached.
     -->
+    <div class="sv-modal-profile"><div><small>CURRENT STANDING</small><strong id="stCurrentStatus">—</strong></div><div><small>PROGRAM &amp; YEAR</small><strong id="svModalProgram">—</strong></div></div>
+    <nav class="st-modal-tabs" aria-label="Student review"><button type="button" class="on" data-st-pane="review" onclick="setStatusPane('review')"><i class="fas fa-address-card"></i> Overview</button><button type="button" data-st-pane="history" onclick="setStatusPane('history')"><i class="fas fa-clock-rotate-left"></i> History</button><button type="button" data-st-pane="change" onclick="setStatusPane('change')"><i class="fas fa-pen-to-square"></i> Change status</button></nav>
     <div class="st-case" id="modalCase">
       <div class="st-case-head">
-        <div class="st-modal-ai-lbl"><i class="fas fa-robot"></i> What to verify</div>
+        <div class="st-modal-ai-lbl"><i class="fas fa-clipboard-check"></i> Record overview</div>
         <span class="st-case-src" id="modalCaseSrc"></span>
       </div>
       <div class="st-case-note" id="modalCaseNote">Assembling the record…</div>
       <div class="st-case-body">
         <div class="st-case-col">
-          <h4>Flags</h4>
+          <h4>Concerns to review</h4>
           <div id="modalCaseFlags"><div class="st-modal-empty"><i class="fas fa-inbox"></i> Nothing flagged</div></div>
         </div>
         <div class="st-case-col">
-          <h4>Evidence</h4>
+          <h4>Supporting records</h4>
           <div id="modalCaseEvidence"><div class="st-modal-empty"><i class="fas fa-inbox"></i> Not read yet</div></div>
         </div>
       </div>
@@ -867,15 +506,15 @@ include '../includes/sidebar.php';
       for the statuses that are time-boxed by nature; a graduation has
       no expiry, and asking for one would be asking the wrong question.
     -->
-    <form class="st-change" id="stChangeForm" onsubmit="return false;">
+    <form class="st-change" id="stChangeForm" hidden onsubmit="return false;">
       <div class="st-change-head">
-        <h4>Record a status change</h4>
-        <span class="st-change-hint">Recorded under your name, with the reason you give.</span>
+        <h4>Choose the new standing</h4>
+        <span class="st-change-hint">This updates the student record immediately after confirmation.</span><div class="sv-status-guidance" id="svStatusGuidance">Select an approved status, then describe the supporting decision below.</div>
       </div>
       <div class="st-change-grid">
         <div class="st-field">
           <label for="chStatus">New status</label>
-          <select id="chStatus" onchange="toggleWindowFields()">
+          <select id="chStatus" onchange="toggleWindowFields();showStandingDescription()">
             <?php foreach ($STATUSES as $s): ?>
               <option value="<?= $s ?>"><?= htmlspecialchars(ucwords(str_replace('-', ' ', $s))) ?></option>
             <?php endforeach; ?>
@@ -883,7 +522,7 @@ include '../includes/sidebar.php';
         </div>
         <div class="st-field st-field-wide">
           <label for="chReason">Reason <span class="st-req">required</span></label>
-          <input type="text" id="chReason" maxlength="255" placeholder="What prompted this change?">
+          <textarea id="chReason" maxlength="255" rows="3" placeholder="e.g. Approved withdrawal received on November 10."></textarea>
         </div>
         <div class="st-field st-window" id="chEffectiveWrap" hidden>
           <label for="chEffective">Effective from</label>
@@ -896,15 +535,19 @@ include '../includes/sidebar.php';
       </div>
       <div class="st-change-foot">
         <span class="st-change-err" id="chError" role="alert"></span>
-        <button type="button" class="st-btn-dismiss" onclick="closeModal()">Cancel</button>
-        <button type="button" class="st-btn-apply" id="chSubmit" onclick="submitStatusChange()">
-          Record change
+        <button type="button" class="st-btn-dismiss" onclick="setStatusPane('review')">Back to review</button>
+        <button type="button" class="st-btn-apply" id="chSubmit" onclick="reviewStatusChange()">
+          Review change
         </button>
       </div>
     </form>
+    <div class="st-review-footer" id="stReviewFooter"><button type="button" class="st-btn-dismiss" onclick="closeModal()">Close</button><button type="button" class="st-btn-apply" onclick="setStatusPane('change')"><i class="fas fa-pen"></i> Change status</button></div>
   </div>
 </div>
+<div class="st-confirm-overlay" id="stConfirm" hidden role="dialog" aria-modal="true" aria-labelledby="stConfirmTitle"><div class="st-confirm-card"><div class="st-confirm-icon"><i class="fas fa-user-check"></i></div><h2 id="stConfirmTitle">Confirm status change</h2><p id="stConfirmStudent"></p><div class="st-transition"><strong id="stConfirmFrom"></strong><i class="fas fa-arrow-right"></i><strong id="stConfirmTo"></strong></div><div class="st-confirm-reason"><small>Reason for change</small><p id="stConfirmReason"></p></div><p class="st-confirm-note">Saves immediately and records your name in status history.</p><div class="st-confirm-actions"><button type="button" class="st-btn-dismiss" onclick="closeStatusConfirm()">Back</button><button type="button" class="st-btn-apply" id="stConfirmSave" onclick="saveStatusConfirmed()">Confirm &amp; save</button></div><p id="stConfirmError" role="alert"></p></div></div>
 
+<script>window.STUDENT_STANDING = <?= json_encode(array_column($db->fetchAll("SELECT id, status FROM students"), 'status', 'id'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;window.STUDENT_PROFILE = <?= json_encode(array_column($db->fetchAll("SELECT id, course, year_level FROM students"),null,'id'), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;</script>
+<script src="../js/status-workflow.js?v=20261110-v2"></script>
 <!-- Toast -->
 <div class="st-toast" id="toast"></div>
 
@@ -959,7 +602,7 @@ setTimeout(()=>el.classList.remove('show'),3000);
 window.toast=toast;
 
 /* --- Review tools --- */
-// The four-button bar is gone. "Check what I missed" is one link in the
+// The four-button bar is gone. "Scan records" is one link in the
 // rail, because the rail already lists what it finds — the button
 // explained the list rather than adding to it. The other three checks
 // live behind the case panel's overflow menu.
@@ -1039,7 +682,7 @@ if(d.partial){
 h+='<div class="st-find-warn"><i class="fas fa-triangle-exclamation"></i> Some records could not be read, so this list is incomplete.</div>';
 }
 if(!count){
-return{html:h+'<div class="st-find-clear"><i class="fas fa-circle-check"></i><b>Nothing contradicts itself</b><span>Every record on the roster agrees with itself. New findings land here as soon as one does not.</span></div>',count:0};
+return{html:h+'<div class="st-find-clear"><i class="fas fa-circle-check"></i><b>No review concerns found</b><span>Every record on the roster agrees with itself. New findings land here as soon as one does not.</span></div>',count:0};
 }
 list.forEach((f,i)=>{
 const meta=STATUS_META[f.current_status]||STATUS_META.inactive;
@@ -1244,7 +887,7 @@ document.getElementById('modalTimeline').innerHTML='<div class="st-modal-empty">
 // Reset the case panel and the change form every time, so a previous
 // student's evidence is never read as this one's.
 const note=document.getElementById('modalCaseNote');
-if(note)note.textContent='Press Assemble case to read this record.';
+if(note)note.textContent='Reading supporting records…';
 const flags=document.getElementById('modalCaseFlags');
 if(flags)flags.innerHTML='<div class="st-modal-empty"><i class="fas fa-inbox"></i> Not read yet</div>';
 const ev=document.getElementById('modalCaseEvidence');
@@ -1258,6 +901,8 @@ if(err)err.textContent='';
 modal.classList.add('show');
 document.body.style.overflow='hidden';
 fetchStudentHistory(id);
+prepareStatusReview(id);
+assembleCase();
 };
 
 /* --- Assemble a case ---
@@ -1285,21 +930,21 @@ const d=await r.json();
 if(!d.success)throw new Error(d.message||'unavailable');
 const dd=d.data||{};
 if(noteEl)noteEl.textContent=dd.note||'No summary available.';
-if(srcEl)srcEl.textContent=dd.source==='ai'?'phrasing by AI':'rule text';
+if(srcEl)srcEl.textContent=dd.source==='ai'?'phrasing by AI':'Record checks';
 renderCaseFlags(dd.findings||[]);
 renderCaseEvidence(dd.evidence||{},!!dd.partial);
 }catch(e){
 if(noteEl)noteEl.textContent='The case could not be assembled. A record may be missing on this server.';
 if(flagEl)flagEl.innerHTML='<div class="st-modal-empty"><i class="fas fa-exclamation-circle"></i> Nothing read</div>';
 }
-if(btn){btn.innerHTML='<i class="fas fa-folder-open"></i> Assemble case';btn.disabled=false;}
+if(btn){btn.innerHTML='<i class="fas fa-folder-open"></i> Refresh review';btn.disabled=false;}
 }
 window.assembleCase=assembleCase;
 
 function renderCaseFlags(findings){
 const el=document.getElementById('modalCaseFlags');
 if(!el)return;
-if(!findings.length){el.innerHTML='<div class="st-modal-empty"><i class="fas fa-circle-check"></i> Nothing contradicts itself</div>';return;}
+if(!findings.length){el.innerHTML='<div class="st-modal-empty"><i class="fas fa-circle-check"></i> No review concerns found</div>';return;}
 let h='';
 findings.forEach(f=>{
 h+='<div class="st-case-flag w-'+escapeHTML(f.weight||'low')+'">';
@@ -1312,29 +957,12 @@ el.innerHTML=h;
 }
 
 function renderCaseEvidence(ev,partial){
-const el=document.getElementById('modalCaseEvidence');
-if(!el)return;
-const rows=[];
-const bal=parseFloat(ev.balance||0);
-if(bal>0)rows.push(['Outstanding balance','PHP '+bal.toFixed(2)]);
-const disc=ev.discipline||{};
-const pend=(disc.pending||[]).length;
-const res=disc.resolved||0;
-if(pend||res)rows.push(['Disciplinary cases',pend+' pending, '+res+' closed']);
-const docs=ev.documents||{};
-if(docs.open||docs.held)rows.push(['Document requests',docs.open+' open'+(docs.held?(' · '+docs.held+' on hold'):'')]);
-const grades=ev.grades||[];
-if(grades.length)rows.push(['GWA (newest first)',grades.slice(0,4).map(g=>Number(g.gwa).toFixed(2)).join(' ’ ')]);
-if(ev.window&&ev.window.end_date)rows.push(['Status window','ended '+String(ev.window.end_date).slice(0,10)]);
-rows.push(['Guardian',ev.has_guardian?'on file':'none on file']);
-if(ev.last_scan)rows.push(['Last card scan',String(ev.last_scan).slice(0,16).replace('T',' ')]);
-const hist=ev.history||[];
-if(hist.length)rows.push(['Recorded changes',String(hist.length)]);
-let h='<dl class="st-case-ev">';
-rows.forEach(r=>{h+='<div><dt>'+escapeHTML(r[0])+'</dt><dd>'+escapeHTML(r[1])+'</dd></div>';});
-h+='</dl>';
-if(partial)h+='<div class="st-desk-partial" style="margin-top:10px"><i class="fas fa-triangle-exclamation"></i> Part of this record could not be read.</div>';
-el.innerHTML=h;
+const el=document.getElementById('modalCaseEvidence');if(!el)return;
+const disc=ev.discipline||{},docs=ev.documents||{};
+const rows=[['fa-wallet','Outstanding balance','PHP '+Number(ev.balance||0).toLocaleString('en-PH',{minimumFractionDigits:2})],['fa-file-lines','Document requests',Number(docs.open||0)+' open · '+Number(docs.held||0)+' held'],['fa-scale-balanced','Disciplinary cases',(disc.pending||[]).length+' pending'],['fa-user-shield','Guardian contact',ev.has_guardian?'On file':'Not on file']];
+if((ev.grades||[]).length)rows.push(['fa-graduation-cap','Latest GWA',Number(ev.grades[0].gwa).toFixed(2)]);
+if(ev.last_scan)rows.push(['fa-id-card','Last card scan',String(ev.last_scan).slice(0,16).replace('T',' ')]);
+el.innerHTML='<div class="sv-evidence-grid">'+rows.map(r=>'<div class="sv-evidence-item"><i class="fas '+r[0]+'"></i><div><small>'+escapeHTML(r[1])+'</small><strong>'+escapeHTML(r[2])+'</strong></div></div>').join('')+'</div>'+(partial?'<p class="sv-partial">Some sources could not be read. Verify missing information before deciding.</p>':'');
 }
 
 async function fetchStudentHistory(id){
@@ -1348,7 +976,7 @@ if(history.length===0){container.innerHTML='<div class="st-modal-empty"><i class
 let html='';
 history.forEach(h=>{
 const meta=STATUS_META[h.current_status]||STATUS_META['inactive'];
-const prevMeta=STATUS_META[h.previous_status]||STATUS_META['inactive'];
+const prevMeta=STATUS_META[h.previous_status]||{bg:'#eef2f7',color:'#64748b'};
 html+='<div class="st-tl-i"><div class="st-tl-dot" style="background:'+meta.color+'"></div><div class="st-tl-chg">';
 html+='<span class="st-badge" style="background:'+prevMeta.bg+';color:'+prevMeta.color+';padding:2px 6px;font-size:10px">'+(h.previous_status||'N/A')+'</span>';
 html+=' <i class="fas fa-arrow-right" style="color:var(--text-subtle);font-size:10px"></i> ';
@@ -1440,7 +1068,8 @@ toast('Status recorded for '+(document.getElementById('modalName').textContent||
 setTimeout(()=>location.reload(),900);
 }catch(e){
 err(e.message||'The change was not recorded.');
-if(btn){btn.disabled=false;btn.textContent='Record change';}
+if(btn){btn.disabled=false;btn.textContent='Review change';}
+closeStatusConfirm();
 }
 }
 window.submitStatusChange=submitStatusChange;
