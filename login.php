@@ -38,7 +38,7 @@ $timeout = isset($_GET['timeout']) ? true : false;
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
-    <link rel="stylesheet" href="assets/login/login.css?v=20261110b" />
+    <link rel="stylesheet" href="assets/login/login.css?v=20261110c" />
     <!-- One show/hide control per password field. Shared because login.php,
          settings.php and registrar/users.php all had their own copy of these
          rules, and they had drifted apart - which is how two of them ended up

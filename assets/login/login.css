@@ -99,21 +99,21 @@ body{min-height:100vh;min-height:100dvh;padding:48px 24px 28px;display:flex;flex
 /* Compact desktop composition; mobile keeps its touch-friendly sizing. */
 @media(min-width:901px){
  body{padding:28px 24px 20px;gap:24px}
- .plate{max-width:1000px;border-radius:20px}
- .plate-brand{padding:30px 28px 28px}
+ .plate{max-width:900px;border-radius:18px}
+ .plate-brand{padding:26px 25px 24px}
  .brand-header{gap:14px}.brand-header>div{padding-left:14px}
  .crest{width:48px;height:58px}.college-name{font-size:15px}
  .system-name{font-size:10px;letter-spacing:1.7px}
- .brand-story h1{font-size:34px;letter-spacing:-1px;margin-top:28px}
+ .brand-story h1{font-size:30px;letter-spacing:-1px;margin-top:24px}
  .brand-story>p{font-size:15px;margin-top:16px}
- .brand-illustration{width:92%;max-width:350px;align-self:center;margin:16px 0 18px}
+ .brand-illustration{width:88%;max-width:300px;align-self:center;margin:12px 0 16px}
  .services{gap:12px}.services li{gap:9px;font-size:11px}
  .services li+li{padding-left:12px}.services i{font-size:22px}
- .plate-form{padding:32px 40px}.form-eyebrow{font-size:11px;margin-bottom:15px}
- .plate-title{font-size:34px;margin-bottom:10px}
- .form-intro{font-size:15px;margin-bottom:25px}
- .auth-form{gap:17px}.field{gap:8px}.field-box input{height:50px}
- .btn-signin{min-height:50px;font-size:16px}
+ .plate-form{padding:26px 32px}.form-eyebrow{font-size:11px;margin-bottom:15px}
+ .plate-title{font-size:30px;margin-bottom:8px}
+ .form-intro{font-size:14px;margin-bottom:21px}
+ .auth-form{gap:14px}.field{gap:7px}.field-box input{height:46px;font-size:15px}
+ .btn-signin{min-height:46px;font-size:15px}
  .form-help{margin-top:24px;padding-top:16px}
  .page-footer{font-size:13px}.page-footer p{margin-bottom:4px}
 }
