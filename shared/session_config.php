@@ -25,7 +25,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // Always re-apply cookie flags on every request after session starts,// so existing sessions also get HttpOnly/Secure/SameSite protection// regardless of php.ini defaults.
-i n_set('session.cookie_httponly', '1');
+ini_set('session.cookie_httponly', '1');
 ini_set('session.cookie_samesite', 'Lax');
 $isHttps = (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off')
     || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https')
