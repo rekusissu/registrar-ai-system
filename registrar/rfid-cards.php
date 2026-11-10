@@ -2104,12 +2104,13 @@ body[data-page="rfid"] td.rc-empty span{display:block}
 
 <!-- â”€â”€ View ID Card Modal â”€â”€ -->
 <link rel="stylesheet" href="../assets/id-card/student-id.css?v=20261110-tech-options">
-<link rel="stylesheet" href="../assets/id-card/student-id-tech.css?v=20261110-8">
+<link rel="stylesheet" href="../assets/id-card/student-id-tech.css?v=20261110-9">
+<link rel="stylesheet" href="../assets/id-card/student-id-collection.css?v=20261110-pearl6">
 <div class="modal-overlay" id="idCardModal" role="dialog" aria-modal="true" aria-label="Student ID card preview">
     <div class="modal-content" style="max-width:420px;">
         <div class="modal-header"><h3><i class="fas fa-id-card" style="color:#2563eb;"></i> Student ID Card</h3><button class="modal-close" onclick="document.getElementById('idCardModal').classList.remove('active'); document.body.style.overflow='';"><i class="fas fa-times"></i></button></div>
         <div class="modal-body">
-            <fieldset class="id-design-picker"><legend>Card design</legend><label><input type="radio" name="idDesign" value="classic"><span><i class="id-design-dot classic"></i>Classic</span></label><label><input type="radio" name="idDesign" value="light" checked><span><i class="id-design-dot light"></i>Tech Light</span></label><label><input type="radio" name="idDesign" value="dark"><span><i class="id-design-dot dark"></i>Tech Dark</span></label></fieldset>
+            <div class="id-design-select"><label for="idDesignSelect">Card design</label><select id="idDesignSelect"><optgroup label="Original designs"><option value="classic">Classic</option><option value="light" selected>Tech Light</option><option value="dark">Tech Dark</option></optgroup><optgroup label="New collection"><option value="arctic">Arctic Circuit</option><option value="cobalt">Cobalt Edge</option><option value="pearl">Pearl Matrix</option><option value="silver">Silver Signal</option></optgroup></select></div>
             <div class="idcard-flip" id="cardFlip"><div class="idcard-scale"><div class="idcard-inner"><div class="idcard" aria-label="Student ID front">
  <div class="idcard-head"><img src="../assets/images/BCP_LOGO.png" alt="Bestlink College crest"><div class="school">BESTLINK COLLEGE<br>OF THE PHILIPPINES<small>STUDENT IDENTIFICATION</small></div></div>
  <div class="idcard-photo-wrap"><div class="idcard-photo-frame"><img class="idcard-photo" id="cardPhoto" alt="Student portrait" style="display:none"><div class="idcard-initials" id="cardInitials" style="display:none">—</div></div></div>
@@ -2121,9 +2122,9 @@ body[data-page="rfid"] td.rc-empty span{display:block}
  <div class="idcard-head idcard-back-head"><img src="../assets/images/BCP_LOGO.png" alt="Bestlink College crest"><div class="school">BESTLINK COLLEGE<br>OF THE PHILIPPINES<small>Registrar's Office</small></div></div>
  <div class="id-tech-wordmark" aria-hidden="true"><svg viewBox="0 0 296 76" xmlns="http://www.w3.org/2000/svg" fill="none"><g class="bcp-lettering" stroke="currentColor" stroke-width="1.25" stroke-linejoin="miter" transform="translate(45 0) scale(.82 1) skewX(-6)"><path d="M6 7H61L74 19V29L65 37L74 45V57L61 69H6Z M22 20H54L58 24V28L54 31H22Z M22 45H54L58 49V53L54 57H22Z"/><path d="M112 7H163L176 19L164 31L156 22H120L111 31V46L120 55H156L164 46L176 58L163 69H112L94 51V25Z"/><path d="M196 7H250L264 21V39L250 53H213V69H196Z M213 22V38H243L248 33V27L243 22Z"/></g><g class="bcp-circuits" stroke="currentColor" stroke-width="1"><path d="M0 18H8L16 26H24M0 32H7L15 40H22M0 58H9L17 50H22M277 26H281L289 18H296M277 40H283L291 32H296M277 50H281L289 58H296M39 75H98M160 1H204"/></g><g fill="currentColor"><circle cx="24" cy="26" r="1.7"/><circle cx="22" cy="40" r="1.7"/><circle cx="22" cy="50" r="1.7"/><circle cx="277" cy="26" r="1.7"/><circle cx="277" cy="40" r="1.7"/><circle cx="277" cy="50" r="1.7"/><circle cx="39" cy="75" r="1.5"/><path d="M4 65H9L4 71H0ZM12 65H17L12 71H7ZM283 65H288L283 71H278ZM291 65H296L291 71H286Z"/></g></svg></div>
  <div class="idcard-back-content">
- <section class="idcard-back-sec"><div class="idcard-sec-title"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> In case of emergency, please contact</div><div id="cardBackEmg" class="idcard-emergency"></div></section>
- <section class="idcard-back-sec"><div class="idcard-sec-title"><i class="fa-solid fa-house" aria-hidden="true"></i> Address</div><div class="idcard-addr" id="cardBackAddr">Not on file</div></section>
- <section class="idcard-back-sec"><div class="idcard-sec-title"><i class="fa-solid fa-file-lines" aria-hidden="true"></i> Reminders</div><div class="idcard-reminders"><ul><li>This card is non-transferable and must be worn at all times inside the campus.</li><li>Not valid without the signature of the Registrar.</li><li>Report lost cards immediately to the Registrar's Office.</li></ul></div></section>
+ <section class="idcard-back-sec"><div class="idcard-sec-title" data-label="EMERGENCY CONTACT"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> In case of emergency, please contact</div><div id="cardBackEmg" class="idcard-emergency"></div></section>
+ <section class="idcard-back-sec"><div class="idcard-sec-title" data-label="ADDRESS"><i class="fa-solid fa-house" aria-hidden="true"></i> Address</div><div class="idcard-addr" id="cardBackAddr">Not on file</div></section>
+ <section class="idcard-back-sec"><div class="idcard-sec-title" data-label="CARDHOLDER GUIDELINES"><i class="fa-solid fa-file-lines" aria-hidden="true"></i> Reminders</div><div class="idcard-reminders"><ul><li>This card is non-transferable and must be worn at all times inside the campus.</li><li>Not valid without the signature of the Registrar.</li><li>Report lost cards immediately to the Registrar's Office.</li></ul></div></section>
  <div class="idcard-sig"><div class="line"></div><div class="who">SIGNATURE OF STUDENT</div><div class="idcard-signature-note">NOT VALID WITHOUT SIGNATURE</div></div>
  </div><div class="idcard-back-foot">If found, please return this card to the Registrar's Office or call the school hotline.</div>
 </div></div></div></div>
@@ -2954,8 +2955,9 @@ document.querySelectorAll('[data-close-modal]').forEach(el => {
 
 // â”€â”€ ID Card View (3D flip) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const CARD_EXTRAS = <?= json_encode($cardExtras ?: new stdClass(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+const ID_DESIGNS = ['classic', 'light', 'dark', 'arctic', 'cobalt', 'pearl', 'silver'];
 let currentIdDesign = 'light';
-try { const savedDesign = localStorage.getItem('bcp-id-design'); currentIdDesign = ['classic', 'light', 'dark'].includes(savedDesign) ? savedDesign : 'light'; } catch (_) {}
+try { const savedDesign = localStorage.getItem('bcp-id-design'); currentIdDesign = ID_DESIGNS.includes(savedDesign) ? savedDesign : 'light'; } catch (_) {}
 let idBuildAnimations = [];
 let idBuildOverlay = null;
 function stopIdConstruction() {
@@ -3065,19 +3067,20 @@ function constructIdDesign(preview) {
 }
 function applyIdDesign(design, animate = false) {
     const previousDesign = currentIdDesign;
-    currentIdDesign = ['classic', 'light', 'dark'].includes(design) ? design : 'light';
+    currentIdDesign = ID_DESIGNS.includes(design) ? design : 'light';
     document.querySelectorAll('#cardFlip .idcard, #cardFlip .idcard-back').forEach(face => {
-        face.classList.toggle('id-tech', currentIdDesign !== 'classic');
+        face.classList.toggle('id-tech', ['light', 'dark'].includes(currentIdDesign));
+        face.classList.toggle('id-collection', ['arctic', 'cobalt', 'pearl', 'silver'].includes(currentIdDesign));
         face.dataset.design = currentIdDesign;
     });
-    document.querySelectorAll('[name="idDesign"]').forEach(input => { input.checked = input.value === currentIdDesign; });
+    document.getElementById('idDesignSelect').value = currentIdDesign;
     try { localStorage.setItem('bcp-id-design', currentIdDesign); } catch (_) {}
     stopIdConstruction();
     const preview = document.getElementById('cardFlip');
     if (animate && previousDesign !== currentIdDesign && preview && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
         constructIdDesign(preview);
     }}
-document.querySelectorAll('[name="idDesign"]').forEach(input => input.addEventListener('change', () => applyIdDesign(input.value, true)));
+document.getElementById('idDesignSelect').addEventListener('change', event => applyIdDesign(event.target.value, true));
 applyIdDesign(currentIdDesign);
 let idCardData = null;
 let idPhotoRequest = 0;
