@@ -34,19 +34,19 @@ CREATE TABLE IF NOT EXISTS `departments` (
 
 -- Seed default departments if empty (idempotent: only inserts when table is empty)
 INSERT INTO `departments` (`id`, `name`, `code`, `is_active`, `created_at`)
-SELECT * FROM (SELECT 1, 'College of Engineering', 'COE', 1, '2026-01-01 00:00:00') AS tmp
+SELECT 1, 'College of Engineering', 'COE', 1, '2026-01-01 00:00:00'
 WHERE NOT EXISTS (SELECT 1 FROM `departments`);
 INSERT INTO `departments` (`id`, `name`, `code`, `is_active`, `created_at`)
-SELECT * FROM (SELECT 2, 'College of Nursing', 'CON', 1, '2026-01-01 00:00:00') AS tmp
+SELECT 2, 'College of Nursing', 'CON', 1, '2026-01-01 00:00:00'
 WHERE NOT EXISTS (SELECT 1 FROM `departments` WHERE `id` = 2);
 INSERT INTO `departments` (`id`, `name`, `code`, `is_active`, `created_at`)
-SELECT * FROM (SELECT 3, 'College of Business', 'COB', 1, '2026-01-01 00:00:00') AS tmp
+SELECT 3, 'College of Business', 'COB', 1, '2026-01-01 00:00:00'
 WHERE NOT EXISTS (SELECT 1 FROM `departments` WHERE `id` = 3);
 INSERT INTO `departments` (`id`, `name`, `code`, `is_active`, `created_at`)
-SELECT * FROM (SELECT 4, 'College of Education', 'CED', 1, '2026-01-01 00:00:00') AS tmp
+SELECT 4, 'College of Education', 'CED', 1, '2026-01-01 00:00:00'
 WHERE NOT EXISTS (SELECT 1 FROM `departments` WHERE `id` = 4);
 INSERT INTO `departments` (`id`, `name`, `code`, `is_active`, `created_at`)
-SELECT * FROM (SELECT 5, 'College of IT', 'CIT', 1, '2026-01-01 00:00:00') AS tmp
+SELECT 5, 'College of IT', 'CIT', 1, '2026-01-01 00:00:00'
 WHERE NOT EXISTS (SELECT 1 FROM `departments` WHERE `id` = 5);
 
 -- ── 2. Add department_id to users ────────────────────────────────────────
@@ -63,7 +63,12 @@ EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
 
 -- ── 3. Widen the role ENUM ───────────────────────────────────────────────
--- First, migrate any rows that hold old role values the new ENUM won't accept.
+-- Allow both sets BEFORE converting rows. Updating an old ENUM directly
+-- rejects the new values (or stores an empty string in non-strict mode).
+ALTER TABLE `users`
+  MODIFY COLUMN `role` enum('admin','registrar','staff','teacher','student','super_admin','acad_officer','department_head') NOT NULL DEFAULT 'staff';
+
+-- Convert existing accounts while retaining their identity and passwords.
 UPDATE `users` SET `role` = 'super_admin' WHERE `role` = 'admin';
 UPDATE `users` SET `role` = 'staff' WHERE `role` = 'registrar';
 UPDATE `users` SET `role` = 'acad_officer' WHERE `role` = 'teacher';

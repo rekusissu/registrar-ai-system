@@ -1,150 +1,33 @@
-// ============================================================
-//  JS/SEARCHABLE-SELECT.JS
-//  Progressive enhancement: turns any <select data-searchable>
-//  into a type-to-search dropdown. Designed for large option
-//  lists (1,000+ students) — renders a capped result set and
-//  filters by substring match on the option label.
-//
-//  The native <select> stays in the DOM (hidden) and is kept in
-//  sync, so form validation, form posts, and existing JS that
-//  reads/writes select.value keep working unchanged.
-// ============================================================
-
-(function () {
-    'use strict';
-
-    var MAX_RESULTS = 100;   // cap rendered items; hint shown beyond this
-    var SCROLL_H = 240;      // dropdown max height (px)
-
-    function enhance(sel) {
-        if (sel.dataset.ssInit) return;
-        sel.dataset.ssInit = '1';
-
-        var wrap = document.createElement('div');
-        wrap.className = 'ss-wrap';
-        sel.parentNode.insertBefore(wrap, sel);
-
-        var input = document.createElement('input');
-        input.type = 'text';
-        input.className = 'form-control ss-input';
-        input.setAttribute('autocomplete', 'off');
-        input.setAttribute('placeholder', sel.dataset.placeholder || 'Type to search…');
-
-        var list = document.createElement('div');
-        list.className = 'ss-list';
-
-        wrap.appendChild(input);
-        wrap.appendChild(list);
-        wrap.appendChild(sel);          // keep native select inside (hidden)
-        sel.classList.add('ss-native');
-
-
-        // Options snapshot (placeholder = first empty-value option, excluded from search)
-        var opts = [];
-        var placeholderText = '';
-        for (var i = 0; i < sel.options.length; i++) {
-            var o = sel.options[i];
-            if (o.value === '' && i === 0) { placeholderText = o.textContent.trim(); continue; }
-            opts.push({ v: o.value, t: o.textContent.replace(/\s+/g, ' ').trim() });
-        }
-        if (!sel.dataset.placeholder && placeholderText) {
-            input.setAttribute('placeholder', placeholderText);
-        }
-
-        var filtered = opts, hl = 0, editing = false;
-        var lastVal = sel.value;
-
-        function selected() {
-            for (var i = 0; i < opts.length; i++) if (opts[i].v === sel.value) return opts[i];
-            return null;
-        }
-        function escHtml(s) {
-            return s.replace(/[&<>"']/g, function (c) {
-                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-            });
-        }
-        function renderLabel() {
-            if (editing) return;
-            var s = selected();
-            input.value = s ? s.t : '';
-        }
-        function renderList() {
-            var q = input.value.trim().toLowerCase();
-            filtered = !q ? opts.slice(0, MAX_RESULTS)
-                          : opts.filter(function (x) { return x.t.toLowerCase().indexOf(q) !== -1; }).slice(0, MAX_RESULTS);
-            hl = filtered.length ? 0 : -1;
-            var html = '';
-            for (var i = 0; i < filtered.length; i++) {
-                html += '<div class="ss-item' + (i === hl ? ' hl' : '') + '" data-i="' + i + '">' + escHtml(filtered[i].t) + '</div>';
-            }
-            if (q && opts.length > MAX_RESULTS && filtered.length === MAX_RESULTS) {
-                html += '<div class="ss-more">Refine your search to see more…</div>';
-            } else if (!filtered.length) {
-                html += '<div class="ss-more">No matches found</div>';
-            }
-            list.innerHTML = html;
-        }
-        function openList() {
-            editing = true;
-            input.value = '';
-            renderList();
-            list.classList.add('open');
-            list.style.maxHeight = SCROLL_H + 'px';
-        }
-        function closeList() {
-            list.classList.remove('open');
-            editing = false;
-            renderLabel();
-        }
-        function pick(i) {
-            if (i < 0 || i >= filtered.length) return;
-            sel.value = filtered[i].v;
-            lastVal = sel.value;
-            try { sel.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {}
-            closeList();
-            input.blur();
-        }
-
-
-        input.addEventListener('focus', openList);
-        input.addEventListener('input', function () { editing = true; renderList(); });
-        input.addEventListener('blur', function () { setTimeout(closeList, 140); });
-
-        input.addEventListener('keydown', function (e) {
-            if (e.key === 'ArrowDown') { e.preventDefault(); if (!list.classList.contains('open')) openList(); else if (hl < filtered.length - 1) { hl++; markHl(); } }
-            else if (e.key === 'ArrowUp') { e.preventDefault(); if (hl > 0) { hl--; markHl(); } }
-            else if (e.key === 'Enter') { if (list.classList.contains('open') && hl >= 0) { e.preventDefault(); pick(hl); } }
-            else if (e.key === 'Escape') { closeList(); }
-        });
-        function markHl() {
-            var items = list.querySelectorAll('.ss-item');
-            for (var i = 0; i < items.length; i++) items[i].classList.toggle('hl', i === hl);
-            if (items[hl]) items[hl].scrollIntoView({ block: 'nearest' });
-        }
-
-        list.addEventListener('mousedown', function (e) {   // mousedown fires before input blur
-            var item = e.target.closest('.ss-item');
-            if (item) { e.preventDefault(); pick(parseInt(item.dataset.i, 10)); }
-        });
-
-        // Keep the visible label in sync when other JS sets select.value
-        // (e.g. edit modals prefilling the student).
-        setInterval(function () {
-            if (sel.value !== lastVal) { lastVal = sel.value; renderLabel(); }
-        }, 300);
-
-        renderLabel();
-    }
-
-    function initAll(root) {
-        var sels = (root || document).querySelectorAll('select[data-searchable]');
-        for (var i = 0; i < sels.length; i++) enhance(sels[i]);
-    }
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', function () { initAll(); });
-    } else {
-        initAll();
-    }
-    window.refreshSearchableSelects = initAll;   // for dynamically injected selects
+// Shared custom dropdowns. Native selects remain the source of form values.
+(function(){
+'use strict';
+const items=new Set(),known=new WeakMap();let active=null,uid=0;
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const icon=s=>/term|semester|year|period/i.test(s.name+' '+s.id)?'calendar-days':/program|course/i.test(s.name+' '+s.id)?'graduation-cap':'layer-group';
+function period(o){const m=(o.value+' '+o.textContent).match(/(\d{4}[-–]\d{4})\s+(1st|2nd|Summer)/i);return m?{year:m[1],name:({'1st':'First Semester','2nd':'Second Semester',summer:'Summer'})[m[2].toLowerCase()]}:null;}
+function enhance(s){
+ if(known.has(s)||s.multiple||s.size>1||s.hasAttribute('data-native')||s.classList.contains('select2-hidden-accessible'))return;
+ const label=s.getAttribute('aria-label')||[...(s.labels||[])].map(l=>[...l.childNodes].filter(n=>n.nodeType===3).map(n=>n.textContent).join('').trim()).filter(Boolean).join(' ')||s.name||'Select option';
+ const inlineLayout=getComputedStyle(s.parentElement).display.includes('flex');const wrap=document.createElement('div');wrap.className='bcp-select'+(inlineLayout?' bcp-select-inline':'');s.before(wrap);wrap.append(s);s.classList.add('bcp-native');s.tabIndex=-1;
+ const button=document.createElement('button');button.type='button';button.className='bcp-select-trigger';button.setAttribute('role','combobox');button.setAttribute('aria-haspopup','listbox');button.setAttribute('aria-expanded','false');button.setAttribute('aria-label',label);if(s.hasAttribute('aria-describedby'))button.setAttribute('aria-describedby',s.getAttribute('aria-describedby'));button.innerHTML=`<i class="fa-solid fa-${icon(s)}" aria-hidden="true"></i><span></span><i class="fa-solid fa-chevron-down" aria-hidden="true"></i>`;wrap.append(button);
+ const menu=document.createElement('div');menu.className='bcp-select-menu';menu.id='bcp-menu-'+(++uid);menu.hidden=true;menu.setAttribute('popover','manual');wrap.append(menu);
+ menu.innerHTML=`<div class="bcp-select-searchbox"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input type="search" autocomplete="off" placeholder="Search options…" aria-label="Search ${esc(label)}"></div><div class="bcp-select-options" role="listbox" id="${menu.id}-list" aria-label="${esc(label)}"></div><div class="bcp-select-hint"><span>↑ ↓ Navigate</span><span>Enter Select</span><span>Esc Close</span></div>`;
+ const search=menu.querySelector('input'),list=menu.querySelector('[role=listbox]');button.setAttribute('aria-controls',list.id);search.setAttribute('role','combobox');search.setAttribute('aria-controls',list.id);search.setAttribute('aria-expanded','false');search.setAttribute('aria-autocomplete','list');
+ let filtered=[],hl=-1,opened=false,last='';
+ function sync(){button.disabled=s.disabled||s.matches(':disabled');const o=s.selectedOptions[0],p=o&&period(o);button.querySelector('span').textContent=p?`${p.name} · ${p.year}`:o?.textContent.trim()||s.dataset.placeholder||'Select…';button.setAttribute('aria-required',String(s.required));if(opened&&button.disabled)close(false);}
+ function position(){const r=button.getBoundingClientRect(),width=Math.min(Math.max(r.width,300),innerWidth-16),below=innerHeight-r.bottom-12,above=r.top-12,space=Math.max(below,above),height=Math.min(410,space);menu.style.width=width+'px';list.style.maxHeight=Math.max(55,height-115)+'px';menu.style.left=Math.max(8,Math.min(r.left,innerWidth-width-8))+'px';menu.style.top=(below>=Math.min(300,above)?r.bottom+7:Math.max(8,r.top-Math.min(menu.scrollHeight,height)-7))+'px';}
+ function mark(){list.querySelectorAll('[role=option]').forEach((n,i)=>n.classList.toggle('is-focused',i===hl));const row=list.querySelector(`[data-index="${hl}"]`);if(row){search.setAttribute('aria-activedescendant',row.id);button.setAttribute('aria-activedescendant',row.id);row.scrollIntoView({block:'nearest'});}else{search.removeAttribute('aria-activedescendant');button.removeAttribute('aria-activedescendant');}}
+ function render(){const q=search.value.trim().toLowerCase();filtered=[...s.options].filter(o=>!o.hidden&&(o.textContent+' '+o.value).toLowerCase().includes(q)).slice(0,100);let group='',html='';filtered.forEach((o,i)=>{const p=period(o),heading=p?.year||(o.parentElement.tagName==='OPTGROUP'?o.parentElement.label:'');if(heading&&heading!==group){group=heading;html+=`<div class="bcp-select-group" role="presentation">${esc(heading)}</div>`;}const status=/status/i.test(s.name+' '+s.id)?({ready:'ready',waiting:'waiting',accepted:'accepted'}[o.value]||''):'';html+=`<div class="bcp-select-option ${status?'status-'+status:''}" role="option" id="${menu.id}-o-${i}" data-index="${i}" aria-selected="${o.selected}" aria-disabled="${o.disabled||o.parentElement.disabled||false}"><span class="bcp-option-icon"><i class="fa-solid fa-${p?'calendar-days':status?'circle':icon(s)}" aria-hidden="true"></i></span><span><strong>${esc(p?.name||o.textContent.trim())}</strong>${p?`<small>Academic year ${esc(p.year)}</small>`:''}</span><i class="fa-solid fa-check bcp-option-check" aria-hidden="true"></i></div>`;});list.innerHTML=html||'<div class="bcp-select-empty">No matching options</div>';hl=filtered.findIndex(o=>o.selected&&!o.disabled);if(hl<0)hl=filtered.findIndex(o=>!o.disabled);mark();}
+ function close(focus=true){if(!opened)return;opened=false;try{if(menu.matches(':popover-open'))menu.hidePopover();}catch{}menu.hidden=true;menu.classList.remove('bcp-menu-fallback');button.setAttribute('aria-expanded','false');search.setAttribute('aria-expanded','false');button.querySelector('i:last-child').className='fa-solid fa-chevron-down';button.removeAttribute('aria-activedescendant');if(active===api)active=null;if(focus)button.focus();}
+ function show(){sync();if(button.disabled)return;if(active&&active!==api)active.close(false);active=api;opened=true;menu.hidden=false;search.value='';render();try{menu.showPopover();}catch{menu.classList.add('bcp-menu-fallback');}position();button.setAttribute('aria-expanded','true');search.setAttribute('aria-expanded','true');button.querySelector('i:last-child').className='fa-solid fa-chevron-up';search.focus({preventScroll:true});mark();}
+ function disabled(o){return o.disabled||o.parentElement.disabled;}
+ function pick(i){const o=filtered[i];if(!o||disabled(o))return;s.selectedIndex=o.index;sync();close();s.dispatchEvent(new Event('input',{bubbles:true}));s.dispatchEvent(new Event('change',{bubbles:true}));}
+ function key(e){if(e.key==='Escape'&&opened){e.preventDefault();e.stopPropagation();close();return;}if(e.key==='Tab'&&opened){close();return;}if(['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();e.stopPropagation();if(!opened){show();return;}let n=hl,step=e.key==='ArrowUp'||e.key==='End'?-1:1;if(e.key==='Home')n=-1;if(e.key==='End')n=filtered.length;do{n+=step;}while(n>=0&&n<filtered.length&&disabled(filtered[n]));if(n>=0&&n<filtered.length)hl=n;mark();}else if(e.key==='Enter'&&opened){e.preventDefault();e.stopPropagation();pick(hl);}}
+ button.addEventListener('click',()=>opened?close():show());button.addEventListener('keydown',key);search.addEventListener('keydown',key);search.addEventListener('input',()=>{render();position();});list.addEventListener('pointerdown',e=>{const row=e.target.closest('[data-index]');if(row){e.preventDefault();pick(Number(row.dataset.index));}});s.addEventListener('change',()=>{sync();button.removeAttribute('aria-invalid');});s.addEventListener('invalid',e=>{e.preventDefault();button.focus();button.setAttribute('aria-invalid','true');});
+ const api={s,wrap,menu,close,position,sync,check(){const next=s.innerHTML+'|'+s.selectedIndex+'|'+s.disabled+'|'+s.matches(':disabled');if(last!==next){last=next;sync();if(opened){render();position();}}}};known.set(s,api);items.add(api);sync();
+}
+function init(root=document){if(root.matches?.('select'))enhance(root);root.querySelectorAll?.('select').forEach(enhance);}
+document.addEventListener('pointerdown',e=>{if(active&&!active.wrap.contains(e.target))active.close(false);},true);addEventListener('resize',()=>active?.position());document.addEventListener('scroll',e=>{if(active&&!active.menu.contains(e.target))active.position();},true);document.addEventListener('reset',()=>setTimeout(()=>items.forEach(i=>i.sync()),0));
+function start(){init();new MutationObserver(ms=>{for(const m of ms)for(const n of m.addedNodes)if(n.nodeType===1&&!n.closest('.bcp-select'))init(n);}).observe(document.body,{childList:true,subtree:true});setInterval(()=>{for(const i of items){if(!i.s.isConnected){i.close(false);items.delete(i);}else i.check();}},250);}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();window.refreshSearchableSelects=init;
 })();

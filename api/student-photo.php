@@ -3,7 +3,7 @@
 require_once __DIR__ . '/../shared/security_headers.php';
 require_once __DIR__ . '/../shared/session_config.php';
 if (!isLoggedIn()) { http_response_code(401); exit; }
-if (!in_array($_SESSION['role'] ?? '', ['admin','registrar'], true)) { http_response_code(403); exit; }
+if (!in_array($_SESSION['role'] ?? '', ['super_admin','staff'], true)) { http_response_code(403); exit; }
 if (!in_array($_SERVER['REQUEST_METHOD'] ?? 'GET', ['GET','HEAD'], true)) { header('Allow: GET, HEAD'); http_response_code(405); exit; }
 $studentId = (int)($_GET['student_id'] ?? 0);
 if ($studentId <= 0) { http_response_code(400); exit; }

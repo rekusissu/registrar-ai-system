@@ -3,7 +3,7 @@ require_once __DIR__ . '/shared/security_headers.php';
 require_once __DIR__ . '/shared/session_config.php';
 if (!isLoggedIn()) { header('Location: login.php'); exit; }
 if (($_SESSION['role'] ?? '') === 'student') { header('Location: student/dashboard.php'); exit; }
-if (!in_array($_SESSION['role'] ?? '', ['admin','registrar'], true)) { http_response_code(403); exit('Access denied.'); }
+if (!in_array($_SESSION['role'] ?? '', ['super_admin','staff'], true)) { http_response_code(403); exit('Access denied.'); }
 header('Cache-Control: no-store, private');
 require_once __DIR__ . '/shared/dashboard_data.php';
 $snapshot = null;

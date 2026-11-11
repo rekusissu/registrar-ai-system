@@ -1742,111 +1742,29 @@ body[data-page="rfid"] td.rc-empty span{display:block}
 </main>
 
 ﻿<!-- -- Assign Card Modal -- -->
-<div class="logout-modal-overlay" id="assignModal">
-    <div class="logout-modal rfid-modal">
-        <div class="rfid-modal-header">
-            <div class="header-icon assign"><i class="fas fa-credit-card"></i></div>
-            <div>
-                <h3>Assign RFID Card</h3>
-                <p>Pick a card from the pool or enter a new UID.</p>
-            </div>
-        </div>
-        <form id="assignCardForm">
-            <input type="hidden" id="selectedStudentId" name="student_id" value="">
-            <input type="hidden" id="assignMode" value="pool">
-            <input type="hidden" id="selectedPoolCardId" value="">
-            <div class="rfid-modal-body-wrapper">
-                <div class="form-section">
-                    <div class="form-section-header">
-                        <div class="form-section-icon"><i class="fas fa-user-graduate"></i></div>
-                        <div><div class="form-section-title">Student</div><div class="form-section-subtitle">Search and select</div></div>
-                    </div>
-                    <div class="student-search-wrapper" style="position:relative;">
-                        <input type="text" id="studentSearchInput" class="form-control" placeholder="Type student name..." autocomplete="off" />
-                        <div class="student-search-results" id="studentSearchResults"></div>
-                    </div>
-
-                    <select id="studentSelect" style="display:none;">
-                        <option value="">Select a student</option>
-                        <?php foreach ($students as $student): ?>
-                            <option value="<?= (int)$student['id'] ?>">
-                                <?= htmlspecialchars($student['name']) ?> &middot; <?= htmlspecialchars($student['student_number']) ?> &middot; <?= htmlspecialchars($student['course']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
-
-                    <div class="selected-student-chip" id="selectedStudentDisplay">
-                        <i class="fas fa-check-circle"></i>
-                        <div style="flex:1;"><span class="chip-name" id="selectedName"></span><span class="chip-id" id="selectedId" style="display:block;font-size:11px;color:#16a34a;margin-top:1px;">Selected</span></div>
-                        <button type="button" class="chip-clear" onclick="clearSelectedStudent()" title="Clear"><i class="fas fa-times"></i></button>
-                    </div>
-                </div>
-                <div class="assign-tabs">
-                    <button type="button" class="assign-tab active" onclick="switchAssignTab('pool')"><i class="fas fa-box-open"></i> From Pool</button>
-                    <button type="button" class="assign-tab" onclick="switchAssignTab('new')"><i class="fas fa-keyboard"></i> New UID</button>
-                </div>
-                <div class="assign-tab-pane active" id="tabPool">
-                    <div class="form-section" style="border-bottom:none;">
-                        <div class="form-section-header">
-                            <div class="form-section-icon" style="background:#e0e7ff;color:#4f46e5;"><i class="fas fa-box-open"></i></div>
-                            <div><div class="form-section-title">Available Cards</div><div class="form-section-subtitle">Select from unassigned pool</div></div>
-                        </div>
-                        <div class="form-group">
-                            <label>Select Card</label>
-                            <select id="poolCardSelect" class="form-control" onchange="onPoolCardSelect(this)">
-                                <option value="">-- Select from pool --</option>
-                                <?php foreach ($availablePool as $pc): ?>
-                                <option value="<?= (int)$pc['id'] ?>" data-uid="<?= htmlspecialchars($pc['card_uid']) ?>"><?= htmlspecialchars($pc['card_uid']) ?><?php if ($pc['registered_at']): ?> (<?= date('M d', strtotime($pc['registered_at'])) ?>)<?php endif; ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                <div class="assign-tab-pane" id="tabNew">
-                    <div class="form-section" style="border-bottom:none;">
-                        <div class="form-section-header">
-                            <div class="form-section-icon"><i class="fas fa-microchip"></i></div>
-                            <div><div class="form-section-title">Card UID</div><div class="form-section-subtitle">10-digit identifier</div></div>
-                        </div>
-                        <div class="uid-row">
-                            <div style="flex:1;position:relative;">
-                                <input type="text" id="cardUid" class="form-control" maxlength="10" inputmode="numeric" placeholder="e.g. 1234567890" style="padding-right:50px;" />
-                                <span id="uidLengthBadge" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;font-weight:600;color:#94a3b8;background:#f1f5f9;padding:2px 8px;border-radius:6px;">0/10</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="form-section">
-                    <div class="form-section-header">
-                        <div class="form-section-icon"><i class="fas fa-calendar"></i></div>
-                        <div><div class="form-section-title">Validity Period</div><div class="form-section-subtitle">Issued and expiry dates</div></div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group"><label>Issued</label><input type="date" id="issuedDate" name="issued_date" class="form-control" value="<?= date('Y-m-d') ?>" /></div>
-                        <div class="form-group"><label>Expiry</label><input type="date" id="expiryDate" name="expiry_date" class="form-control" value="<?= date('Y-m-d', strtotime('+1 year')) ?>" /></div>
-                    </div>
-                </div>
-                <div class="form-section" style="border-bottom:none;">
-                    <div class="form-section-header">
-                        <div class="form-section-icon"><i class="fas fa-sticky-note"></i></div>
-                        <div><div class="form-section-title">Notes</div><div class="form-section-subtitle">Optional remarks</div></div>
-                    </div>
-                    <div class="form-group"><textarea id="cardNotes" name="notes" class="form-control" rows="2" placeholder="e.g. Replacement card..."></textarea></div>
-                </div>
-            </div>
-            <div class="rfid-notice rfid-notice-issue">
-                <span class="rn-icon"><i class="fas fa-id-card"></i></span>
-                <span class="rn-text">
-                    <b>STUDENT ID CARD WITH QR CODE WILL BE ISSUED AUTOMATICALLY</b>
-                    <span class="rn-sub">No extra step &mdash; it is generated the moment this card is assigned.</span>
-                </span>
-            </div>
-            <div class="rfid-modal-actions">
-                <button type="button" class="btn btn-light" data-close-modal="assign">Cancel</button>
-                <button type="submit" class="btn btn-primary" id="assignSubmitBtn" disabled><i class="fas fa-save"></i> Assign Card</button>
-            </div>
-        </form>
-    </div>
+<link rel="stylesheet" href="../assets/id-card/assign-card.css?v=20261111-1">
+<div class="logout-modal-overlay" id="assignModal" role="dialog" aria-modal="true" aria-labelledby="assignTitle">
+ <div class="logout-modal rfid-modal assign-dialog">
+  <header class="assign-header"><div class="assign-heading-icon"><i class="fas fa-credit-card" aria-hidden="true"></i></div><div><h3 id="assignTitle">Assign RFID card</h3><p>Link a card to a student and set its validity.</p></div><button type="button" class="assign-close" onclick="closeAssignModal()" aria-label="Close assignment"><i class="fas fa-xmark"></i></button></header>
+  <form id="assignCardForm"><input type="hidden" id="selectedStudentId" name="student_id"><input type="hidden" id="assignMode" value="pool"><input type="hidden" id="selectedPoolCardId">
+   <div class="assign-body"><div class="assign-fields">
+    <section class="assign-section"><h4><span>1</span> Select student</h4><div class="student-search-wrapper assign-student-search"><label for="studentSearchInput" class="assign-sr-only">Search name or student number</label><i class="fas fa-magnifying-glass" aria-hidden="true"></i><input type="search" id="studentSearchInput" class="form-control" placeholder="Search name or student number" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="studentSearchResults" aria-autocomplete="list"><div id="studentSearchResults" class="student-search-results" role="listbox" hidden></div></div>
+    <div id="selectedStudentDisplay" class="assign-selected" hidden><span id="assignStudentAvatar">—</span><div><strong id="selectedName"></strong><small id="selectedId"></small><small id="assignStudentCourse"></small></div><button type="button" onclick="clearSelectedStudent()">Change</button></div>
+    </section>
+    <section class="assign-section"><h4><span>2</span> Choose a card</h4><div class="assign-tabs" role="group" aria-label="Card source"><button type="button" class="assign-tab active" data-assign-source="pool" onclick="switchAssignTab('pool')" aria-pressed="true"><i class="fas fa-layer-group" aria-hidden="true"></i> Available pool</button><button type="button" class="assign-tab" data-assign-source="new" onclick="switchAssignTab('new')" aria-pressed="false"><i class="fas fa-keyboard" aria-hidden="true"></i> New UID</button></div>
+    <div class="assign-tab-pane active" id="tabPool"><label for="poolCardSelect">Available RFID card</label><div class="assign-pool-row"><select id="poolCardSelect" class="form-control" onchange="onPoolCardSelect(this)"><option value="">Select an available card</option><?php foreach($availablePool as $pc): ?><option value="<?= (int)$pc['id'] ?>" data-uid="<?= htmlspecialchars($pc['card_uid'],ENT_QUOTES) ?>"><?= htmlspecialchars($pc['card_uid']) ?></option><?php endforeach; ?></select><span id="assignAvailability" class="assign-availability" hidden><i class="fas fa-circle"></i> Available</span></div><p class="assign-field-help" id="assignPoolHelp"><?= $availablePool ? 'Choose an unassigned card from inventory.' : 'No unassigned cards in the pool. Register a new card using New UID.' ?></p></div>
+    <div class="assign-tab-pane" id="tabNew"><label for="cardUid">New card UID</label><div class="assign-uid-field"><input id="cardUid" class="form-control" inputmode="numeric" maxlength="10" placeholder="Enter the 10-digit card UID" autocomplete="off" aria-describedby="assignUidStatus"><span id="uidLengthBadge">0/10</span></div><p id="assignUidStatus" class="assign-field-help" role="status">Enter the UID printed by your RFID reader.</p></div>
+    </section>
+    <section class="assign-section assign-validity"><h4><span>3</span> Set validity</h4><div class="assign-date-row"><label for="issuedDate">Issue date<input type="date" id="issuedDate" name="issued_date" class="form-control" value="<?= date('Y-m-d') ?>" required></label><label for="expiryDate">Expiry date<input type="date" id="expiryDate" name="expiry_date" class="form-control" value="<?= date('Y-m-d',strtotime('+1 year')) ?>" required></label></div><label class="assign-notes-label" for="cardNotes">Notes <span>(optional)</span></label><textarea id="cardNotes" name="notes" class="form-control" rows="2" maxlength="1000" placeholder="e.g. Replacement for a lost card"></textarea></section>
+   </div>
+   <aside class="assign-summary"><h4>Assignment summary</h4><div class="assign-rfid-art" aria-label="Campus RFID card illustration"><div class="assign-art-brand"><img src="../assets/images/BCP_LOGO.png" alt="Bestlink College crest"><div><strong>Bestlink College</strong><small>CAMPUS ACCESS</small></div></div><svg class="assign-coil" viewBox="0 0 120 120" fill="none" aria-hidden="true"><g stroke="#18e7ff" stroke-width="1.6" stroke-linecap="round"><path d="M49 109a50 50 0 1 1 22 0M50 101a42 42 0 1 1 20 0M51 93a34 34 0 1 1 18 0M52 85a26 26 0 1 1 16 0"/></g><g fill="#83f0ff"><circle cx="49" cy="109" r="2.2"/><circle cx="71" cy="109" r="2.2"/><circle cx="50" cy="101" r="2"/><circle cx="70" cy="101" r="2"/><circle cx="51" cy="93" r="1.8"/><circle cx="69" cy="93" r="1.8"/><circle cx="52" cy="85" r="1.7"/><circle cx="68" cy="85" r="1.7"/></g></svg><div class="assign-art-bottom"><div><small>CARD UID</small><strong id="assignPreviewUid">— — — — —</strong></div><span>RFID</span></div></div>
+   <dl class="assign-summary-rows"><div><dt>Student</dt><dd id="assignSummaryStudent">Not selected</dd></div><div><dt>Card source</dt><dd id="assignSummarySource">Available pool</dd></div><div><dt>Validity</dt><dd id="assignSummaryValidity">—</dd></div></dl>
+   <div class="assign-included"><i class="fas fa-check" aria-hidden="true"></i><div><strong>Student ID card included</strong><p>A student ID card and verification QR code are generated automatically.</p></div></div></aside>
+   </div>
+   <p id="assignFormError" class="assign-error" role="alert" hidden></p>
+   <footer class="assign-footer"><span><i class="fas fa-lock" aria-hidden="true"></i> Recorded under your account.</span><div><button type="button" class="assign-cancel" onclick="closeAssignModal()">Cancel</button><button type="submit" class="assign-submit" id="assignSubmitBtn" disabled>Assign card <i class="fas fa-arrow-right" aria-hidden="true"></i></button></div></footer>
+  </form>
+ </div>
 </div>
 
 <div class="logout-modal-overlay" id="editModal">
@@ -2106,11 +2024,12 @@ body[data-page="rfid"] td.rc-empty span{display:block}
 <link rel="stylesheet" href="../assets/id-card/student-id.css?v=20261110-tech-options">
 <link rel="stylesheet" href="../assets/id-card/student-id-tech.css?v=20261110-9">
 <link rel="stylesheet" href="../assets/id-card/student-id-collection.css?v=20261110-pearl6">
-<div class="modal-overlay" id="idCardModal" role="dialog" aria-modal="true" aria-label="Student ID card preview">
-    <div class="modal-content" style="max-width:420px;">
-        <div class="modal-header"><h3><i class="fas fa-id-card" style="color:#2563eb;"></i> Student ID Card</h3><button class="modal-close" onclick="document.getElementById('idCardModal').classList.remove('active'); document.body.style.overflow='';"><i class="fas fa-times"></i></button></div>
-        <div class="modal-body">
-            <div class="id-design-select"><label for="idDesignSelect">Card design</label><select id="idDesignSelect"><optgroup label="Original designs"><option value="classic">Classic</option><option value="light" selected>Tech Light</option><option value="dark">Tech Dark</option></optgroup><optgroup label="New collection"><option value="arctic">Arctic Circuit</option><option value="cobalt">Cobalt Edge</option><option value="pearl">Pearl Matrix</option><option value="silver">Silver Signal</option></optgroup></select></div>
+<link rel="stylesheet" href="../assets/id-card/id-studio.css?v=20261111-edit2">
+<div class="modal-overlay" id="idCardModal" role="dialog" aria-modal="true" aria-labelledby="idStudioTitle">
+ <div class="modal-content idstudio-dialog">
+  <header class="idstudio-header"><div class="idstudio-heading"><span class="idstudio-heading-icon"><i class="fas fa-id-card" aria-hidden="true"></i></span><div><p>STUDENT CREDENTIALS</p><h3 id="idStudioTitle">ID card studio</h3></div></div><button type="button" class="idstudio-close" onclick="closeIdStudio()" aria-label="Close ID card studio"><i class="fas fa-xmark" aria-hidden="true"></i></button></header>
+  <div class="modal-body idstudio-body">
+   <section class="idstudio-preview" aria-label="Card preview"><div class="idstudio-preview-heading"><span><i class="fas fa-circle" aria-hidden="true"></i> Live preview</span><small id="idStudioFaceLabel" aria-live="polite">Front side</small></div><div class="idstudio-canvas">
             <div class="idcard-flip" id="cardFlip"><div class="idcard-scale"><div class="idcard-inner"><div class="idcard" aria-label="Student ID front">
  <div class="idcard-head"><img src="../assets/images/BCP_LOGO.png" alt="Bestlink College crest"><div class="school">BESTLINK COLLEGE<br>OF THE PHILIPPINES<small>STUDENT IDENTIFICATION</small></div></div>
  <div class="idcard-photo-wrap"><div class="idcard-photo-frame"><img class="idcard-photo" id="cardPhoto" alt="Student portrait" style="display:none"><div class="idcard-initials" id="cardInitials" style="display:none">—</div></div></div>
@@ -2128,16 +2047,30 @@ body[data-page="rfid"] td.rc-empty span{display:block}
  <div class="idcard-sig"><div class="line"></div><div class="who">SIGNATURE OF STUDENT</div><div class="idcard-signature-note">NOT VALID WITHOUT SIGNATURE</div></div>
  </div><div class="idcard-back-foot">If found, please return this card to the Registrar's Office or call the school hotline.</div>
 </div></div></div></div>
-            <div style="text-align:center;margin-top:14px;">
-                <button type="button" class="btn btn-light" onclick="document.getElementById('cardFlip').classList.toggle('flipped')" style="min-width:150px;"><i class="fas fa-rotate"></i> Flip Card</button>
-            </div>
-        </div>
-        <div class="modal-footer">
-            <button class="btn btn-secondary" onclick="document.getElementById('idCardModal').classList.remove('active'); document.body.style.overflow='';">Close</button>
-            <button class="btn btn-primary" onclick="printIdCard()"><i class="fas fa-print"></i> Print ID</button>
-        </div>
-    </div>
+
+   </div><div class="idstudio-face-controls" role="group" aria-label="Card side"><button type="button" class="selected" data-card-face="front" aria-pressed="true" onclick="setIdStudioFace('front')"><i class="fas fa-id-card" aria-hidden="true"></i> Front</button><button type="button" data-card-face="back" aria-pressed="false" onclick="setIdStudioFace('back')"><i class="fas fa-address-card" aria-hidden="true"></i> Back</button></div></section>
+   <aside class="idstudio-controls"><section class="idstudio-appearance"><div class="idstudio-section-heading"><h4>Card appearance</h4><span>7 designs</span></div><p class="idstudio-help">Choose a look for this student’s ID.</p>
+<div class="id-design-select"><label for="idDesignSelect">Card design</label><select id="idDesignSelect"><optgroup label="Original designs"><option value="classic">Classic</option><option value="light" selected>Tech Light</option><option value="dark">Tech Dark</option></optgroup><optgroup label="New collection"><option value="arctic">Arctic Circuit</option><option value="cobalt">Cobalt Edge</option><option value="pearl">Pearl Matrix</option><option value="silver">Silver Signal</option></optgroup></select></div>
+    <div class="idstudio-style-summary"><span class="idstudio-style-swatch" id="idStudioSwatch"></span><div><strong id="idStudioDesignName">Tech Light</strong><p id="idStudioDesignNote"></p></div></div>
+   </section><section class="idstudio-student"><div class="idstudio-section-heading"><h4>Cardholder</h4><button type="button" class="idstudio-edit-button" id="idStudioEditButton" onclick="editIdStudioDetails()" disabled><i class="fas fa-pen" aria-hidden="true"></i> Edit details</button></div><div class="idstudio-person"><span id="idStudioInitials">—</span><div><strong id="idStudioName">—</strong><small id="idStudioNumber">—</small></div></div><dl><div><dt>Program</dt><dd id="idStudioCourse">—</dd></div><div><dt>Valid until</dt><dd id="idStudioExpiry">—</dd></div></dl></section>
+   <section class="idstudio-editor" id="idStudioEditor" hidden><div class="idstudio-section-heading"><h4>Edit printed details</h4><button type="button" class="idstudio-editor-back" onclick="cancelIdStudioEdit()" aria-label="Cancel editing"><i class="fas fa-arrow-left"></i> Back</button></div><p class="idstudio-editor-note">Changes apply to this ID only. Student records, student number, QR identity, and RFID access dates stay unchanged.</p><form id="idStudioEditForm">
+    <label>Printed name <input name="name" maxlength="100" required autocomplete="off"></label>
+    <label>Printed program <input name="program" maxlength="120" autocomplete="off"></label>
+    <div class="idstudio-edit-dates"><label>Printed issue date<input type="date" name="issued_date"></label><label>Printed expiry date<input type="date" name="expiry_date"></label></div>
+    <label>Printed address<textarea name="address" maxlength="240" rows="2"></textarea></label>
+    <div class="idstudio-editor-group"><h5>Emergency contact on ID</h5><label>Contact name<input name="emergency_name" maxlength="100" autocomplete="off"></label><div class="idstudio-edit-dates"><label>Relationship<input name="emergency_relationship" maxlength="50"></label><label>Phone<input type="tel" name="emergency_phone" maxlength="25"></label></div></div>
+    <label>Reason for correction <textarea name="reason" maxlength="255" rows="2" placeholder="e.g. Student requested an updated emergency contact." required></textarea></label>
+    <p class="idstudio-editor-preview-note"><i class="fas fa-eye"></i> Preview updates as you type. Save to keep your changes.</p><p id="idStudioEditError" class="idstudio-edit-error" role="alert"></p>
+    <div class="idstudio-edit-actions"><button type="button" onclick="cancelIdStudioEdit()">Cancel</button><button type="submit" id="idStudioSaveButton">Save ID details</button></div>
+   </form><button type="button" class="idstudio-reset" id="idStudioResetButton" onclick="showIdStudioReset()" hidden>Use original student details</button><div class="idstudio-reset-confirm" id="idStudioResetConfirm" hidden><p>Remove the saved ID corrections and use the current student record?</p><button type="button" onclick="resetIdStudioDetails()">Reset ID details</button><button type="button" onclick="document.getElementById('idStudioResetConfirm').hidden=true">Keep changes</button></div></section>
+   <div class="idstudio-details-status" id="idStudioDetailsStatus" role="status"></div>
+   <div class="idstudio-output"><i class="fas fa-print" aria-hidden="true"></i><div><strong>Print-ready ID</strong><span>Both sides · Standard card size</span></div></div>
+   <div class="idstudio-actions"><button type="button" class="idstudio-print" onclick="printIdCard()"><i class="fas fa-print" aria-hidden="true"></i> Print ID</button><button type="button" class="idstudio-done" onclick="closeIdStudio()">Done</button></div>
+   </aside>
+  </div>
+ </div>
 </div>
+<script src="../js/id-studio.js?v=20261111-edit2"></script>
 
 <!-- â”€â”€ Toast container â”€â”€ -->
 <div id="printArea"></div>
@@ -2172,68 +2105,22 @@ body[data-page="rfid"] td.rc-empty span{display:block}
 </div>
 
 <!-- Register Cards Modal -->
-<div class="logout-modal-overlay" id="registerModal">
-    <div class="logout-modal rfid-modal" style="max-width:580px;">
-        <div class="rfid-modal-header">
-            <div class="header-icon" style="background:#e0e7ff;color:#4f46e5;"><i class="fas fa-layer-group"></i></div>
-            <div>
-                <h3>Bulk Register Cards</h3>
-                <p id="registerSubheader">Paste card UIDs (one per line, 10 digits each).</p>
-            </div>
-        </div>
-        <div class="reg-steps" id="regSteps">
-            <div class="reg-step active" id="regStep1"><span>1</span> Enter UIDs</div>
-            <div class="reg-step-line" id="regLine1"></div>
-            <div class="reg-step" id="regStep2"><span>2</span> Preview</div>
-            <div class="reg-step-line" id="regLine2"></div>
-            <div class="reg-step" id="regStep3"><span>3</span> Result</div>
-        </div>
-        <div class="reg-step-panel active" id="regPanel1">
-            <div class="rfid-modal-body-wrapper">
-                <div class="form-section" style="border-bottom:none;">
-                    <div class="form-group">
-                        <label>Card UIDs <span style="color:#94a3b8;font-weight:400;">(max 1000, one per line or comma-separated)</span></label>
-                        <textarea id="registerUids" class="register-textarea" placeholder="1234567890&#10;0987654321&#10;1111111111&#10;..."></textarea>
-                        <div id="uidCountHint" class="uid-count-hint"></div>
-                    </div>
-                    <div class="form-group">
-                        <label>Notes <span style="color:#94a3b8;font-weight:400;">(optional)</span></label>
-                        <input type="text" id="registerNotes" class="form-control" placeholder="e.g. Batch received from supplier" />
-                    </div>
-                </div>
-            </div>
-            <div class="rfid-modal-actions">
-                <button type="button" class="btn btn-light" onclick="closeRegisterModal()">Cancel</button>
-                <button type="button" class="btn btn-primary" id="registerPreviewBtn" onclick="previewBulkRegister()" disabled>
-                    <i class="fas fa-magnifying-glass-chart"></i> Validate &amp; Preview
-                </button>
-            </div>
-        </div>
-        <div class="reg-step-panel" id="regPanel2">
-            <div class="rfid-modal-body-wrapper">
-                <div class="reg-summary-grid" id="regSummaryGrid"></div>
-                <div id="regPreviewDetails" class="reg-preview-details"></div>
-            </div>
-            <div class="rfid-modal-actions">
-                <button type="button" class="btn btn-light" onclick="regGoStep(1)"><i class="fas fa-arrow-left"></i> Back</button>
-                <button type="button" class="btn btn-primary" id="registerProceedBtn" onclick="submitBulkRegister()">
-                    <i class="fas fa-check-circle"></i> Register <span id="regProceedCount">0</span> Cards
-                </button>
-            </div>
-        </div>
-        <div class="reg-step-panel" id="regPanel3">
-            <div class="rfid-modal-body-wrapper">
-                <div id="regResultContent"></div>
-            </div>
-            <div class="rfid-modal-actions">
-                <button type="button" class="btn btn-secondary" id="regViewPoolBtn" onclick="viewInPool()">
-                    <i class="fas fa-box-open"></i> View in Available Pool
-                </button>
-                <button type="button" class="btn btn-primary" onclick="closeRegisterModal()">Done</button>
-            </div>
-        </div>
-    </div>
-</div>
+<link rel="stylesheet" href="../assets/id-card/register-cards.css?v=20261111-1">
+<div class="logout-modal-overlay" id="registerModal" role="dialog" aria-modal="true" aria-labelledby="bulkTitle"><div class="logout-modal rfid-modal bulk-dialog">
+<header class="bulk-header"><span class="bulk-header-icon"><i class="fas fa-layer-group" aria-hidden="true"></i></span><div><h3 id="bulkTitle">Register RFID cards</h3><p id="registerSubheader">Add new cards to your available inventory.</p></div><button type="button" class="bulk-close" onclick="closeRegisterModal()" aria-label="Close card registration"><i class="fas fa-xmark"></i></button></header>
+<ol class="bulk-steps" aria-label="Registration progress"><li data-bulk-step="1" class="active" aria-current="step"><span>1</span> Enter UIDs</li><li data-bulk-step="2"><span>2</span> Review batch</li><li data-bulk-step="3"><span>3</span> Complete</li></ol>
+<div class="bulk-body"><div class="bulk-main">
+<section id="bulkEntryPanel" class="bulk-panel"><div class="bulk-section-heading"><h4>Card UIDs</h4><span>Maximum 1,000 cards</span></div><p class="bulk-description">Paste one UID per line, or separate with commas.</p>
+<div id="bulkIssueNav" class="bulk-issue-nav" hidden><strong id="bulkIssueCount"></strong><div><span id="bulkIssuePosition"></span><button type="button" onclick="navigateBulkIssue(-1)" aria-label="Previous issue"><i class="fas fa-chevron-up"></i></button><button type="button" onclick="navigateBulkIssue(1)" aria-label="Next issue"><i class="fas fa-chevron-down"></i></button></div></div>
+<div class="bulk-editor"><div id="bulkUidRows" class="bulk-uid-rows" role="group" aria-label="Card UID entries"></div><div class="bulk-editor-footer"><span id="uidCountHint" role="status">0 UIDs entered</span><button type="button" onclick="clearBulkRows()"><i class="fas fa-trash-can"></i> Clear list</button></div></div><p class="bulk-entry-help">10 digits per row. Moves to the next row automatically. Review checks current inventory.</p>
+<label for="registerNotes" class="bulk-notes-label">Batch notes <span>(optional)</span></label><input id="registerNotes" type="text" maxlength="1000" placeholder="e.g. New cards received from supplier" class="bulk-notes">
+</section>
+<section id="bulkReviewPanel" class="bulk-panel" hidden><div class="bulk-review-heading"><h4>Review your batch</h4><p id="bulkReviewHelp">Only new, valid cards will be registered.</p></div><div id="bulkReviewMetrics" class="bulk-metrics"></div><div id="bulkSkipNotice" class="bulk-skip-notice" hidden></div><div class="bulk-table-scroll"><table class="bulk-table"><thead><tr><th>#</th><th>Card UID</th><th>Check result</th><th>Details</th></tr></thead><tbody id="bulkReviewRows"></tbody></table></div><p class="bulk-batch-note" id="bulkReviewNote"></p></section>
+<section id="bulkCompletePanel" class="bulk-panel" hidden><div class="bulk-result-heading"><span><i class="fas fa-check"></i></span><div><h4 id="bulkResultTitle">Cards registered</h4><p id="bulkResultDescription"></p></div></div><div class="bulk-table-scroll"><table class="bulk-table"><thead><tr><th>#</th><th>Card UID</th><th>Status</th><th>Details</th></tr></thead><tbody id="bulkResultRows"></tbody></table></div><p class="bulk-batch-note" id="bulkResultNote"></p></section>
+</div><aside class="bulk-summary"><div class="bulk-stack" aria-hidden="true"><div class="bulk-stack-layer layer-2"><div class="assign-rfid-art" aria-hidden="true"><div class="assign-art-brand"><img src="../assets/images/BCP_LOGO.png" alt="Bestlink College crest"><div><strong>Bestlink College</strong><small>CAMPUS ACCESS</small></div></div><svg class="assign-coil" viewBox="0 0 120 120" fill="none" aria-hidden="true"><g stroke="#18e7ff" stroke-width="1.6" stroke-linecap="round"><path d="M49 109a50 50 0 1 1 22 0M50 101a42 42 0 1 1 20 0M51 93a34 34 0 1 1 18 0M52 85a26 26 0 1 1 16 0"/></g><g fill="#83f0ff"><circle cx="49" cy="109" r="2.2"/><circle cx="71" cy="109" r="2.2"/><circle cx="50" cy="101" r="2"/><circle cx="70" cy="101" r="2"/><circle cx="51" cy="93" r="1.8"/><circle cx="69" cy="93" r="1.8"/><circle cx="52" cy="85" r="1.7"/><circle cx="68" cy="85" r="1.7"/></g></svg><div class="assign-art-bottom"><div><small>CARD UID</small><strong class="bulk-stack-uid">— — — — —</strong></div><span>RFID</span></div></div></div><div class="bulk-stack-layer layer-1"><div class="assign-rfid-art" aria-hidden="true"><div class="assign-art-brand"><img src="../assets/images/BCP_LOGO.png" alt="Bestlink College crest"><div><strong>Bestlink College</strong><small>CAMPUS ACCESS</small></div></div><svg class="assign-coil" viewBox="0 0 120 120" fill="none" aria-hidden="true"><g stroke="#18e7ff" stroke-width="1.6" stroke-linecap="round"><path d="M49 109a50 50 0 1 1 22 0M50 101a42 42 0 1 1 20 0M51 93a34 34 0 1 1 18 0M52 85a26 26 0 1 1 16 0"/></g><g fill="#83f0ff"><circle cx="49" cy="109" r="2.2"/><circle cx="71" cy="109" r="2.2"/><circle cx="50" cy="101" r="2"/><circle cx="70" cy="101" r="2"/><circle cx="51" cy="93" r="1.8"/><circle cx="69" cy="93" r="1.8"/><circle cx="52" cy="85" r="1.7"/><circle cx="68" cy="85" r="1.7"/></g></svg><div class="assign-art-bottom"><div><small>CARD UID</small><strong class="bulk-stack-uid">— — — — —</strong></div><span>RFID</span></div></div></div><div class="bulk-stack-layer layer-0"><div class="assign-rfid-art" aria-hidden="true"><div class="assign-art-brand"><img src="../assets/images/BCP_LOGO.png" alt="Bestlink College crest"><div><strong>Bestlink College</strong><small>CAMPUS ACCESS</small></div></div><svg class="assign-coil" viewBox="0 0 120 120" fill="none" aria-hidden="true"><g stroke="#18e7ff" stroke-width="1.6" stroke-linecap="round"><path d="M49 109a50 50 0 1 1 22 0M50 101a42 42 0 1 1 20 0M51 93a34 34 0 1 1 18 0M52 85a26 26 0 1 1 16 0"/></g><g fill="#83f0ff"><circle cx="49" cy="109" r="2.2"/><circle cx="71" cy="109" r="2.2"/><circle cx="50" cy="101" r="2"/><circle cx="70" cy="101" r="2"/><circle cx="51" cy="93" r="1.8"/><circle cx="69" cy="93" r="1.8"/><circle cx="52" cy="85" r="1.7"/><circle cx="68" cy="85" r="1.7"/></g></svg><div class="assign-art-bottom"><div><small>CARD UID</small><strong class="bulk-stack-uid">— — — — —</strong></div><span>RFID</span></div></div></div></div><h4 id="bulkSummaryTitle">Batch overview</h4><dl class="bulk-summary-rows" id="bulkSummaryRows"></dl><div class="bulk-info" id="bulkInfo"><i class="fas fa-shield-halved" aria-hidden="true"></i><div><strong id="bulkInfoTitle">Review before registering</strong><p id="bulkInfoText">The next step checks invalid UIDs, duplicates, and cards already in inventory.</p></div></div></aside></div>
+<p id="bulkError" class="bulk-error" role="alert" hidden></p>
+<footer class="bulk-footer"><span id="bulkFooterNote"><i class="fas fa-lock"></i> Cards remain unassigned until you assign them.</span><div id="bulkEntryActions"><button type="button" class="bulk-secondary" onclick="closeRegisterModal()">Cancel</button><button type="button" class="bulk-primary" id="registerPreviewBtn" onclick="previewBulkRegister()" disabled>Review batch <i class="fas fa-arrow-right"></i></button></div><div id="bulkReviewActions" hidden><button type="button" class="bulk-secondary" onclick="regGoStep(1)">Back to edit</button><button type="button" class="bulk-primary" id="registerProceedBtn" onclick="submitBulkRegister()">Register cards <i class="fas fa-arrow-right"></i></button></div><div id="bulkCompleteActions" hidden><button type="button" class="bulk-secondary" onclick="startAnotherBulkBatch()">Register another batch</button><button type="button" class="bulk-primary" onclick="closeRegisterModal()">Done <i class="fas fa-check"></i></button></div></footer>
+</div></div>
 <!-- The standalone Archive modal and its per-row Archive button are gone.
      The Edit modal is now the single way to retire a card, and it records a
      retirement reason in archive_reason. The old modal wrote free-text values
@@ -2292,7 +2179,7 @@ document.getElementById('deleteModal')?.addEventListener('click', (e) => {
         deleteTarget = null;
     }
 });
-['assignModal','editModal','viewModal'].forEach(id => {
+['editModal','viewModal'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('click', (e) => {
         if (e.target === e.currentTarget) {
@@ -2411,193 +2298,10 @@ if (searchClearBtn) {
 // Apply once on load so the counts and the view agree with the server-rendered rows.
 setRfidView('active');
 
-// ─── Assign modal: students from <select> ────────────────────────
-const allStudents = [];
-const studentSelectEl = document.getElementById('studentSelect');
-if (studentSelectEl) {
-    Array.from(studentSelectEl.options).forEach(opt => {
-        if (opt.value) allStudents.push({ id: opt.value, name: opt.textContent.trim() });
-    });
-}
-const studentSearchInput = document.getElementById('studentSearchInput');
-const studentSearchResults = document.getElementById('studentSearchResults');
+// Assignment workspace handlers live in js/assign-card.js.
+function closeEditModal(){document.getElementById('editModal').classList.remove('active');document.body.style.overflow='';}
+function closeViewDrawer(){closeViewModal();}
 
-function selectStudent(id, name) {
-    document.getElementById('studentSelect').value = id;
-    document.getElementById('selectedStudentId').value = id;
-    document.getElementById('selectedName').textContent = name;
-    document.getElementById('selectedId').textContent = 'Selected';
-    document.getElementById('selectedStudentDisplay').classList.add('show');
-    if (studentSearchInput) {
-        studentSearchInput.value = name;
-        studentSearchInput.style.borderColor = '#22c55e';
-        studentSearchInput.style.background = '#f0fdf4';
-    }
-    if (studentSearchResults) studentSearchResults.classList.remove('show');
-    showToast(name + ' selected.', 'success');
-    validateAssignForm();
-}
-
-function clearSelectedStudent() {
-    document.getElementById('selectedStudentDisplay').classList.remove('show');
-    document.getElementById('selectedStudentId').value = '';
-    document.getElementById('studentSelect').value = '';
-    if (studentSearchInput) {
-        studentSearchInput.value = '';
-        studentSearchInput.style.borderColor = '';
-        studentSearchInput.style.background = '';
-    }
-    validateAssignForm();
-}
-
-if (studentSearchInput) {
-    studentSearchInput.addEventListener('input', function () {
-        const query = this.value.trim().toLowerCase();
-        if (!query) { studentSearchResults.classList.remove('show'); return; }
-        const results = allStudents.filter(s => s.name.toLowerCase().includes(query));
-        if (!results.length) {
-            studentSearchResults.innerHTML = '<div class="no-results">No students found</div>';
-        } else {
-            studentSearchResults.innerHTML = results.slice(0, 10).map(s =>
-                `<div class="result-item" onclick="selectStudent('${s.id}', '${s.name.replace(/'/g, "\\'")}')">
-                    <span class="student-name">${s.name}</span>
-                </div>`
-            ).join('');
-        }
-        studentSearchResults.classList.add('show');
-    });
-    document.addEventListener('click', (e) => {
-        if (!e.target.closest('.student-search-wrapper')) studentSearchResults.classList.remove('show');
-    });
-}
-
-// â”€â”€ UID input + duplicate check â”€â”€
-const cardUidInput = document.getElementById('cardUid');
-let uidCheckTimeout;
-let uidSubmitting = false; // guard: prevent post-submit check_uid from showing false "Duplicate UID" toast
-
-if (cardUidInput) {
-    cardUidInput.addEventListener('input', function () {
-        this.value = this.value.replace(/[^0-9]/g, '').slice(0, 10);
-        const len = this.value.length;
-        this.style.borderColor = len === 10 ? '#22c55e' : '';
-        this.style.background = len === 10 ? '#f0fdf4' : '';
-        const badge = document.getElementById('uidLengthBadge');
-        if (badge) {
-            badge.textContent = len + '/10';
-            badge.style.color = len === 10 ? '#16a34a' : '#94a3b8';
-            badge.style.background = len === 10 ? '#dcfce7' : '#f1f5f9';
-        }
-        // Duplicate check
-        clearTimeout(uidCheckTimeout);
-        const uid = this.value;
-        if (uid.length === 10) {
-            uidCheckTimeout = setTimeout(() => {
-                if (uidSubmitting) return;
-                fetch('../api/rfid.php?check_uid=' + encodeURIComponent(uid))
-                    .then(r => r.json())
-                    .then(d => {
-                        if (d.exists && !uidSubmitting) {
-                            this.style.borderColor = '#dc2626';
-                            this.style.background = '#fee2e2';
-                            const badge2 = document.getElementById('uidLengthBadge');
-                            if (badge2) { badge2.style.color = '#dc2626'; badge2.style.background = '#fee2e2'; }
-                            showToast('Card ' + uid + ' already assigned to ' + d.student, 'warning');
-                        }
-                    })
-                    .catch(() => {});
-            }, 500);
-        }
-        validateAssignForm();
-    });
-}
-
-// â”€â”€ Form validation for Assign modal â”€â”€
-function validateAssignForm() {
-    const studentId = document.getElementById('selectedStudentId').value;
-    const mode = document.getElementById('assignMode').value;
-    const submitBtn = document.getElementById('assignSubmitBtn');
-    if (!submitBtn) return;
-    if (mode === 'pool') {
-        const cardId = document.getElementById('selectedPoolCardId').value;
-        submitBtn.disabled = !(studentId && cardId);
-    } else {
-        const cardUid = document.getElementById('cardUid').value.trim();
-        submitBtn.disabled = !(studentId && cardUid && cardUid.length === 10);
-    }
-}
-
-// â”€â”€ Open / close modals â”€â”€
-function openAssignModal() {
-    document.getElementById('assignModal').classList.add('active');
-    document.body.style.overflow = 'hidden';
-    if (cardUidInput) setTimeout(() => cardUidInput.focus(), 50);
-}
-function closeAssignModal() {
-    document.getElementById('assignModal').classList.remove('active');
-    document.body.style.overflow = '';
-    const f = document.getElementById('assignCardForm');
-    if (f) f.reset();
-    clearSelectedStudent();
-    clearTimeout(uidCheckTimeout);
-    uidSubmitting = false;
-    document.getElementById('issuedDate').value = new Date().toISOString().slice(0, 10);
-    const d = new Date(); d.setFullYear(d.getFullYear() + 1);
-    document.getElementById('expiryDate').value = d.toISOString().slice(0, 10);
-}
-function closeEditModal() {
-    document.getElementById('editModal').classList.remove('active');
-    document.body.style.overflow = '';
-}
-function closeViewDrawer() {
-    closeViewModal();
-}
-
-// Assign form submit
-document.getElementById('assignCardForm')?.addEventListener('submit', async function (e) {
-    e.preventDefault();
-    const studentId = document.getElementById('selectedStudentId').value;
-    const mode = document.getElementById('assignMode').value;
-    if (!studentId) { showToast('Please select a student.', 'error'); return; }
-
-    clearTimeout(uidCheckTimeout);
-    uidSubmitting = true;
-
-    const submitBtn = document.getElementById('assignSubmitBtn');
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Assigning...';
-
-    try {
-        let url, body;
-        if (mode === 'pool') {
-            const cardId = document.getElementById('selectedPoolCardId').value;
-            if (!cardId) { showToast('Select a card from the pool.', 'error'); submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fas fa-save"></i> Assign Card'; return; }
-            url = '../api/rfid.php?action=quick-assign';
-            body = { card_id: parseInt(cardId), student_id: parseInt(studentId), issued_date: document.getElementById('issuedDate').value, expiry_date: document.getElementById('expiryDate').value, notes: document.getElementById('cardNotes').value };
-        } else {
-            const cardUid = document.getElementById('cardUid').value.trim();
-            if (!cardUid || cardUid.length !== 10) { showToast('UID must be exactly 10 digits.', 'error'); submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fas fa-save"></i> Assign Card'; return; }
-            url = '../api/rfid.php';
-            body = { student_id: studentId, card_uid: cardUid, issued_date: document.getElementById('issuedDate').value, expiry_date: document.getElementById('expiryDate').value, notes: document.getElementById('cardNotes').value };
-        }
-        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-        const data = await res.json();
-        if (data.success) { showToast(data.message, 'success'); setTimeout(() => window.location.reload(), 1000); }
-        else { showToast(data.message, 'error'); submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fas fa-save"></i> Assign Card'; }
-    } catch (err) {
-        showToast('Network error. Please try again.', 'error');
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = '<i class="fas fa-save"></i> Assign Card';
-    }
-});
-// â”€â”€ Edit modal â”€â”€
-// One outcome = one (status, reason) pair. The old modal had two independent
-// selects and could save status=active with reason=graduated; here a choice
-// always writes both, so they cannot disagree.
-//
-// `reason` is the value written to archive_reason, which the API allow-list
-// accepts. The page used to send `status_reason`, which that allow-list drops
-// silently, so the chosen reason was never actually saved.
 const EDIT_OUTCOMES = {
     keep:     { status: 'active',   reason: 'active',      label: 'Still in use',      verb: 'Save Changes',   effect: 'keep' },
     lost:     { status: 'lost',     reason: 'lost_card',   label: 'Reported lost',     verb: 'Mark Card Lost', effect: 'warning' },
@@ -3075,6 +2779,8 @@ function applyIdDesign(design, animate = false) {
     });
     document.getElementById('idDesignSelect').value = currentIdDesign;
     try { localStorage.setItem('bcp-id-design', currentIdDesign); } catch (_) {}
+    if (typeof refreshIdStudioDesign === 'function') refreshIdStudioDesign(currentIdDesign);
+    if (typeof fitIdStudioPrintedText === 'function') fitIdStudioPrintedText();
     stopIdConstruction();
     const preview = document.getElementById('cardFlip');
     if (animate && previousDesign !== currentIdDesign && preview && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -3141,7 +2847,7 @@ function viewIdCard(btn) {
     const d = tr.dataset;
     if (!d.studentId || d.studentId === '0') { showToast('This card has no student assigned.', 'warning'); return; }
     idCardData = {
-        name: d.name, studentId: d.studentId, photo: d.photo, course: d.course,
+        cardId: d.id, name: d.name, studentId: d.studentId, photo: d.photo, course: d.course,
         year: d.year, idnumber: d.idnumber, qr: d.qr, idtype: d.idtype,
         issued: d.issued, expiry: d.expiry
     };
@@ -3184,6 +2890,7 @@ function viewIdCard(btn) {
     applyIdDesign(currentIdDesign);
     document.getElementById('cardFlip').classList.remove('flipped');
     document.getElementById('idCardModal').classList.add('active');
+    openIdStudioDetails(btn);
     fitIdCardPreview();
     refreshIdPhotoFromStorage(d.id, d.studentId);
     document.body.style.overflow = 'hidden';
@@ -3234,7 +2941,8 @@ function fillIdCardBack(studentId) {
 function fitIdCardPreview() {
     const flip = document.getElementById('cardFlip');
     if (!flip) return;
-    const width = Math.min(340, flip.parentElement.clientWidth);
+    const canvas = flip.closest('.idstudio-canvas');
+    const width = canvas ? Math.max(1, Math.min(340, canvas.clientWidth - 40, (canvas.clientHeight - 24) * 340 / 539)) : Math.min(340, flip.parentElement.clientWidth);
     flip.style.width = width + 'px';
     flip.style.height = (width * 539 / 340) + 'px';
     flip.style.setProperty('--idcard-scale', width / 340);
@@ -3286,180 +2994,11 @@ document.getElementById('qrModalOverlay')?.addEventListener('click', function(e)
     if (e.target === this) closeQrModal();
 });
 
-// ── Assign Tab Switching ──────────────────────────────────────────
-function switchAssignTab(tab) {
-    document.querySelectorAll('.assign-tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.assign-tab-pane').forEach(p => p.classList.remove('active'));
-    if (tab === 'pool') {
-        document.querySelector('.assign-tab:first-child').classList.add('active');
-        document.getElementById('tabPool').classList.add('active');
-        document.getElementById('assignMode').value = 'pool';
-    } else {
-        document.querySelectorAll('.assign-tab')[1].classList.add('active');
-        document.getElementById('tabNew').classList.add('active');
-        document.getElementById('assignMode').value = 'new';
-    }
-    validateAssignForm();
-}
-function onPoolCardSelect(sel) {
-    document.getElementById('selectedPoolCardId').value = sel.value;
-    validateAssignForm();
-}
-
-// Register Modal - Two-Step Wizard
-var regPreviewData = null;
-function openRegisterModal() {
-    document.getElementById('registerModal').classList.add('active');
-    document.body.style.overflow = 'hidden';
-    regGoStep(1);
-    document.getElementById('registerUids').value = '';
-    document.getElementById('registerNotes').value = '';
-    document.getElementById('uidCountHint').textContent = '';
-    regPreviewData = null;
-    var ta = document.getElementById('registerUids');
-    ta.oninput = function() {
-        var lines = this.value.split(/\s*[\n\r,;]+\s*/).filter(function(u){ return u.trim(); });
-        var hint = document.getElementById('uidCountHint');
-        if (lines.length > 0) {
-            hint.textContent = lines.length + ' UID' + (lines.length !== 1 ? 's' : '') + ' detected';
-            hint.classList.add('has-count');
-        } else { hint.textContent = ''; hint.classList.remove('has-count'); }
-        document.getElementById('registerPreviewBtn').disabled = (lines.length === 0);
-    };
-}
-function closeRegisterModal() {
-    document.getElementById('registerModal').classList.remove('active');
-    document.body.style.overflow = '';
-}
-function viewInPool() {
-    closeRegisterModal();
-    var pool = document.getElementById('poolSection');
-    if (pool) pool.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    else showToast('No available cards in pool.', 'info');
-}
-function regGoStep(step) {
-    [1,2,3].forEach(function(s){ document.getElementById('regPanel'+s).classList.toggle('active', s===step); });
-    ['regStep1','regStep2','regStep3'].forEach(function(id,i) {
-        var el = document.getElementById(id);
-        el.classList.remove('active','done');
-        if (i+1 === step) el.classList.add('active');
-        else if (i+1 < step) el.classList.add('done');
-    });
-    ['regLine1','regLine2'].forEach(function(id,i) {
-        document.getElementById(id).classList.toggle('done', i+1 < step);
-    });
-    document.getElementById('registerSubheader').textContent =
-        step===1 ? 'Paste card UIDs (one per line, 10 digits each).' :
-        step===2 ? 'Review the validation before registering.' :
-        'Registration complete.';
-}
-async function previewBulkRegister() {
-    var raw = document.getElementById('registerUids').value.trim();
-    if (!raw) { showToast('Paste at least one UID.', 'error'); return; }
-    var uids = raw.split(/\s*[\n\r,;]+\s*/).filter(function(u){ return u.trim(); });
-    if (uids.length === 0) { showToast('Paste at least one UID.', 'error'); return; }
-    var btn = document.getElementById('registerPreviewBtn');
-    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Validating...';
-    try {
-        var res = await fetch('../api/rfid.php?action=preview-register', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ uids: uids })
-        });
-        var data = await res.json();
-        btn.disabled = false; btn.innerHTML = '<i class="fas fa-magnifying-glass-chart"></i> Validate &amp; Preview';
-        if (!data.success) { showToast(data.message, 'error'); return; }
-        regPreviewData = data;
-        var s = data.summary;
-        document.getElementById('regSummaryGrid').innerHTML =
-            '<div class="reg-summary-card green"><div class="rs-num">' + s.new + '</div><div class="rs-label">New</div></div>' +
-            '<div class="reg-summary-card amber"><div class="rs-num">' + s.already_registered + '</div><div class="rs-label">Already Registered</div></div>' +
-            '<div class="reg-summary-card gray"><div class="rs-num">' + s.duplicates_in_list + '</div><div class="rs-label">Duplicates</div></div>' +
-            '<div class="reg-summary-card red"><div class="rs-num">' + s.format_errors + '</div><div class="rs-label">Invalid</div></div>';
-        var details = '';
-        if (data.already_registered.length > 0) {
-            details += '<div class="reg-preview-section"><h4><i class="fas fa-copy" style="color:#d97706;"></i> Already in Database (' + data.already_registered.length + ')</h4><ul>';
-            data.already_registered.forEach(function(r) { details += '<li><code style="background:#f1f5f9;padding:1px 5px;border-radius:4px;font-size:11px;">' + r.uid + '</code> <span style="color:#94a3b8;">(' + r.status + ')</span></li>'; });
-            details += '</ul></div>';
-        }
-        if (data.dupes_in_list.length > 0) {
-            details += '<div class="reg-preview-section"><h4><i class="fas fa-arrows-rotate" style="color:#6b7280;"></i> Duplicated in List (' + data.dupes_in_list.length + ')</h4><ul>';
-            data.dupes_in_list.forEach(function(uid) { details += '<li><code style="background:#f1f5f9;padding:1px 5px;border-radius:4px;font-size:11px;">' + uid + '</code></li>'; });
-            details += '</ul></div>';
-        }
-        if (data.format_errors.length > 0) {
-            details += '<div class="reg-preview-section"><h4><i class="fas fa-triangle-exclamation" style="color:#dc2626;"></i> Invalid Format (' + data.format_errors.length + ')</h4><ul>';
-            data.format_errors.forEach(function(uid) { details += '<li><code style="background:#fef2f2;padding:1px 5px;border-radius:4px;font-size:11px;color:#991b1b;">' + uid + '</code></li>'; });
-            details += '</ul></div>';
-        }
-        document.getElementById('regPreviewDetails').innerHTML = details;
-        document.getElementById('regProceedCount').textContent = s.new;
-        var proceedBtn = document.getElementById('registerProceedBtn');
-        if (s.new === 0) {
-            proceedBtn.disabled = true;
-            proceedBtn.innerHTML = '<i class="fas fa-ban"></i> Nothing New to Register';
-        } else {
-            proceedBtn.disabled = false;
-            proceedBtn.innerHTML = '<i class="fas fa-check-circle"></i> Register ' + s.new + ' Card' + (s.new !== 1 ? 's' : '');
-        }
-        regGoStep(2);
-    } catch(e) {
-        showToast('Network error.', 'error');
-        btn.disabled = false; btn.innerHTML = '<i class="fas fa-magnifying-glass-chart"></i> Validate &amp; Preview';
-    }
-}
-async function submitBulkRegister() {
-    if (!regPreviewData || !regPreviewData.new_uids || regPreviewData.new_uids.length === 0) return;
-    var notes = document.getElementById('registerNotes').value.trim();
-    var btn = document.getElementById('registerProceedBtn');
-    btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registering...';
-    try {
-        var res = await fetch('../api/rfid.php?action=register', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ uids: regPreviewData.new_uids, notes: notes })
-        });
-        var data = await res.json();
-        if (data.success) {
-            var rc = data.registered || 0;
-            var skipped = (data.skipped || []).length;
-            var isPartial = skipped > 0 || (data.errors && data.errors.length > 0);
-            var html = '<div class="reg-result-box">' +
-                '<div class="result-icon ' + (isPartial ? 'partial' : 'success') + '"><i class="fas fa-' + (isPartial ? 'circle-check' : 'check-double') + '"></i></div>' +
-                '<h3>' + (isPartial ? 'Partial Success' : 'Registration Complete!') + '</h3>' +
-                '<p>' + rc + ' card' + (rc !== 1 ? 's' : '') + ' added to Available pool' + (skipped > 0 ? ' (' + skipped + ' skipped)' : '') + '</p>';
-            if (rc > 0 || skipped > 0) {
-                html += '<div class="reg-result-breakdown">';
-                if (rc > 0) html += '<div class="rb-item"><div class="rb-num" style="color:#16a34a;">' + rc + '</div><div class="rb-label">Registered</div></div>';
-                if (skipped > 0) html += '<div class="rb-item"><div class="rb-num" style="color:#d97706;">' + skipped + '</div><div class="rb-label">Skipped</div></div>';
-                if (data.errors && data.errors.length > 0) html += '<div class="rb-item"><div class="rb-num" style="color:#dc2626;">' + data.errors.length + '</div><div class="rb-label">Errors</div></div>';
-                html += '</div>';
-            }
-            if (skipped > 0) {
-                html += '<div style="margin-top:12px;font-size:12px;color:#64748b;text-align:left;"><strong>Skipped UIDs:</strong><br>';
-                data.skipped.forEach(function(u) { html += '<code style="background:#f1f5f9;padding:1px 5px;border-radius:4px;">' + u + '</code> '; });
-                html += '</div>';
-            }
-            if (data.errors && data.errors.length > 0) {
-                html += '<div style="margin-top:8px;font-size:12px;color:#991b1b;text-align:left;"><strong>Invalid:</strong><br>' + data.errors.join(', ') + '</div>';
-            }
-            html += '</div>';
-            document.getElementById('regResultContent').innerHTML = html;
-        } else {
-            document.getElementById('regResultContent').innerHTML =
-                '<div class="reg-result-box"><div class="result-icon error"><i class="fas fa-xmark"></i></div>' +
-                '<h3>Registration Failed</h3><p>' + (data.message || 'Unknown error') + '</p></div>';
-        }
-        regGoStep(3);
-    } catch(e) { showToast('Network error.', 'error'); }
-    btn.disabled = false;
-}
-// The archive modal and its handlers were removed. openEditModal() is the single
-// path for retiring a card; it writes both status and archive_reason, and the
-// card then drops out of the live table into the retired view on reload.
-['registerModal'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('click', e => { if (e.target === e.currentTarget) { el.classList.remove('active'); document.body.style.overflow = ''; } });
-});
+// Bulk registration is handled by js/register-cards.js.
 
 </script>
 
+<script type="application/json" id="assignStudentsData"><?= json_encode($students,JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_INVALID_UTF8_SUBSTITUTE) ?></script>
+<script src="../js/assign-card.js?v=20261111-1"></script>
+<script src="../js/register-cards.js?v=20261111-2"></script>
 <?php include '../includes/footer.php'; ?>

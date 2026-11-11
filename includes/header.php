@@ -32,7 +32,7 @@ $__csrfToken = htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8');
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    
+
     <title><?= htmlspecialchars($page_title) ?> — BCP Registrar System</title>
     <meta name='csrf-token' content='<?= $__csrfToken ?>' />
 
@@ -59,6 +59,8 @@ $__csrfToken = htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8');
     <link rel="stylesheet" href="<?= $APP_ROOT ?>css/registrar.css" />
     <link rel="stylesheet" href="<?= $APP_ROOT ?>css/registrar-premium.css" />
     <link rel="stylesheet" href="<?= $APP_ROOT ?>css/dashboard.css" />
+
+    <link rel="stylesheet" href="<?= $APP_ROOT ?>css/searchable-select.css?v=<?= filemtime(__DIR__ . '/../css/searchable-select.css') ?>" />
 
     <!-- Confirmation dialog (replaces native confirm) - MUST come before
          any page script that might call confirmAction() -->

@@ -28,7 +28,7 @@ if (empty($_SESSION['user_id'])) {
     echo json_encode(['success' => false, 'message' => 'Sign in first.']);
     exit;
 }
-if (!in_array(getCurrentUserRole(), ['registrar', 'admin'], true)) {
+if (!in_array(getCurrentUserRole(), ['staff', 'super_admin'], true)) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Only a registrar can use this.']);
     exit;

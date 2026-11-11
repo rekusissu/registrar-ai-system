@@ -47,7 +47,7 @@ $action = trim($input['action'] ?? ($_GET['action'] ?? ''));
 // delivery fee before submitting); booking + delivery simulation stay
 // Registrar-only.
 $role = getCurrentUserRole();
-if ($action !== 'quotation' && !in_array($role, ['admin', 'registrar'], true)) {
+if ($action !== 'quotation' && !in_array($role, ['super_admin', 'staff'], true)) {
     echo json_encode(['success' => false, 'message' => 'Forbidden.']);
     exit;
 }

@@ -29,6 +29,23 @@ $action = $_GET['action'] ?? '';
 
 try {
     $db = Database::getInstance();
+    if ($method === 'POST' && ($action === 'quick-assign' || $action === '')) {
+        requireCsrf();
+        require_once __DIR__ . '/../shared/rfid_assignment.php';
+        $input = json_decode(file_get_contents('php://input'), true);
+        if (!is_array($input)) { http_response_code(422); echo json_encode(['success'=>false,'message'=>'Invalid request.']); exit; }
+        try {
+            $assigned = assignRfidCredential($db, $input, $action === 'quick-assign');
+            echo json_encode(['success'=>true,'message'=>'RFID card assigned. Student ID card and verification QR code are ready.','data'=>$assigned]);
+        } catch (InvalidArgumentException $e) {
+            http_response_code(422); echo json_encode(['success'=>false,'message'=>$e->getMessage()]);
+        } catch (RuntimeException $e) {
+            if ($e->getCode() !== 409) throw $e;
+            http_response_code(409); echo json_encode(['success'=>false,'message'=>$e->getMessage()]);
+        }
+        exit;
+    }
+
 
     // CHECK UID EXISTS
     if ($method === 'GET' && isset($_GET['check_uid'])) {
@@ -50,135 +67,20 @@ try {
         exit;
     }
 
-    // PREVIEW REGISTER — validate UIDs without inserting
-    if ($method === 'POST' && $action === 'preview-register') {
-        $input = json_decode(file_get_contents('php://input'), true);
-        $uids = $input['uids'] ?? [];
-
-        if (empty($uids) || !is_array($uids)) {
-            echo json_encode(['success' => false, 'message' => 'No card UIDs provided.']);
-            exit;
+    // Preview and final registration use the same classification rules.
+    if ($method === 'POST' && in_array($action, ['preview-register','register'], true)) {
+        requireCsrf();
+        require_once __DIR__ . '/../shared/rfid_batch.php';
+        try {
+            $input=json_decode(file_get_contents('php://input'),true);
+            if(!is_array($input))throw new InvalidArgumentException('Invalid batch request.');
+            $uids=rfidBatchInput($input);
+            if(!is_string($input['notes']??'') || mb_strlen($input['notes']??'')>1000)throw new InvalidArgumentException('Batch notes must be 1,000 characters or fewer.');
+            $data=$action==='preview-register'?rfidBatchPreview($db,$uids):rfidBatchRegister($db,$uids,trim($input['notes']??''));
+            echo json_encode(['success'=>true]+$data,JSON_INVALID_UTF8_SUBSTITUTE);
+        } catch(InvalidArgumentException $e) {
+            http_response_code(422);echo json_encode(['success'=>false,'message'=>$e->getMessage()]);
         }
-        if (count($uids) > 1000) {
-            echo json_encode(['success' => false, 'message' => 'Maximum 1000 cards per batch.']);
-            exit;
-        }
-
-        $valid = [];
-        $formatErrors = [];
-        $dupesInList = [];
-        $alreadyRegistered = [];
-        $seen = [];
-        foreach ($uids as $raw) {
-            $uid = trim((string) $raw);
-            if ($uid === '') continue;
-            if (!preg_match('/^\d{10}$/', $uid)) {
-                $formatErrors[] = $uid;
-                continue;
-            }
-            if (in_array($uid, $seen, true)) {
-                $dupesInList[] = $uid;
-                continue;
-            }
-            $seen[] = $uid;
-            $valid[] = $uid;
-        }
-
-        if (!empty($valid)) {
-            $placeholders = implode(',', array_fill(0, count($valid), '?'));
-            $existingRows = $db->fetchAll("SELECT card_uid, status FROM rfid_cards WHERE card_uid IN ($placeholders)", $valid);
-            foreach ($existingRows as $row) {
-                $alreadyRegistered[] = ['uid' => $row['card_uid'], 'status' => $row['status']];
-            }
-        }
-
-        $existingUids = array_column($alreadyRegistered, 'uid');
-        $newUids = array_values(array_diff($valid, $existingUids));
-
-        echo json_encode([
-            'success' => true,
-            'summary' => [
-                'total_input' => count($uids),
-                'new' => count($newUids),
-                'already_registered' => count($alreadyRegistered),
-                'duplicates_in_list' => count($dupesInList),
-                'format_errors' => count($formatErrors),
-            ],
-            'new_uids' => $newUids,
-            'already_registered' => $alreadyRegistered,
-            'dupes_in_list' => $dupesInList,
-            'format_errors' => $formatErrors,
-        ]);
-        exit;
-    }
-    // BULK REGISTER CARDS
-    if ($method === 'POST' && $action === 'register') {
-        $input = json_decode(file_get_contents('php://input'), true);
-        $uids = $input['uids'] ?? [];
-        $notes = trim($input['notes'] ?? '');
-
-        if (empty($uids) || !is_array($uids)) {
-            echo json_encode(['success' => false, 'message' => 'No card UIDs provided.']);
-            exit;
-        }
-        if (count($uids) > 1000) {
-            echo json_encode(['success' => false, 'message' => 'Maximum 1000 cards per batch.']);
-            exit;
-        }
-
-        $clean = [];
-        $dupes = [];
-        $errors = [];
-        $seen = [];
-        foreach ($uids as $raw) {
-            $uid = trim((string) $raw);
-            if ($uid === '') continue;
-            if (!preg_match('/^\d{10}$/', $uid)) {
-                $errors[] = $uid . ' (not 10 digits)';
-                continue;
-            }
-            if (in_array($uid, $seen, true)) {
-                $dupes[] = $uid . ' (duplicate in list)';
-                continue;
-            }
-            $seen[] = $uid;
-            $clean[] = $uid;
-        }
-
-        if (empty($clean)) {
-            echo json_encode(['success' => false, 'message' => 'No valid UIDs.', 'errors' => $errors, 'dupes' => $dupes]);
-            exit;
-        }
-
-        $placeholders = implode(',', array_fill(0, count($clean), '?'));
-        $existingRows = $db->fetchAll("SELECT card_uid FROM rfid_cards WHERE card_uid IN ($placeholders)", $clean);
-        $existingUids = array_column($existingRows, 'card_uid');
-
-        $registered = 0;
-        $skipped = [];
-        foreach ($clean as $uid) {
-            if (in_array($uid, $existingUids, true)) {
-                $skipped[] = $uid;
-                continue;
-            }
-            $db->insert('rfid_cards', [
-                'card_uid' => $uid,
-                'card_type' => 'rfid',
-                'status' => 'available',
-                'notes' => $notes ?: null,
-                'registered_at' => date('Y-m-d H:i:s'),
-            ]);
-            $registered++;
-        }
-
-        echo json_encode([
-            'success' => true,
-            'message' => "$registered card(s) registered.",
-            'registered' => $registered,
-            'skipped' => $skipped,
-            'errors' => $errors,
-            'dupes_in_list' => $dupes,
-        ]);
         exit;
     }
 
@@ -282,59 +184,6 @@ try {
     }
 
 
-    // QUICK ASSIGN
-    if ($method === 'POST' && $action === 'quick-assign') {
-        $input = json_decode(file_get_contents('php://input'), true);
-        $cardId = intval($input['card_id'] ?? 0);
-        $studentId = intval($input['student_id'] ?? 0);
-        $issuedDate = $input['issued_date'] ?? date('Y-m-d');
-        $expiryDate = $input['expiry_date'] ?? date('Y-m-d', strtotime('+1 year'));
-        $notes = $input['notes'] ?? '';
-
-        if (!$cardId || !$studentId) {
-            echo json_encode(['success' => false, 'message' => 'Card ID and Student ID are required.']);
-            exit;
-        }
-
-        $card = $db->fetchOne("SELECT id, card_uid, status FROM rfid_cards WHERE id = ?", [$cardId]);
-        if (!$card || $card['status'] !== 'available') {
-            echo json_encode(['success' => false, 'message' => 'Card is not available for assignment.']);
-            exit;
-        }
-
-        $existingStudent = $db->fetchOne("SELECT id FROM rfid_cards WHERE student_id = ? AND status = 'active'", [$studentId]);
-        if ($existingStudent) {
-            echo json_encode(['success' => false, 'message' => 'Student already has an active card.']);
-            exit;
-        }
-
-        $db->update('rfid_cards', [
-            'student_id' => $studentId,
-            'status' => 'active',
-            'issued_date' => $issuedDate,
-            'expiry_date' => $expiryDate,
-            'assigned_at' => date('Y-m-d H:i:s'),
-            'notes' => $notes ?: null,
-        ], 'id = ?', [$cardId]);
-
-        require_once __DIR__ . '/../shared/qr_generator.php';
-        $qrPath = generateStudentQrFile($studentId);
-
-        $existingSid = $db->fetchOne("SELECT id, id_number, qr_code_path FROM student_ids WHERE student_id = ? AND id_type = 'school_id' AND status = 'active'", [$studentId]);
-        if ($existingSid) {
-            $updates = [];
-            if (empty($existingSid['qr_code_path']) && $qrPath) $updates['qr_code_path'] = $qrPath;
-            if ($updates) $db->update('student_ids', $updates, 'id = ?', [$existingSid['id']]);
-        } else {
-            $sidData = ['student_id' => $studentId, 'id_type' => 'school_id', 'id_number' => '', 'issue_date' => $issuedDate, 'expiry_date' => $expiryDate, 'status' => 'active', 'rfid_card_id' => $cardId];
-            if ($qrPath) $sidData['qr_code_path'] = $qrPath;
-            $db->insert('student_ids', $sidData);
-        }
-
-        echo json_encode(['success' => true, 'message' => 'Card ' . $card['card_uid'] . ' assigned successfully.', 'data' => ['id' => $cardId]]);
-        exit;
-    }
-
     // ARCHIVE CARD
     if ($method === 'POST' && $action === 'archive') {
         $input = json_decode(file_get_contents('php://input'), true);
@@ -411,54 +260,6 @@ try {
         } else {
             echo json_encode(['success' => false, 'message' => 'RFID card not found.']);
         }
-        exit;
-    }
-
-    // ASSIGN RFID CARD (legacy: type UID)
-    if ($method === 'POST' && !$action) {
-        $input = json_decode(file_get_contents('php://input'), true);
-        $studentId = $input['student_id'] ?? null;
-        $cardUid = trim($input['card_uid'] ?? '');
-        $issuedDate = $input['issued_date'] ?? date('Y-m-d');
-        $expiryDate = $input['expiry_date'] ?? date('Y-m-d', strtotime('+1 year'));
-        $notes = $input['notes'] ?? '';
-
-        if (!$studentId) { echo json_encode(['success' => false, 'message' => 'Student ID is required.']); exit; }
-        if (empty($cardUid)) { echo json_encode(['success' => false, 'message' => 'Card UID is required.']); exit; }
-        if (!preg_match('/^\d{10}$/', $cardUid)) { echo json_encode(['success' => false, 'message' => 'Card UID must be exactly 10 digits.']); exit; }
-
-        $existing = $db->fetchOne("SELECT id, status FROM rfid_cards WHERE card_uid = ?", [$cardUid]);
-        if ($existing && $existing['status'] !== 'available') {
-            echo json_encode(['success' => false, 'message' => 'Card UID already exists.']);
-            exit;
-        }
-        $existingStudent = $db->fetchOne("SELECT id FROM rfid_cards WHERE student_id = ? AND status = 'active'", [$studentId]);
-        if ($existingStudent) {
-            echo json_encode(['success' => false, 'message' => 'Student already has an active card.']);
-            exit;
-        }
-
-        if ($existing && $existing['status'] === 'available') {
-            $newId = $existing['id'];
-            $db->update('rfid_cards', ['student_id' => $studentId, 'status' => 'active', 'issued_date' => $issuedDate, 'expiry_date' => $expiryDate, 'assigned_at' => date('Y-m-d H:i:s'), 'notes' => $notes ?: null], 'id = ?', [$newId]);
-        } else {
-            $newId = $db->insert('rfid_cards', ['student_id' => $studentId, 'card_uid' => $cardUid, 'card_type' => 'rfid', 'status' => 'active', 'issued_date' => $issuedDate, 'expiry_date' => $expiryDate, 'notes' => $notes, 'assigned_at' => date('Y-m-d H:i:s')]);
-        }
-
-        require_once __DIR__ . '/../shared/qr_generator.php';
-        $qrPath = generateStudentQrFile(intval($studentId));
-        $existingSid = $db->fetchOne("SELECT id, id_number, qr_code_path FROM student_ids WHERE student_id = ? AND id_type = 'school_id' AND status = 'active'", [$studentId]);
-        if ($existingSid) {
-            $updates = [];
-            if (empty($existingSid['qr_code_path']) && $qrPath) $updates['qr_code_path'] = $qrPath;
-            if ($updates) $db->update('student_ids', $updates, 'id = ?', [$existingSid['id']]);
-        } else {
-            $sidData = ['student_id' => $studentId, 'id_type' => 'school_id', 'id_number' => '', 'issue_date' => $issuedDate, 'expiry_date' => $expiryDate, 'status' => 'active', 'rfid_card_id' => $newId];
-            if ($qrPath) $sidData['qr_code_path'] = $qrPath;
-            $db->insert('student_ids', $sidData);
-        }
-
-        echo json_encode(['success' => true, 'message' => 'Card assigned successfully.', 'data' => ['id' => $newId]]);
         exit;
     }
 

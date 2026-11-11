@@ -62,7 +62,7 @@ function contactsTargetStudentId(string $role, array $input): int {
 
 /** A registrar/admin-only action: reject everyone else. */
 function contactsRequireStaff(string $role): void {
-    if (!in_array($role, ['admin', 'registrar'], true)) {
+    if (!in_array($role, ['super_admin', 'staff'], true)) {
         echo json_encode(['success' => false, 'message' => 'Forbidden.']);
         exit;
     }
