@@ -21,7 +21,7 @@ if (!isLoggedIn()) {
     exit;
 }
 $role = getCurrentUserRole();
-if (!in_array($role, ['student', 'admin'], true)) {
+if (!in_array($role, ['student', 'super_admin'], true)) {
     echo json_encode(['success' => false, 'message' => 'Forbidden.']);
     exit;
 }

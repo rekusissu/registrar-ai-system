@@ -11,7 +11,7 @@ require_once __DIR__ . '/../shared/ai_client.php';
 require_once __DIR__ . '/../shared/document_reader.php';
 
 if (!isLoggedIn()) { echo json_encode(['success' => false, 'message' => 'Unauthorized.']); exit; }
-if (!in_array(getCurrentUserRole(), ['admin', 'registrar'], true)) { echo json_encode(['success' => false, 'message' => 'Forbidden.']); exit; }
+if (!in_array(getCurrentUserRole(), ['super_admin', 'staff'], true)) { echo json_encode(['success' => false, 'message' => 'Forbidden.']); exit; }
 
 $db = Database::getInstance();
 $action = $_GET['action'] ?? '';

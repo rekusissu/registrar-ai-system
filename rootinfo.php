@@ -13,6 +13,6 @@ if (empty($_SESSION['user_id'])) {
     header('Location: login.php');
     exit;
 }
-requireRole('admin');
+requireRole('super_admin');
 
 phpinfo();

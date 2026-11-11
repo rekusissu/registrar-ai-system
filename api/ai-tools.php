@@ -64,7 +64,7 @@ if (!is_array($input)) {
 // silently default to "open to everyone". Only registrar/ pages call
 // this endpoint (registrar/students.php, registrar/status-tracker.php),
 // so staff-tier roles are the right boundary.
-$AI_TOOLS_ROLES = ['admin', 'registrar', 'staff'];
+$AI_TOOLS_ROLES = ['super_admin', 'staff', 'acad_officer'];
 
 if (!in_array(getCurrentUserRole(), $AI_TOOLS_ROLES, true)) {
     error_log('[ai-tools] denied action=' . ($action ?: '(none)')

@@ -1157,7 +1157,8 @@ CREATE TABLE `users` (
   `email` varchar(100) NOT NULL,
   `password_hash` varchar(255) NOT NULL,
   `full_name` varchar(100) NOT NULL,
-  `role` enum('admin','registrar','staff','teacher','student') NOT NULL DEFAULT 'staff',
+  `role` enum('super_admin','staff','acad_officer','department_head','student') NOT NULL DEFAULT 'staff',
+  `department_id` int(11) DEFAULT NULL,
   `rfid_uid` varchar(20) DEFAULT NULL,
   `is_active` tinyint(1) DEFAULT 1,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -1264,9 +1265,9 @@ CREATE TABLE `users` (
 -- deliberately not reused here.
 -- ---------------------------------------------------------------------------
 INSERT INTO `users` (`id`, `email`, `password_hash`, `full_name`, `role`, `rfid_uid`, `is_active`, `created_at`, `updated_at`, `student_id`, `username`, `login_attempts`, `locked_until`) VALUES
-(1,'admin@gmail.com','$2y$10$f9PmndF92hBFI/jeJAWxC.Pua3Osob3.zkWHn9GRSTQXSyPX8x0dK','System Administrator','admin',NULL,1,'2026-07-07 06:42:45','2026-09-23 12:57:09',NULL,'ADM-001',0,NULL),
-(2,'registrar@gmail.com','$2y$10$zj33OjRB93RcPZWd2/f4VudcEqzDCfZdLAajEcZQ7LABuuEKeqFyu','Registrar Staff','registrar',NULL,1,'2026-07-07 06:42:45','2026-09-23 12:57:10',NULL,'RGS-001',0,NULL),
-(3,'roldantiu89@gmail.com','$2y$10$goIPlSwZLw21GfQLYBsoxOCwqaO86NGUssooNsG4FHGOi3IbFb6aO','Roldan Tiu','admin',NULL,1,'2026-07-07 06:42:45','2026-09-23 12:57:11',NULL,'ADM-002',0,NULL);
+(1,'admin@gmail.com','$2y$10$f9PmndF92hBFI/jeJAWxC.Pua3Osob3.zkWHn9GRSTQXSyPX8x0dK','System Administrator','super_admin',NULL,1,'2026-07-07 06:42:45','2026-09-23 12:57:09',NULL,'ADM-001',0,NULL),
+(2,'registrar@gmail.com','$2y$10$zj33OjRB93RcPZWd2/f4VudcEqzDCfZdLAajEcZQ7LABuuEKeqFyu','Registrar Staff','staff',NULL,1,'2026-07-07 06:42:45','2026-09-23 12:57:10',NULL,'RGS-001',0,NULL),
+(3,'roldantiu89@gmail.com','$2y$10$goIPlSwZLw21GfQLYBsoxOCwqaO86NGUssooNsG4FHGOi3IbFb6aO','Roldan Tiu','super_admin',NULL,1,'2026-07-07 06:42:45','2026-09-23 12:57:11',NULL,'ADM-002',0,NULL);
 
 -- Explicit COMMIT. Every statement above commits on its own under the
 -- default autocommit, so this changes nothing in the normal case - but an

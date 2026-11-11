@@ -57,7 +57,7 @@ if (!isLoggedIn()) {
 }
 
 $role    = (string) getCurrentUserRole();
-$isStaff = in_array($role, ['admin', 'registrar', 'staff'], true);
+$isStaff = in_array($role, ['super_admin', 'staff'], true);
 
 // ── 1b. Payment receipts ──────────────────────────────────────
 //

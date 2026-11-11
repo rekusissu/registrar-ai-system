@@ -31,7 +31,7 @@ if (!isLoggedIn()) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized.']);
     exit;
 }
-if (!in_array(getCurrentUserRole(), ['admin', 'registrar'], true)) {
+if (!in_array(getCurrentUserRole(), ['super_admin', 'staff'], true)) {
     echo json_encode(['success' => false, 'message' => 'Forbidden.']);
     exit;
 }

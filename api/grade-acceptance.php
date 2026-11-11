@@ -34,7 +34,7 @@ if (empty($_SESSION['user_id'])) {
 // Registrar only. Accepting a term is a signature on an official record;
 // it is not an action the student portal or Faculty's view may take. Same
 // check requireRole('registrar') makes on the page, admin included.
-if (!in_array(getCurrentUserRole(), ['registrar', 'admin'], true)) {
+if (!in_array(getCurrentUserRole(), ['staff', 'super_admin'], true)) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Only a registrar can accept a term.']);
     exit;

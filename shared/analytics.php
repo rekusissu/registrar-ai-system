@@ -39,7 +39,7 @@ define('ANALYTICS_LOADED', true);
  * ("AI Tools" group is hidden for student accounts).
  */
 function aiInsightRoles(): array {
-    return ['admin', 'registrar', 'staff'];
+    return ['super_admin', 'staff', 'acad_officer'];
 }
 
 // â”€â”€â”€ Reporting period â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

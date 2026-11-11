@@ -18,7 +18,7 @@ if (!isLoggedIn()) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized.']);
     exit;
 }
-if (getCurrentUserRole() !== 'admin') {
+if (getCurrentUserRole() !== 'super_admin') {
     echo json_encode(['success' => false, 'message' => 'Forbidden.']);
     exit;
 }

@@ -35,7 +35,7 @@ if (!isLoggedIn()) {
     echo 'Unauthorized.';
     exit;
 }
-if (!in_array(getCurrentUserRole(), ['admin', 'registrar'], true)) {
+if (!in_array(getCurrentUserRole(), ['super_admin', 'staff'], true)) {
     http_response_code(403);
     echo 'Forbidden.';
     exit;

@@ -93,7 +93,7 @@ function defaultCatalog(): array
 
 $users     = (int) $db->fetchColumn('SELECT COUNT(*) FROM users');
 $catalog   = (int) $db->fetchColumn('SELECT COUNT(*) FROM document_catalog');
-$admins    = (int) $db->fetchColumn("SELECT COUNT(*) FROM users WHERE role = 'admin'");
+$admins    = (int) $db->fetchColumn("SELECT COUNT(*) FROM users WHERE role = 'super_admin'");
 
 echo $NL . "  First-run bootstrap" . $NL;
 echo "  -------------------" . $NL;
@@ -145,7 +145,7 @@ if ($users === 0) {
         'email'         => $email,
         'username'      => $user,
         'full_name'     => $name,
-        'role'          => 'admin',
+        'role'          => 'super_admin',
         'password_hash' => password_hash($pass, PASSWORD_DEFAULT),
         'is_active'     => 1,
     ]);
@@ -156,7 +156,7 @@ if ($users === 0) {
     // more. Worth naming, because it is a quiet dead end otherwise.
     echo "  Accounts exist but none has the admin role, so no one can manage" . $NL;
     echo "  accounts. Promote one with:" . $NL . $NL;
-    echo "    UPDATE users SET role = 'admin' WHERE email = '<the address>';" . $NL . $NL;
+    echo "    UPDATE users SET role = 'super_admin' WHERE email = '<the address>';" . $NL . $NL;
 }
 
 // ── Document catalog ─────────────────────────────────────────────────────

@@ -142,11 +142,19 @@ if ($USER_ROLE === 'student') {
 
         <div class="sidebar-divider"></div>
 
-        <!-- GROUP 2 — Registrar -->
+        <!-- GROUP 2 — Registrar / Academic -->
+        <?php
+        $isStaffOrSuper   = in_array($USER_ROLE, ['super_admin', 'staff'], true);
+        $isAcadOrDeptHead = in_array($USER_ROLE, ['acad_officer', 'department_head'], true);
+        $isAnyStaff       = $isStaffOrSuper || $isAcadOrDeptHead;
+        $isSuperAdmin     = $USER_ROLE === 'super_admin';
+        ?>
+        <?php if ($isAnyStaff): ?>
         <div class="sidebar-brand">
-            <div class="brand-title">Registrar</div>
+            <div class="brand-title"><?= $isSuperAdmin || $isStaffOrSuper ? 'Registrar' : 'Academic Records' ?></div>
         </div>
 
+        <?php if ($isStaffOrSuper): ?>
         <a href="<?= $APP_ROOT ?>registrar/students.php" class="sidebar-item <?= $ACTIVE_NAV === 'students' ? 'active' : '' ?>">
             <i class="fa-solid fa-user-graduate"></i>
             <span class="sidebar-text">Students</span>
@@ -187,7 +195,9 @@ if ($USER_ROLE === 'student') {
             <i class="fa-solid fa-folder-open"></i>
             <span class="sidebar-text">File Storage</span>
         </a>
+        <?php endif; ?>
 
+        <?php if ($isAnyStaff): ?>
         <a href="<?= $APP_ROOT ?>registrar/status-tracker.php" class="sidebar-item <?= $ACTIVE_NAV === 'tracker' ? 'active' : '' ?>">
             <i class="fa-solid fa-arrows-rotate"></i>
             <span class="sidebar-text">Status Tracker</span>
@@ -197,10 +207,13 @@ if ($USER_ROLE === 'student') {
             <i class="fa-solid fa-school"></i>
             <span class="sidebar-text">Academic History</span>
         </a>
+        <?php endif; ?>
 
         <div class="sidebar-divider"></div>
+        <?php endif; ?>
 
         <!-- GROUP 3 — AI Tools -->
+        <?php if ($isAnyStaff): ?>
         <div class="sidebar-brand">
             <div class="brand-title">AI Tools</div>
         </div>
@@ -209,8 +222,9 @@ if ($USER_ROLE === 'student') {
             <i class="fa-solid fa-chart-line"></i>
             <span class="sidebar-text">Intelligent Analytics and Reports</span>
         </a>
+        <?php endif; ?>
 
-        <?php if ($USER_ROLE !== 'admin'): ?>
+        <?php if ($isAnyStaff): ?>
         <div class="sidebar-divider"></div>
 
         <div class="sidebar-brand">
@@ -223,18 +237,14 @@ if ($USER_ROLE === 'student') {
         </a>
         <?php endif; ?>
 
-        <?php if ($USER_ROLE === 'admin'): ?>
+        <?php if ($isSuperAdmin): ?>
         <div class="sidebar-divider"></div>
 
-        <!-- GROUP 4 — System (admin only) -->
+        <!-- GROUP 4 — System (super admin only) -->
         <div class="sidebar-brand">
             <div class="brand-title">System</div>
         </div>
 
-        <a href="<?= $APP_ROOT ?>settings.php" class="sidebar-item <?= $ACTIVE_NAV === 'settings' ? 'active' : '' ?>">
-            <i class="fa-solid fa-gear"></i>
-            <span class="sidebar-text">Settings</span>
-        </a>
         <a href="<?= $APP_ROOT ?>registrar/users.php" class="sidebar-item <?= $ACTIVE_NAV === 'users' ? 'active' : '' ?>">
             <i class="fa-solid fa-user-gear"></i>
             <span class="sidebar-text">Users</span>

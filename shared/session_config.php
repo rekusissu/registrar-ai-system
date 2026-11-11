@@ -144,20 +144,20 @@ function requireLogin() {
 function requireRole($requiredRole) {
     requireLogin();
     $role = getCurrentUserRole();
-    if ($role === 'admin' || $role === $requiredRole) {
+    if ($role === 'super_admin' || $role === $requiredRole) {
         return;
     }
     header('Location: dashboard.php?error=access_denied');
     exit;
 }
 /**
- * Guard for student-portal pages. Only a 'student' role (or admin,
+ * Guard for student-portal pages. Only a 'student' role (or super_admin,
  * which bypasses everything) may proceed. Anything else is bounced.
  */
 function requireStudent() {
     requireLogin();
     $role = getCurrentUserRole();
-    if ($role === 'admin' || $role === 'student') {
+    if ($role === 'super_admin' || $role === 'student') {
         return;
     }
     header('Location: dashboard.php?error=access_denied');

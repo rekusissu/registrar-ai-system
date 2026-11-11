@@ -8,7 +8,7 @@
 require_once __DIR__ . '/../shared/security_headers.php';
 require_once __DIR__ . '/../shared/session_config.php';
 if (empty($_SESSION['user_id'])) { header('Location: ../login.php'); exit; }
-requireRole('admin');
+requireRole('super_admin');
 
 $page_title = 'Audit Logs';
 $APP_ROOT = '../';

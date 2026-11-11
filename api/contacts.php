@@ -54,7 +54,7 @@ function contactsTargetStudentId(string $role, array $input): int {
     if ($role === 'student') {
         return (int) getCurrentStudentId();
     }
-    if (in_array($role, ['admin', 'registrar'], true)) {
+    if (in_array($role, ['super_admin', 'staff'], true)) {
         return (int) ($input['student_id'] ?? 0);
     }
     return 0;

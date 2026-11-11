@@ -21,7 +21,7 @@ if (!isLoggedIn()) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized.']);
     exit;
 }
-if (getCurrentUserRole() !== 'admin') {
+if (getCurrentUserRole() !== 'super_admin') {
     echo json_encode(['success' => false, 'message' => 'Forbidden.']);
     exit;
 }
@@ -31,7 +31,7 @@ $db = Database::getInstance();
 $id = isset($_GET['id']) ? intval($_GET['id']) : null;
 $input = json_decode(file_get_contents('php://input'), true) ?: [];
 
-$roles = ['admin', 'registrar', 'staff'];
+$roles = ['super_admin', 'staff', 'acad_officer', 'department_head', 'student'];
 
 // ─── LIST ─────────────────────────────────────────────────────
 if ($method === 'GET') {
@@ -164,9 +164,9 @@ if ($method === 'PUT' || $method === 'PATCH') {
             exit;
         }
         // Guard: cannot disable the last active admin
-        if ($user['role'] === 'admin' && !$newActive) {
+        if ($user['role'] === 'super_admin' && !$newActive) {
             $adminCount = (int) $db->fetchColumn(
-                "SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_active = 1 AND id != ?", [$id]
+                "SELECT COUNT(*) FROM users WHERE role = 'super_admin' AND is_active = 1 AND id != ?", [$id]
             );
             if ($adminCount === 0) {
                 echo json_encode(['success' => false, 'message' => 'Cannot disable the last active admin account.']);
@@ -193,10 +193,10 @@ if ($method === 'PUT' || $method === 'PATCH') {
         echo json_encode(['success' => false, 'message' => 'Invalid role.']);
         exit;
     }
-    // Guard: cannot demote the last active admin away from admin
-    if ($user['role'] === 'admin' && $role !== 'admin') {
+    // Guard: cannot demote the last active super_admin away from super_admin
+    if ($user['role'] === 'super_admin' && $role !== 'super_admin') {
         $adminCount = (int) $db->fetchColumn(
-            "SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_active = 1 AND id != ?", [$id]
+            "SELECT COUNT(*) FROM users WHERE role = 'super_admin' AND is_active = 1 AND id != ?", [$id]
         );
         if ($adminCount === 0) {
             echo json_encode(['success' => false, 'message' => 'Cannot demote the last active admin account.']);
@@ -244,9 +244,9 @@ if ($method === 'DELETE' && $id) {
         echo json_encode(['success' => false, 'message' => 'You cannot delete your own account.']);
         exit;
     }
-    if ($user['role'] === 'admin' && $user['is_active']) {
+    if ($user['role'] === 'super_admin' && $user['is_active']) {
         $adminCount = (int) $db->fetchColumn(
-            "SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_active = 1 AND id != ?", [$id]
+            "SELECT COUNT(*) FROM users WHERE role = 'super_admin' AND is_active = 1 AND id != ?", [$id]
         );
         if ($adminCount === 0) {
             echo json_encode(['success' => false, 'message' => 'Cannot delete the last active admin account.']);

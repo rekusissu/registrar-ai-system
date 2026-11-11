@@ -80,7 +80,7 @@ $db     = Database::getInstance();
 // client-supplied student_id is honoured at all. A student's session
 // id always wins over anything in the body.
 $role     = (string) getCurrentUserRole();
-$isStaff  = in_array($role, ['admin', 'registrar'], true);
+$isStaff  = in_array($role, ['super_admin', 'staff'], true);
 $body     = $_POST ?: (json_decode(file_get_contents('php://input'), true) ?: []);
 $studentId = getCurrentStudentId();
 
