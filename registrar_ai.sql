@@ -1,157 +1,14 @@
--- registrar_ai.sql -- full schema and seed data for a fresh install.
---
--- Importing THIS file is sufficient. Everything the application reads is
--- defined here, including the walk-in document-request work:
---
---   document_catalog.sla_days          per-SKU turnaround target
---   document_requests.blocked_reason    what a request is waiting on
---   document_requests.blocked_since     when the hold started
---   document_requests.blocked_source    balance | registrar | NULL
---   document_requests.source/counter/   walk-in provenance
---   walkin_at/walkin_by/...
---
--- The migrations in migrations/ are for databases that ALREADY exist.
--- They are guarded and idempotent, so running one against a database
--- created from this file is harmless but unnecessary.
---
--- ═══════════════════════════════════════════════════════════════════════════
---  THIS FILE DESTROYS DATA. BACK UP FIRST. READ THIS BEFORE IMPORTING.
--- ═══════════════════════════════════════════════════════════════════════════
---
--- Every table below is preceded by DROP TABLE IF EXISTS. Importing this file
--- into a database that already has data DELETES that data. This is now true
--- where it was not before: an earlier revision only ever did CREATE TABLE, so
--- importing it into a populated database stopped at the first "table already
--- exists" and left a partial import. That was safe but useless for the case
--- that actually comes up - importing onto a hosting database that already has
--- the old tables - so the DROPs were added and the risk came with them.
---
---   mysqldump -u USER -p --routines --triggers registrar_ai > backup.sql
---
--- TAKE THAT DUMP FIRST, EVERY TIME. There is no undo in SQL and no prompt.
---
--- What you get afterwards: the correct schema, and two staff logins - one
--- admin, one registrar - whose bcrypt hashes are in this repository
--- and therefore public. Change every password immediately after importing:
---
---   php create_admin.php
---
--- What you lose: every student, document request, queue ticket, grade and
--- audit row that was in those tables. The uploads/ files on disk are NOT
--- touched by this import - rows referencing them will survive the schema but
--- have nothing to point at until the files are deployed alongside.
---
--- To KEEP existing data instead, do not import this file. Import the
--- migrations, which are guarded and idempotent - safe in any order, repeatable,
--- and a no-op on a database already up to date:
---
---   mysql -u USER -p registrar_ai < migrations/document_walkin_only.sql
---
--- That is the right command for a live database with records in it.
--- ───────────────────────────────────────────────────────────────────────────
---
--- Safe to import into an EMPTY database, or one whose contents you are
--- deliberately discarding:
---
---   CREATE DATABASE registrar_ai CHARACTER SET utf8mb4;
---   mysql -u USER -p registrar_ai < registrar_ai.sql
---
--- Safe to import MORE THAN ONCE. Every statement is DROP-then-CREATE, so a
--- second import reproduces the same schema instead of erroring. It also
--- re-inserts the three staff rows, which have fixed ids and so do not
--- duplicate. tests/dump_freshness.php imports the file twice and asserts this.
---
--- Generated from the live schema, so it cannot drift from the code the way
--- a hand-edited dump does. tests/dump_freshness.php proves it imports clean,
--- that every migration is a no-op against it, and that nothing but staff
--- logins is seeded. Run it after any schema change.
---
--- The freshness check has three parts, and the third is the one that matters
--- most for a fresh install:
---
---   1. every table in the LIVE database is defined here
---   2. every column the code reads exists in both
---   3. every table the CODE reads is defined here
---
--- (3) exists because (1) cannot catch a table that is missing from both. That
--- is how `card_readers` survived here: five files read it unguarded and it
--- existed neither in this dump nor in the live database, so a fresh install
--- would have shipped a dead RFID Kiosk, a dead Readers page, and a
--- card-readers endpoint answering "table not found" - from a file whose header
--- called the schema complete.
---
--- Three tables were REMOVED as dead, on 2026-10-03:
---
---   announcements      the bulletin feed. student/announcements.php and
---                      api/announcements.php were deleted, and nothing has
---                      referenced the table since.
---   authorized_cards   "staff cards authorized to operate stations" from the
---                      retired RFID station model. rfid_cards, rfid_scan_logs
---                      and card_readers all remain and are all in use; only
---                      this side table went with the stations.
---   masterlist_cache   a query cache for the retired masterlist generator.
---                      api/masterlist.php regenerates on demand and never
---                      reads it; the only surviving mention was a cache purge
---                      inside a migration.
---
--- Before removing any of the three: zero references in any PHP file, zero rows
--- in the live database, zero inbound foreign keys, and zero audit_logs rows
--- naming them. tools/unused_tables.php reports the current state.
---
--- The blind spot that nearly caused a disaster, recorded so the next person
--- does not repeat it: shared/database.php takes the table name as a STRING -
--- $db->insert('enrollment_history', ...). A scanner that strips quoted
--- literals reports enrollment_history, contact_change_requests and
--- mock_lalamove_orders as unused. All three are load-bearing. Do not write a
--- deletion tool that strips quotes.
---
--- Student status: enrolled / active / graduate / alumni / dropped, defined once
--- in studentStatuses() (shared/functions.php) and mirrored here. The dump
--- already declares the narrow enum, so migrations/student_status_five_values.sql
--- is a silent no-op against it - it exists for databases that ALREADY exist.
---
--- Folded in from migrations/ so a fresh install needs this file alone:
---
---   queue_lanes_cutoff.sql    queue_tickets.txn_type / priority_group /
---                             idx_queue_lane, and the queue_day_settings table
---   grades_faculty_source.sql academic_grades provenance columns + uq_ag_source
---                             / idx_ag_faculty, and academic_history's
---                             gwa_reported / gwa_computed pair
---   document_type_enum.sql    document_requests.document_type widened from five
---                             values to nine, so the four catalog SKUs that map
---                             outside the original enum can round-trip instead
---                             of being silently coerced to ''
---   add_queue_daily_tap_cap.sql queue_day_settings.max_daily_taps
---
--- Both were previously migration-only, so a fresh install shipped a queue with
--- no lanes and no opening hours, and a records page reading six columns that
--- did not exist. migrations/queue_lanes_cutoff.sql and
--- migrations/grades_faculty_source.sql remain for databases that ALREADY exist
--- and are no-ops against this file.
---
--- Everything else in migrations/ is either a repair for rows a PREVIOUS
--- revision already damaged (document_type_enum's backfill), or a no-op here.
--- Re-running any of them against a database created from this file is harmless
--- - they are all guarded - but unnecessary.
-
+-- BCP Registrar: consolidated deployment database, 2026-11-13.
+-- FRESH INSTALL / REPLACE ONLY: drops and recreates the listed application tables.
+-- Existing hosted records: use migrations/deployment_upgrade_20261113.sql instead.
+-- Keeps only the requested owner account as super_admin; its existing password hash is preserved.
+-- Includes document catalog, departments and requirement definitions. No demo users/students,
+-- grades, requests, files, queue activity, login tokens, caches or operational audit history.
+-- Uploads are stored separately on disk. No database name/CREATE DATABASE required by hosting.
 SET NAMES utf8mb4;
-SET FOREIGN_KEY_CHECKS = 0;
-SET SQL_MODE = 'NO_AUTO_VALUE_ON_ZERO';
-SET time_zone = '+00:00';
+SET @bundle_old_fk=@@FOREIGN_KEY_CHECKS;
+SET FOREIGN_KEY_CHECKS=0;
 
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!40101 SET NAMES utf8mb4 */;
-/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
-/*!40103 SET TIME_ZONE='+00:00' */;
-/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
 DROP TABLE IF EXISTS `academic_grades`;
 CREATE TABLE `academic_grades` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -172,36 +29,19 @@ CREATE TABLE `academic_grades` (
   `final_grade` varchar(10) DEFAULT NULL,
   `final_rating` varchar(10) DEFAULT NULL,
   `grade_status` enum('passed','failed','incomplete','dropped') DEFAULT NULL,
-  -- ── Provenance (migrations/grades_faculty_source.sql) ───────────
-  -- Where the row came from, so no page has to care. 'faculty' is the
-  -- default and the intended producer (Faculty Management #296 owns the
-  -- grade record); 'import' and 'manual' exist so a backfill or a hand-keyed
-  -- correction can be identified later instead of silently blending in.
-  -- shared/term_grades.php reads every one of these unguarded.
   `source_system` varchar(32) NOT NULL DEFAULT 'faculty',
-  `source_ref`    varchar(64) DEFAULT NULL,
-  `faculty_id`    int(11)     DEFAULT NULL,
-  `received_at`   timestamp   NULL DEFAULT NULL,
-  `term_status`   varchar(20) DEFAULT NULL,
-  -- 0 = the free-text instructor has NOT been checked against a faculty
-  -- record. Kept rather than dropped: a name can arrive from Faculty that we
-  -- have not reconciled, and "unverified" has to stay distinguishable from
-  -- "confirmed" once the reference lands.
+  `source_ref` varchar(64) DEFAULT NULL,
+  `faculty_id` int(11) DEFAULT NULL,
+  `received_at` timestamp NULL DEFAULT NULL,
+  `term_status` varchar(20) DEFAULT NULL,
   `instructor_confirmed` tinyint(1) NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
-  KEY `idx_academic_history_id` (`academic_history_id`),
-  -- Re-syncing must not duplicate: the same subject arrives again on every
-  -- fetch, and without this a second sync of an unchanged term doubles every
-  -- row. NULL source_ref rows are exempt because UNIQUE treats NULLs as
-  -- distinct - deliberate, since a row with no source key yet is not claimed
-  -- by any single source row.
   UNIQUE KEY `uq_ag_source` (`academic_history_id`,`source_system`,`source_ref`),
+  KEY `idx_academic_history_id` (`academic_history_id`),
   KEY `idx_ag_faculty` (`faculty_id`),
   CONSTRAINT `fk_grade_academy` FOREIGN KEY (`academic_history_id`) REFERENCES `academic_history` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+
 DROP TABLE IF EXISTS `academic_history`;
 CREATE TABLE `academic_history` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -215,31 +55,27 @@ CREATE TABLE `academic_history` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `semester` varchar(20) DEFAULT NULL,
   `credits` decimal(6,2) DEFAULT NULL,
-  -- Both GWA figures, side by side, from migrations/grades_faculty_source.sql.
-  -- gwa_reported is Faculty's number; gwa_computed is ours from
-  -- shared/term_grades.php. Once Faculty owns the grades, a number typed in two
-  -- places can disagree, so the disagreement is printed rather than silently
-  -- resolved. `gwa` above is left in place and keeps holding the computed value,
-  -- so every existing reader (the TOR, the student grade views,
-  -- gwa_agreement_check.php) keeps working untouched.
   `gwa_reported` decimal(5,2) DEFAULT NULL,
   `gwa_computed` decimal(5,2) DEFAULT NULL,
-  -- ── Acceptance (migrations/grade_acceptance.sql) ─────────────────
-  -- When the Registrar accepted this term for the section, and who. A
-  -- null accepted_at IS the waitlist - a term nobody has accepted reads
-  -- as outstanding - so there is no separate boolean to drift out of sync.
-  -- Deliberately on the term row, not on academic_grades.term_status:
-  -- that column describes a subject, and one per-subject copy of a term
-  -- fact could disagree with itself.
   `accepted_at` timestamp NULL DEFAULT NULL,
-  `accepted_by` int(11)   DEFAULT NULL,
+  `accepted_by` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `idx_student_id` (`student_id`),
   CONSTRAINT `academic_history_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+
+DROP TABLE IF EXISTS `academic_validations`;
+CREATE TABLE `academic_validations` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `academic_history_id` int(11) NOT NULL,
+  `reviewer_id` int(11) NOT NULL,
+  `review_status` enum('reviewed','needs_correction','incomplete') NOT NULL,
+  `remarks` text NOT NULL,
+  `created_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_validation_record` (`academic_history_id`,`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 DROP TABLE IF EXISTS `ai_cache`;
 CREATE TABLE `ai_cache` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -252,10 +88,8 @@ CREATE TABLE `ai_cache` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `prompt_hash` (`prompt_hash`),
   KEY `idx_prompt_hash` (`prompt_hash`)
-) ENGINE=InnoDB AUTO_INCREMENT=55 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 DROP TABLE IF EXISTS `audit_logs`;
 CREATE TABLE `audit_logs` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -263,13 +97,6 @@ CREATE TABLE `audit_logs` (
   `action` varchar(100) NOT NULL,
   `table_name` varchar(50) DEFAULT NULL,
   `record_id` int(11) DEFAULT NULL,
-  -- Collation is utf8mb4_general_ci here, matching the live table, and the
-  -- seed previously said utf8mb4_bin. That difference is inert: these are
-  -- write-only JSON payloads, never compared in SQL (grepped to confirm),
-  -- and json_valid() is a parse check rather than a comparison. The seed is
-  -- aligned to the database that actually runs rather than the reverse.
-  -- Change it here and you would be changing what a rebuild produces for no
-  -- behavioural gain.
   `old_values` longtext DEFAULT NULL CHECK (json_valid(`old_values`)),
   `new_values` longtext DEFAULT NULL CHECK (json_valid(`new_values`)),
   `ip_address` varchar(45) DEFAULT NULL,
@@ -280,20 +107,24 @@ CREATE TABLE `audit_logs` (
   KEY `idx_action` (`action`),
   KEY `idx_created_at` (`created_at`),
   CONSTRAINT `audit_logs_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=362 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-DROP TABLE IF EXISTS `staff_notification_reads`;
-CREATE TABLE `staff_notification_reads` (
-  `user_id` int(11) NOT NULL,
-  `last_read_id` int(11) NOT NULL DEFAULT 0,
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  PRIMARY KEY (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+
+DROP TABLE IF EXISTS `card_readers`;
+CREATE TABLE `card_readers` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  `location` varchar(100) DEFAULT NULL,
+  `reader_type` enum('entrance','exit','both') NOT NULL DEFAULT 'both',
+  `reader_code` varchar(50) DEFAULT NULL,
+  `status` enum('active','inactive') NOT NULL DEFAULT 'active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_reader_code` (`reader_code`),
+  KEY `idx_status` (`status`),
+  KEY `idx_reader_type` (`reader_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 DROP TABLE IF EXISTS `communication_log`;
 CREATE TABLE `communication_log` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -312,10 +143,8 @@ CREATE TABLE `communication_log` (
   KEY `idx_student` (`student_id`),
   KEY `idx_type_status` (`message_type`,`status`),
   KEY `idx_created` (`created_at`)
-) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 DROP TABLE IF EXISTS `contact_change_requests`;
 CREATE TABLE `contact_change_requests` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -335,9 +164,7 @@ CREATE TABLE `contact_change_requests` (
   KEY `idx_status` (`status`),
   CONSTRAINT `fk_ccr_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+
 DROP TABLE IF EXISTS `contact_recipients`;
 CREATE TABLE `contact_recipients` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -359,10 +186,20 @@ CREATE TABLE `contact_recipients` (
   UNIQUE KEY `uq_contact_email` (`student_id`,`email`),
   KEY `idx_student` (`student_id`),
   CONSTRAINT `fk_contact_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+DROP TABLE IF EXISTS `departments`;
+CREATE TABLE `departments` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  `code` varchar(20) NOT NULL,
+  `is_active` tinyint(1) DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_department_code` (`code`),
+  KEY `idx_department_active` (`is_active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 DROP TABLE IF EXISTS `discipline_records`;
 CREATE TABLE `discipline_records` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -380,9 +217,7 @@ CREATE TABLE `discipline_records` (
   CONSTRAINT `fk_discipline_by` FOREIGN KEY (`recorded_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_discipline_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+
 DROP TABLE IF EXISTS `document_ai_audit`;
 CREATE TABLE `document_ai_audit` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -398,10 +233,8 @@ CREATE TABLE `document_ai_audit` (
   KEY `idx_daa_document` (`document_id`),
   KEY `idx_daa_student` (`student_id`),
   KEY `idx_daa_action` (`action`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 DROP TABLE IF EXISTS `document_catalog`;
 CREATE TABLE `document_catalog` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -416,10 +249,24 @@ CREATE TABLE `document_catalog` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_sku` (`sku`)
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+DROP TABLE IF EXISTS `document_request_attachments`;
+CREATE TABLE `document_request_attachments` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `request_id` int(11) NOT NULL,
+  `requirement_code` varchar(40) DEFAULT NULL COMMENT 'Checklist item, or NULL for a loose file',
+  `original_name` varchar(180) NOT NULL COMMENT 'As uploaded; display only, never a path',
+  `file_path` varchar(255) NOT NULL COMMENT 'Relative to repo root',
+  `sha256` char(64) NOT NULL COMMENT 'Proves the bytes are unaltered',
+  `mime_type` varchar(80) DEFAULT NULL,
+  `size_bytes` int(11) NOT NULL DEFAULT 0,
+  `uploaded_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_att_request` (`request_id`),
+  KEY `idx_att_req_code` (`request_id`,`requirement_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 DROP TABLE IF EXISTS `document_request_events`;
 CREATE TABLE `document_request_events` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -431,20 +278,13 @@ CREATE TABLE `document_request_events` (
   PRIMARY KEY (`id`),
   KEY `idx_events_request` (`request_id`),
   CONSTRAINT `fk_events_request` FOREIGN KEY (`request_id`) REFERENCES `document_requests` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=102 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 DROP TABLE IF EXISTS `document_requests`;
 CREATE TABLE `document_requests` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `request_id` varchar(24) DEFAULT NULL,
-  -- 'online' was added by migrations/document_online_lifecycle.sql. The seed
-  -- kept enum('walk_in') with the comment "All requests are counter
-  -- walk-ins", which is what makes this dangerous: rebuilding from the seed
-  -- produces a table that rejects every online request with a silent
-  -- truncation to '' in strict mode, and an outright error otherwise.
-  `source` enum('walk_in','online') NOT NULL DEFAULT 'walk_in' COMMENT 'walk_in = counter, online = filed by the student',
+  `source` enum('walk_in','online') NOT NULL DEFAULT 'walk_in',
   `walkin_at` datetime DEFAULT NULL COMMENT 'Walked in at the counter',
   `walkin_by` int(11) DEFAULT NULL COMMENT 'Registrar who took the request',
   `counter` tinyint(3) NOT NULL DEFAULT 1 COMMENT 'Releasing counter (1-3)',
@@ -454,46 +294,17 @@ CREATE TABLE `document_requests` (
   `record_file_generated_at` datetime DEFAULT NULL,
   `record_copies_issued` int(11) NOT NULL DEFAULT 0,
   `student_id` int(11) NOT NULL,
-  -- Nine values, folded in from migrations/document_type_enum.sql.
-  --
-  -- The five-value list this line used to carry was the bug, not the target:
-  -- api/student-documents.php derives document_type from the catalog SKU, and
-  -- four of the seven SKUs map to values the five-value enum could not hold -
-  -- diploma, ctc, honorable_dismissal, course_description.
-  --
-  -- This server does not run STRICT_TRANS_TABLES, so writing one of those four
-  -- does NOT raise an error. MySQL silently coerces it to ''. The request files
-  -- successfully, the registrar sees it, and the document type is blank - which
-  -- reads on the student's own page and in the registrar's filters as "the
-  -- document type is missing".
-  --
-  -- form137 and clearance are kept: they were already permitted and older rows
-  -- may still carry them. catalog_id + document_catalog.sku is the real source
-  -- of truth; this column is legacy but is still read for display and filtering,
-  -- so it has to be able to hold a real answer.
-  --
-  -- A MODIFY COLUMN written from a SHORT list replaces the enum rather than
-  -- extending it. The same trap the note on document_status below warns about.
   `document_type` enum('form137','good_moral','transcript','certificate','clearance','diploma','ctc','honorable_dismissal','course_description') NOT NULL,
   `catalog_id` int(11) DEFAULT NULL,
   `quantity` int(11) NOT NULL DEFAULT 1,
   `request_type` enum('Express','Regular') NOT NULL DEFAULT 'Regular',
   `fulfillment_type` enum('Pickup','Delivery','Digital') NOT NULL DEFAULT 'Pickup',
   `delivery_address` text DEFAULT NULL,
-  `payment_method` enum('Online','Cash_on_Delivery','Counter') NOT NULL DEFAULT 'Counter',
+  `payment_method` enum('Online','Bank_Transfer','Cash_on_Delivery','Counter') NOT NULL DEFAULT 'Counter',
   `purpose` varchar(255) DEFAULT NULL,
   `recipient` varchar(255) DEFAULT NULL,
   `status` enum('pending','processing','approved','denied','completed','released') DEFAULT 'pending',
-  -- NOTE: this enum must stay byte-identical to the live table. Two values
-  -- were added by migrations and never made it back into the seed:
-  --   Awaiting_Payment — the online-payment hold
-  --   Shipped          — courier hand-off
-  -- A MODIFY COLUMN written from this (wrong) list REPLACES the enum
-  -- rather than extending it, so applying it drops both values and
-  -- rewrites every affected row to ''. That is silent and it only shows
-  -- up once payments stop flowing.
-  -- Verify with: php tests/document_receipt_migration_check.php
-  `document_status` enum('Filed','Pending_Clearance','Awaiting_Payment','Processing','Ready','Shipped','Claimed','Rejected') NOT NULL DEFAULT 'Filed',
+  `document_status` enum('Draft','Filed','Pending_Clearance','Awaiting_Payment','Processing','Ready','Shipped','Claimed','Rejected','Cancelled') NOT NULL DEFAULT 'Filed',
   `blocked_reason` varchar(160) DEFAULT NULL COMMENT 'What this request is waiting on, if anything',
   `blocked_since` datetime DEFAULT NULL COMMENT 'When the current blockage began',
   `blocked_source` varchar(16) DEFAULT NULL,
@@ -519,15 +330,6 @@ CREATE TABLE `document_requests` (
   `delivery_fee` decimal(10,2) DEFAULT NULL,
   `official_receipt` varchar(40) DEFAULT NULL,
   `release_date` datetime DEFAULT NULL,
-  -- ── GCash payment receipt ────────────────────────────────────
-  -- Added by migrations/document_receipt_upload.sql. Previously these
-  -- existed only in that migration, so the seed described a table the
-  -- application cannot use: a database built from this file rejected
-  -- every receipt upload and every receipt sign-off.
-  --
-  -- The migration is guarded (it checks information_schema first), so
-  -- applying it on top of this seed is a no-op rather than a duplicate
-  -- column error. The seed and the migration are both correct here.
   `payment_receipt_path` varchar(255) DEFAULT NULL COMMENT 'Relative path to the uploaded GCash receipt image/PDF',
   `payment_receipt_sha256` char(64) DEFAULT NULL COMMENT 'SHA-256 of the receipt at upload; proves the file is unaltered',
   `payment_receipt_filename` varchar(180) DEFAULT NULL COMMENT 'Original filename as uploaded, for display only',
@@ -538,14 +340,20 @@ CREATE TABLE `document_requests` (
   `payment_receipt_waived_at` datetime DEFAULT NULL COMMENT 'When staff accepted the request WITHOUT a receipt',
   `payment_receipt_waived_by` int(11) DEFAULT NULL COMMENT 'users.id of the staff member who waived the receipt requirement',
   `payment_receipt_waived_reason` varchar(255) DEFAULT NULL COMMENT 'Why the receipt requirement was waived — required, never blank',
-  -- ── Pickup notice ────────────────────────────────────────────
-  -- Sent when the request goes to Ready. Recorded so a registrar can
-  -- see afterwards whether the student was actually told — a Ready
-  -- document nobody was notified about is the failure that gets
-  -- discovered by the student standing at the counter.
   `pickup_notified_at` datetime DEFAULT NULL COMMENT 'When the pickup/availability email was successfully sent',
   `pickup_notified_to` varchar(255) DEFAULT NULL COMMENT 'Recipients the pickup email actually reached',
   `pickup_notify_error` varchar(255) DEFAULT NULL COMMENT 'Why the pickup email could not be sent; NULL when it sent',
+  `requirements_reviewed_at` datetime DEFAULT NULL,
+  `requirements_reviewed_by` int(11) DEFAULT NULL,
+  `requirements_review_note` text DEFAULT NULL,
+  `wizard_step` tinyint(3) NOT NULL DEFAULT 0 COMMENT 'Furthest wizard step reached: 0 none, 1..4 (drafts only)',
+  `notes` text DEFAULT NULL COMMENT 'Additional notes the student typed, free text',
+  `purpose_code` varchar(40) DEFAULT NULL COMMENT 'Controlled purpose: employment|board_exam|further_studies|transfer|other',
+  `submitted_at` datetime DEFAULT NULL COMMENT 'When the student completed the wizard and submitted',
+  `estimated_release_at` datetime DEFAULT NULL COMMENT 'Promised release date, computed once at filing',
+  `payment_reference` varchar(24) DEFAULT NULL COMMENT 'Payment reference quoted to the student (OTC / bank)',
+  `cancelled_at` datetime DEFAULT NULL COMMENT 'When the student withdrew the request',
+  `cancellation_reason` varchar(255) DEFAULT NULL COMMENT 'Why the student withdrew it',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_request_id` (`request_id`),
   UNIQUE KEY `uq_qr_hash` (`qr_hash`),
@@ -564,10 +372,25 @@ CREATE TABLE `document_requests` (
   CONSTRAINT `fk_document_requests_catalog` FOREIGN KEY (`catalog_id`) REFERENCES `document_catalog` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_document_requests_released_by` FOREIGN KEY (`released_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_document_requests_walkin_by` FOREIGN KEY (`walkin_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=25 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+DROP TABLE IF EXISTS `document_type_requirements`;
+CREATE TABLE `document_type_requirements` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `catalog_id` int(11) NOT NULL,
+  `code` varchar(40) NOT NULL COMMENT 'Stable key, e.g. library_clearance',
+  `label` varchar(160) NOT NULL COMMENT 'What the student sees',
+  `hint` varchar(255) DEFAULT NULL COMMENT 'Format guidance, e.g. "white background"',
+  `is_required` tinyint(1) NOT NULL DEFAULT 1,
+  `max_files` tinyint(3) NOT NULL DEFAULT 1,
+  `sort_order` int(11) NOT NULL DEFAULT 0,
+  `is_active` tinyint(1) NOT NULL DEFAULT 1,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_catalog_code` (`catalog_id`,`code`),
+  KEY `idx_catalog_active` (`catalog_id`,`is_active`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 DROP TABLE IF EXISTS `documents`;
 CREATE TABLE `documents` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -599,10 +422,8 @@ CREATE TABLE `documents` (
   KEY `idx_documents_file_hash` (`file_hash`),
   CONSTRAINT `documents_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE,
   CONSTRAINT `documents_ibfk_2` FOREIGN KEY (`uploaded_by`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 DROP TABLE IF EXISTS `emergency_contacts`;
 CREATE TABLE `emergency_contacts` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -618,9 +439,7 @@ CREATE TABLE `emergency_contacts` (
   KEY `idx_student_id` (`student_id`),
   CONSTRAINT `fk_emergency_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+
 DROP TABLE IF EXISTS `enrollment_history`;
 CREATE TABLE `enrollment_history` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -638,9 +457,7 @@ CREATE TABLE `enrollment_history` (
   KEY `idx_enrollment_history_student` (`student_id`),
   CONSTRAINT `fk_eh_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+
 DROP TABLE IF EXISTS `enrollments`;
 CREATE TABLE `enrollments` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -679,10 +496,8 @@ CREATE TABLE `enrollments` (
   PRIMARY KEY (`id`),
   KEY `idx_enrollments_status` (`status`),
   KEY `idx_enrollments_student_number` (`student_number`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 DROP TABLE IF EXISTS `finance`;
 CREATE TABLE `finance` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -692,10 +507,25 @@ CREATE TABLE `finance` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_finance_student` (`student_id`),
   CONSTRAINT `fk_finance_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+DROP TABLE IF EXISTS `guardian_contact_attempts`;
+CREATE TABLE `guardian_contact_attempts` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `student_id` int(11) NOT NULL,
+  `contact_type` enum('guardian','emergency') NOT NULL,
+  `contact_id` int(11) NOT NULL,
+  `contact_name` varchar(200) NOT NULL,
+  `channel` enum('call','email') NOT NULL,
+  `occasion` varchar(100) NOT NULL,
+  `outcome` enum('reached','no_answer','left_message','email_sent','failed') NOT NULL,
+  `notes` text NOT NULL,
+  `recorded_by` int(11) NOT NULL,
+  `created_at` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_contact_student` (`student_id`,`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 DROP TABLE IF EXISTS `guardians`;
 CREATE TABLE `guardians` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -712,10 +542,25 @@ CREATE TABLE `guardians` (
   KEY `idx_student_id` (`student_id`),
   KEY `idx_contact` (`contact_number`),
   CONSTRAINT `guardians_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+DROP TABLE IF EXISTS `id_card_details`;
+CREATE TABLE `id_card_details` (
+  `rfid_card_id` int(11) NOT NULL,
+  `student_id` int(11) NOT NULL,
+  `details_json` text NOT NULL,
+  `reason` varchar(255) NOT NULL,
+  `version` int(10) unsigned NOT NULL DEFAULT 1,
+  `updated_by` int(11) DEFAULT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`rfid_card_id`),
+  KEY `idx_id_details_student` (`student_id`),
+  KEY `fk_id_details_user` (`updated_by`),
+  CONSTRAINT `fk_id_details_card` FOREIGN KEY (`rfid_card_id`) REFERENCES `rfid_cards` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_id_details_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_id_details_user` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 DROP TABLE IF EXISTS `login_attempts`;
 CREATE TABLE `login_attempts` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
@@ -726,10 +571,8 @@ CREATE TABLE `login_attempts` (
   PRIMARY KEY (`id`),
   KEY `idx_email_ip_time` (`email`,`ip_address`,`attempted_at`),
   KEY `idx_ip_time` (`ip_address`,`attempted_at`)
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 DROP TABLE IF EXISTS `mock_lalamove_orders`;
 CREATE TABLE `mock_lalamove_orders` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -751,9 +594,7 @@ CREATE TABLE `mock_lalamove_orders` (
   KEY `idx_lala_request` (`request_id`),
   CONSTRAINT `fk_lala_request` FOREIGN KEY (`request_id`) REFERENCES `document_requests` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+
 DROP TABLE IF EXISTS `mock_payment_transactions`;
 CREATE TABLE `mock_payment_transactions` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -782,9 +623,7 @@ CREATE TABLE `mock_payment_transactions` (
   KEY `idx_txn_paymongo_payment` (`paymongo_payment_id`),
   CONSTRAINT `fk_txn_request` FOREIGN KEY (`request_id`) REFERENCES `document_requests` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+
 DROP TABLE IF EXISTS `otp_codes`;
 CREATE TABLE `otp_codes` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -794,32 +633,13 @@ CREATE TABLE `otp_codes` (
   `expires_at` datetime NOT NULL,
   `used_at` datetime DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  -- Added by migrations/security_hardening_phase1.sql. NOT NULL DEFAULT 0,
-  -- so the seed has to declare it: without it a seeded database has an
-  -- OTP table with no attempt counter, and the brute-force lockout in
-  -- auth_security.php silently never triggers.
   `verify_attempts` int(11) NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`),
   KEY `idx_otp_user` (`user_id`),
   KEY `idx_otp_purpose` (`user_id`,`purpose`),
   CONSTRAINT `fk_otp_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
--- Also created by migrations/security_hardening_phase1.sql; it was
--- missing from the SEED only. That is still a real gap: the seed is what
--- a fresh install is built from, so a seeded database had no
--- password_reset_grants at all and every "forgot password" request would
--- fail on a missing-table error unless that migration happened to be run
--- afterwards. auth_security.php reads and writes it (11 references), so
--- the feature looks implemented and simply cannot run.
---
--- Declared IF NOT EXISTS in the migration, so the two agree and running
--- the migration over this seed is a no-op rather than a duplicate error.
---
--- Only the HASH of the reset token is stored, never the token itself: a
--- read-only compromise of this table must not yield usable reset links.
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 DROP TABLE IF EXISTS `password_reset_grants`;
 CREATE TABLE `password_reset_grants` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -832,9 +652,24 @@ CREATE TABLE `password_reset_grants` (
   KEY `idx_grant_user` (`user_id`,`expires_at`),
   CONSTRAINT `fk_grant_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+
+DROP TABLE IF EXISTS `queue_day_settings`;
+CREATE TABLE `queue_day_settings` (
+  `queue_date` date NOT NULL,
+  `opens_time` time NOT NULL DEFAULT '08:00:00',
+  `closes_time` time NOT NULL DEFAULT '17:00:00',
+  `cutoff_enabled` tinyint(1) NOT NULL DEFAULT 1,
+  `cutoff_forced_at` datetime DEFAULT NULL,
+  `cutoff_forced_by` int(10) unsigned DEFAULT NULL,
+  `max_taps_student` int(10) unsigned NOT NULL DEFAULT 0,
+  `max_taps_priority` int(10) unsigned NOT NULL DEFAULT 0,
+  `max_daily_taps` int(10) unsigned NOT NULL DEFAULT 0,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `updated_by` int(10) unsigned DEFAULT NULL,
+  PRIMARY KEY (`queue_date`),
+  KEY `idx_qds_forced_by` (`cutoff_forced_by`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 DROP TABLE IF EXISTS `queue_tickets`;
 CREATE TABLE `queue_tickets` (
   `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
@@ -846,10 +681,6 @@ CREATE TABLE `queue_tickets` (
   `course` varchar(100) DEFAULT NULL,
   `status` enum('waiting','serving','completed','no-show','removed','cancelled') NOT NULL DEFAULT 'waiting',
   `counter` int(10) unsigned NOT NULL DEFAULT 1,
-  -- Four lanes: txn_type (service | claim) x priority_group (student | priority).
-  -- Both DEFAULT to the old single-lane behaviour, so a ticket written before
-  -- the cut-over is exactly a "service / student" ticket and no backfill is needed.
-  -- FROM migrations/queue_lanes_cutoff.sql; api/queue-public.php filters on both.
   `txn_type` enum('service','claim') NOT NULL DEFAULT 'service',
   `priority_group` enum('student','priority') NOT NULL DEFAULT 'student',
   `purpose` enum('general','document_request','payment','enrollment') NOT NULL DEFAULT 'general',
@@ -868,93 +699,30 @@ CREATE TABLE `queue_tickets` (
   KEY `fk_queue_document_request` (`document_request_id`),
   CONSTRAINT `fk_queue_document_request` FOREIGN KEY (`document_request_id`) REFERENCES `document_requests` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_queue_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=23 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
--- QUEUE DAY SETTINGS
---
--- One row per queue_date, created lazily the first time a registrar saves
--- something. Per-day rather than a global settings table because the caps are
--- explicitly "per day", and because who cut the line off, and when, is an audit
--- fact the registrar wants to see afterwards.
---
--- max_taps_* of 0 means UNLIMITED, so a fresh install behaves exactly as it
--- did before: open all day, no cap, until someone saves a value.
--- shared/queue_helpers.php tolerates the table being absent, so nothing here
--- is a hard dependency of the queue.
---
--- FROM migrations/queue_lanes_cutoff.sql. Without it here, api/queue.php's
--- save / cut-off / reopen endpoints and shared/queue_helpers.php's read all
--- named a table no fresh install had.
-DROP TABLE IF EXISTS `queue_day_settings`;
-CREATE TABLE `queue_day_settings` (
-  `queue_date`       date         NOT NULL,
-  `opens_time`       time         NOT NULL DEFAULT '08:00:00',
-  `closes_time`      time         NOT NULL DEFAULT '17:00:00',
-  `cutoff_enabled`   tinyint(1)   NOT NULL DEFAULT 1,
-  `cutoff_forced_at` datetime     DEFAULT NULL,
-  `cutoff_forced_by` int unsigned DEFAULT NULL,
-  `max_taps_student` int unsigned NOT NULL DEFAULT 0,
-  `max_taps_priority` int unsigned NOT NULL DEFAULT 0,
-  -- FROM migrations/add_queue_daily_tap_cap.sql
-  -- How many numbers may be issued for the WHOLE day, all students
-  -- together - the throughput the counter is staffed for. The two caps
-  -- above are PER STUDENT (an abuse guard); this one is the day's capacity.
-  -- 0 = unlimited, like every other cap here.
-  `max_daily_taps`   int unsigned NOT NULL DEFAULT 0,
-  `updated_at`       timestamp    NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `updated_by`       int unsigned DEFAULT NULL,
-  PRIMARY KEY (`queue_date`),
-  KEY `idx_qds_forced_by` (`cutoff_forced_by`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
--- RFID READER DEVICES
---
--- The physical readers that tap or scan a card, and the name of the place they
--- sit. A scan records a reader_id (see rfid_scan_logs.scanner_id) so the office
--- can tell a tap at the entrance from one at the registrar's window.
---
--- Added to the dump because five files read this table unguarded -
--- api/card-readers.php, registrar/rfid-readers.php, registrar/rfid-kiosk.php,
--- api/rfid-scan.php and shared/rfid_helpers.php - and none of them check
--- whether it exists first. It was absent from both this dump and the live
--- database, so the RFID Kiosk, the Readers page and the whole card-readers
--- endpoint were all one "table not found" away from being dead on a fresh
--- install, on a database the header calls complete.
---
--- reader_type is what a scan MEANS, not what the hardware is:
---   entrance  the reader is a door, a tap records an entry
---   exit      the reader is a door, a tap records an exit
---   both      one reader covers both directions (a desktop reader)
--- api/rfid-scan.php branches on exactly these three values.
-DROP TABLE IF EXISTS `card_readers`;
-CREATE TABLE `card_readers` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  -- Widths match the live table. The seed carried 120/160/64 and every
-  -- column NOT NULL, while production has 100/100/50 with name and
-  -- status still NOT NULL but location and reader_code nullable. That
-  -- combination is not cosmetic: seeding NOT NULL columns means a
-  -- reader cannot be created without a location and a code, so the
-  -- "add reader before enrolling anyone" step fails on a fresh install.
-  -- Added by migrations/security_hardening_phase1.sql.
-  `name` varchar(100) NOT NULL,
-  `location` varchar(100) DEFAULT NULL,
-  `reader_type` enum('entrance','exit','both') NOT NULL DEFAULT 'both',
-  `reader_code` varchar(50) DEFAULT NULL,
-  `status` enum('active','inactive') NOT NULL DEFAULT 'active',
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+
+DROP TABLE IF EXISTS `report_exports`;
+CREATE TABLE `report_exports` (
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `actor_name` varchar(100) NOT NULL,
+  `actor_role` varchar(40) NOT NULL,
+  `report_name` varchar(160) NOT NULL,
+  `format` varchar(20) NOT NULL,
+  `resource` text NOT NULL,
+  `status` varchar(30) NOT NULL,
+  `token_hash` char(64) DEFAULT NULL,
+  `session_hash` char(64) DEFAULT NULL,
+  `ip_address` varchar(45) DEFAULT NULL,
+  `created_at` datetime NOT NULL,
+  `expires_at` datetime DEFAULT NULL,
+  `initiated_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_reader_code` (`reader_code`),
-  KEY `idx_status` (`status`),
-  KEY `idx_reader_type` (`reader_type`)
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+  UNIQUE KEY `uq_export_token` (`token_hash`),
+  KEY `idx_export_actor` (`user_id`,`created_at`),
+  KEY `idx_export_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 DROP TABLE IF EXISTS `rfid_cards`;
 CREATE TABLE `rfid_cards` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -979,10 +747,8 @@ CREATE TABLE `rfid_cards` (
   KEY `idx_student_id` (`student_id`),
   KEY `idx_available` (`status`,`student_id`),
   CONSTRAINT `rfid_cards_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 DROP TABLE IF EXISTS `rfid_scan_logs`;
 CREATE TABLE `rfid_scan_logs` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -1000,10 +766,16 @@ CREATE TABLE `rfid_scan_logs` (
   KEY `idx_student_id` (`student_id`),
   KEY `idx_scanned_at` (`scanned_at`),
   KEY `idx_location` (`location`)
-) ENGINE=InnoDB AUTO_INCREMENT=35 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+DROP TABLE IF EXISTS `staff_notification_reads`;
+CREATE TABLE `staff_notification_reads` (
+  `user_id` int(11) NOT NULL,
+  `last_read_id` int(11) NOT NULL DEFAULT 0,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 DROP TABLE IF EXISTS `status_tracker`;
 CREATE TABLE `status_tracker` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -1019,17 +791,11 @@ CREATE TABLE `status_tracker` (
   KEY `changed_by` (`changed_by`),
   KEY `idx_student_id` (`student_id`),
   KEY `idx_current_status` (`current_status`),
-  -- From migrations/status_loa_window.sql. The LOA view asks "which
-  -- time-boxed statuses are open for this student", which filters on student_id
-  -- and end_date together - idx_student_id alone does not serve it, and the
-  -- table grows one row per status change per student.
   KEY `idx_student_end_date` (`student_id`,`end_date`),
   CONSTRAINT `status_tracker_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE,
   CONSTRAINT `status_tracker_ibfk_2` FOREIGN KEY (`changed_by`) REFERENCES `users` (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 DROP TABLE IF EXISTS `student_ids`;
 CREATE TABLE `student_ids` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -1053,10 +819,8 @@ CREATE TABLE `student_ids` (
   KEY `idx_student_ids_rfid_card_id` (`rfid_card_id`),
   CONSTRAINT `fk_student_ids_rfid_card` FOREIGN KEY (`rfid_card_id`) REFERENCES `rfid_cards` (`id`) ON DELETE SET NULL,
   CONSTRAINT `student_ids_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 DROP TABLE IF EXISTS `student_notifications`;
 CREATE TABLE `student_notifications` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -1074,9 +838,7 @@ CREATE TABLE `student_notifications` (
   KEY `idx_sn_read` (`is_read`),
   CONSTRAINT `fk_sn_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+
 DROP TABLE IF EXISTS `students`;
 CREATE TABLE `students` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -1110,19 +872,9 @@ CREATE TABLE `students` (
   `father_name` varchar(100) DEFAULT NULL,
   `birth_country` varchar(60) DEFAULT NULL,
   `graduation_date` date DEFAULT NULL COMMENT 'Date the degree was conferred',
-  -- Transfer / prior-school history. Added by
-  -- migrations/add_previous_school_fields.sql. Without these in the seed a
-  -- fresh install fails the enrolment form's previous-school block on an
-  -- unknown column.
   `previous_school` varchar(150) DEFAULT NULL COMMENT 'School last attended before this one',
   `school_year_graduated` varchar(20) DEFAULT NULL,
   `last_year_level_completed` varchar(30) DEFAULT NULL,
-  -- Bounce tracking + address quality, from
-  -- migrations/security_hardening_phase1.sql.
-  -- email_is_placeholder is the important one: without it a seeded database
-  -- has no way to tell a real address from the synthetic one enrolment
-  -- invents, so the pickup-notice sender would try to email placeholders
-  -- and every send would bounce.
   `email_bounced_at` datetime DEFAULT NULL,
   `email_bounce_reason` varchar(255) DEFAULT NULL,
   `email_is_placeholder` tinyint(1) NOT NULL DEFAULT 0,
@@ -1130,51 +882,33 @@ CREATE TABLE `students` (
   KEY `idx_student_number` (`student_number`),
   KEY `idx_status` (`status`),
   KEY `idx_course` (`course`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!40101 SET character_set_client = utf8 */;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+DROP TABLE IF EXISTS `user_program_assignments`;
+CREATE TABLE `user_program_assignments` (
+  `user_id` int(11) NOT NULL,
+  `program_code` varchar(30) NOT NULL,
+  `assigned_by` int(11) NOT NULL,
+  `assigned_at` datetime NOT NULL,
+  PRIMARY KEY (`user_id`,`program_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 DROP TABLE IF EXISTS `users`;
 CREATE TABLE `users` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  -- NOT widened, and NOT nullable, even though
-  -- migrations/security_hardening_phase1.sql would do both. Deliberate:
-  --
-  --   * That migration MODIFYs this column to varchar(190) NULL. It also
-  --     DROPs the unique index and replaces it with a plain one
-  --     (idx_users_email). Making email nullable and non-unique is a change
-  --     to who may hold an account, not a schema tidy-up, so it is not folded
-  --     in here on the strength of a migration that has not been applied.
-  --
-  --   * varchar(100) indexes this column perfectly well - the 190/767-byte
-  --     limit in that migration applies to a longer column, and is not a
-  --     reason to widen one that is already indexed (UNIQUE KEY `email` and
-  --     KEY `idx_email` below both exist).
-  --
-  -- If the office decides duplicate emails should be allowed, that decision
-  -- belongs in the migration and in a reviewed deploy - not silently in a
-  -- schema file that gets imported over production.
   `email` varchar(100) NOT NULL,
   `password_hash` varchar(255) NOT NULL,
   `full_name` varchar(100) NOT NULL,
-  `role` enum('super_admin','staff','acad_officer','department_head','student') NOT NULL DEFAULT 'staff',
-  `department_id` int(11) DEFAULT NULL,
+  `role` enum('super_admin','registrar_admin','staff','acad_officer','department_head','student') NOT NULL DEFAULT 'staff',
   `rfid_uid` varchar(20) DEFAULT NULL,
   `is_active` tinyint(1) DEFAULT 1,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   `student_id` int(11) DEFAULT NULL,
+  `department_id` int(11) DEFAULT NULL,
   `username` varchar(60) DEFAULT NULL,
   `login_attempts` int(11) NOT NULL DEFAULT 0,
   `locked_until` datetime DEFAULT NULL,
-  -- Session invalidation + bounce tracking, from
-  -- migrations/security_hardening_phase1.sql.
-  --
-  -- password_changed_at is load-bearing, not bookkeeping: session_config.php
-  -- compares it against $_SESSION['login_time'] and forces a re-login when
-  -- they disagree. That is what makes a password reset actually terminate
-  -- existing sessions. On a seeded database without the column, a stolen
-  -- cookie survives the victim changing their password.
   `password_changed_at` datetime DEFAULT NULL,
   `email_bounced_at` datetime DEFAULT NULL,
   `email_bounce_reason` varchar(255) DEFAULT NULL,
@@ -1183,100 +917,84 @@ CREATE TABLE `users` (
   UNIQUE KEY `uq_users_username` (`username`),
   KEY `idx_email` (`email`),
   KEY `idx_student_id` (`student_id`),
+  KEY `idx_users_department` (`department_id`),
+  CONSTRAINT `fk_users_department` FOREIGN KEY (`department_id`) REFERENCES `departments` (`id`) ON DELETE SET NULL,
   CONSTRAINT `fk_users_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-/*!40101 SET character_set_client = @saved_cs_client */;
-/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
-/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
-/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
-/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
-/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
-/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
-/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
--- ---------------------------------------------------------------------------
--- Staff accounts.
---
--- The two staff logins are seeded so a fresh install can be signed into:
--- ONE per role - admin, registrar. Change their passwords before the
--- host goes live, because the hashes below are in this repository and
--- therefore known to anyone who has read it:
---
---   php create_admin.php
---
--- THREE, not two. A second admin (roldantiu89@gmail.com, ADM-002) is seeded
--- again. It was removed once because two admins shared ONE password hash, and
--- because that address is also a student's own, so the UNIQUE index on
--- users.email made that student's portal-account creation fail and silently
--- discard their address (see SECURITY-ROADMAP.md). Both problems are real.
---
--- What is different now:
---
---   1. It does NOT share a hash with the other admin. Every seeded login has
---      its own credential. Two rows carrying the same hash are two copies of
---      one password, which is what made the old arrangement bad.
---
---   2. Its password is printed once, at the bottom of this comment, and is
---      NOT derivable from anything else in this file. Change it on first
---      login: php create_admin.php
---
--- STILL YOUR PROBLEM TO WATCH: that address is a student's. If a student is
--- ever enrolled with it, users.email is UNIQUE and their portal account will
--- fail to be created - which is exactly the incident that got this row
--- removed the first time. The fix is not to leave the admin out of a fresh
--- install; it is to enrol the student under an address the office controls,
--- or to give this admin a role address instead of a personal one.
---
--- A nurse login used to be seeded here too. The clinic portal and every
--- health record were removed, so the account had nothing left to sign into
--- and the role itself no longer exists in the users.role enum.
---
--- Create any additional staff from inside the application once you are in and
--- can set a password nobody else has seen.
---
--- No student accounts and no document catalog are seeded. A student login
--- is personal data and a fresh install has no students, and the catalog is
--- per-school business policy -- fees and turnaround targets differ. Add
--- both from inside the application once you are in:
---
---   php create_admin.php --catalog    document types the desk will offer
---
--- Students are enrolled through the registrar's own screens, and each one
--- gets its portal account automatically (shared/functions.php creates the
--- matching users row with role='student').
---
--- The student_id column is NULL for every row above, so this INSERT does
--- not depend on any student existing.
--- ---------------------------------------------------------------------------
--- ADM-002 PASSWORD (roldantiu89@gmail.com)
---
---   9y4TcjcUPVrwQjEnAe!8
---
--- Printed once, here, and nowhere else. It is in a public repository, so treat
--- it as spent the moment this file is pushed: change it on first login with
---
---   php create_admin.php
---
--- or, once you are signed in, from Users -> your account.
---
--- It is NOT the live database's password for this account. That one was the
--- literal string 'password', published in
--- backups/set_roldantiu_password_20260926.sql, so it is already known and is
--- deliberately not reused here.
--- ---------------------------------------------------------------------------
-INSERT INTO `users` (`id`, `email`, `password_hash`, `full_name`, `role`, `rfid_uid`, `is_active`, `created_at`, `updated_at`, `student_id`, `username`, `login_attempts`, `locked_until`) VALUES
-(1,'admin@gmail.com','$2y$10$f9PmndF92hBFI/jeJAWxC.Pua3Osob3.zkWHn9GRSTQXSyPX8x0dK','System Administrator','super_admin',NULL,1,'2026-07-07 06:42:45','2026-09-23 12:57:09',NULL,'ADM-001',0,NULL),
-(2,'registrar@gmail.com','$2y$10$zj33OjRB93RcPZWd2/f4VudcEqzDCfZdLAajEcZQ7LABuuEKeqFyu','Registrar Staff','staff',NULL,1,'2026-07-07 06:42:45','2026-09-23 12:57:10',NULL,'RGS-001',0,NULL),
-(3,'roldantiu89@gmail.com','$2y$10$goIPlSwZLw21GfQLYBsoxOCwqaO86NGUssooNsG4FHGOi3IbFb6aO','Roldan Tiu','super_admin',NULL,1,'2026-07-07 06:42:45','2026-09-23 12:57:11',NULL,'ADM-002',0,NULL);
+-- Business/reference configuration
+INSERT INTO `departments` (`id`,`name`,`code`,`is_active`,`created_at`) VALUES
+('1','College of Engineering','COE','1','2026-01-01 00:00:00');
+INSERT INTO `departments` (`id`,`name`,`code`,`is_active`,`created_at`) VALUES
+('2','College of Nursing','CON','1','2026-01-01 00:00:00');
+INSERT INTO `departments` (`id`,`name`,`code`,`is_active`,`created_at`) VALUES
+('3','College of Business','COB','1','2026-01-01 00:00:00');
+INSERT INTO `departments` (`id`,`name`,`code`,`is_active`,`created_at`) VALUES
+('4','College of Education','CED','1','2026-01-01 00:00:00');
+INSERT INTO `departments` (`id`,`name`,`code`,`is_active`,`created_at`) VALUES
+('5','College of IT','CIT','1','2026-01-01 00:00:00');
+INSERT INTO `document_catalog` (`id`,`sku`,`name`,`description`,`base_fee`,`sla_days`,`fee_type`,`requirement`,`is_active`,`created_at`) VALUES
+('13','DOC-COE','Certificate of Enrollment','Proof of current enrollment','100.00','1','flat',NULL,'1','2026-11-10 18:52:56');
+INSERT INTO `document_catalog` (`id`,`sku`,`name`,`description`,`base_fee`,`sla_days`,`fee_type`,`requirement`,`is_active`,`created_at`) VALUES
+('14','DOC-TOR','Transcript of Records','Complete academic record (TOR)','250.00','3','per_page','Scanned copy of valid ID','1','2026-11-10 18:52:56');
+INSERT INTO `document_catalog` (`id`,`sku`,`name`,`description`,`base_fee`,`sla_days`,`fee_type`,`requirement`,`is_active`,`created_at`) VALUES
+('15','DOC-GM','Certificate of Good Moral','Good moral character certificate','150.00','3','flat','No pending disciplinary cases','1','2026-11-10 18:52:56');
+INSERT INTO `document_catalog` (`id`,`sku`,`name`,`description`,`base_fee`,`sla_days`,`fee_type`,`requirement`,`is_active`,`created_at`) VALUES
+('16','DOC-DIPLOMA','Diploma Replacement','Replacement of lost diploma','1000.00','5','flat','Notarized Affidavit of Loss','1','2026-11-10 18:52:56');
+INSERT INTO `document_catalog` (`id`,`sku`,`name`,`description`,`base_fee`,`sla_days`,`fee_type`,`requirement`,`is_active`,`created_at`) VALUES
+('17','DOC-CTC','Certified True Copy','Certified true copy of a record','50.00','2','per_page',NULL,'1','2026-11-10 18:52:56');
+INSERT INTO `document_catalog` (`id`,`sku`,`name`,`description`,`base_fee`,`sla_days`,`fee_type`,`requirement`,`is_active`,`created_at`) VALUES
+('18','DOC-HD','Honorable Dismissal','Transfer / honorable dismissal','300.00','10','flat',NULL,'1','2026-11-10 18:52:56');
+INSERT INTO `document_catalog` (`id`,`sku`,`name`,`description`,`base_fee`,`sla_days`,`fee_type`,`requirement`,`is_active`,`created_at`) VALUES
+('19','DOC-CD','Course Description','Subject syllabus / course description','100.00','1','per_syllabus',NULL,'1','2026-11-10 18:52:56');
+INSERT INTO `document_type_requirements` (`id`,`catalog_id`,`code`,`label`,`hint`,`is_required`,`max_files`,`sort_order`,`is_active`,`created_at`) VALUES
+('1','13','school_id','Valid School ID','Front side, name and number clearly readable','1','1','1','1','2026-11-13 00:52:40');
+INSERT INTO `document_type_requirements` (`id`,`catalog_id`,`code`,`label`,`hint`,`is_required`,`max_files`,`sort_order`,`is_active`,`created_at`) VALUES
+('2','14','school_id','Valid School ID','Front side, name and number clearly readable','1','1','1','1','2026-11-13 00:52:40');
+INSERT INTO `document_type_requirements` (`id`,`catalog_id`,`code`,`label`,`hint`,`is_required`,`max_files`,`sort_order`,`is_active`,`created_at`) VALUES
+('3','15','school_id','Valid School ID','Front side, name and number clearly readable','1','1','1','1','2026-11-13 00:52:40');
+INSERT INTO `document_type_requirements` (`id`,`catalog_id`,`code`,`label`,`hint`,`is_required`,`max_files`,`sort_order`,`is_active`,`created_at`) VALUES
+('4','16','school_id','Valid School ID','Front side, name and number clearly readable','1','1','1','1','2026-11-13 00:52:40');
+INSERT INTO `document_type_requirements` (`id`,`catalog_id`,`code`,`label`,`hint`,`is_required`,`max_files`,`sort_order`,`is_active`,`created_at`) VALUES
+('5','17','school_id','Valid School ID','Front side, name and number clearly readable','1','1','1','1','2026-11-13 00:52:40');
+INSERT INTO `document_type_requirements` (`id`,`catalog_id`,`code`,`label`,`hint`,`is_required`,`max_files`,`sort_order`,`is_active`,`created_at`) VALUES
+('6','18','school_id','Valid School ID','Front side, name and number clearly readable','1','1','1','1','2026-11-13 00:52:40');
+INSERT INTO `document_type_requirements` (`id`,`catalog_id`,`code`,`label`,`hint`,`is_required`,`max_files`,`sort_order`,`is_active`,`created_at`) VALUES
+('7','19','school_id','Valid School ID','Front side, name and number clearly readable','1','1','1','1','2026-11-13 00:52:40');
+INSERT INTO `document_type_requirements` (`id`,`catalog_id`,`code`,`label`,`hint`,`is_required`,`max_files`,`sort_order`,`is_active`,`created_at`) VALUES
+('8','13','photo_2x2','2x2 Photo (white background)','Recent, plain background, no hat or sunglasses','1','1','2','1','2026-11-13 00:52:40');
+INSERT INTO `document_type_requirements` (`id`,`catalog_id`,`code`,`label`,`hint`,`is_required`,`max_files`,`sort_order`,`is_active`,`created_at`) VALUES
+('9','14','photo_2x2','2x2 Photo (white background)','Recent, plain background, no hat or sunglasses','1','1','2','1','2026-11-13 00:52:40');
+INSERT INTO `document_type_requirements` (`id`,`catalog_id`,`code`,`label`,`hint`,`is_required`,`max_files`,`sort_order`,`is_active`,`created_at`) VALUES
+('10','15','photo_2x2','2x2 Photo (white background)','Recent, plain background, no hat or sunglasses','1','1','2','1','2026-11-13 00:52:40');
+INSERT INTO `document_type_requirements` (`id`,`catalog_id`,`code`,`label`,`hint`,`is_required`,`max_files`,`sort_order`,`is_active`,`created_at`) VALUES
+('11','16','photo_2x2','2x2 Photo (white background)','Recent, plain background, no hat or sunglasses','1','1','2','1','2026-11-13 00:52:40');
+INSERT INTO `document_type_requirements` (`id`,`catalog_id`,`code`,`label`,`hint`,`is_required`,`max_files`,`sort_order`,`is_active`,`created_at`) VALUES
+('12','17','photo_2x2','2x2 Photo (white background)','Recent, plain background, no hat or sunglasses','1','1','2','1','2026-11-13 00:52:40');
+INSERT INTO `document_type_requirements` (`id`,`catalog_id`,`code`,`label`,`hint`,`is_required`,`max_files`,`sort_order`,`is_active`,`created_at`) VALUES
+('13','18','photo_2x2','2x2 Photo (white background)','Recent, plain background, no hat or sunglasses','1','1','2','1','2026-11-13 00:52:40');
+INSERT INTO `document_type_requirements` (`id`,`catalog_id`,`code`,`label`,`hint`,`is_required`,`max_files`,`sort_order`,`is_active`,`created_at`) VALUES
+('14','19','photo_2x2','2x2 Photo (white background)','Recent, plain background, no hat or sunglasses','1','1','2','1','2026-11-13 00:52:40');
+INSERT INTO `document_type_requirements` (`id`,`catalog_id`,`code`,`label`,`hint`,`is_required`,`max_files`,`sort_order`,`is_active`,`created_at`) VALUES
+('15','16','library_clearance','Library Clearance','Signed and stamped by the Library','0','1','3','1','2026-11-13 00:52:40');
+INSERT INTO `document_type_requirements` (`id`,`catalog_id`,`code`,`label`,`hint`,`is_required`,`max_files`,`sort_order`,`is_active`,`created_at`) VALUES
+('16','18','library_clearance','Library Clearance','Signed and stamped by the Library','0','1','3','1','2026-11-13 00:52:40');
+INSERT INTO `document_type_requirements` (`id`,`catalog_id`,`code`,`label`,`hint`,`is_required`,`max_files`,`sort_order`,`is_active`,`created_at`) VALUES
+('17','14','library_clearance','Library Clearance','Signed and stamped by the Library','0','1','3','1','2026-11-13 00:52:40');
+INSERT INTO `document_type_requirements` (`id`,`catalog_id`,`code`,`label`,`hint`,`is_required`,`max_files`,`sort_order`,`is_active`,`created_at`) VALUES
+('18','16','accounting_clearance','Accounting Clearance','Signed and stamped by the Accounting Office','0','1','4','1','2026-11-13 00:52:40');
+INSERT INTO `document_type_requirements` (`id`,`catalog_id`,`code`,`label`,`hint`,`is_required`,`max_files`,`sort_order`,`is_active`,`created_at`) VALUES
+('19','14','accounting_clearance','Accounting Clearance','Signed and stamped by the Accounting Office','0','1','4','1','2026-11-13 00:52:40');
+INSERT INTO `document_type_requirements` (`id`,`catalog_id`,`code`,`label`,`hint`,`is_required`,`max_files`,`sort_order`,`is_active`,`created_at`) VALUES
+('21','18','dean_signature','Dean\'s Office Endorsement','The original endorsement letter, not a photo of a photo','1','1','1','1','2026-11-13 00:52:40');
+INSERT INTO `document_type_requirements` (`id`,`catalog_id`,`code`,`label`,`hint`,`is_required`,`max_files`,`sort_order`,`is_active`,`created_at`) VALUES
+('22','16','affidavit_loss','Affidavit of Loss','Signed in front of a notary public, with a valid ID','1','1','1','1','2026-11-13 00:52:40');
+INSERT INTO `document_type_requirements` (`id`,`catalog_id`,`code`,`label`,`hint`,`is_required`,`max_files`,`sort_order`,`is_active`,`created_at`) VALUES
+('23','18','affidavit_loss','Affidavit of Loss','Signed in front of a notary public, with a valid ID','1','1','1','1','2026-11-13 00:52:40');
 
--- Explicit COMMIT. Every statement above commits on its own under the
--- default autocommit, so this changes nothing in the normal case - but an
--- import is run by people who do not know that, and someone with
--- autocommit off (a hosting panel's import tool, a phpMyAdmin box with
--- the setting changed) would otherwise be left with a half-built schema
--- that vanishes on disconnect.
+-- Owner account (no plaintext password)
+INSERT INTO `users` (`id`,`email`,`password_hash`,`full_name`,`role`,`rfid_uid`,`is_active`,`created_at`,`updated_at`,`student_id`,`department_id`,`username`,`login_attempts`,`locked_until`,`password_changed_at`,`email_bounced_at`,`email_bounce_reason`) VALUES
+('3','roldantiu89@gmail.com','$2y$10$goIPlSwZLw21GfQLYBsoxOCwqaO86NGUssooNsG4FHGOi3IbFb6aO','Roldan Tiu','super_admin',NULL,'1','2026-07-07 14:42:45','2026-11-11 18:27:25',NULL,NULL,'ADM-002','0',NULL,NULL,NULL,NULL);
+
+SET FOREIGN_KEY_CHECKS=@bundle_old_fk;
 COMMIT;
-
-SET FOREIGN_KEY_CHECKS = 1;
-
--- End of registrar_ai.sql
