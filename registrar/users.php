@@ -8,7 +8,8 @@
 require_once __DIR__ . '/../shared/security_headers.php';
 require_once __DIR__ . '/../shared/session_config.php';
 if (empty($_SESSION['user_id'])) { header('Location: ../login.php'); exit; }
-requireRole('super_admin');
+requireLogin();
+if (!in_array(getCurrentUserRole(), ['super_admin','registrar_admin'], true)) { http_response_code(403); exit('Access denied.'); }
 require_once __DIR__ . '/../shared/database.php';
 require_once __DIR__ . '/../shared/password_policy.php';
 
@@ -18,7 +19,8 @@ $passwordRequirements = passwordPolicyRequirements();
 $db = Database::getInstance();
 
 $users = $db->fetchAll("
-    SELECT u.id, u.email, u.full_name, u.role, u.is_active, u.created_at, u.updated_at
+    SELECT u.id, u.email, u.full_name, u.role, u.is_active, u.created_at, u.updated_at,
+           (SELECT MAX(a.created_at) FROM audit_logs a WHERE a.user_id=u.id AND a.action='login_success') AS last_login
     FROM users u
     WHERE u.role <> 'student'
     ORDER BY u.id ASC
@@ -27,7 +29,7 @@ $users = $db->fetchAll("
 $totalUsers    = count($users);
 $activeUsers   = count(array_filter($users, fn($u) => (int)$u['is_active'] === 1));
 $disabledUsers = $totalUsers - $activeUsers;
-$adminUsers    = count(array_filter($users, fn($u) => $u['role'] === 'admin'));
+$adminUsers    = count(array_filter($users, fn($u) => in_array($u['role'], ['super_admin','registrar_admin'], true)));
 
 $page_title = 'Users';
 $APP_ROOT = '../';
@@ -78,8 +80,7 @@ include '../includes/sidebar.php';
     <label class="adm-filters-label" for="roleFilter">Role</label>
     <select id="roleFilter" class="form-control" onchange="performSearch()">
         <option value="">All roles</option>
-        <option value="admin">Admin</option>
-        <option value="registrar">Registrar</option>
+        <option value="super_admin">Super Admin</option><option value="registrar_admin">Registrar Admin</option><option value="acad_officer">Academic Officer</option><option value="department_head">Department Head</option>
             <option value="staff">Staff</option>
         </select>
     </div>
@@ -87,11 +88,11 @@ include '../includes/sidebar.php';
     <div class="table-responsive" style="overflow-x:auto;">
     <table class="table">
         <thead>
-        <tr><th>User</th><th>Role</th><th>Status</th><th>Created</th><th style="text-align:center;">Actions</th></tr>
+        <tr><th>User</th><th>Role</th><th>Status</th><th>Last login</th><th>Created</th><th style="text-align:center;">Actions</th></tr>
         </thead>
         <tbody id="userBody">
         <?php if (empty($users)): ?>
-        <tr><td colspan="5" class="empty-state"><i class="fas fa-user-slash"></i><p>No users found</p><span>Add your first user to get started</span></td></tr>
+        <tr><td colspan="6" class="empty-state"><i class="fas fa-user-slash"></i><p>No users found</p><span>Add your first user to get started</span></td></tr>
         <?php else:
         $avatarColors = ['blue','green','purple','orange','pink'];
         foreach ($users as $i => $u):
@@ -107,8 +108,10 @@ include '../includes/sidebar.php';
             <td><span class="pill <?= htmlspecialchars($u['role']) ?>"><i class="fas fa-<?= $u['role']==='admin'?'user-shield':($u['role']==='student'?'user-graduate':($u['role']==='registrar'?'user-tie':'user')) ?>"></i> <?= ucfirst($u['role']) ?></span></td>
 
             <td><span class="pill <?= (int)$u['is_active']===1?'active':'inactive' ?>"><span class="status-dot <?= (int)$u['is_active']===1?'active':'inactive' ?>"></span><?= (int)$u['is_active']===1?'Active':'Disabled' ?></span></td>
+            <td style="font-size:12px;color:#64748b;"><?= $u['last_login'] ? htmlspecialchars(date('M d, Y · g:i A', strtotime($u['last_login']))) : 'No login recorded' ?></td>
             <td style="font-size:12px;color:#64748b;"><?= date('M d, Y', strtotime($u['created_at'])) ?></td>
             <td><div class="action-group">
+                <?php if(getCurrentUserRole()==='super_admin'||$u['role']==='staff'): ?>
                 <button class="action-btn edit" onclick="editUser(<?= (int)$u['id'] ?>)" title="Edit"><i class="fas fa-pen"></i></button>
                 <button class="action-btn" style="color:#7c3aed;" onclick="resetPassword(<?= (int)$u['id'] ?>,'<?= htmlspecialchars($u['full_name'],ENT_QUOTES) ?>')" title="Reset Password"><i class="fas fa-key"></i></button>
                 <?php if ((int)$u['is_active']===1): ?>
@@ -116,6 +119,7 @@ include '../includes/sidebar.php';
                 <?php else: ?>
                 <button class="action-btn restore" onclick="toggleUser(<?= (int)$u['id'] ?>,'<?= htmlspecialchars($u['full_name'],ENT_QUOTES) ?>','enable')" title="Enable"><i class="fas fa-user-check"></i></button>
                 <?php endif; ?>
+                <?php else: ?><span>View only</span><?php endif; ?>
             </div></td>
         </tr>
         <?php endforeach; endif; ?>
@@ -146,7 +150,7 @@ include '../includes/sidebar.php';
     <div class="form-group"><label for="addFullName">Full Name <span style="color:#dc2626;">*</span></label><input type="text" id="addFullName" class="form-control" autocomplete="name" required></div>
     <div class="form-group"><label for="addEmail">Email <span style="color:#dc2626;">*</span></label><input type="email" id="addEmail" class="form-control" autocomplete="email" required></div>
     <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-        <div class="form-group"><label for="addRole">Role</label><select id="addRole" class="form-control"><option value="staff">Staff</option><option value="registrar">Registrar</option><option value="admin">Admin</option></select></div>
+        <div class="form-group"><label for="addRole">Role</label><select id="addRole" class="form-control"><option value="staff">Staff</option><?php if (getCurrentUserRole() === "super_admin"): ?><option value="registrar_admin">Registrar Admin</option><option value="acad_officer">Academic Officer</option><option value="department_head">Department Head</option><?php endif; ?></select></div>
         <div class="form-group"><label for="addPassword">Password <span style="color:#dc2626;">*</span></label><div class="password-field-shell"><input type="text" data-masked="1" id="addPassword" class="form-control" autocomplete="new-password" required minlength="<?= $passwordMinLength ?>" aria-describedby="addPasswordMeter addPasswordError"><div class="password-tools"><button type="button" class="password-tool" data-password-toggle="addPassword" aria-label="Show password"><i class="fas fa-eye"></i></button><button type="button" class="password-tool" data-password-generate="addPassword" aria-label="Generate strong password" title="Generate strong password"><i class="fas fa-wand-magic-sparkles"></i></button></div></div></div>
     </div>
     <div class="password-meter" id="addPasswordMeter" data-password-meter="addPassword" data-min-length="<?= $passwordMinLength ?>"><div class="password-meter-head"><span>Password strength</span><span class="password-score" aria-live="polite">Not started</span></div><div class="password-track" aria-hidden="true"><span></span></div><div class="password-requirements">
@@ -162,7 +166,7 @@ include '../includes/sidebar.php';
 <form id="editForm"><input type="hidden" id="editId" value=""><div class="modal-body">
     <div class="form-group"><label>Full Name <span style="color:#dc2626;">*</span></label><input type="text" id="editFullName" class="form-control" required></div>
     <div class="form-group"><label>Email</label><input type="email" id="editEmail" class="form-control" disabled style="background:#f8fafc;font-size:12px;"></div>
-    <div class="form-group"><label>Role</label><select id="editRole" class="form-control"><option value="staff">Staff</option><option value="registrar">Registrar</option><option value="admin">Admin</option></select></div>
+    <div class="form-group"><label for="editRole">Role</label><select id="editRole" class="form-control"><option value="staff">Staff</option><?php if (getCurrentUserRole() === 'super_admin'): ?><option value="registrar_admin">Registrar Admin</option><option value="acad_officer">Academic Officer</option><option value="department_head">Department Head</option><option value="super_admin" disabled>Super Admin (existing account)</option><?php endif; ?></select></div>
 
 </div>
 <div class="modal-footer"><button type="button" class="btn btn-light" onclick="closeModal('editModal')">Cancel</button><button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save</button></div></form></div></div>

@@ -69,7 +69,7 @@ function grade_acceptance_roster($db, string $sy, string $sem, string $section, 
     }
 
     $rows = $db->fetchAll(
-        "SELECT s.id, s.student_number, s.first_name, s.last_name, ah.id AS record_id
+        "SELECT s.id, s.student_number, s.first_name, s.last_name, s.year_level, ah.id AS record_id
            FROM students s
            LEFT JOIN academic_history ah
              ON ah.student_id = s.id AND ah.school_year = ? AND ah.semester = ?
@@ -117,6 +117,7 @@ function grade_acceptance_roster($db, string $sy, string $sem, string $section, 
             );
         }
         $roster[] = [
+            'year_level' => $r['year_level'],
             'id'        => (int) $r['id'],
             'name'      => trim($r['first_name'] . ' ' . $r['last_name']),
             'number'    => (string) ($r['student_number'] ?? ''),

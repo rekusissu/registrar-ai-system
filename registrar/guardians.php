@@ -274,6 +274,7 @@ include '../includes/sidebar.php';
                             <?php endif; ?>
                         </td>
                         <td><div class="action-group">
+                            <a class="action-btn" href="contact-log.php?student_id=<?= (int)$s['student_id'] ?>" title="Contact and attempt log" aria-label="Contact and attempt log"><i class="fas fa-phone"></i></a>
                             <button class="action-btn edit" onclick="openManage(<?= (int)$s['student_id'] ?>,'<?= htmlspecialchars($s['student_name'], ENT_QUOTES) ?>')" title="Manage"><i class="fas fa-user-pen"></i></button>
                         </div></td>
                     </tr>

@@ -54,13 +54,19 @@ $__csrfToken = htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8');
 
     <!-- CSS Files -->
     <link rel="stylesheet" href="<?= $APP_ROOT ?>css/page-loader.css" />
-    <link rel="stylesheet" href="<?= $APP_ROOT ?>css/components.css" />
+    <link rel="stylesheet" href="<?= $APP_ROOT ?>css/components.css?v=<?= filemtime(__DIR__ . '/../css/components.css') ?>" />
     <link rel="stylesheet" href="<?= $APP_ROOT ?>css/sidebar.css" />
     <link rel="stylesheet" href="<?= $APP_ROOT ?>css/registrar.css" />
     <link rel="stylesheet" href="<?= $APP_ROOT ?>css/registrar-premium.css" />
     <link rel="stylesheet" href="<?= $APP_ROOT ?>css/dashboard.css" />
 
     <link rel="stylesheet" href="<?= $APP_ROOT ?>css/searchable-select.css?v=<?= filemtime(__DIR__ . '/../css/searchable-select.css') ?>" />
+
+    <?php if (in_array($_SESSION['role'] ?? '', ['super_admin','registrar_admin','staff','acad_officer','department_head'], true)): ?>
+    <link rel="stylesheet" href="<?= $APP_ROOT ?>css/report-export-security.css?v=<?= filemtime(__DIR__ . '/../css/report-export-security.css') ?>" />
+    <script>window.ReportExportConfig={enabled:true,root:<?= json_encode($APP_ROOT) ?>};</script>
+    <script src="<?= $APP_ROOT ?>js/report-export-security.js?v=<?= filemtime(__DIR__ . '/../js/report-export-security.js') ?>" defer></script>
+    <?php endif; ?>
 
     <!-- Confirmation dialog (replaces native confirm) - MUST come before
          any page script that might call confirmAction() -->

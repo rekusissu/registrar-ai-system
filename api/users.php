@@ -16,12 +16,13 @@ require_once __DIR__ . '/../shared/session_config.php';
 require_once __DIR__ . '/../shared/csrf_guard.php';
 require_once __DIR__ . '/../shared/functions.php';
 require_once __DIR__ . '/../shared/password_policy.php';
+require_once __DIR__ . '/../shared/auth_security.php';
 
 if (!isLoggedIn()) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized.']);
     exit;
 }
-if (getCurrentUserRole() !== 'super_admin') {
+if (!in_array(getCurrentUserRole(), ['super_admin','registrar_admin'], true)) {
     echo json_encode(['success' => false, 'message' => 'Forbidden.']);
     exit;
 }
@@ -31,7 +32,7 @@ $db = Database::getInstance();
 $id = isset($_GET['id']) ? intval($_GET['id']) : null;
 $input = json_decode(file_get_contents('php://input'), true) ?: [];
 
-$roles = ['super_admin', 'staff', 'acad_officer', 'department_head', 'student'];
+$roles = ['super_admin', 'registrar_admin', 'staff', 'acad_officer', 'department_head', 'student'];
 
 // ─── LIST ─────────────────────────────────────────────────────
 if ($method === 'GET') {
@@ -40,6 +41,7 @@ if ($method === 'GET') {
     $params = [];
     $sql = "SELECT u.id, u.email, u.full_name, u.role, u.rfid_uid, u.is_active, u.created_at, u.updated_at,
                    u.student_id,
+                   (SELECT MAX(a.created_at) FROM audit_logs a WHERE a.user_id=u.id AND a.action='login_success') AS last_login,
                    CONCAT(s.first_name, ' ', s.last_name) AS student_name,
                    s.student_number
             FROM users u
@@ -67,6 +69,7 @@ if ($method === 'POST') {
     $password = (string)($input['password'] ?? '');
     $fullName = trim($input['full_name'] ?? '');
     $role = $input['role'] ?? 'staff';
+    if ($role === 'super_admin' || (getCurrentUserRole() === 'registrar_admin' && $role !== 'staff')) { http_response_code(403); echo json_encode(['success'=>false,'message'=>'Registrar Admin may create Staff accounts only; additional Super Admin accounts are disabled.']); exit; }
 
     if (!isValidEmail($email)) {
         echo json_encode(['success' => false, 'message' => 'A valid email is required.']);
@@ -130,6 +133,7 @@ if ($method === 'PUT' || $method === 'PATCH') {
         exit;
     }
 
+    if (getCurrentUserRole() === 'registrar_admin' && ($user['role'] !== 'staff' || (isset($input['role']) && $input['role'] !== 'staff'))) { http_response_code(403); echo json_encode(['success'=>false,'message'=>'Registrar Admin may manage Staff accounts only.']); exit; }
     $action = $input['action'] ?? null;
 
     // ── Reset password (PATCH action=password) ──
@@ -144,13 +148,9 @@ if ($method === 'PUT' || $method === 'PATCH') {
             echo json_encode(['success' => false, 'message' => $passwordCheck['message']]);
             exit;
         }
-        $db->update('users', [
-            'password_hash' => password_hash($password, PASSWORD_DEFAULT),
-            'login_attempts' => 0,
-            'locked_until'   => null,
-            'updated_at'     => date('Y-m-d H:i:s'),
-        ], 'id = ?', [$id]);
-        logActivity($_SESSION['user_id'], 'user_password_reset', null, 'users', $id);
+        $db->beginTransaction();
+        try {finalizePasswordChange($db,(int)$id,password_hash($password,PASSWORD_DEFAULT));logActivity($_SESSION['user_id'],'user_password_reset',null,'users',$id);$db->commit();}
+        catch(Throwable $e){$db->rollBack();error_log('[user-password-reset] '.$e->getMessage());http_response_code(500);echo json_encode(['success'=>false,'message'=>'Password reset could not be completed.']);exit;}
         echo json_encode(['success' => true, 'message' => 'Password updated.']);
         exit;
     }
@@ -193,6 +193,7 @@ if ($method === 'PUT' || $method === 'PATCH') {
         echo json_encode(['success' => false, 'message' => 'Invalid role.']);
         exit;
     }
+    if ($role === 'super_admin' && $user['role'] !== 'super_admin') { http_response_code(403); echo json_encode(['success'=>false,'message'=>'An existing Super Admin is retained; additional Super Admin promotions are disabled.']); exit; }
     // Guard: cannot demote the last active super_admin away from super_admin
     if ($user['role'] === 'super_admin' && $role !== 'super_admin') {
         $adminCount = (int) $db->fetchColumn(
@@ -244,6 +245,7 @@ if ($method === 'DELETE' && $id) {
         echo json_encode(['success' => false, 'message' => 'You cannot delete your own account.']);
         exit;
     }
+    if (getCurrentUserRole() === 'registrar_admin' && $user['role'] !== 'staff') { http_response_code(403); echo json_encode(['success'=>false,'message'=>'Registrar Admin may manage Staff accounts only.']); exit; }
     if ($user['role'] === 'super_admin' && $user['is_active']) {
         $adminCount = (int) $db->fetchColumn(
             "SELECT COUNT(*) FROM users WHERE role = 'super_admin' AND is_active = 1 AND id != ?", [$id]

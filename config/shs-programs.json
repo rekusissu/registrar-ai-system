@@ -1,0 +1,34 @@
+{
+  "verified_on": "2026-11-12",
+  "note": "Published school offerings; availability by grade and school year must be confirmed by the registrar. Strengthened SHS clusters remain distinct from legacy strands.",
+  "grade_levels": [11, 12],
+  "campuses": {
+    "quezon_city": {
+      "label": "Quezon City / MV",
+      "source": "https://bcp.edu.ph/academic-programs",
+      "offerings": [
+        {"code": "GAS", "label": "General Academic Strand", "framework": "legacy"},
+        {"code": "HUMSS", "label": "Humanities and Social Sciences", "framework": "legacy"},
+        {"code": "STEM", "label": "Science, Technology, Engineering and Mathematics", "framework": "legacy"},
+        {"code": "ABM", "label": "Accountancy, Business and Management", "framework": "legacy"},
+        {"code": "HE", "label": "Home Economics", "framework": "legacy"},
+        {"code": "ICT", "label": "Information and Communications Technology", "framework": "legacy"},
+        {"code": "PA", "label": "Performing Arts", "framework": "legacy"},
+        {"code": "SPORTS", "label": "Sports Track", "framework": "legacy"}
+      ]
+    },
+    "bulacan": {
+      "label": "Bulacan",
+      "source": "https://bcp.edu.ph/academic-programs/bulacan",
+      "offerings": [
+        {"code": "ASSH", "label": "Arts, Social Sciences, and Humanities", "framework": "strengthened", "track": "Academic"},
+        {"code": "BE", "label": "Business and Entrepreneurship", "framework": "strengthened", "track": "Academic"},
+        {"code": "SHAW", "label": "Sports, Health, and Wellness", "framework": "strengthened", "track": "Academic"},
+        {"code": "HT", "label": "Hospitality and Tourism", "framework": "strengthened", "track": "Technical-Professional"},
+        {"code": "ICT", "label": "Information and Communication Technology", "framework": "strengthened", "track": "Technical-Professional"},
+        {"code": "HUMSS", "label": "Humanities and Social Sciences", "framework": "legacy"},
+        {"code": "TVL-HE", "label": "Technical-Vocational-Livelihood — Home Economics", "framework": "legacy"}
+      ]
+    }
+  }
+}

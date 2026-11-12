@@ -9,12 +9,14 @@ require_once __DIR__ . '/../shared/config.php';
 corsSameOrigin();
 require_once __DIR__ . '/../shared/database.php';
 require_once __DIR__ . '/../shared/session_config.php';
+require_once __DIR__ . '/../shared/registrar_access.php';
 
 if (!isLoggedIn()) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized.']);
     exit;
 }
-if (!in_array(getCurrentUserRole(), ['super_admin', 'staff'], true)) {
+if (!in_array(getCurrentUserRole(), ['super_admin','registrar_admin','staff','acad_officer','department_head'], true) || $_SERVER['REQUEST_METHOD']!=='GET') {
+    http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Forbidden.']);
     exit;
 }
@@ -24,6 +26,7 @@ if (!$studentId) {
     echo json_encode(['success' => false, 'message' => 'student_id required.']);
     exit;
 }
+registrarRequireStudent($studentId);
 
 try {
     $db = Database::getInstance();

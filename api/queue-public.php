@@ -452,7 +452,7 @@ if ($action === 'board') {
         }
 
         $recent = $db->fetchAll(
-            "SELECT ticket_number, student_name, status FROM queue_tickets
+            "SELECT ticket_number, student_name, status, counter, served_at FROM queue_tickets
              WHERE queue_date = ? AND status IN ('completed','no-show','removed','cancelled')
              ORDER BY COALESCE(served_at, joined_at) DESC, id DESC
              LIMIT 5",
@@ -463,6 +463,8 @@ if ($action === 'board') {
                 'number' => padNumber((int) $r['ticket_number']),
                 'name'   => $r['student_name'],
                 'status' => $r['status'],
+                'window' => (int) ($r['counter'] ?? 0),
+                'served_at' => $r['served_at'] ?? null,
             ];
         }, $recent);
 

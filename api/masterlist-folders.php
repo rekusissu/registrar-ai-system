@@ -44,6 +44,7 @@ require_once __DIR__ . '/../shared/database.php';
 require_once __DIR__ . '/../shared/session_config.php';
 require_once __DIR__ . '/../shared/csrf_guard.php';
 require_once __DIR__ . '/../shared/functions.php';
+require_once __DIR__ . '/../shared/report_export_security.php';
 require_once __DIR__ . '/../shared/masterlist_folders.php';
 require_once __DIR__ . '/../shared/zip_writer.php';
 
@@ -51,7 +52,7 @@ if (!isLoggedIn()) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized.']);
     exit;
 }
-if (!in_array(getCurrentUserRole(), ['super_admin', 'staff'], true)) {
+if (!in_array(getCurrentUserRole(), ['super_admin','registrar_admin','staff'], true)) {
     echo json_encode(['success' => false, 'message' => 'Forbidden.']);
     exit;
 }
@@ -169,6 +170,7 @@ function mlf_request_filters(): array
 
     // ─── EXPORT ───────────────────────────────────────────
     if ($action === 'export') {
+        requireReportExport();
         // Resolved by SUBTREE, not by "the one level being
         // viewed". Downloading BSIT must give the whole of BSIT:
         // an archive that silently omitted Year 2 because the

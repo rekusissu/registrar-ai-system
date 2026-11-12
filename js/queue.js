@@ -167,8 +167,11 @@
         var boardTimer = null;
         var standingTimer = null;
         var submitting = false;
+        var returnTimer = null;
+        var partialReadTimer = null;
 
         function show(screen) {
+            clearTimeout(returnTimer);
             activeScreen = screen;
             var screens = ['tap', 'result', 'board', 'standing', 'pick', 'closed'];
             screens.forEach(function (s) {
@@ -197,8 +200,9 @@
         }
 
         function returnToTap(ms) {
-            setTimeout(function () {
-                if (activeScreen === 'result') show('tap');
+            clearTimeout(returnTimer);
+            returnTimer = setTimeout(function () {
+                if (activeScreen === 'result') { if (queueClosed) showClosed(closedInfo && closedInfo.reason, null, closedInfo && closedInfo.at); else show('tap'); }
                 if (cardInput) cardInput.focus();
             }, ms || 6000);
         }
@@ -284,7 +288,7 @@ function renderLaneStep() {
         btn.type = 'button';
         btn.className = 'lane-choice t-' + c.tone;
         btn.innerHTML =
-            '<span class="lane-body">' +
+            (window.KioskUI ? '<i class="fas fa-' + ({service:'file-lines',claim:'folder-open',student:'user',priority:'universal-access'}[c.tone] || 'id-card') + ' kt-choice-icon" aria-hidden="true"></i>' : '') + '<span class="lane-body">' +
                 '<span class="lane-title">' + esc(c.title) + '</span>' +
                 '<span class="lane-meta">' + esc(c.meta) + '</span>' +
             '</span>' +
@@ -400,6 +404,7 @@ function showClosed(reason, message, when) {
 // sign appears on its own the moment a registrar hits CUT OFF — nobody
 // has to be at the kiosk to trigger it.
 function refreshClosed(data) {
+    if (window.KioskUI) window.KioskUI.connection(true);
     var wasClosed = queueClosed;
     queueClosed = !!(data && data.queue_closed);
 
@@ -468,6 +473,7 @@ function showLanePicker(uid) {
 function submitJoin(uid) {
     if (!uid || submitting) return;
     submitting = true;
+    if (window.KioskUI) { show('result'); window.KioskUI.busy(); }
     if (cardInput) cardInput.value = '';
     fetchJson(API + '?action=join', {
         method: 'POST',
@@ -487,11 +493,12 @@ function submitJoin(uid) {
         reportQueueError(e, 'kiosk join');
         renderResult({ success: false, message: shortReason(e), code: 'network' });
         returnToTap(4500);
-    }).finally(function () { submitting = false; }
+    }).finally(function () { submitting = false; if (window.KioskUI) window.KioskUI.ready(); }
     );
 }
 
         function renderResult(d) {
+            if (window.KioskUI) { if (d.code === 'queue_closed') { queueClosed = true; closedInfo = {reason:'forced',at:''}; } show('result'); window.KioskUI.result(d); return; }
             var icon = document.getElementById('rIcon');
             var num = document.getElementById('rNumber');
             var name = document.getElementById('rName');
@@ -682,7 +689,7 @@ function submitJoin(uid) {
 
         function bindKiosk() {
             function beginTap(uid) {
-                if (!uid) return;
+                if (!uid || submitting || activeScreen === 'pick') return;
                 // The picker comes BEFORE the join. A tap while the queue
                 // is closed must not open a picker that leads to a
                 // guaranteed failure — it goes straight to the sign.
@@ -705,6 +712,9 @@ function submitJoin(uid) {
                     }
                 });
                 cardInput.addEventListener('input', function () {
+                    clearTimeout(partialReadTimer);
+                    if (cardInput.value.length > 0 && cardInput.value.length < 10) partialReadTimer = setTimeout(function () { if (!submitting && activeScreen === 'result' && cardInput.value.length < 10) { cardInput.value = ''; show('tap'); } }, 4000);
+                    if (window.KioskUI && cardInput.value.length > 0 && cardInput.value.length < 10 && !submitting && activeScreen !== 'pick' && !queueClosed) { show('result'); window.KioskUI.reading(); }
                     // A reader may not send Enter; submit when 10 digits are buffered
                     if (cardInput.value.length >= 10) {
                         var uid = cardInput.value.trim();
@@ -768,6 +778,7 @@ function submitJoin(uid) {
         // probe's benefit, not for the application's.
         window.queueKioskShow = show;
         window.queueKioskClosed = showClosed;
+        window.queueKioskRetry = function () { if (pendingUid && !submitting) showLanePicker(pendingUid); else laneCancel(); };
         window.queueKioskMessage = closedMessageFor;
         window.queueKioskLanePicker = showLanePicker;
 
@@ -779,7 +790,7 @@ function submitJoin(uid) {
         startPoll(function () {
             fetchJson(API + '?action=board').then(function (d) {
                 if (d.success && d.data) refreshClosed(d.data);
-            }).catch(function (e) { reportQueueError(e, 'kiosk status'); });
+            }).catch(function (e) { if (window.KioskUI) window.KioskUI.connection(false); reportQueueError(e, 'kiosk status'); });
         }, 15000);
     }
 
@@ -790,6 +801,7 @@ function submitJoin(uid) {
         var lastServing = {};
 
         function render(data) {
+            if (window.MonitorUI) { window.MonitorUI.render(data); return; }
             var strip = document.getElementById('windowStrip');
             var waitList = document.getElementById('waitList');
             var recentList = document.getElementById('recentList');
@@ -846,8 +858,8 @@ function submitJoin(uid) {
 
         function loadBoard() {
             fetchJson(API + '?action=board').then(function (d) {
-                if (d.success && d.data) render(d.data);
-            }).catch(function (e) { reportQueueError(e, 'monitor board'); });
+                if (d.success && d.data) render(d.data); else if (window.MonitorUI) window.MonitorUI.offline();
+            }).catch(function (e) { if (window.MonitorUI) window.MonitorUI.offline(); reportQueueError(e, 'monitor board'); });
         }
 
         // Clock

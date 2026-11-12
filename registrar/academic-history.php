@@ -33,7 +33,9 @@
 require_once __DIR__ . '/../shared/security_headers.php';
 require_once __DIR__ . '/../shared/session_config.php';
 if (empty($_SESSION['user_id'])) { header('Location: ../login.php'); exit; }
-requireRole('staff');
+requireLogin();
+if (!in_array(getCurrentUserRole(), ['super_admin','registrar_admin','staff','acad_officer','department_head'], true)) { http_response_code(403); exit('Access denied.'); }
+require_once __DIR__ . '/../shared/registrar_access.php';
 require_once __DIR__ . '/../shared/database.php';
 require_once __DIR__ . '/../shared/term_grades.php';
 // For the programme catalogue below. Masterlist loads this same file at the
@@ -57,13 +59,14 @@ $csrfToken = csrfToken();
 // The term is chosen first and everything below is scoped to it, because
 // a term is the unit of work here. Grading one is not a per-student
 // action repeated 200 times; it is a single pass over a list.
+$periodScope = registrarStudentScope();
 $realYears = array_map(
     static fn($r) => (string) $r['school_year'],
     $db->fetchAll("
-        SELECT DISTINCT school_year FROM academic_history
-         WHERE school_year IS NOT NULL AND school_year <> ''
-         ORDER BY school_year DESC
-    ")
+        SELECT DISTINCT a.school_year FROM academic_history a JOIN students s ON s.id=a.student_id
+         WHERE a.school_year IS NOT NULL AND a.school_year <> '' AND {$periodScope['sql']}
+         ORDER BY a.school_year DESC
+    ",$periodScope['params'])
 );
 
 // Which years the box may offer, and which term it OPENS on, are two
@@ -184,12 +187,13 @@ $program = isset($_GET['program']) ? trim((string) $_GET['program']) : '';
 $section = isset($_GET['section']) ? trim((string) $_GET['section']) : '';
 
 // Student history includes unsectioned students; only the review board groups by section.
+$academicScope = registrarStudentScope();
 $roster = $db->fetchAll("
     SELECT s.id, s.student_number, s.first_name, s.last_name,
             s.course AS program, s.year_level, s.section
        FROM students s
-      WHERE s.status != 'archived'
-   ORDER BY s.last_name, s.first_name"
+      WHERE s.status != 'archived' AND {$academicScope['sql']}
+   ORDER BY s.last_name, s.first_name", $academicScope['params']
 );
 
 $programs = [];
@@ -250,6 +254,7 @@ foreach ($visible as $r) {
     $subjects = [];
     foreach (($rid ? ($termGrades[$rid] ?? []) : []) as $g) {
         $subjects[] = [
+            'grading_scale' => (int)($r['year_level']??0)>=11?'shs':'college',
             'subject'      => (string) $g['subject'],
             'subject_code' => (string) ($g['subject_code'] ?? ''),
             'units'        => (float) ($g['units'] ?? 0),
@@ -300,6 +305,7 @@ foreach ($visible as $r) {
     ];
 
     $rosterForAudit[] = [
+        'year_level' => $r['year_level']??null,
         'name'     => trim($r['first_name'] . ' ' . $r['last_name']),
         'number'   => (string) $r['student_number'],
         'gwa'      => $rec['gwa'] ?? null,
@@ -419,9 +425,9 @@ if ($sectionsByCode && $sy !== '') {
         "SELECT s.course, s.section, COUNT(*) AS stamped
            FROM academic_history ah
            JOIN students s ON s.id = ah.student_id
-          WHERE ah.school_year = ? AND ah.semester = ? AND ah.accepted_at IS NOT NULL
+          WHERE ah.school_year = ? AND ah.semester = ? AND ah.accepted_at IS NOT NULL AND {$academicScope['sql']}
           GROUP BY s.course, s.section",
-        [$sy, $sem]
+        array_merge([$sy, $sem], $academicScope['params'])
     ) as $a) {
         $acceptedSections[trim((string) $a['course']) . "\0" . trim((string) $a['section'])] = (int) $a['stamped'];
     }
@@ -516,6 +522,7 @@ function ah_initials(string $name): string
 // — 60 queries for a 20-student page, all of it to fill a document only
 // one person at a time will ever print. Two queries serve the whole page,
 // indexed by student id.
+$careerLevels=array_column($rows,'level','id');
 $careerTerms    = [];
 $careerSubjects = [];
 $careerGwas     = [];
@@ -562,6 +569,7 @@ if ($rows) {
         $syKey = (string) ($g['school_year'] ?? '') . '|'
                . (string) ($g['semester'] ?? '');
         $careerSubjects[$sid][$syKey][] = [
+            'grading_scale' => (int)($careerLevels[$sid]??0)>=11?'shs':'college',
             'subject'      => (string) $g['subject'],
             'subject_code' => (string) ($g['subject_code'] ?? ''),
             'units'        => $g['units'],
@@ -616,6 +624,7 @@ if ($rows) {
 }
 
 $payload = json_encode([
+    'readOnly' => registrarIsAcademicReader(),
     'sy'       => $sy,
     'sem'      => $sem,
     // Kept in the payload even though the page no longer writes. The CSRF
@@ -632,7 +641,7 @@ $payload = json_encode([
     // registrar/assets/images/... , which does not exist, and the letterhead
     // prints with an empty box where the crest should be.
 'logoPath' => '../assets/images/BCP_LOGO.png',
-    'school'   => 'College of Computer Studies',
+    'school'   => 'Office of the Registrar',
     'printedOn'=> date('F j, Y'),
     // Initials are computed here rather than in JS so the dialog tile and
     // the roster use one helper, the same one the other registrar pages

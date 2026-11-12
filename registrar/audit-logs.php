@@ -8,7 +8,7 @@
 require_once __DIR__ . '/../shared/security_headers.php';
 require_once __DIR__ . '/../shared/session_config.php';
 if (empty($_SESSION['user_id'])) { header('Location: ../login.php'); exit; }
-requireRole('super_admin');
+if(!in_array(getCurrentUserRole(),['super_admin','registrar_admin'],true)){http_response_code(403);exit('Access denied.');}
 
 $page_title = 'Audit Logs';
 $APP_ROOT = '../';
@@ -35,26 +35,7 @@ include '../includes/sidebar.php';
     </div>
 </header>
 
-<!-- Filters -->
-<div class="adm-panel">
-    <div class="adm-panel-title"><i class="fas fa-filter"></i> Narrow the log</div>
-    <div class="adm-filters">
-        <div class="search-wrap">
-            <i class="fas fa-search"></i>
-            <input type="text" id="logSearch" placeholder="Search action, table, or IP...">
-        </div>
-        <label class="adm-filters-label" for="userFilter">User</label>
-        <select id="userFilter" class="form-control"><option value="">All users</option></select>
-        <label class="adm-filters-label" for="actionFilter">Action</label>
-        <select id="actionFilter" class="form-control"><option value="">All actions</option></select>
-        <label class="adm-filters-label" for="fromDate">From</label>
-        <input type="date" id="fromDate" class="form-control">
-        <span class="adm-filters-label">to</span>
-        <input type="date" id="toDate" class="form-control" aria-label="To date">
-        <button class="btn btn-primary" onclick="loadLogs(1)"><i class="fas fa-filter"></i> Apply</button>
-    </div>
-</div>
-
+<section class="ax-surface ax-audit-filters"><header class="ax-surface-head"><div><span class="ax-eyebrow">ACTIVITY EXPLORER</span><h2>Find an event</h2><p>Filter by account, action or a specific date range.</p></div><button type="button" id="auditReset" class="btn btn-secondary">Clear filters</button></header><form class="ax-audit-filter-grid" onsubmit="event.preventDefault();loadLogs(1)"><label class="ax-search">Search activity<input type="search" id="logSearch" placeholder="Action, table, or IP address…"></label><label>Account<select id="userFilter" class="form-control"><option value="">All users</option></select></label><label>Action<select id="actionFilter" class="form-control"><option value="">All actions</option></select></label><label>From date<input type="date" id="fromDate" class="form-control"></label><label>To date<input type="date" id="toDate" class="form-control"></label><button class="btn btn-primary" type="submit"><i class="fas fa-search" aria-hidden="true"></i> Find events</button></form></section>
 <!-- Table -->
 <div class="adm-panel">
     <div class="adm-panel-title"><i class="fas fa-list"></i> Activity</div>
@@ -174,6 +155,7 @@ async function loadLogs(page) {
 }
 
 function renderLogs(rows, meta) {
+    rows.forEach(r => { logCache[r.id] = r; });
     const body = document.getElementById('logBody');
     if (!rows.length) {
         body.innerHTML = '<tr><td colspan="8" style="padding:0;"><div class="adm-empty"><i class="fas fa-inbox"></i><p>No entries match these filters</p><span>Widen the date range or clear the user and action filters.</span></div></td></tr>';

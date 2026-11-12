@@ -2970,7 +2970,7 @@ async function printIdCard() {
     try {
         await document.fonts.ready;
         await Promise.all(Array.from(area.querySelectorAll('img')).map(img => img.decode().catch(() => {})));
-        window.print();
+        await window.print();
     } finally { area.replaceChildren(); }
 }
 

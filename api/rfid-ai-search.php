@@ -18,7 +18,7 @@ if (!isLoggedIn()) {
     exit;
 }
 // Admin + registrar only
-if (!in_array(getCurrentUserRole(), ['super_admin', 'staff'], true)) {
+if (!in_array(getCurrentUserRole(), ['super_admin','registrar_admin','staff'], true)) {
     echo json_encode(['success' => false, 'message' => 'Forbidden.']);
     exit;
 }
@@ -42,7 +42,7 @@ try {
 
     // Fetch all cards with student info
     $cards = $db->fetchAll("
-        SELECT 
+        SELECT
             rf.*,
             CONCAT(s.first_name, ' ', s.last_name) AS student_name,
             s.student_number,

@@ -208,6 +208,7 @@ function statusStudentEvidence(int $studentId): array
         [$studentId]
     ));
 
+    if((int)($ev['student']['year_level']??0)>=11){$ev['grades']=[];$ev['grade_scale']='shs_percentage';}
     return $ev;
 }
 
@@ -307,7 +308,7 @@ function statusEvidenceFindings(array $ev): array
 
     // ── Academic direction, not just the latest GWA ───────────────
     $grades = $ev['grades'] ?? [];
-    if (count($grades) >= 2) {
+    if ((int)($s['year_level']??0)<11 && count($grades) >= 2) {
         $latest = (float) $grades[0]['gwa'];
         $prior  = (float) $grades[1]['gwa'];
         $drop   = $prior - $latest;

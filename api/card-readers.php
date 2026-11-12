@@ -17,7 +17,7 @@ if (!isLoggedIn()) {
     exit;
 }
 // Admin + registrar only
-if (!in_array(getCurrentUserRole(), ['super_admin', 'staff'], true)) {
+if (!in_array(getCurrentUserRole(), ['super_admin','registrar_admin','staff'], true)) {
     echo json_encode(['success' => false, 'message' => 'Forbidden.']);
     exit;
 }

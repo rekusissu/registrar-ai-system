@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0",
+  "mode": "placeholder",
+  "providers": {
+    "enrollment": {"enabled": false, "endpoint": null, "owns": ["student_intake", "enrollment_status"]},
+    "curriculum": {"enabled": false, "endpoint": null, "owns": ["subject_catalog", "academic_record_submission"]},
+    "clinic": {"enabled": false, "endpoint": null, "owns": ["health_clearance"]},
+    "class_scheduling": {"enabled": false, "endpoint": null, "owns": ["section_assignment", "term_roster"]},
+    "alumni": {"enabled": false, "endpoint": null, "owns": ["alumni_record"]}
+  }
+}

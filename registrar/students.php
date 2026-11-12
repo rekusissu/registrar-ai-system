@@ -7,11 +7,13 @@
 require_once __DIR__ . '/../shared/security_headers.php';
 require_once __DIR__ . '/../shared/session_config.php';
 if (empty($_SESSION['user_id'])) { header('Location: ../login.php'); exit; }
+if (in_array(getCurrentUserRole(), ['acad_officer','department_head'], true)) {header('Location: academic-dashboard.php?view=students');exit;}
 requireRole('staff');
 require_once __DIR__ . '/../shared/database.php';
 require_once __DIR__ . '/../shared/functions.php';
 require_once __DIR__ . '/../shared/normalize.php';
 require_once __DIR__ . '/../shared/stored_file.php';
+require_once __DIR__ . '/../shared/registrar_access.php';
 
 $db = Database::getInstance();
 
@@ -23,10 +25,11 @@ $db = Database::getInstance();
 // doing it here means one query for the whole list instead of one request per
 // student with the disk check repeated in every one of them. The JS fallback
 // stays as a safety net, never as the primary path.
+$scope=registrarStudentScope();
 $students = $db->fetchAll(
     "SELECT s.*, " . studentPhotoSelectSql() . " AS photo_path
-     FROM students s
-     ORDER BY s.id DESC"
+     FROM students s WHERE {$scope['sql']}
+     ORDER BY s.id DESC",$scope['params']
 );
 
 // Stats with real MoM trends
@@ -43,7 +46,7 @@ $graduatedStudents = count(array_filter($students, fn($s) => in_array($s['status
 // status, and this card can only honestly report what the column holds.
 $droppedStudents = count(array_filter($students, fn($s) => ($s['status'] ?? '') === 'dropped'));
 // Per-year-level counts for the Year 1-4 cards.
-$yearLevelCounts = [1 => 0, 2 => 0, 3 => 0, 4 => 0];
+$yearLevelCounts = [1 => 0, 2 => 0, 3 => 0, 4 => 0, 11 => 0, 12 => 0];
 $unassignedStudents = 0;
 foreach ($students as $s) {
     $yl = (int) ($s['year_level'] ?? 0);
@@ -55,11 +58,11 @@ foreach ($students as $s) {
 // same-weight year cards. Percentages are of the total, so the
 // segments read as parts of a whole rather than four tallies.
 $ribbonSegments = [];
-foreach ([1, 2, 3, 4] as $yl) {
+foreach ([1, 2, 3, 4, 11, 12] as $yl) {
     $ribbonSegments[] = [
         'key'  => 'y' . $yl,
         'year' => $yl,
-        'tone' => ['y1', 'y2', 'y3', 'y4'][$yl - 1],
+        'tone' => [1=>'y1',2=>'y2',3=>'y3',4=>'y4',11=>'y1',12=>'y2'][$yl],
         'count' => $yearLevelCounts[$yl],
     ];
 }
@@ -68,12 +71,12 @@ if ($unassignedStudents > 0) {
 }
 $ribbonBase = max(1, $totalStudents); // never divide by zero on an empty list
 
-$thisMonth = $db->fetchColumn("SELECT COUNT(*) FROM students WHERE created_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01')") ?: 0;
-$lastMonth = $db->fetchColumn("SELECT COUNT(*) FROM students WHERE created_at >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH) AND created_at < DATE_FORMAT(CURDATE(), '%Y-%m-01')") ?: 0;
+$thisMonth = $db->fetchColumn("SELECT COUNT(*) FROM students s WHERE s.created_at >= DATE_FORMAT(CURDATE(), '%Y-%m-01') AND {$scope['sql']}",$scope['params']) ?: 0;
+$lastMonth = $db->fetchColumn("SELECT COUNT(*) FROM students s WHERE s.created_at >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH) AND s.created_at < DATE_FORMAT(CURDATE(), '%Y-%m-01') AND {$scope['sql']}",$scope['params']) ?: 0;
 $trendTotal = $lastMonth > 0 ? round(($thisMonth - $lastMonth) / $lastMonth * 100) : ($thisMonth > 0 ? 100 : 0);
 
 // Courses for filter
-$courses = $db->fetchAll("SELECT DISTINCT course FROM students WHERE course IS NOT NULL AND course != '' ORDER BY course");
+$courses = $db->fetchAll("SELECT DISTINCT s.course FROM students s WHERE s.course IS NOT NULL AND s.course != '' AND {$scope['sql']} ORDER BY s.course",$scope['params']);
 
 // ─── OFFERED COURSES & MAJORS ────────────────────────────────
 // Single source of truth (shared with the Masterlist via shared/functions.php).
@@ -700,27 +703,6 @@ img.student-avatar{object-fit:cover;background:#e8edf3}
 .table-footer .info-text{font-size:13px;color:#64748b}
 .table-footer .info-text strong{color:#0f172a}
 
-/* Data Quality review modal */
-#qualityModal .modal-content{max-width:1040px;height:min(760px,88vh);padding:0;overflow:hidden;display:flex;flex-direction:column}
-.quality-shell{display:flex;flex:1;min-height:0}
-.quality-queue{width:330px;flex:0 0 330px;border-right:1px solid #e5e7eb;background:#f8fafc;display:flex;flex-direction:column;min-height:0}
-.quality-queue-head{padding:18px;border-bottom:1px solid #e2e8f0}
-.quality-queue-head h3{font-family:Fraunces,serif;font-size:19px;color:#14213d;margin:0 0 3px}.quality-queue-head p{font-size:12px;color:#64748b;margin:0 0 12px}
-.quality-search{position:relative}.quality-search i{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:12px}.quality-search input{width:100%;padding:9px 10px 9px 32px;border:1px solid #dbe2ea;border-radius:9px;font-size:13px;background:#fff}
-.quality-filters{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}.quality-filter{border:1px solid #dbe2ea;background:#fff;color:#64748b;border-radius:999px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer}.quality-filter.active{background:#14213d;border-color:#14213d;color:#fff}
-.quality-list{overflow:auto;padding:8px;flex:1}.quality-student{width:100%;border:1px solid transparent;background:transparent;border-radius:11px;padding:11px;text-align:left;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:4px 8px;margin-bottom:4px}.quality-student:hover{background:#fff}.quality-student.active{background:#fff;border-color:#bfdbfe;box-shadow:0 3px 12px rgba(15,23,42,.06)}
-.quality-student-name{font-size:13px;font-weight:700;color:#0f172a}.quality-student-num{font-size:11px;color:#64748b;font-family:inherit}.quality-student-count{grid-row:1/3;align-self:center;min-width:25px;height:25px;border-radius:999px;display:grid;place-items:center;background:#fee2e2;color:#b91c1c;font-size:11px;font-weight:800;font-family:inherit}
-.quality-detail{flex:1;min-width:0;overflow:auto;background:#fff;position:relative}.quality-detail-empty{height:100%;display:grid;place-items:center;padding:40px;text-align:center;color:#94a3b8}
-.quality-detail-inner{padding:24px 26px 34px}.quality-person{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;padding-bottom:18px;border-bottom:1px solid #e2e8f0}.quality-person h2{font-family:Fraunces,serif;font-size:25px;line-height:1.15;color:#14213d;margin:0 0 6px}.quality-person p{font-size:12px;line-height:1.55;color:#64748b;margin:0}
-.quality-score{text-align:right;flex:0 0 auto}.quality-score strong{display:block;font-family:inherit;font-size:31px;line-height:1;color:#14213d}.quality-score span{font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.5px}
-.quality-ai{margin:18px 0;padding:15px 16px;background:#f5f8ff;border:1px solid #c7d7fe;border-left:4px solid #2563eb;border-radius:10px}.quality-ai-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:7px}.quality-ai-head strong{font-size:12px;color:#1e40af}.quality-ai p{font-size:13px;line-height:1.65;color:#334155;margin:0}.quality-ai-actions{display:flex;gap:8px;margin-top:11px}
-.quality-section-title{font-size:11px;font-weight:800;letter-spacing:.45em;color:#64748b;margin:22px 0 9px}
-.quality-issue{border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:8px;border-left-width:4px}.quality-issue.high{border-left-color:#b91c1c}.quality-issue.medium{border-left-color:#b45309}.quality-issue.low{border-left-color:#2563eb}.quality-issue.identity .quality-issue-top>span{color:#4f46e5}.quality-issue.contact .quality-issue-top>span{color:#0f766e}.quality-issue.academic .quality-issue-top>span{color:#7c3aed}.quality-issue.duplicate .quality-issue-top>span{color:#c2410c}.quality-issue-top{display:flex;justify-content:space-between;gap:12px}.quality-issue-top>span{font-size:10px;font-weight:800;letter-spacing:.4em;text-transform:uppercase}.quality-issue strong{font-size:13px;color:#0f172a}.quality-issue p{font-size:12px;line-height:1.5;color:#64748b;margin:4px 0 0}.quality-value-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px}.quality-value{padding:8px 10px;background:#f8fafc;border-radius:7px}.quality-value label{display:block;font-size:9px;text-transform:uppercase;letter-spacing:.4px;color:#94a3b8;margin-bottom:2px}.quality-value span{font-size:12px;color:#334155;word-break:break-word}.quality-value.suggested{background:#f0fdf4}.quality-value.suggested label{color:#15803d}
-.quality-duplicate{padding:12px 14px;border:1px solid #fed7aa;background:#fffaf1;border-radius:10px;font-size:12px;line-height:1.5;color:#7c2d12}.quality-duplicate + .quality-duplicate{margin-top:7px}
-.quality-actions{flex:0 0 68px;padding:12px 26px;border-top:1px solid #e2e8f0;background:#fff;display:flex;justify-content:flex-end;align-items:center;gap:8px;box-shadow:0 -4px 12px rgba(15,23,42,.04);z-index:2}.quality-actions .btn{min-width:112px}.quality-actions .btn-primary{min-width:150px}
-.quality-empty{padding:32px;text-align:center;color:#64748b;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:10px}.quality-empty i{font-size:30px;color:#94a3b8;display:block;margin-bottom:8px}
-@media(max-width:760px){#qualityModal .modal-content{height:94vh;max-height:94vh}.quality-shell{display:flex;flex-direction:column;overflow:hidden}.quality-queue{width:100%;height:220px;flex:0 0 220px;border-right:0;border-bottom:1px solid #e2e8f0}.quality-detail{overflow:auto;min-height:0}.quality-detail-inner{padding:18px 16px 28px}.quality-actions{flex-basis:auto;min-height:62px;padding:10px 16px;gap:6px}.quality-actions .btn{min-width:0;flex:1;padding-left:9px;padding-right:9px;font-size:12px}.quality-actions .btn-primary{min-width:0}.quality-person{display:block}.quality-score{text-align:left;margin-top:10px}.quality-value-grid{grid-template-columns:1fr}.quality-ai-actions{flex-wrap:wrap}}
-@media(prefers-reduced-motion:reduce){.quality-student{transition:none}}
 /* Empty state */
 .vtab.active{border-bottom-color:#2563eb !important;color:#2563eb !important;}
 
@@ -855,6 +837,8 @@ body[data-page="students"] .stu-legend-val{font-size:16px}
 .quality-legend:hover .quality-legend-box{display:block;}
 .quality-legend-box::before{content:'';position:absolute;top:-5px;left:50%;transform:translateX(-50%);border:6px solid transparent;border-bottom-color:#0f172a;}
 </style>
+<link rel="stylesheet" href="../css/student-record-modals.css?v=<?= filemtime(__DIR__.'/../css/student-record-modals.css') ?>">
+<link rel="stylesheet" href="../css/student-data-quality.css?v=<?= filemtime(__DIR__.'/../css/student-data-quality.css') ?>">
 <main class="dashboard-main">
 <header class="header">
 <div class="title">
@@ -876,7 +860,7 @@ body[data-page="students"] .stu-legend-val{font-size:16px}
   <div class="stu-action-group">
     <span class="stu-action-label">Student tools</span>
     <div class="stu-action-buttons">
-      <button type="button" class="btn btn-secondary" onclick="openQualityPanel()" title="Review incomplete or inconsistent student records"><i class="fas fa-shield-halved"></i> Data Quality</button>
+      <button type="button" class="btn btn-secondary" onclick="openQualityPanel()" title="Review incomplete or inconsistent student records"><i class="fas fa-shield-halved" aria-hidden="true"></i> Data Quality</button>
       <div class="export-wrap">
         <button type="button" class="btn btn-secondary" id="exportBtn"><i class="fas fa-download"></i> Export</button>
         <div class="export-menu" id="exportMenu">
@@ -945,10 +929,10 @@ body[data-page="students"] .stu-legend-val{font-size:16px}
 <span class="stu-ribbon-note">Each segment is that year's share of all <?= $totalStudents ?> records</span>
 </div>
 <?php if ($totalStudents > 0): ?>
-<div class="stu-ribbon-bar" role="img" aria-label="<?= htmlspecialchars(implode(', ', array_map(fn($sg) => ($sg['year'] ? 'Year ' . $sg['year'] : 'Unassigned') . ': ' . $sg['count'] . ' students', $ribbonSegments)), ENT_QUOTES) ?>">
+<div class="stu-ribbon-bar" role="img" aria-label="<?= htmlspecialchars(implode(', ', array_map(fn($sg) => ($sg['year'] ? ($sg['year'] >= 11 ? 'Grade ' : 'Year ') . $sg['year'] : 'Unassigned') . ': ' . $sg['count'] . ' students', $ribbonSegments)), ENT_QUOTES) ?>">
 <?php foreach ($ribbonSegments as $sg):
 $pct = round($sg['count'] / $ribbonBase * 100, 2);
-$segLabel = $sg['year'] ? 'Year ' . $sg['year'] : 'Unassigned year level';
+$segLabel = $sg['year'] ? ($sg['year'] >= 11 ? 'Grade ' : 'Year ') . $sg['year'] : 'Unassigned year level';
 ?>
 <div class="stu-seg tone-<?= $sg['tone'] ?>" style="width:<?= $pct ?>%" title="<?= htmlspecialchars($segLabel . ' — ' . $sg['count'] . ' students (' . round($pct) . '%)', ENT_QUOTES) ?>">
 <?php /* Label the segment only when it is wide enough to hold the number; the legend always carries it. */ if ($pct >= 7): ?><b><?= $sg['count'] ?></b><?php endif; ?>
@@ -958,7 +942,7 @@ $segLabel = $sg['year'] ? 'Year ' . $sg['year'] : 'Unassigned year level';
 <ul class="stu-ribbon-legend">
 <?php foreach ($ribbonSegments as $sg): ?>
 <li>
-<div class="stu-legend-key"><i class="tone-<?= $sg['tone'] ?>"></i><?= $sg['year'] ? 'Year ' . $sg['year'] : 'Unassigned' ?></div>
+<div class="stu-legend-key"><i class="tone-<?= $sg['tone'] ?>"></i><?= $sg['year'] ? ($sg['year'] >= 11 ? 'Grade ' : 'Year ') . $sg['year'] : 'Unassigned' ?></div>
 <div class="stu-legend-val"><?= $sg['count'] ?><span class="stu-legend-pct"><?= round($sg['count'] / $ribbonBase * 100) ?>%</span></div>
 </li>
 <?php endforeach; ?>
@@ -1104,7 +1088,7 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 <div class="modal-body">
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
 <div class="form-group"><label>Status</label><select id="filterStatus" class="form-control"><option value="">All Status</option><?php foreach (studentStatuses() as $st): ?><option value="<?= $st ?>"><?= studentStatusLabel($st) ?></option><?php endforeach; ?></select></div>
-<div class="form-group"><label>Year Level</label><select id="filterYear" class="form-control"><option value="">All Year</option><option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option><option value="4">4th</option></select></div>
+<div class="form-group"><label>Year Level</label><select id="filterYear" class="form-control"><option value="">All Year</option><option value="1">1st</option><option value="2">2nd</option><option value="3">3rd</option><option value="4">4th</option><option value="11">Grade 11</option><option value="12">Grade 12</option></select></div>
 <div class="form-group"><label>Course</label><select id="filterCourse" class="form-control"><option value="">All Courses</option><?php foreach($courses as $c): ?><option value="<?= htmlspecialchars($c['course']) ?>"><?= htmlspecialchars($c['course']) ?></option><?php endforeach; ?></select></div>
 <?php // No Section filter. Section belongs to the Masterlist's batch assignment;
         // filtering the registrar's roster by it would mean maintaining the same
@@ -1260,36 +1244,20 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
      The count is now asserted by testEveryDivInTheModalRunIsClosed, which is
      the check that should have existed before the first attempt. -->
 
-<!-- Data Quality Review Desk -->
-<div class="modal-overlay" id="qualityModal" role="dialog" aria-modal="true" aria-labelledby="qualityModalTitle">
-    <div class="modal-content">
-        <div class="modal-header" style="padding:18px 22px;margin:0;border-bottom:1px solid #e2e8f0">
-            <div><h2 id="qualityModalTitle"><i class="fas fa-shield-halved"></i> Student Data Quality</h2><p style="font-size:12px;color:#64748b;margin:4px 0 0">Review incomplete and inconsistent student records.</p></div>
-            <div style="display:flex;gap:8px;align-items:center"><button type="button" class="btn btn-secondary" id="qualityRefreshBtn" style="padding:8px 12px;font-size:12px"><i class="fas fa-rotate"></i> Refresh</button><button class="modal-close" aria-label="Close Data Quality" onclick="closeQualityPanel()"><i class="fas fa-times"></i></button></div>
-        </div>
-        <div class="quality-shell">
-            <section class="quality-queue" aria-label="Students needing review">
-                <div class="quality-queue-head">
-                    <h3>Records to review</h3><p id="qualityQueueMeta">Checking student records…</p>
-                    <div class="quality-search"><i class="fas fa-search"></i><input id="qualitySearch" type="search" placeholder="Search name or student #" autocomplete="off"></div>
-                    <div class="quality-filters" id="qualityFilters">
-                        <button type="button" class="quality-filter active" data-filter="all">All</button>
-                        <button type="button" class="quality-filter" data-filter="identity">Identity</button>
-                        <button type="button" class="quality-filter" data-filter="contact">Contact</button>
-                        <button type="button" class="quality-filter" data-filter="academic">Academic</button>
-                        <button type="button" class="quality-filter" data-filter="duplicate">Duplicates</button>
-                    </div>
-                </div>
-                <div class="quality-list" id="qualityList"></div>
-            </section>
-            <section class="quality-detail" id="qualityDetail" aria-live="polite"><div class="quality-detail-empty"><div><i class="fas fa-user-check"></i><p>Select a student to review their record.</p></div></div></section>
-        </div>
-        <div class="quality-actions" aria-label="Data Quality actions">
-            <button class="btn btn-secondary" onclick="closeQualityPanel()">Close</button>
-            <button class="btn btn-secondary" id="qualityOpenStudentBtn" type="button" onclick="openQualityStudent()"><i class="fas fa-user"></i> Open student</button>
-            <button class="btn btn-primary" id="qualityApplyBtn" type="button" onclick="applySelectedQualityRepairs()" disabled><i class="fas fa-check"></i> Apply selected</button>
-        </div>
-    </div>
+<!-- Data Quality Review Desk: approved technical review layout -->
+<div class="modal-overlay" id="qualityModal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="qualityModalTitle" aria-describedby="qualityModalDescription">
+ <div class="modal-content quality-tech">
+  <header class="quality-topbar">
+   <div class="quality-brand"><svg class="quality-shield" viewBox="0 0 48 56" aria-hidden="true"><path d="M24 3 44 10v16c0 13-10 22-20 27C14 48 4 39 4 26V10Z"/><path d="m14 27 7 7 14-15"/></svg><div><span class="quality-kicker">BCP / RECORD INTEGRITY</span><h2 id="qualityModalTitle">Student Data Quality</h2><p id="qualityModalDescription">Inspect records. Verify corrections. Keep every change traceable.</p></div></div>
+   <div class="quality-header-actions"><button type="button" id="qualityRefreshBtn"><i class="fas fa-rotate" aria-hidden="true"></i> Run check</button><span class="quality-scan-status" id="qualityScanStatus" role="status"><i aria-hidden="true"></i>Ready to check</span><button type="button" class="quality-close" aria-label="Close Data Quality" onclick="closeQualityPanel()"><i class="fas fa-times" aria-hidden="true"></i></button></div>
+  </header>
+  <div class="quality-distribution" id="qualityCategoryChart" aria-label="Issue breakdown"></div>
+  <div class="quality-shell">
+   <section class="quality-queue" aria-label="Student review queue"><div class="quality-queue-head"><h3>01 / REVIEW QUEUE</h3><label class="quality-search" for="qualitySearch"><i class="fas fa-search" aria-hidden="true"></i><input id="qualitySearch" type="search" placeholder="Search student or ID" autocomplete="off"><span class="quality-sr-only">Search student name or ID</span></label><div class="quality-filters" id="qualityFilters"><button type="button" class="quality-filter active" data-filter="all" aria-pressed="true">All <span id="qualityAllCount">0</span></button><button type="button" class="quality-filter" data-filter="identity" aria-pressed="false">Identity</button><button type="button" class="quality-filter" data-filter="contact" aria-pressed="false">Contact</button><button type="button" class="quality-filter" data-filter="academic" aria-pressed="false">Academic</button><button type="button" class="quality-filter" data-filter="duplicate" aria-pressed="false">Duplicates</button></div><p id="qualityQueueMeta" class="quality-queue-meta" role="status"></p></div><div class="quality-list" id="qualityList"></div><div class="quality-queue-note"><i class="fas fa-circle-info" aria-hidden="true"></i><span>No changes are applied automatically.</span></div></section>
+   <section class="quality-detail" id="qualityDetail" aria-label="Student record inspection"><div class="quality-detail-empty"><i class="fas fa-user-check" aria-hidden="true"></i><p>Select a student to inspect their record.</p></div></section>
+  </div>
+  <footer class="quality-actions"><p><i class="fas fa-lock" aria-hidden="true"></i><span>Every change is recorded with your account and timestamp.</span></p><div><button class="btn btn-secondary" id="qualityOpenStudentBtn" type="button" onclick="openQualityStudent()" disabled><i class="fas fa-arrow-up-right-from-square" aria-hidden="true"></i> Open student record</button><button class="btn btn-primary" id="qualityApplyBtn" type="button" onclick="applySelectedQualityRepairs()" disabled><i class="fas fa-check" aria-hidden="true"></i> Apply selected fixes</button></div></footer>
+ </div>
 </div>
 
 <!-- Add Modal (inline, with guardian) -->
@@ -1483,6 +1451,7 @@ $qTitle = 'Quality ' . $qScore . '%' . (!empty($qAnoms) ? ' — ' . implode('; '
 </div>
 <div class="modal-footer"><button class="btn btn-secondary" onclick="loadEnrollments()"><i class="fas fa-rotate"></i> Refresh</button><button class="btn btn-light" onclick="closeReceiveModal()"><i class="fas fa-times"></i> Close</button></div></div></div>
 
+<script src="<?= $APP_ROOT ?>js/student-record-modals.js?v=<?= filemtime(__DIR__.'/../js/student-record-modals.js') ?>"></script>
 <script src="<?= $APP_ROOT ?>js/student-data-quality.js?v=<?= is_file(__DIR__ . '/../js/student-data-quality.js') ? filemtime(__DIR__ . '/../js/student-data-quality.js') : time() ?>"></script>
 <script>
 // ─── DATA ────────────────────────────────────────────────────
@@ -1630,14 +1599,14 @@ function viewStudent(id) {
         document.getElementById('vNationality').textContent = s.nationality||'—';
         document.getElementById('vReligion').textContent = s.religion||'—';
         document.getElementById('vCourse').innerHTML = s.course
-            ? esc(s.course)
+            ? esc(s.course) + (s.major ? '<br><small>' + esc(s.major) + '</small>' : '')
             : '—';
         // Year level and Section are separate fields now. Section is not rendered at
 // all: #vSection holds a fixed "N/A - from the Masterlist" in the markup,
 // because a section is assigned in batches elsewhere and this view would then
 // assert a stale one. Writing a section here would also have meant displaying
 // a field this page cannot correct.
-document.getElementById('vYearLevel').textContent = s.year_level ? s.year_level + ' Year' : '—';
+document.getElementById('vYearLevel').textContent = s.year_level ? (Number(s.year_level) >= 11 ? 'Grade ' + s.year_level : 'Year ' + s.year_level) : '—';
         document.getElementById('vSchoolYearSem').textContent = (s.school_year?s.school_year:'—')+(s.semester?' — '+s.semester:'');
         document.getElementById('vAdviser').textContent = (s.adviser_id && ADVISER_MAP[s.adviser_id]) ? ADVISER_MAP[s.adviser_id] : '—';
         document.getElementById('vEmail').textContent = s.email||'—';
@@ -1870,6 +1839,7 @@ function closeViewModal() { viewModal.classList.remove('active'); document.body.
 viewModal.addEventListener('click', function(e) { if (e.target === this) closeViewModal(); });
 
 function printTable() {
+    if(window.ExportSecurity&&!window.ExportSecurity.isExecuting()) return window.ExportSecurity.run({report:'Student directory',format:'print-pdf',resource:'client-print:'+location.pathname},()=>printTable());
     const w = window.open(); w.document.write('<html><head><style>table{width:100%;border-collapse:collapse}th,td{padding:8px;border:1px solid #ddd;text-align:left;font-size:12px}th{background:#f4f4f4}</style></head><body><h2>Student List</h2><table><tr><th>ID</th><th>Name</th><th>Course</th><th>Year</th><th>Status</th></tr>');
     allStudents.filter(s=>s.element&&s.element.style.display!=='none').forEach(s=>{
         w.document.write('<tr><td>'+(s.student_number||'')+'</td><td>'+(s.first_name||'')+' '+(s.last_name||'')+'</td><td>'+(s.course||'')+'</td><td>'+(s.year_level||'')+'</td><td>'+(s.status||'')+'</td></tr>');
@@ -1901,6 +1871,7 @@ function editStudent(id) {
         document.getElementById('editCourse').value = s.course || '';
         refreshMajorOptions('edit');
         document.getElementById('editMajor').value = s.major || '';
+        refreshShsPeriod('edit');
         document.getElementById('editYearLevel').value = s.year_level || '';
         document.getElementById('editSchoolYear').value = s.school_year || '';
         document.getElementById('editSemester').value = s.semester || '';
@@ -1913,8 +1884,9 @@ function editStudent(id) {
         document.getElementById('editGuardianContact').value = '';
         document.getElementById('editGuardianEmail').value = '';
         fetch('../api/students.php?action=guardian&student_id='+id).then(r=>r.json()).then(gd=>{
-            if(gd.success&&gd.data){document.getElementById('editGuardianName').value=gd.data.full_name||'';document.getElementById('editGuardianRel').value=gd.data.relationship||'';document.getElementById('editGuardianContact').value=gd.data.contact_number||'';document.getElementById('editGuardianEmail').value=gd.data.email||'';}
-        }).catch(()=>{});
+            if(String(document.getElementById('editId').value)!==String(id))return;if(gd.success&&gd.data){document.getElementById('editGuardianName').value=gd.data.full_name||'';document.getElementById('editGuardianRel').value=gd.data.relationship||'';document.getElementById('editGuardianContact').value=gd.data.contact_number||'';document.getElementById('editGuardianEmail').value=gd.data.email||'';}window.StudentModals?.captureGuardian(gd.data||null);
+        }).catch(()=>window.StudentModals?.captureGuardian(null));
+        window.StudentModals?.beginEdit(s);
         document.getElementById('editModal').classList.add('active');
         document.body.style.overflow = 'hidden';
     }).catch(() => showToast('Failed to load.', 'error'));
@@ -1975,6 +1947,10 @@ document.getElementById('editForm').addEventListener('submit', async function(e)
 // ─── COURSE & MAJOR DROPDOWN (native select) ─────────────────
 // Course data is rendered directly into the <select> options by PHP.
 const COURSE_MAJORS = <?= json_encode($offeredCourses) ?>;
+const SHS_PROGRAMS = <?= json_encode(array_keys(shsPrograms())) ?>;
+const SHS_FRAMEWORKS = <?= json_encode((function(){ $out=[]; $catalog=json_decode(file_get_contents(__DIR__.'/../config/shs-programs.json'),true);foreach($catalog['campuses'] as $campus)foreach($campus['offerings'] as $o)$out[$o['label'].' ('.$o['code'].')']=$o['framework'];return $out;})()) ?>;
+function refreshShsPeriod(prefix){const el=document.getElementById(prefix+'Semester');if(!el)return;const old=el.value,shs=SHS_PROGRAMS.includes(document.getElementById(prefix+'Course').value),framework=SHS_FRAMEWORKS[document.getElementById(prefix+'Major').value];const periods=shs&&framework==='strengthened'?['T1','T2','T3']:['1st','2nd','summer'];el.innerHTML='<option value="">Select period</option>'+periods.map(p=>'<option value="'+p+'">'+(p.startsWith('T')?'Term '+p.slice(1):p==='summer'?'Summer':p+' Semester')+'</option>').join('');el.value=periods.includes(old)?old:'';}
+['add','edit'].forEach(prefix=>document.getElementById(prefix+'Major')?.addEventListener('change',()=>refreshShsPeriod(prefix)));
 
 /**
  * Refresh the Major dropdown for a given prefix (add/edit).
@@ -1985,10 +1961,20 @@ function refreshMajorOptions(prefix) {
     const majorGroup = document.getElementById(prefix + 'MajorGroup');
     const majorEl = document.getElementById(prefix + 'Major');
     if (!majorGroup || !majorEl) return;
+    const isShs = SHS_PROGRAMS.includes(course);
+    const yearEl = document.getElementById(prefix + 'YearLevel');
+    if (yearEl) {
+        const previousYear = yearEl.value;
+        const years = isShs ? [11, 12] : [1, 2, 3, 4];
+        yearEl.innerHTML = '<option value="">Select</option>' + years.map(y => '<option value="' + y + '">' + (isShs ? 'Grade ' : 'Year ') + y + '</option>').join('');
+        yearEl.value = years.includes(Number(previousYear)) ? previousYear : '';
+    }
+    majorGroup.querySelector('label').textContent = isShs ? 'SHS strand / cluster *' : 'Major';
+    majorEl.required = isShs;
     const majors = (COURSE_MAJORS[course] || []);
     if (majors.length > 0) {
         majorGroup.style.display = '';
-        majorEl.innerHTML = '<option value="">Select major</option>' +
+        majorEl.innerHTML = '<option value="">' + (isShs ? 'Select strand / cluster' : 'Select major') + '</option>' +
             majors.map(m => '<option value="' + m.replace(/"/g, '&quot;') + '">' + m + '</option>').join('');
     } else {
         majorGroup.style.display = 'none';
@@ -1999,7 +1985,7 @@ function refreshMajorOptions(prefix) {
 // Wire the course selects so changing the course refreshes the Major dropdown
 ['add', 'edit'].forEach(prefix => {
     const cEl = document.getElementById(prefix + 'Course');
-    if (cEl) cEl.addEventListener('change', () => refreshMajorOptions(prefix));
+    if (cEl) cEl.addEventListener('change', () => {refreshMajorOptions(prefix);refreshShsPeriod(prefix);});
 });
 
 // ─── Course select: scrollable custom list ────────────────────
@@ -2240,6 +2226,7 @@ document.getElementById('addForm').addEventListener('submit', async function(e) 
                 civil_status: document.getElementById('addCivilStatus').value,
                 birth_date: document.getElementById('addBirthDate').value,
                 place_of_birth: document.getElementById('addBirthPlace').value,
+                birth_country: document.getElementById('addBirthCountry')?.value || null,
                 nationality: document.getElementById('addNationality').value,
                 religion: document.getElementById('addReligion').value,
                 status: document.getElementById('addStatus').value,

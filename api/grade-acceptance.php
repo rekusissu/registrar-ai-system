@@ -22,6 +22,7 @@ require_once __DIR__ . '/../shared/csrf_guard.php';
 require_once __DIR__ . '/../shared/database.php';
 require_once __DIR__ . '/../shared/term_grades.php';
 require_once __DIR__ . '/../shared/grade_acceptance.php';
+require_once __DIR__ . '/../shared/registrar_access.php';
 
 header('Content-Type: application/json');
 
@@ -34,7 +35,7 @@ if (empty($_SESSION['user_id'])) {
 // Registrar only. Accepting a term is a signature on an official record;
 // it is not an action the student portal or Faculty's view may take. Same
 // check requireRole('registrar') makes on the page, admin included.
-if (!in_array(getCurrentUserRole(), ['staff', 'super_admin'], true)) {
+if (!in_array(getCurrentUserRole(), ['staff','registrar_admin','super_admin'], true)) {
     http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Only a registrar can accept a term.']);
     exit;
@@ -75,7 +76,9 @@ if ($section === '') {
     exit;
 }
 
+if (!registrarHasAllPrograms()) registrarRequireProgram($program);
 $roster = grade_acceptance_roster($db, $sy, $sem, $section, $program);
+if (!registrarHasAllPrograms()) foreach ($roster as $student) registrarRequireStudent((int)$student['id']);
 $gate   = sectionAcceptance($sy, $sem, $roster);
 
 // Every UPDATE below filters on program as well as section, for the same

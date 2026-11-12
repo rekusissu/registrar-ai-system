@@ -31,7 +31,7 @@ if (!isLoggedIn()) {
     exit;
 }
 // Admin + registrar only
-if (!in_array(getCurrentUserRole(), ['super_admin', 'staff'], true)) {
+if (!in_array(getCurrentUserRole(), ['super_admin','registrar_admin','staff'], true)) {
     echo json_encode(['success' => false, 'message' => 'Forbidden.']);
     exit;
 }
@@ -99,7 +99,7 @@ try {
         // sectionCodeFromParts() digit rules.
         $readSemester = static function ($raw): ?string {
             $v = trim((string) $raw);
-            return in_array($v, ['1st', '2nd', 'summer'], true) ? $v : null;
+            return in_array($v, ['1st', '2nd', 'summer','T1','T2','T3'], true) ? $v : null;
         };
 
         // ─── LIST SECTIONS (grouped summaries) ───────────────
@@ -125,7 +125,7 @@ try {
             $year   = isset($input['year_level']) ? (int) $input['year_level'] : 0;
             $semester = $readSemester($input['semester'] ?? '');
 
-            if ($course === '' || $year < 1 || $year > 9) {
+            if ($course === '' || (($year < 1 || $year > 9) && !in_array($year,[11,12],true))) {
                 echo json_encode(['success' => false, 'message' => 'Course and year level are required.']);
                 exit;
             }
@@ -191,6 +191,8 @@ try {
                 }
             }
 
+            require_once __DIR__.'/../shared/shs_catalog.php';
+            validateShsSectionAssignment($db, isset($members) ? array_column($members,'id') : $ids, $fields);
             $conn = $db->getConnection();
             $conn->beginTransaction();
             try {
@@ -244,8 +246,8 @@ try {
             $newSchoolYear = trim((string) ($input['school_year'] ?? ''));
             $newAdviser = isset($input['adviser_id']) && $input['adviser_id'] !== '' ? (int) $input['adviser_id'] : null;
 
-            if ($newYear < 1 || $newYear > 9) {
-                echo json_encode(['success' => false, 'message' => 'A section needs a year level between 1 and 9.']);
+            if ((($newYear < 1 || $newYear > 9) && !in_array($newYear,[11,12],true))) {
+                echo json_encode(['success' => false, 'message' => 'A section needs a year level between 1 and 9, or Grade 11/12.']);
                 exit;
             }
 
@@ -284,6 +286,9 @@ try {
             ];
             if ($newSchoolYear !== '') $fields['school_year'] = $newSchoolYear;
             if ($newAdviser !== null)  $fields['adviser_id'] = $newAdviser;
+
+            require_once __DIR__.'/../shared/shs_catalog.php';
+            validateShsSectionAssignment($db,array_column($members,'id'),$fields);
 
             $conn = $db->getConnection();
             $conn->beginTransaction();
@@ -325,7 +330,7 @@ try {
                 ? 'Assigned ' . $result['updated'] . ' student(s) to a section.'
                 : 'Nothing to assign. Every student with a year level already has a section.';
             if ($result['skipped'] > 0) {
-                $message .= ' ' . $result['skipped'] . ' student(s) skipped because they have no year level set.';
+                $message .= ' ' . $result['skipped'] . ' student(s) skipped: missing year level or SHS strand.';
             }
 
             echo json_encode([

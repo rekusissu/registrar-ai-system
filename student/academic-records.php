@@ -61,6 +61,7 @@ $terms = ($selected['sy'] === '' && $selected['sem'] === '')
             && strcasecmp((string) $t['semester'], $selected['sem']) === 0;
     }));
 
+if((int)($student['year_level']??0)>=11){foreach($gradesByTerm as &$subjectRows){foreach($subjectRows as &$subject)$subject['grading_scale']='shs';unset($subject);}unset($subjectRows);}
 // Summary. GWA comes from careerGwa() in shared/term_grades.php - the
 // same function the registrar's audit and the Transcript of Records use.
 // This page used to average the legacy `grade` column inline over a
@@ -224,7 +225,7 @@ foreach ($gradeRows as $g) {
                 <div class="s-icon purple"><i class="fa-solid fa-calculator"></i></div>
                 <div>
                     <div class="s-value"><?= htmlspecialchars($avgGrade) ?></div>
-                    <div class="s-label">Term GWA</div>
+                    <div class="s-label"><?= (int)($student['year_level']??0)>=11?'College GWA — not applicable to SHS':'Term GWA' ?></div>
                 </div>
             </div>
             <div class="s-item">
@@ -248,7 +249,7 @@ foreach ($gradeRows as $g) {
                     <?php if ($term['school_year']): ?><span class="chip blue"><i class="fa-solid fa-calendar-days"></i> <?= htmlspecialchars($term['school_year']) ?></span><?php endif; ?>
                     <?php if ($term['semester']): ?><span class="chip gray"><?= htmlspecialchars($term['semester']) ?></span><?php endif; ?>
                     <?php if ($term['grade_level']): ?><span class="chip gray"><i class="fa-solid fa-layer-group"></i> <?= htmlspecialchars($term['grade_level']) ?></span><?php endif; ?>
-                    <?php if ($term['gwa'] !== null): ?><span class="chip green"><i class="fa-solid fa-star"></i> GWA <?= htmlspecialchars($term['gwa']) ?></span><?php endif; ?>
+                    <?php if ((int)($student['year_level']??0)<11 && $term['gwa'] !== null): ?><span class="chip green"><i class="fa-solid fa-star"></i> GWA <?= htmlspecialchars($term['gwa']) ?></span><?php endif; ?>
                 </div>
             </div>
 

@@ -75,6 +75,10 @@ foreach ($gradeRows as $g) {
     $gradesByTerm[$g['academic_history_id']][] = $g;
 }
 
+if((int)$db->fetchColumn('SELECT year_level FROM students WHERE id=?',[$studentId])>=11){
+    echo json_encode(['success'=>true,'data'=>['summary'=>'Your SHS record contains '.count($terms).' academic periods and '.count($gradeRows).' received subjects. Source percentage grades are displayed without conversion to college GWA.','advice'=>'Report missing or incorrect grades to the responsible academic office.','computed_gwa'=>null,'terms'=>count($terms),'subjects'=>count($gradeRows),'trend'=>null,'strengths'=>[],'attention'=>[],'honors_hint'=>null,'source'=>'local_analysis']]);exit;
+}
+
 // ── Deterministic stats ─────────────────────────────────────
 $numeric = [];
 foreach ($gradeRows as $g) {

@@ -25,38 +25,20 @@ $api_base = rtrim(app_url('/api'), '/') . '/';
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="<?= $APP_ROOT ?>css/queue.css" />
+    <link rel="stylesheet" href="<?= $APP_ROOT ?>css/queue-monitor-tech.css?v=<?= filemtime(__DIR__ . '/../css/queue-monitor-tech.css') ?>" />
 </head>
 <body class="monitor-body" data-page="monitor" data-api-base="<?= htmlspecialchars($api_base, ENT_QUOTES) ?>">
 <div class="monitor-screen">
 
-    <div class="monitor-top">
-        <div class="brand">
-            <img src="<?= $APP_ROOT ?>assets/images/BCP_LOGO.png" alt="BCP Logo" />
-            <h1>Registrar Queue</h1>
-        </div>
-        <div class="clock" id="clock"></div>
-    </div>
-
-    <!-- NOW SERVING — one slot per window -->
-    <div class="window-strip" id="windowStrip"></div>
-
-    <div class="monitor-cols">
-        <div>
-            <div class="monitor-col-title"><i class="fas fa-list-ol"></i> Waiting line</div>
-            <div class="monitor-wait-list" id="waitList">
-                <div style="color:#64748b;text-align:center;padding:16px;">Loading…</div>
-            </div>
-        </div>
-        <div>
-            <div class="monitor-col-title"><i class="fas fa-clock-rotate-left"></i> Recently served</div>
-            <div class="monitor-recent-list" id="recentList">
-                <div style="color:#64748b;text-align:center;padding:16px;">Loading…</div>
-            </div>
-        </div>
-    </div>
+    <header class="mt-header"><div class="mt-brand"><img src="../assets/images/BCP_LOGO.png" alt="Bestlink College crest"><div><p>Bestlink College of the Philippines</p><h1>Registrar Queue</h1><small>OFFICE OF THE REGISTRAR</small></div></div><div class="mt-live" id="mtLive">Connecting…</div><div class="mt-clock"><time id="mtTime"></time><span id="mtDate"></span></div></header>
+    <section class="mt-windows" id="windowStrip" aria-label="Service windows"><div class="mt-loading">Connecting to the registrar queue…</div></section>
+    <div class="mt-announcement" role="status"><i class="fas fa-volume-high" aria-hidden="true"></i><strong id="mtCall">Please watch for your number</strong><span id="mtCallMessage">Approach your window only when called.</span></div>
+    <div class="mt-columns"><section class="mt-panel"><header><h2><i class="fas fa-list-ol" aria-hidden="true"></i> Waiting line</h2><span id="mtWaitingCount">— waiting</span></header><div id="waitList" class="mt-table-body"></div><div id="mtMore" class="mt-more"></div></section><section class="mt-panel"><header><h2><i class="fas fa-clock-rotate-left" aria-hidden="true"></i> Recently served</h2></header><div id="recentList" class="mt-table-body"></div></section></div>
+    <footer class="mt-footer"><span></span>Watch for your number. Approach the assigned window only when called.</footer>
 
 </div>
 
+<script src="<?= $APP_ROOT ?>js/queue-monitor-tech.js?v=<?= filemtime(__DIR__ . '/../js/queue-monitor-tech.js') ?>"></script>
 <script src="<?= $APP_ROOT ?>js/queue.js?v=<?= filemtime(__DIR__ . '/../js/queue.js') ?>"></script>
 </body>
 </html>

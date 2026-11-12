@@ -389,6 +389,10 @@ function aiExplainGatewayError(int $status, string $body): string
  * OpenAI-compatible gateway is used.
  */
 function aiHttpChat(array $payload) {
+    if (!function_exists('curl_init')) {
+        error_log('ai_client: PHP cURL is unavailable; using the caller fallback.');
+        return null;
+    }
     if (aiIsGeminiProvider() || aiIsGeminiModel((string) ($payload['model'] ?? ''))) {
         return aiCallGemini($payload);
     }

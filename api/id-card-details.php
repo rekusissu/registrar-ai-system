@@ -9,7 +9,7 @@ header('Content-Type: application/json');
 header('Cache-Control: no-store, private');
 function idDetailsFail(int $status, string $message): void { http_response_code($status); echo json_encode(['success'=>false,'message'=>$message]); exit; }
 if (!isLoggedIn()) idDetailsFail(401, 'Please sign in.');
-if (!in_array(getCurrentUserRole(), ['super_admin','staff'], true)) idDetailsFail(403, 'Only registrar staff may edit ID details.');
+if (!in_array(getCurrentUserRole(), ['super_admin','registrar_admin','staff'], true)) idDetailsFail(403, 'Only registrar staff may edit ID details.');
 $method=$_SERVER['REQUEST_METHOD'];
 if (!in_array($method,['GET','PUT','DELETE'],true)) { header('Allow: GET, PUT, DELETE'); idDetailsFail(405,'Method not allowed.'); }
 requireCsrf();

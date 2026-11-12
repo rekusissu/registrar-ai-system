@@ -464,7 +464,7 @@ include '../includes/sidebar.php';
         <div style="margin-top:16px;padding:14px;background:#f8fafc;border-radius:10px;">
             <div style="font-weight:600;font-size:13px;color:#0f172a;margin-bottom:8px;"><i class="fas fa-chart-bar" style="color:#2563eb;"></i> Summary</div>
             <div style="font-size:13px;color:#475569;line-height:1.8;">
-                <strong><?= $totalStudents ?></strong> active students &middot;
+                <strong><?= $totalStudents ?></strong> students on file &middot;
                 <strong><?= $totalFiles ?></strong> total files &middot;
                 <strong><?= fmtBytes($sumBytes) ?></strong> total storage<br>
                 <span style="color:#16a34a;font-weight:600;"><?= $totalStudents - $missingCount ?></span> fully documented &middot;

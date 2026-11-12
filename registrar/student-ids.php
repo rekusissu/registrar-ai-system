@@ -555,6 +555,7 @@ function editStatus(btn) {
 
 // Print a clean official ID card sheet (school logo, photo, QR, signature line)
 function printCard() {
+    if(window.ExportSecurity&&!window.ExportSecurity.isExecuting()) return window.ExportSecurity.run({report:'Student ID card',format:'print-pdf',resource:'client-print:'+location.pathname},()=>printCard());
     const d = currentCardData || {};
     const photo = normalizePhotoPath(d.photo) || '';
     const initials = initialsOf(d.name);

@@ -54,7 +54,7 @@ function contactsTargetStudentId(string $role, array $input): int {
     if ($role === 'student') {
         return (int) getCurrentStudentId();
     }
-    if (in_array($role, ['super_admin', 'staff'], true)) {
+    if (in_array($role, ['super_admin','registrar_admin','staff'], true)) {
         return (int) ($input['student_id'] ?? 0);
     }
     return 0;
@@ -62,7 +62,7 @@ function contactsTargetStudentId(string $role, array $input): int {
 
 /** A registrar/admin-only action: reject everyone else. */
 function contactsRequireStaff(string $role): void {
-    if (!in_array($role, ['super_admin', 'staff'], true)) {
+    if (!in_array($role, ['super_admin','registrar_admin','staff'], true)) {
         echo json_encode(['success' => false, 'message' => 'Forbidden.']);
         exit;
     }

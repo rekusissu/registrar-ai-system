@@ -226,7 +226,7 @@ switch ($action) {
     // No page outside registrar/ calls check_duplicate, so the fix is a
     // staff-tier role gate here rather than changing the helper.
     case 'check_duplicate':
-        if (!in_array(getCurrentUserRole(), ['super_admin', 'staff'], true)) {
+        if (!in_array(getCurrentUserRole(), ['super_admin','registrar_admin','staff'], true)) {
             error_log('[ai-assist] denied check_duplicate role=' . (getCurrentUserRole() ?? '(none)'));
             http_response_code(403);
             echo json_encode([

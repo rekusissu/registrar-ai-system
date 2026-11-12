@@ -12,6 +12,7 @@ if (empty($_SESSION['user_id'])) {
     header('Location: ../login.php');
     exit;
 }
+if (in_array(getCurrentUserRole(), ['acad_officer','department_head'], true)) {header('Location: academic-dashboard.php?view=masterlist');exit;}
 requireRole('staff');
 
 require_once __DIR__ . '/../shared/database.php';
@@ -1972,7 +1973,7 @@ let lastDuplicateHit = null;
 function findSectionCollision() {
     if (!editSectionContext) return null;
     const code = document.getElementById('esSection').value.trim();
-    if (!/^[0-9]{5}$/.test(code)) return null;
+    if (!/^(?:[1-9]|1[12])[123][0-9]{3}$/.test(code)) return null;
 
     const ctx = editSectionContext;
     const course = document.getElementById('esCourse').value;
@@ -2124,8 +2125,8 @@ async function saveEditSection() {
     const errEl = document.getElementById('esError');
     const count = document.getElementById('esStudentCount').textContent;
 
-    if (!/^[0-9]{5}$/.test(newSection)) {
-        errEl.textContent = 'A section code is 5 digits, e.g. 11001.';
+    if (!/^(?:[1-9]|1[12])[123][0-9]{3}$/.test(newSection)) {
+        errEl.textContent = 'Use a college code such as 11001 or SHS code such as 111001.';
         errEl.style.display = 'block';
         return;
     }
@@ -2647,6 +2648,7 @@ function downloadBlob(blob, filename) {
 
 // ─── PRINT (Official Masterlist sheet w/ logo + signature) ────
 function printRows(rows) {
+    if(window.ExportSecurity&&!window.ExportSecurity.isExecuting()) return window.ExportSecurity.run({report:'Student masterlist',format:'print-pdf',resource:'client-print:'+location.pathname},()=>printRows(rows));
     const w = window.open();
     const sy = document.getElementById('filterSchoolYear') ? document.getElementById('filterSchoolYear').value : '';
     w.document.write('<!DOCTYPE html><html><head><title>Masterlist</title><style>');

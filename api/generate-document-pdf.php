@@ -31,7 +31,7 @@ if (!isLoggedIn()) {
     echo json_encode(['success' => false, 'message' => 'Unauthorized.']);
     exit;
 }
-if (!in_array(getCurrentUserRole(), ['super_admin', 'staff'], true)) {
+if (!in_array(getCurrentUserRole(), ['super_admin','registrar_admin','staff'], true)) {
     echo json_encode(['success' => false, 'message' => 'Forbidden.']);
     exit;
 }
@@ -39,6 +39,9 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode(['success' => false, 'message' => 'Invalid request method.']);
     exit;
 }
+
+require_once __DIR__.'/../shared/report_export_security.php';
+requireReportExport();
 
 $input = json_decode(file_get_contents('php://input'), true) ?: [];
 $requestId = (int) ($input['request_id'] ?? 0);

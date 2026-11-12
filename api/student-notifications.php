@@ -36,7 +36,7 @@ if ($role === 'student') {
         $row = $db->fetchOne("SELECT student_id FROM users WHERE id = ?", [$_SESSION['user_id']]);
         $studentId = $row ? intval($row['student_id']) : 0;
     }
-} elseif (in_array($role, ['super_admin', 'staff'], true)) {
+} elseif (in_array($role, ['super_admin','registrar_admin','staff'], true)) {
     $studentId = intval($_GET['student_id'] ?? $_POST['student_id'] ?? 0);
 }
 

@@ -1872,6 +1872,7 @@ function openPreview(id) {
 function printDoc(id) {
     const frame = document.querySelector('.dq-preview-frame');
     if (frame) {
+        if(window.ExportSecurity&&!window.ExportSecurity.isExecuting()) return window.ExportSecurity.run({report:'Registrar document',format:'print-pdf',resource:'document-preview:'+id},()=>printDoc(id));
         try {
             const w = frame.contentWindow;
             if (w && typeof w.print === 'function') {

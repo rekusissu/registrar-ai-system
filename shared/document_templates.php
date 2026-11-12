@@ -1208,6 +1208,7 @@ function dt_collect_context(int $requestId, array $opt = []): ?array
     // academic_history.gwa that status_evidence.php reads, and this
     // printed figure, come from the same function and cannot drift.
     require_once __DIR__ . '/term_grades.php';
+    if((int)($row['year_level']??0)>=11){foreach($terms as &$term){$term['gwa']=null;foreach($term['subjects'] as &$subject)$subject['grading_scale']='shs';unset($subject);}unset($term);}
     $careerGwa = careerGwa($terms);
 
     $totalUnits = 0.0; $anyUnits = false;

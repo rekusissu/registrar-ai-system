@@ -28,6 +28,7 @@ require_once __DIR__ . '/../shared/database.php';
 require_once __DIR__ . '/../shared/session_config.php';
 require_once __DIR__ . '/../shared/csrf_guard.php';
 require_once __DIR__ . '/../shared/functions.php';
+require_once __DIR__ . '/../shared/report_export_security.php';
 require_once __DIR__ . '/../shared/document_templates.php';
 
 if (!isLoggedIn()) {
@@ -35,7 +36,7 @@ if (!isLoggedIn()) {
     echo 'Unauthorized.';
     exit;
 }
-if (!in_array(getCurrentUserRole(), ['super_admin', 'staff'], true)) {
+if (!in_array(getCurrentUserRole(), ['super_admin','registrar_admin','staff'], true)) {
     http_response_code(403);
     echo 'Forbidden.';
     exit;
@@ -63,6 +64,7 @@ $status = (string) ($ctx['request']['document_status'] ?? '');
 
 try {
     if (isset($_GET['print'])) {
+        requireReportExport();
         $title = (string) ($ctx['catalog']['name'] ?? 'Official Document');
         echo dt_standalone_html($ctx, $title);
         exit;

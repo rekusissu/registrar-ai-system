@@ -1,0 +1,12 @@
+<?php
+require_once __DIR__.'/../shared/registrar_access.php';requireLogin();
+if(!in_array(getCurrentUserRole(),['super_admin','registrar_admin'],true)){http_response_code(403);exit('Access denied.');}
+$page_title='Program Assignments';$APP_ROOT='../';$ACTIVE_NAV='users';include __DIR__.'/../includes/header.php';include __DIR__.'/../includes/sidebar.php';
+?>
+<main class="dashboard-main"><div class="dashboard-container ax-page">
+<header class="page-header"><div><h1>Program Assignments</h1><p>Choose an account, review program access, and save the confirmed selection.</p></div></header>
+<form id="paForm" class="ax-access-layout">
+<aside class="ax-account-rail"><span class="ax-eyebrow">01 / SELECT ACCOUNT</span><h2>Who needs access?</h2><label for="paUser">Staff account</label><select id="paUser" required><option value="">Loading accounts…</option></select><div id="paIdentity" class="ax-account-identity"></div><div class="ax-access-note"><i class="fas fa-user-shield" aria-hidden="true"></i><h3>Program authorization</h3><p>Select the programs this account is authorized to access. Existing role permissions still apply.</p></div><div id="paSelectedSummary"></div></aside>
+<section class="ax-surface ax-program-catalog"><header class="ax-surface-head"><div><span class="ax-eyebrow">02 / ASSIGN PROGRAMS</span><h2>Program access</h2><p>College and senior high school programs.</p></div><span class="ax-count" id="paCount">0 selected</span></header><div class="ax-program-search"><label for="paSearch" class="ax-search"><span>Find a program</span><input id="paSearch" type="search" placeholder="Search program name or code…"></label><div class="ax-segments" aria-label="Program category"><button type="button" data-pa-filter="all" class="active">All</button><button type="button" data-pa-filter="college">College</button><button type="button" data-pa-filter="shs">SHS</button><button type="button" data-pa-filter="selected">Selected</button></div></div><div id="paPrograms" class="ax-program-list"></div><footer class="ax-access-footer"><div><strong id="paChangeCount">No unsaved changes</strong><p id="paMessage" role="status">Loading authorized accounts…</p></div><button type="submit" class="btn btn-primary" id="paSave" disabled><i class="fas fa-check" aria-hidden="true"></i> Save access</button></footer></section>
+</form></div></main>
+<?php include __DIR__.'/../includes/footer.php'; ?>

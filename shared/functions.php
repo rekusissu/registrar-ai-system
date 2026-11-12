@@ -646,17 +646,17 @@ function getStudentInitials($student) {
  */
 function nextSectionNumber(string $course, int $year, ?string $semester): int {
     $db = Database::getInstance();
-    $prefix = substr(sectionCodeFromParts($year, $semester, 1), 0, 2); // e.g. "11"
+    $prefix = (string)$year . semesterDigit($semester);
     $rows = $db->fetchAll(
         "SELECT DISTINCT section FROM students
          WHERE TRIM(course) = ? AND year_level = ?
            AND TRIM(IFNULL(semester, '')) = ?
-           AND section LIKE ? AND section REGEXP '^[0-9]{5}$'",
+           AND section LIKE ? AND section REGEXP '^[0-9]{5,6}$'",
         [$course, $year, (string) $semester, $prefix . '%']
     );
     $max = 0;
     foreach ($rows as $r) {
-        $num = (int) substr(trim((string) $r['section']), 2);
+        $num = (int) substr(trim((string) $r['section']), strlen($prefix));
         if ($num > $max) $max = $num;
     }
     return $max + 1;
@@ -683,6 +683,7 @@ function sectionExists(string $course, int $year, ?string $semester, string $sec
  * the Students page and the Masterlist section-creation flow.
  */
 function getOfferedCourses(): array {
+    require_once __DIR__.'/shs_catalog.php';
     return [
         'BACHELOR OF SCIENCE IN INFORMATION TECHNOLOGY (BSIT)' => [],
         'BACHELOR OF SCIENCE IN HOSPITALITY MANAGEMENT (BSHM)' => [],
@@ -709,7 +710,7 @@ function getOfferedCourses(): array {
             'Mathematics',
             'Science',
         ],
-    ];
+    ] + shsPrograms();
 }
 
 /**
@@ -739,7 +740,7 @@ function autoAssignStudentSections(?int $maxPerSection = null): array {
     $skipped = (int) ($skippedRow['cnt'] ?? 0);
 
     $students = $db->fetchAll(
-        "SELECT id, course, year_level, semester, section, last_name, first_name
+        "SELECT id, course, major, year_level, semester, section, last_name, first_name
          FROM students
          WHERE course IS NOT NULL AND TRIM(course) != ''
            AND year_level IS NOT NULL AND TRIM(IFNULL(year_level, '')) != ''
@@ -751,12 +752,15 @@ function autoAssignStudentSections(?int $maxPerSection = null): array {
         $course = trim((string) $row['course']);
         $year = (int) $row['year_level'];
         $semester = ($row['semester'] ?? '') !== '' ? (string) $row['semester'] : null;
-        $key = $course . "\0" . $year . "\0" . ($semester ?? '');
+        $major = $year>=11 ? trim((string)($row['major']??'')) : '';
+        if($year>=11&&$major===''){$skipped++;continue;}
+        $key = $course . "\0" . $year . "\0" . ($semester ?? '') . "\0" . $major;
         if (!isset($buckets[$key])) {
             $buckets[$key] = [
                 'course' => $course,
                 'year_level' => $year,
                 'semester' => $semester,
+                'major' => $major,
                 'ids' => [],
             ];
         }
@@ -789,10 +793,11 @@ function autoAssignStudentSections(?int $maxPerSection = null): array {
                  FROM students
                  WHERE TRIM(course) = ? AND year_level = ?
                    AND TRIM(IFNULL(semester, '')) = ?
-                   AND section REGEXP '^[0-9]{5}$'
+                   AND (?='' OR TRIM(IFNULL(major,''))=?)
+                   AND section REGEXP '^[0-9]{5,6}$'
                  GROUP BY TRIM(section)
                  ORDER BY section",
-                [$course, $year, (string) $semester]
+                [$course, $year, (string) $semester, $bucket['major'], $bucket['major']]
             );
 
             $existingCodes = [];
@@ -814,7 +819,7 @@ function autoAssignStudentSections(?int $maxPerSection = null): array {
             }
 
             // 2) Create new sections only for students still unassigned
-            $nextNumber = 1;
+            $nextNumber = nextSectionNumber($course,$year,$semester);
             while (!empty($unassigned)) {
                 // Pick the next free code (skip codes already used)
                 while (isset($existingCodes[sectionCodeFromParts($year, $semester, $nextNumber)])) {
@@ -1498,17 +1503,17 @@ function createStudentFromInput(array $input, $db): array
         throw new InvalidArgumentException('Year level is required.');
     }
     $yearLevel = (int) $yearLevelRaw;
-    if ($yearLevel < 1 || $yearLevel > 4) {
-        throw new InvalidArgumentException('Year level must be 1st, 2nd, 3rd, or 4th Year.');
-    }
+    require_once __DIR__.'/shs_catalog.php';
+    validateStudentAcademicPlacement($input);
 
     // Semester: required, from the fixed set the section codes encode.
     $semesterRaw = trim((string) ($input['semester'] ?? ''));
     if ($semesterRaw === '') {
         throw new InvalidArgumentException('Semester is required.');
     }
-    if (!in_array($semesterRaw, ['1st', '2nd', 'summer'], true)) {
-        throw new InvalidArgumentException('Semester must be 1st, 2nd, or summer.');
+    $allowedPeriods=isset(shsPrograms()[trim((string)($input['course']??''))])?['1st','2nd','summer','T1','T2','T3']:['1st','2nd','summer'];
+    if (!in_array($semesterRaw, $allowedPeriods, true)) {
+        throw new InvalidArgumentException('Choose an academic period supported by this program.');
     }
 
     $data = [

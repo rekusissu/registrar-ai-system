@@ -57,7 +57,7 @@ $input = $_POST ?: (json_decode(file_get_contents('php://input'), true) ?: []);
 // which is not a permission error, it is every request looking like it
 // belongs to nobody.
 $studentId = (int) ($input['student_id'] ?? 0);
-if (in_array($role, ['super_admin', 'staff'], true) && $studentId > 0) {
+if (in_array($role, ['super_admin','registrar_admin','staff'], true) && $studentId > 0) {
     $exists = Database::getInstance()->fetchOne('SELECT id FROM students WHERE id = ?', [$studentId]);
     if (!$exists) {
         echo json_encode(['success' => false, 'message' => 'Selected student not found.']);

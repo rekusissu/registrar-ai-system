@@ -1,6 +1,7 @@
 <header class="aw-header">
  <div><span class="aw-eyebrow">REGISTRAR / ACADEMIC RECORDS</span><h1>Academic History</h1><p>Review student grades, verify term records, and prepare academic documents.</p></div>
 </header>
+<p style="text-align:right;margin:0 0 12px"><a href="academic-validation.php">Academic validation</a></p>
 <nav class="aw-tabs" aria-label="Academic workspace">
  <button type="button" class="is-active" data-workspace-tab="students" aria-pressed="true">Student history</button>
  <button type="button" data-workspace-tab="review" aria-pressed="false">Term review</button>

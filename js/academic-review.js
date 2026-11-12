@@ -17,10 +17,12 @@ function arDetail(index) {
  const advisories=g.advisory.map(f=>`<div class="ar-check"><i class="fa-solid fa-circle-info" aria-hidden="true"></i><div><strong>${esc(f.title)}</strong><p>${esc(f.detail)}</p></div></div>`).join('');
  panel.innerHTML=`<div class="ar-detail-head"><h2 id="arDetailTitle">${esc(g.label)} · Year ${esc(g.year||'—')} · Section ${esc(g.code)}</h2><span class="aw-badge ${state==='accepted'?'green':state==='waiting'?'amber':''}">${arLabel(state)}</span></div><div class="ar-detail-body"><div><h3>Record checks</h3>${findings||'<div class="ar-check"><i class="fa-solid fa-circle-check" aria-hidden="true"></i>No blocking issues found by the term audit.</div>'}${advisories}</div><div><dl class="ar-dl"><div><dt>Academic period</dt><dd>${esc(AH.sem)} Semester · ${esc(AH.sy)}</dd></div><div><dt>Students</dt><dd>${g.roster}</dd></div><div><dt>Records received</dt><dd>${g.students.filter(s=>s.record).length}</dd></div><div><dt>Accepted records</dt><dd>${g.stamped} of ${g.roster}</dd></div></dl></div></div><div class="ar-detail-footer"><small>Acceptance is recorded under your account.</small><div><button type="button" class="btn btn-light" id="arViewStudents">View student records</button><button type="button" class="btn btn-primary" id="arAccept" ${state!=='accepted'&&!g.can_accept?'disabled':''}>${state==='accepted'?'Reopen term records':'Accept term records'}</button></div></div><p id="arMessage" role="status" class="ar-footnote"></p><div class="ar-students" id="arStudents" hidden>${g.students.map(s=>`<button class="aw-view ah-view" type="button" data-view="${s.id}">${esc(s.name)} →</button>`).join('')}</div>`;
  panel.hidden=false;
+ if(AH.readOnly) document.getElementById('arAccept').hidden=true;
  document.getElementById('arViewStudents').onclick=()=>{const list=document.getElementById('arStudents');list.hidden=!list.hidden;};
  document.getElementById('arAccept').onclick=()=>arSubmit(index);
 }
 async function arSubmit(index){
+ if(AH.readOnly)return;
  const g=AR[index],button=document.getElementById('arAccept'),message=document.getElementById('arMessage'),action=arState(g)==='accepted'?'reopen':'accept';
  button.disabled=true;message.textContent=action==='accept'?'Verifying current records…':'Reopening records…';
  try{const result=await ahb.call(action,g.code,g.program);if(!result)throw Error('Another review action is still running.');if(!result.ok)throw Error(result.data.message||'The records could not be updated.');
@@ -42,7 +44,7 @@ function apSummary(){
  document.getElementById('apScope').textContent=all?'All recorded school years and semesters will be included.':'Only this school year and semester will be included.';
  const values=[['Student',apStudent.name],['Document',all?'Complete academic history':'Semester grade record'],['Period',all?`${terms.length} recorded terms`:(terms[0]?`${terms[0].semester} Semester ${terms[0].school_year}`:'No recorded term')],['Subjects',subjects.length],['Included units',awNumber(units)],[all?'Cumulative GWA':'Term GWA',awNumber(all?apStudent.careerGwa:terms[0]?.gwa_live)]];
  document.getElementById('apSummary').innerHTML=values.map(([label,value])=>`<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('');
- document.getElementById('apWarning').textContent=demo?'Demo record. Preview only. A sample watermark will appear on the document.':unaccepted?'Unaccepted records are included. This is a preview, not an officially issued academic document.':'Print preview of the selected academic records. Follow the registrar’s issuance procedure for official release.';
+ document.getElementById('apWarning').textContent=Number(apStudent.level)>=11?'SHS source percentage grades. College GWA is not applicable. This is a record preview, not an official SHS certification.':demo?'Demo record. Preview only. A sample watermark will appear on the document.':unaccepted?'Unaccepted records are included. This is a preview, not an officially issued academic document.':'Print preview of the selected academic records. Follow the registrar’s issuance procedure for official release.';
  document.getElementById('apPrint').disabled=!subjects.length;
 }
 openPrintMenu=function(studentId){

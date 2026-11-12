@@ -238,7 +238,7 @@ var BCPPrint = (function () {
         return '<div class="letterhead"><div class="lh-top">' + img
             + '<div class="lh-lines">'
             + '<div class="lh-school">BESTLINK COLLEGE OF THE PHILIPPINES</div>'
-            + '<div class="lh-unit">College of Computer Studies</div>'
+            + '<div class="lh-unit">Office of the Registrar</div>'
             + '<div class="lh-address">1071 Brgy. Kaligayahan Quirino Highway, Novaliches, Quezon City</div>'
             + '</div></div>'
             + (o.title ? '<div class="lh-doc">' + esc(o.title) + '</div>' : '')
@@ -274,7 +274,8 @@ var BCPPrint = (function () {
     // The frame is sized and parked off-screen rather than set to
     // visibility:hidden or 0x0: the crest needs a real layout box to load
     // and resolve, and a collapsed iframe can print without it.
-    function printDocument(opts) {
+    function printDocument(opts, exportConfirmed) {
+        if (window.ExportSecurity && !exportConfirmed) return window.ExportSecurity.run({report:opts?.title || document.title,format:'print-pdf',resource:'client-print:'+location.pathname}, function(){ return printDocument(opts,true); });
         opts = opts || {};
         var frame = document.createElement('iframe');
         frame.setAttribute('aria-hidden', 'true');

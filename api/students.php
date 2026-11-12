@@ -17,6 +17,7 @@ require_once __DIR__ . '/../shared/normalize.php';
 // photograph from Digital File Storage, and checking it is really on this
 // server before handing the client a URL for it.
 require_once __DIR__ . '/../shared/stored_file.php';
+require_once __DIR__ . '/../shared/registrar_access.php';
 
 // Require login
 if (!isLoggedIn()) {
@@ -24,13 +25,40 @@ if (!isLoggedIn()) {
     exit;
 }
 // Admin + registrar only
-if (!in_array(getCurrentUserRole(), ['super_admin', 'staff'], true)) {
+$academicRead = registrarIsAcademicReader() && $_SERVER['REQUEST_METHOD']==='GET' && in_array($_GET['action']??'', ['academic','grades'], true);
+if (!in_array(getCurrentUserRole(), ['super_admin','registrar_admin','staff'], true) && !$academicRead) {
+    http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Forbidden.']);
     exit;
 }
 
 $method = $_SERVER['REQUEST_METHOD'];
 $id = isset($_GET['id']) ? intval($_GET['id']) : null;
+// Academic readers can only consume scoped term/grade records, never CRUD.
+if ($academicRead) {
+    if (($_GET['action']??'')==='grades') {
+        $owner=Database::getInstance()->fetchColumn('SELECT student_id FROM academic_history WHERE id=?',[(int)($_GET['record_id']??0)]);
+        registrarRequireStudent((int)$owner);
+    } else registrarRequireStudent((int)($_GET['student_id']??0));
+}
+// Check every explicit owner before a scoped staff request can read or mutate.
+if (!registrarHasAllPrograms() && !$academicRead) {
+    $payload=json_decode(file_get_contents('php://input'),true)?:[];
+    $action=$_GET['action']??'';
+    foreach (array_filter([(int)($_GET['student_id']??0),(int)($payload['student_id']??0),(int)($_GET['id']??0)]) as $studentId) registrarRequireStudent($studentId);
+    foreach ((array)($payload['ids']??[]) as $studentId) registrarRequireStudent((int)$studentId);
+    if (in_array($action,['delete-guardian','delete-emergency'],true)) {
+        $table=$action==='delete-guardian'?'guardians':'emergency_contacts';
+        $owner=Database::getInstance()->fetchColumn("SELECT student_id FROM $table WHERE id=?",[(int)($payload['id']??0)]);
+        registrarRequireStudent((int)$owner);
+    }
+    if ($action==='grades') {
+        $owner=Database::getInstance()->fetchColumn('SELECT student_id FROM academic_history WHERE id=?',[(int)($_GET['record_id']??0)]);
+        registrarRequireStudent((int)$owner);
+    }
+    if (isset($payload['course'])) registrarRequireProgram((string)$payload['course']);
+    if ($method==='POST'&&$action==='') registrarRequireProgram((string)($payload['course']??''));
+}
 
 try {
     $db = Database::getInstance();
@@ -240,7 +268,7 @@ try {
                 'doc_type'   => (string) $doc['doc_type'],
                 'label'      => storedDocTypeLabel((string) $doc['doc_type']),
                 'filename'   => (string) $doc['filename'],
-                'url'        => $url,
+                'url'        => $url !== '' ? '../api/file-download.php?id='.(int)$doc['id'] : '',
                 'on_disk'    => $url !== '',
                 'file_size'  => $doc['file_size'] !== null ? (int) $doc['file_size'] : null,
                 'file_type'  => (string) ($doc['file_type'] ?? ''),
@@ -300,9 +328,8 @@ try {
 
     // ─── GET ALL STUDENTS ──────────────────────────────────────
     if ($method === 'GET' && !$id) {
-        $students = $db->fetchAll(
-            "SELECT * FROM students ORDER BY created_at DESC"
-        );
+        $scope=registrarStudentScope();
+        $students = $db->fetchAll("SELECT s.* FROM students s WHERE {$scope['sql']} ORDER BY s.created_at DESC",$scope['params']);
         echo json_encode(['success' => true, 'data' => $students]);
         exit;
     }
@@ -614,18 +641,28 @@ try {
                 exit;
             }
 
-            $existing = $db->fetchOne("SELECT id FROM students WHERE id = ?", [$id]);
+            $editConnection=$db->getConnection();
+            $editConnection->beginTransaction();
+            $existing = $db->fetchOne("SELECT * FROM students WHERE id = ? FOR UPDATE", [$id]);
             if (!$existing) {
                 echo json_encode(['success' => false, 'message' => 'Student not found.']);
                 exit;
             }
         } catch (Exception $e) {
+            if(isset($editConnection)&&$editConnection->inTransaction())$editConnection->rollBack();
             echo json_encode(['success' => false, 'message' => 'Error loading student: ' . $e->getMessage()]);
             exit;
         }
 
         try {
             $data = [];
+            if(array_key_exists('change_reason',$input)&&trim((string)$input['change_reason'])==='')throw new InvalidArgumentException('Enter the reason for this change.');
+            if(strlen((string)($input['change_reason']??''))>1000)throw new InvalidArgumentException('Keep the change reason within 1,000 characters.');
+            foreach((array)($input['expected_values']??[]) as $field=>$value){
+                if(array_key_exists($field,$existing)&&(string)($existing[$field]??'')!==(string)($value??'')){
+                    http_response_code(409);throw new RuntimeException('This record changed while you were editing. Reopen it to review the latest values.');
+                }
+            }
             // 'section' is deliberately absent.
             //
             // Section is Class Scheduling's field (DEPARTMENTS.md, #297). This
@@ -654,6 +691,9 @@ try {
                         $value = null;
                     }
                     if ($field === 'year_level' && $value !== null && $value !== '') {
+                        if (!preg_match('/^(1|2|3|4|11|12)$/', (string)$value)) {
+                            throw new InvalidArgumentException('Select a valid college year or SHS grade level.');
+                        }
                         $value = (int)$value;
                     } elseif ($field === 'year_level' && $value === '') {
                         $value = null;
@@ -686,7 +726,7 @@ try {
                 }
             }
 
-            if (empty($data)) {
+            if (empty($data) && !array_key_exists('guardian_name',$input)) {
                 echo json_encode(['success' => false, 'message' => 'No data to update.']);
                 exit;
             }
@@ -702,13 +742,19 @@ try {
                     exit;
                 }
             }
-            $db->update('students', $data, 'id = ?', [$id]);
+            if (array_intersect(['course', 'major', 'year_level','semester'], array_keys($data))) {
+                require_once __DIR__.'/../shared/shs_catalog.php';
+                validateStudentAcademicPlacement(array_merge($existing, $data));
+            }
+            if($data)$db->update('students', $data, 'id = ?', [$id]);
             // Track status change in status_tracker
             if (array_key_exists('status', $data)) {
-                trackStatusChange($id, $data['status'], $input['status_reason'] ?? null);
+                trackStatusChange($id, $data['status'], $input['status_reason'] ?? $input['change_reason'] ?? null);
             }
             // Update guardian if provided
             $guardianName = trim($input['guardian_name'] ?? '');
+            if(array_key_exists('guardian_name',$input)&&$guardianName==='')throw new InvalidArgumentException('Enter the guardian name. Manage guardian removal from Contacts.');
+            if(!empty($input['guardian_email'])&&!isValidEmail(trim((string)$input['guardian_email'])))throw new InvalidArgumentException('Enter a valid guardian email address.');
             $gContact = trim((string) ($input['guardian_contact'] ?? ''));
             if ($gContact !== '') {
                 $gContact = normalizePhone($gContact);
@@ -722,7 +768,7 @@ try {
                     echo json_encode(['success' => false, 'message' => 'Guardian contact number is required and must be an 11-digit mobile number (e.g. 09171234567).']);
                     exit;
                 }
-                $existingGuardian = $db->fetchOne("SELECT id FROM guardians WHERE student_id = ?", [$id]);
+                $existingGuardian = $db->fetchOne("SELECT * FROM guardians WHERE student_id = ? ORDER BY is_primary DESC,id ASC LIMIT 1", [$id]);
                 $gData = [
                     'full_name' => $guardianName,
                     'relationship' => $input['guardian_relationship'] ?? 'guardian',
@@ -730,7 +776,8 @@ try {
                     'email' => $input['guardian_email'] ?? null
                 ];
                 if ($existingGuardian) {
-                    $db->update('guardians', $gData, 'student_id = ?', [$id]);
+                    $db->update('guardians', $gData, 'id = ? AND student_id = ?', [$existingGuardian['id'],$id]);
+                    logActivity(getCurrentUserId(),'guardian_updated',null,'guardians',$existingGuardian['id'],array_intersect_key($existingGuardian,$gData),$gData+['_change_reason'=>trim((string)($input['change_reason']??''))]);
                 } else {
                     $gData['student_id'] = $id;
                     $db->insert('guardians', $gData);
@@ -743,9 +790,12 @@ try {
             // student record is saved again. After enrollment the guardian
             // list is owned by the registrar (Contacts page + the
             // "Auto-fill from Enrollment" action).
+            logActivity(getCurrentUserId(),'student_updated',null,'students',$id,array_intersect_key($existing,$data),$data+['_change_reason'=>trim((string)($input['change_reason']??''))]);
+            if(isset($editConnection)&&$editConnection->inTransaction())$editConnection->commit();
             echo json_encode(['success' => true, 'message' => 'Student updated successfully.']);
             exit;
         } catch (Exception $e) {
+            if(isset($editConnection)&&$editConnection->inTransaction())$editConnection->rollBack();
             echo json_encode(['success' => false, 'message' => 'Error updating student: ' . $e->getMessage()]);
             exit;
         }

@@ -70,7 +70,7 @@ try {
         // A student may only create payments against their own record.
         if ($role === 'student') {
             $studentId = getCurrentStudentId();
-        } elseif (!in_array($role, ['super_admin', 'staff'], true)) {
+        } elseif (!in_array($role, ['super_admin', 'registrar_admin', 'staff'], true)) {
             echo json_encode(['success' => false, 'message' => 'Forbidden.']);
             exit;
         }
@@ -96,7 +96,7 @@ try {
                 echo json_encode(['success' => false, 'message' => 'Document request not found.']);
                 exit;
             }
-            if ((int) $req['student_id'] !== $studentId && !in_array($role, ['super_admin', 'staff'], true)) {
+            if ((int) $req['student_id'] !== $studentId && !in_array($role, ['super_admin', 'registrar_admin', 'staff'], true)) {
                 echo json_encode(['success' => false, 'message' => 'Forbidden.']);
                 exit;
             }

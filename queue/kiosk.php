@@ -28,6 +28,8 @@ $api_base = rtrim(app_url('/api'), '/') . '/';
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="<?= $APP_ROOT ?>css/queue.css" />
+    <link rel="stylesheet" href="<?= $APP_ROOT ?>css/queue-rfid-art.css?v=<?= filemtime(__DIR__ . '/../css/queue-rfid-art.css') ?>" />
+    <link rel="stylesheet" href="<?= $APP_ROOT ?>css/queue-kiosk-tech.css?v=<?= filemtime(__DIR__ . '/../css/queue-kiosk-tech.css') ?>" />
 </head>
 <body class="queue-body" data-page="kiosk" data-api-base="<?= htmlspecialchars($api_base, ENT_QUOTES) ?>">
 <div class="queue-screen">
@@ -35,27 +37,24 @@ $api_base = rtrim(app_url('/api'), '/') . '/';
     <div class="queue-brand">
         <img src="<?= $APP_ROOT ?>assets/images/BCP_LOGO.png" alt="BCP Logo" />
         <div>
-            <h1>BCP Registrar — Queue Kiosk</h1>
-            <p>Tap your student card to join the line</p>
+            <h1>Bestlink College of the Philippines</h1>
+            <p>Office of the Registrar · Queue kiosk</p>
         </div>
     </div>
 
-    <div class="q-tabs">
-        <button class="q-tab-btn" data-tab="tap"><i class="fas fa-credit-card"></i> Tap Card</button>
+    <div class="kt-clock"><span id="ktConnection">Connecting to queue…</span><time id="ktTime"></time></div>
+    <div class="q-tabs" hidden aria-hidden="true">
+        <button class="q-tab-btn" data-tab="tap"><i class="fas fa-id-card"></i> Tap Card</button>
         <button class="q-tab-btn" data-tab="board"><i class="fas fa-list-ol"></i> Full Queue</button>
         <button class="q-tab-btn" data-tab="standing"><i class="fas fa-magnifying-glass"></i> Check my number</button>
     </div>
 
-    <!-- TAP screen -->
-    <div id="screen-tap">
-        <div class="tap-card">
-            <div class="tap-icon"><i class="fas fa-credit-card"></i></div>
-            <h2>Tap your student card</h2>
-            <p>Hold your card on the reader to get a queue number.</p>
-            <div class="hint">Your name will appear next to your number on the board.</div>
-        </div>
-    </div>
-
+    <section id="screen-tap" aria-label="Tap your student ID card">
+      <div class="kt-ready kt-frame"><div class="kt-main"><span class="kt-open-badge"><i class="fas fa-circle-check" aria-hidden="true"></i> Queue open</span><div class="kt-eyebrow">SELF-SERVICE QUEUE</div><h2>Your next step starts here.</h2><p>Tap your student ID card on the reader to get a queue number.</p>
+      <div class="kt-reader-art" aria-hidden="true"><div class="assign-rfid-art kt-rfid-float" aria-label="Campus RFID card illustration"><div class="assign-art-brand"><img src="../assets/images/BCP_LOGO.png" alt="Bestlink College crest"><div><strong>Bestlink College</strong><small>CAMPUS ACCESS</small></div></div><svg class="assign-coil" viewBox="0 0 120 120" fill="none" aria-hidden="true"><g stroke="#18e7ff" stroke-width="1.6" stroke-linecap="round"><path d="M49 109a50 50 0 1 1 22 0M50 101a42 42 0 1 1 20 0M51 93a34 34 0 1 1 18 0M52 85a26 26 0 1 1 16 0"/></g><g fill="#83f0ff"><circle cx="49" cy="109" r="2.2"/><circle cx="71" cy="109" r="2.2"/><circle cx="50" cy="101" r="2"/><circle cx="70" cy="101" r="2"/><circle cx="51" cy="93" r="1.8"/><circle cx="69" cy="93" r="1.8"/><circle cx="52" cy="85" r="1.7"/><circle cx="68" cy="85" r="1.7"/></g></svg><div class="assign-art-bottom"><div><small>CARD UID</small><strong>— — — — —</strong></div><span>RFID</span></div></div><div class="kt-reader-ring"><span></span><span></span><span></span><i class="fas fa-wifi"></i></div></div>
+      <h3>Tap your student ID card</h3><p class="kt-help">Keep your card near the reader until confirmed.</p><div class="kt-ready-state"><span></span>Ready to scan</div></div>
+      <aside class="kt-guide"><h2>Before you join</h2><ol><li><b>1</b><span>Tap your card</span></li><li><b>2</b><span>Choose your service</span></li><li><b>3</b><span>Keep your queue number</span></li></ol><p><i class="fas fa-shield-halved" aria-hidden="true"></i> Your queue number will appear on screen.</p></aside></div>
+    </section>
     <!-- LANE PICKER — shown after the card is read.
          Two questions, one at a time. The first is WHAT you came for;
          the second is WHO you are. Keeping them on separate screens
@@ -107,7 +106,7 @@ $api_base = rtrim(app_url('/api'), '/') . '/';
     </div>
 
     <!-- RESULT screen -->
-    <div id="screen-result" style="display:none;">
+    <div id="screen-result" style="display:none;" aria-live="polite">
         <div class="result-card" id="resultCard">
             <div class="result-icon success" id="rIcon" style="display:none;"><i class="fas fa-circle-check"></i></div>
             <div class="ticket-number" id="rNumber" style="display:none;"></div>
@@ -138,11 +137,13 @@ $api_base = rtrim(app_url('/api'), '/') . '/';
         </div>
     </div>
 
+
 </div>
 
 <!-- Hidden RFID capture input: reader types the UID and presses Enter -->
-<input type="text" id="cardInput" class="q-hidden-input" autocomplete="off" />
+<input type="text" aria-label="RFID card reader" id="cardInput" class="q-hidden-input" autocomplete="off" />
 
+<script src="<?= $APP_ROOT ?>js/queue-kiosk-tech.js?v=<?= filemtime(__DIR__ . '/../js/queue-kiosk-tech.js') ?>"></script>
 <script src="<?= $APP_ROOT ?>js/queue.js?v=<?= filemtime(__DIR__ . '/../js/queue.js') ?>"></script>
 </body>
 </html>

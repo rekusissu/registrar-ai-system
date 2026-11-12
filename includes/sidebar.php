@@ -32,10 +32,10 @@ if ($USER_ROLE === 'student') {
             <a href="<?= $APP_ROOT ?>dashboard.php" title="Go to Dashboard" class="sidebar-logo-link">
                 <img src="<?= $APP_ROOT ?>assets/images/BCP_LOGO.png" alt="BCP Logo" class="sidebar-logo-img"/>
             </a>
-            <span class="sidebar-notif" id="bellBtn" title="Notifications">
+            <button type="button" class="sidebar-notif" id="bellBtn" title="Notifications" aria-label="Notifications" aria-haspopup="dialog" aria-expanded="false" aria-controls="notifModal">
                 <i class="fa-solid fa-bell"></i>
-                <span class="sidebar-notif-badge" id="bellBadge">0</span>
-            </span>
+                <span class="sidebar-notif-badge" id="bellBadge" aria-hidden="true" style="display:none">0</span>
+            </button>
         </div>
         <button class="sidebar-collapse-btn" id="sidebarCollapse" title="Collapse Sidebar">
             <i class="fa-solid fa-angles-left"></i>
@@ -144,7 +144,7 @@ if ($USER_ROLE === 'student') {
 
         <!-- GROUP 2 — Registrar / Academic -->
         <?php
-        $isStaffOrSuper   = in_array($USER_ROLE, ['super_admin', 'staff'], true);
+        $isStaffOrSuper   = in_array($USER_ROLE, ['super_admin', 'registrar_admin', 'staff'], true);
         $isAcadOrDeptHead = in_array($USER_ROLE, ['acad_officer', 'department_head'], true);
         $isAnyStaff       = $isStaffOrSuper || $isAcadOrDeptHead;
         $isSuperAdmin     = $USER_ROLE === 'super_admin';
@@ -197,6 +197,10 @@ if ($USER_ROLE === 'student') {
         </a>
         <?php endif; ?>
 
+        <?php if ($isAcadOrDeptHead): ?>
+        <a href="<?= $APP_ROOT ?>registrar/academic-dashboard.php?view=students" class="sidebar-item <?= $ACTIVE_NAV === 'students' ? 'active' : '' ?>"><i class="fa-solid fa-user-graduate"></i><span class="sidebar-text">Students</span></a>
+        <a href="<?= $APP_ROOT ?>registrar/academic-dashboard.php?view=masterlist" class="sidebar-item <?= $ACTIVE_NAV === 'masterlist' ? 'active' : '' ?>"><i class="fa-solid fa-table-list"></i><span class="sidebar-text">Masterlist</span></a>
+        <?php endif; ?>
         <?php if ($isAnyStaff): ?>
         <a href="<?= $APP_ROOT ?>registrar/status-tracker.php" class="sidebar-item <?= $ACTIVE_NAV === 'tracker' ? 'active' : '' ?>">
             <i class="fa-solid fa-arrows-rotate"></i>
@@ -218,9 +222,9 @@ if ($USER_ROLE === 'student') {
             <div class="brand-title">AI Tools</div>
         </div>
 
-        <a href="<?= $APP_ROOT ?>ai/insights.php" class="sidebar-item <?= $ACTIVE_NAV === 'insights' ? 'active' : '' ?>">
+        <a href="<?= $APP_ROOT ?><?= $isAcadOrDeptHead ? 'registrar/academic-dashboard.php?view=analytics' : 'ai/insights.php' ?>" class="sidebar-item <?= $ACTIVE_NAV === 'insights' ? 'active' : '' ?>">
             <i class="fa-solid fa-chart-line"></i>
-            <span class="sidebar-text">Intelligent Analytics and Reports</span>
+            <span class="sidebar-text"><?= $isAcadOrDeptHead ? 'Academic Reports' : 'Intelligent Analytics and Reports' ?></span>
         </a>
         <?php endif; ?>
 
@@ -231,12 +235,22 @@ if ($USER_ROLE === 'student') {
             <div class="brand-title">Account</div>
         </div>
 
+        <?php if (in_array($USER_ROLE, ['super_admin','registrar_admin','staff','acad_officer','department_head'], true)): ?>
+        <a href="<?= $APP_ROOT ?>registrar/export-history.php" class="sidebar-item <?= $ACTIVE_NAV === 'export-history' ? 'active' : '' ?>"><i class="fa-solid fa-file-shield"></i><span class="sidebar-text">Export History</span></a>
+        <?php endif; ?>
         <a href="<?= $APP_ROOT ?>settings.php" class="sidebar-item <?= $ACTIVE_NAV === 'settings' ? 'active' : '' ?>">
             <i class="fa-solid fa-gear"></i>
             <span class="sidebar-text">Account Settings</span>
         </a>
         <?php endif; ?>
 
+        <?php if (in_array($USER_ROLE, ['super_admin','registrar_admin'], true)): ?>
+        <a href="<?= $APP_ROOT ?>registrar/program-assignments.php" class="sidebar-item"><i class="fa-solid fa-user-check"></i><span class="sidebar-text">Program Assignments</span></a>
+        <?php if ($USER_ROLE === 'registrar_admin'): ?>
+        <a href="<?= $APP_ROOT ?>registrar/audit-logs.php" class="sidebar-item"><i class="fa-solid fa-file-shield"></i><span class="sidebar-text">Registrar Activity</span></a>
+        <a href="<?= $APP_ROOT ?>registrar/users.php" class="sidebar-item"><i class="fa-solid fa-user-gear"></i><span class="sidebar-text">Staff Accounts</span></a>
+        <?php endif; ?>
+        <?php endif; ?>
         <?php if ($isSuperAdmin): ?>
         <div class="sidebar-divider"></div>
 
@@ -289,24 +303,16 @@ if ($USER_ROLE === 'student') {
     </div>
 </div>
 
-<!-- Notification Modal -->
-<div class="logout-modal-overlay" id="notifModal">
-    <div class="logout-modal" style="max-width: 460px;">
-        <div class="logout-modal-icon" style="background: #dbeafe;">
-            <i class="fa-solid fa-bell" style="color: #2563eb;"></i>
-        </div>
-        <h3 class="logout-modal-title">Notifications</h3>
-        <div id="notifList" style="text-align: left; max-height: 320px; overflow-y: auto; margin-bottom: 16px;">
-            <p style="color: #64748b; font-size: 14px; text-align: center;">No notifications yet.</p>
-        </div>
-        <div class="logout-modal-actions">
-            <button type="button" class="logout-btn-cancel" id="notifClose">Close</button>
-            <button type="button" class="logout-btn-confirm" id="notifMarkRead" style="background: #2563eb;">
-                <i class="fa-solid fa-check"></i> Mark All as Read
-            </button>
-        </div>
-    </div>
-</div>
+<link rel="stylesheet" href="<?= $APP_ROOT ?>css/notifications.css?v=<?= filemtime(__DIR__.'/../css/notifications.css') ?>">
+<div id="notifModal" class="notification-overlay" hidden>
+<section class="notification-panel" role="dialog" aria-modal="true" aria-labelledby="notifHeading" tabindex="-1">
+<header class="notification-header"><div><span class="notification-eyebrow">ACTIVITY CENTER</span><h2 id="notifHeading">Notifications <span id="notifCount">0</span></h2></div><button type="button" id="notifClose" aria-label="Close notifications">&#215;</button></header>
+<p class="notification-description">Your records, requests, and account activity.</p>
+<nav class="notification-toolbar" aria-label="Notification filters"><div><button type="button" data-notif-filter="all" aria-pressed="true">All</button><button type="button" data-notif-filter="unread" aria-pressed="false">Unread</button></div><button type="button" id="notifRefresh" aria-label="Refresh notifications"><i class="fa-solid fa-rotate" aria-hidden="true"></i></button></nav>
+<p id="notifStatus" role="status"></p><div id="notifList" aria-label="Recent notifications"></div>
+<footer class="notification-footer"><span>Showing latest 50 updates</span><button type="button" id="notifMarkRead">Mark all as read</button></footer>
+</section></div>
+<script src="<?= $APP_ROOT ?>js/notifications.js?v=<?= filemtime(__DIR__.'/../js/notifications.js') ?>" defer data-feed="<?= $APP_ROOT ?>api/<?= $USER_ROLE === 'student' ? 'student-notifications.php' : 'notifications.php' ?>"></script>
 
 <!-- Styles -->
 <style>
@@ -429,159 +435,3 @@ if ($USER_ROLE === 'student') {
 </style>
 
 <!-- Logout modal wiring moved to js/logout.js -->
-<!-- Notification Modal JavaScript -->
-<script>
-(function() {
-    'use strict';
-
-    var bellBtn = document.getElementById('bellBtn');
-    var notifModal = document.getElementById('notifModal');
-    var notifClose = document.getElementById('notifClose');
-    var notifMarkRead = document.getElementById('notifMarkRead');
-    var notifList = document.getElementById('notifList');
-    var bellBadge = document.getElementById('bellBadge');
-
-    var notifications = [];
-
-    var USER_ROLE = '<?= $USER_ROLE ?>';
-
-    // Resolved from the page's own $APP_ROOT. These endpoints used to be
-    // hardcoded as '../api/...', which is only correct one directory deep:
-    // root pages (dashboard.php, settings.php) sit at $APP_ROOT = './', so
-    // the relative path climbed above the web root and 404'd — the bell was
-    // silently dead there because failures are swallowed below.
-    var API_ROOT = '<?= $APP_ROOT ?>api/';
-    var FEED_URL = USER_ROLE === 'student'
-        ? API_ROOT + 'student-notifications.php'
-        : API_ROOT + 'notifications.php';
-
-    // Notification text is authored by staff and can contain markup.
-    // Escaped before it reaches innerHTML.
-    function esc(str) {
-        return String(str == null ? '' : str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-
-    // Read the CSRF token from the page and send it on the POST directly.
-    // This used to rely entirely on js/csrf.js monkey-patching window.fetch
-    // to attach the header, which silently depends on that script having
-    // loaded and patched first. If it had not, the POST went out without a
-    // token, the server rejected it with 419, and "mark all as read" did
-    // nothing. Reading the token here makes the call self-sufficient.
-    var CSRF_TOKEN = (function() {
-        var meta = document.querySelector('meta[name=csrf-token]');
-        return meta ? meta.getAttribute('content') || '' : '';
-    })();
-
-    function loadNotifications() {
-        fetch(FEED_URL)
-            .then(function(r) { return r.json(); })
-            .then(function(d) {
-                if (d.success && d.data) {
-                    notifications = d.data;
-                    renderNotifications();
-                    if (typeof d.unread !== 'undefined') {
-                        bellBadge.textContent = d.unread;
-                        bellBadge.style.display = d.unread > 0 ? 'flex' : 'none';
-                    }
-                }
-            })
-            .catch(function() {});
-    }
-
-    function renderNotifications() {
-        if (!notifList) return;
-        var unreadCount = 0;
-        if (!notifications.length) {
-            notifList.innerHTML = '<p style="color:#64748b;font-size:14px;text-align:center;">No notifications yet.</p>';
-            if (bellBadge) { bellBadge.textContent = '0'; bellBadge.style.display = 'none'; }
-            return;
-        }
-        var html = '';
-        notifications.forEach(function(n) {
-            if (n.unread) unreadCount++;
-            html += '<div class="notif-item ' + (n.unread ? 'unread' : '') + '" data-notif-id="' + esc(n.id) + '">' +
-                '<div class="notif-icon"><i class="fas ' + esc(n.icon || 'fa-circle-info') + '"></i></div>' +
-                '<div class="notif-content">' +
-                    '<div class="notif-title">' + esc(n.title) + '</div>' +
-                    '<div class="notif-message">' + esc(n.message) + '</div>' +
-                    '<div class="notif-time">' + esc(n.time) + '</div>' +
-                '</div>' +
-            '</div>';
-        });
-        notifList.innerHTML = html;
-        if (bellBadge) {
-            bellBadge.textContent = unreadCount;
-            bellBadge.style.display = unreadCount > 0 ? 'flex' : 'none';
-        }
-    }
-
-    function openNotifModal(e) {
-        if (e) { e.preventDefault(); e.stopPropagation(); }
-        if (notifModal) { notifModal.classList.add('active'); document.body.style.overflow = 'hidden'; }
-    }
-
-    function closeNotifModal() {
-        if (notifModal) { notifModal.classList.remove('active'); document.body.style.overflow = ''; }
-    }
-
-    function markAllRead() {
-        // The response body decides the outcome, not the promise resolving.
-        // fetch() only rejects on a network failure — an HTTP 419 (CSRF) or
-        // 500 still resolves. Clearing the badge on resolution alone made
-        // "mark all as read" look like it worked while the server had
-        // changed nothing, so the count came straight back on the next page.
-        if (notifMarkRead) {
-            notifMarkRead.disabled = true;
-            notifMarkRead.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving';
-        }
-
-        fetch(FEED_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'X-CSRF-Token': CSRF_TOKEN
-            },
-            body: 'action=read_all'
-        }).then(function(r) {
-            return r.json().catch(function() { return { success: false }; });
-        }).then(function(d) {
-            if (!d || d.success !== true) {
-                throw new Error((d && d.message) || 'Could not mark notifications as read.');
-            }
-            notifications.forEach(function(n) { n.unread = false; });
-            renderNotifications();
-            closeNotifModal();
-        }).catch(function(err) {
-            // Leave the list untouched so the true state stays on screen,
-            // and say why rather than closing as if it had worked.
-            if (notifList) {
-                var alreadyUnread = notifications.filter(function(n) { return n.unread; }).length;
-                notifList.innerHTML = '<p style="color:#dc2626;font-size:14px;text-align:center;">'
-                    + esc(err && err.message ? err.message : 'Could not mark notifications as read.')
-                    + (alreadyUnread ? '<br><span style="color:#64748b;">' + alreadyUnread + ' notification' + (alreadyUnread === 1 ? '' : 's') + ' still unread.</span>' : '')
-                    + '</p>';
-            }
-        }).finally(function() {
-            if (notifMarkRead) {
-                notifMarkRead.disabled = false;
-                notifMarkRead.innerHTML = '<i class="fa-solid fa-check"></i> Mark All as Read';
-            }
-        });
-    }
-
-    if (bellBtn) bellBtn.addEventListener('click', openNotifModal);
-    if (notifClose) notifClose.addEventListener('click', closeNotifModal);
-    if (notifMarkRead) notifMarkRead.addEventListener('click', markAllRead);
-    if (notifModal) notifModal.addEventListener('click', function(e) { if (e.target === this) closeNotifModal(); });
-    document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && notifModal && notifModal.classList.contains('active')) closeNotifModal();
-    });
-
-    loadNotifications();
-})();
-</script>

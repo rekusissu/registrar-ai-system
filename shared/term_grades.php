@@ -235,6 +235,7 @@ function termRatingValid($rating): bool
  */
 function termGwa(array $subjects): ?float
 {
+    foreach($subjects as $subject)if(($subject['grading_scale']??'college')==='shs')return null;
     $weighted = 0.0;
     $units    = 0.0;
     foreach ($subjects as $s) {
@@ -259,6 +260,7 @@ function careerGwa(array $terms): ?float
     $units    = 0.0;
     foreach ($terms as $t) {
         foreach (($t['subjects'] ?? []) as $s) {
+            if(($s['grading_scale']??'college')==='shs')return null;
             $rating = $s['final_rating'] ?? null;
             $u      = (float) ($s['units'] ?? 0);
             if (!termRatingValid($rating) || $u <= 0) {
@@ -437,6 +439,8 @@ function termAudit(string $sy, string $sem, array $students, array $opts = []): 
         $num      = trim((string) ($st['number'] ?? ''));
         $who      = $num !== '' ? "$name ($num)" : $name;
         $subjects = $st['subjects'] ?? [];
+        $shs=(int)($st['year_level']??$st['level']??0)>=11;
+        foreach($subjects as &$subject){if($shs)$subject['grading_scale']='shs';if(($subject['grading_scale']??'')==='shs')$shs=true;}unset($subject);
 
         if (!$subjects) {
             // No subjects at all is a different fault from a subject with
@@ -476,7 +480,7 @@ function termAudit(string $sy, string $sem, array $students, array $opts = []): 
                 }
                 continue;
             }
-            if (!termRatingValid($rating)) {
+            if ($shs?(!is_numeric($rating)||(float)$rating<0||(float)$rating>100):!termRatingValid($rating)) {
                 $badScale[] = "$label ($rating)";
             }
             if ($status === 'failed' || $status === 'dropped') {
@@ -495,7 +499,7 @@ function termAudit(string $sy, string $sem, array $students, array $opts = []): 
         }
         if ($badScale) {
             $blocking[] = [
-                'code' => 'rating_out_of_scale', 'title' => 'Rating outside 1.00-5.00',
+                'code' => 'rating_out_of_scale', 'title' => $shs?'Rating outside 0–100 SHS scale':'Rating outside 1.00-5.00',
                 'detail' => $who . ' — ' . implode(', ', $badScale),
                 'action' => 'Correct the entry. A value outside the scale cannot be averaged.',
             ];

@@ -15,6 +15,8 @@ if (empty($_SESSION['user_id'])) {
     exit('Unauthorized.');
 }
 
+require_once __DIR__ . '/../shared/report_export_security.php';
+requireReportExport();
 require_once __DIR__ . '/../shared/student_template.php';
 
 header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');

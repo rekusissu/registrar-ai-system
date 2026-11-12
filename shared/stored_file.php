@@ -281,9 +281,9 @@ function studentPhotoUrl($student, string $appRoot = '../'): string
         return '';
     };
 
-    foreach ([$get('photo'), $get('photo_path')] as $candidate) {
+    foreach ([$get('photo_path'), $get('photo')] as $candidate) {
         $url = storedFileUrl($candidate, $appRoot);
-        if ($url !== '') return $url;
+        if ($url !== '') return (int)$get('id')>0 ? rtrim($appRoot,'/').'/api/student-photo.php?student_id='.(int)$get('id') : $url;
     }
     return '';
 }

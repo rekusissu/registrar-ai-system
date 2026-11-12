@@ -64,7 +64,7 @@ if (!is_array($input)) {
 // silently default to "open to everyone". Only registrar/ pages call
 // this endpoint (registrar/students.php, registrar/status-tracker.php),
 // so staff-tier roles are the right boundary.
-$AI_TOOLS_ROLES = ['super_admin', 'staff', 'acad_officer'];
+$AI_TOOLS_ROLES = ['super_admin', 'registrar_admin', 'staff', 'acad_officer'];
 
 if (!in_array(getCurrentUserRole(), $AI_TOOLS_ROLES, true)) {
     error_log('[ai-tools] denied action=' . ($action ?: '(none)')
@@ -122,6 +122,21 @@ switch ($action) {
             'generated_at' => date('c'),
         ]]);
         exit;
+
+    // Student-level authorization precedes this deliberately narrow audit
+    // read. The ordinary scoped notification feed only shows one's own events.
+    case 'quality_history':
+        require_once __DIR__.'/../shared/registrar_access.php';
+        $studentId=(int)($input['student_id']??0);
+        registrarRequireStudent($studentId);
+        $stmt=$db->getConnection()->prepare("SELECT a.action,a.old_values,a.new_values,a.created_at,u.full_name AS author FROM audit_logs a LEFT JOIN users u ON u.id=a.user_id WHERE a.table_name='students' AND a.record_id=? ORDER BY a.id DESC LIMIT 50");
+        $stmt->execute([$studentId]);$history=[];
+        $allowedFields=array_flip(['student_number','first_name','middle_name','last_name','gender','birth_date','nationality','address','contact_number','email','course','major','year_level','school_year','semester','status']);
+        foreach($stmt->fetchAll(PDO::FETCH_ASSOC) as $entry){
+            $before=json_decode((string)$entry['old_values'],true);$after=json_decode((string)$entry['new_values'],true);
+            $history[]=['action'=>$entry['action'],'created_at'=>$entry['created_at'],'author'=>$entry['author']?:'Staff account','before'=>is_array($before)?array_intersect_key($before,$allowedFields):(object)[],'after'=>is_array($after)?array_intersect_key($after,$allowedFields):(object)[]];
+        }
+        echo json_encode(['success'=>true,'data'=>['history'=>$history]],JSON_INVALID_UTF8_SUBSTITUTE);exit;
 
     // ─── AI EXPLANATION OF ONE STUDENT'S DETECTED ISSUES ─────────
     case 'quality_summary':
@@ -336,7 +351,7 @@ switch ($action) {
         $ids  = array_map('intval', $ids);
         $ph   = implode(',', array_fill(0, count($ids), '?'));
         $rows = $db->fetchAll(
-            "SELECT s.id, s.first_name, s.last_name, s.status
+            "SELECT s.id, s.first_name, s.last_name, s.status, s.year_level
              FROM students s WHERE s.id IN ($ph)",
             $ids
         );
@@ -390,7 +405,7 @@ switch ($action) {
             }
             $last = $h[0]['created_at'] ?? null;
             $days = $last ? (int) floor((time() - strtotime($last)) / 86400) : 999;
-            $gwa  = $gwaBy[$sid] ?? null;
+            $gwa  = (int)($s['year_level']??0)>=11?null:($gwaBy[$sid]??null);
 
             $r = 'low'; $reason = 'Stable, no red flags.';
             if (in_array($st, ['at-risk', 'probation'], true)) {

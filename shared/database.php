@@ -7,6 +7,7 @@ if (defined('DATABASE_LOADED')) {
 define('DATABASE_LOADED', true);
 
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/program_data_scope.php';
 
 class Database {
     private static $instance = null;
@@ -16,7 +17,7 @@ class Database {
         try {
             $dsn = "mysql:host=" . DB_HOST . ";port=" . DB_PORT
                  . ";dbname=" . DB_NAME . ";charset=" . DB_CHARSET;
-            
+
             $this->connection = new PDO($dsn, DB_USER, DB_PASSWORD, [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
@@ -44,6 +45,7 @@ class Database {
     }
 
     public function query($sql, $params = []) {
+        $sql = ProgramDataScope::rewrite($this->connection, $sql, $params);
         $stmt = $this->connection->prepare($sql);
         $stmt->execute($params);
         return $stmt;

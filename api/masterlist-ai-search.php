@@ -19,7 +19,7 @@ if (empty($_SESSION['user_id'])) {
     exit;
 }
 $role = getCurrentUserRole();
-if ($role !== 'super_admin' && $role !== 'staff') {
+if (!in_array($role,['super_admin','registrar_admin','staff'],true)) {
     http_response_code(403);
     header('Content-Type: application/json');
     echo json_encode(['success' => false, 'message' => 'Forbidden.']);

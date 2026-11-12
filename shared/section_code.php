@@ -20,8 +20,8 @@ define('SECTION_CODE_LOADED', true);
  */
 function semesterDigit(?string $semester): int {
     $semester = strtolower(trim((string) $semester));
-    if ($semester === '2nd') return 2;
-    if ($semester === 'summer') return 3;
+    if (in_array($semester,['2nd','t2','term 2'],true)) return 2;
+    if (in_array($semester,['summer','t3','term 3'],true)) return 3;
     return 1; // '' or '1st'
 }
 
@@ -36,10 +36,11 @@ function semesterDigit(?string $semester): int {
  * @throws InvalidArgumentException if the year level is outside 1-9.
  */
 function sectionCodeFromParts(int $year, ?string $semester, int $sectionNumber): string {
-    if ($year < 1 || $year > 9) {
+    if (($year < 1 || $year > 9) && !in_array($year,[11,12],true)) {
         throw new InvalidArgumentException('Year level is required to build a section code (got ' . $year . ').');
     }
     $semDigit = semesterDigit($semester);
-    $num = max(1, min(999, $sectionNumber));
+    if($sectionNumber>999)throw new InvalidArgumentException('All 999 section numbers for this cohort are in use.');
+    $num = max(1, $sectionNumber);
     return $year . $semDigit . str_pad((string) $num, 3, '0', STR_PAD_LEFT);
 }

@@ -1,0 +1,22 @@
+<?php
+require_once __DIR__.'/../shared/academic_analytics.php';
+require_once __DIR__.'/../shared/term_grades.php';
+$checks=0;
+$check=function($ok,$message)use(&$checks){if(!$ok)throw new RuntimeException($message);$checks++;};
+$stats=['received'=>1,'pending'=>1,'incomplete'=>1,'needs_correction'=>1,'reviewed'=>0];
+$report=academicAnalytics(['stats'=>$stats,'students'=>[['missing_grades'=>2,'subject_count'=>4,'record_count'=>2],['missing_grades'=>0,'subject_count'=>0,'record_count'=>0]]]);
+$check($report['received_percent']===50.0,'Coverage percentage incorrect');
+$check($report['counts']['missing_grades']===2&&$report['counts']['duplicate_terms']===1,'Issue counts incorrect');
+$check(count($report['recommendations'])===4,'Missing actionable recommendations');
+$empty=academicAnalytics(['stats'=>array_fill_keys(array_keys($stats),0),'students'=>[]]);
+$check($empty['received_percent']===0,'Empty roster percentage incorrect');
+$subjects=[['subject'=>'Communication','units'=>3,'final_rating'=>90,'grading_scale'=>'shs','grade_status'=>'passed']];
+$check(termGwa($subjects)===null,'SHS was included in college term GWA');
+$check(careerGwa([['subjects'=>$subjects]])===null,'SHS was included in college career GWA');
+$audit=termAudit('2026-2027','1st',[['name'=>'QA','year_level'=>11,'subjects'=>$subjects,'gwa'=>90]]);
+$check(!$audit['blocking'],'Valid SHS percentage blocked by college scale');
+$subjects[0]['final_rating']=101;
+$audit=termAudit('2026-2027','1st',[['name'=>'QA','year_level'=>11,'subjects'=>$subjects]]);
+$check(in_array('rating_out_of_scale',array_column($audit['blocking'],'code'),true),'Invalid SHS percentage accepted');
+$check(termGwa([['units'=>3,'final_rating'=>1.5]])===1.5,'College GWA changed');
+echo "PASS $checks analytics and SHS grading checks\n";

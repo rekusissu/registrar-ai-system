@@ -41,7 +41,9 @@ require_once __DIR__ . '/../shared/security_headers.php';
 require_once __DIR__ . '/../shared/session_config.php';
 require_once __DIR__ . '/../shared/database.php';
 require_once __DIR__ . '/../shared/functions.php';
+require_once __DIR__ . '/../shared/report_export_security.php';
 require_once __DIR__ . '/../shared/stored_file.php';
+require_once __DIR__ . '/../shared/schema.php';
 
 function jsonFail(int $status, string $message): void
 {
@@ -57,7 +59,7 @@ if (!isLoggedIn()) {
 }
 
 $role    = (string) getCurrentUserRole();
-$isStaff = in_array($role, ['super_admin', 'staff'], true);
+$isStaff = in_array($role, ['super_admin','registrar_admin','staff'], true);
 
 // ── 1b. Payment receipts ──────────────────────────────────────
 //
@@ -92,6 +94,7 @@ $kind = (string) ($_GET['kind'] ?? '');
 // database rather than supplied, for the same CWE-639 reason the
 // documents branch below has.
 if ($kind === 'attachment') {
+    if(!db_table_exists('document_request_attachments'))jsonFail(404,'That file is not available.');
     if (!($isStaff || $role === 'student')) {
         jsonFail(403, 'Forbidden.');
     }
@@ -244,6 +247,7 @@ if (strlen($downloadName) > 120) {
 // Neutral type + nosniff + attachment. Never serve a stored file inline:
 // a .txt or .svg returned as its own MIME type in this origin is stored
 // XSS, which is why Content-Type is not taken from the file.
+requireReportExport();
 header('Content-Type: application/octet-stream');
 header('Content-Disposition: attachment; filename="' . $downloadName . '"');
 header("Content-Disposition: attachment; filename*=UTF-8''" . rawurlencode($downloadName));

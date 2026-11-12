@@ -23,6 +23,7 @@ require_once __DIR__ . '/../shared/csrf_guard.php';
 require_once __DIR__ . '/../shared/functions.php';
 
 if (!isLoggedIn()) {
+    http_response_code(401);
     echo json_encode(['success' => false, 'message' => 'Unauthorized.']);
     exit;
 }
@@ -31,12 +32,15 @@ if (!isLoggedIn()) {
 // endpoint (student-notifications.php); letting them reach this one
 // would expose every user's activity to the whole school portal.
 if (getCurrentUserRole() === 'student') {
+    http_response_code(403);
     echo json_encode(['success' => false, 'message' => 'Forbidden.']);
     exit;
 }
 
 $db     = Database::getInstance();
 $userId = (int) getCurrentUserId();
+// Audit activity is private except for administrators responsible for oversight.
+$feedWhere = in_array(getCurrentUserRole(), ['super_admin','registrar_admin'], true) ? '1=1' : 'user_id = ' . $userId;
 
 /** Highest audit_logs.id this user has already acknowledged. */
 function readCursor($db, int $userId): int {
@@ -126,7 +130,12 @@ try {
                 $db->query("ALTER TABLE `staff_notification_reads` DROP FOREIGN KEY `fk_snr_user`");
             }
 
-            $maxId = (int) $db->fetchColumn("SELECT COALESCE(MAX(id), 0) FROM audit_logs");
+            $maxId = (int) $db->fetchColumn("SELECT COALESCE(MAX(id), 0) FROM audit_logs WHERE {$feedWhere}");
+            if (isset($_POST['through_id'])) {
+                $through = filter_var($_POST['through_id'], FILTER_VALIDATE_INT, ['options'=>['min_range'=>0]]);
+                if ($through === false) { http_response_code(422); echo json_encode(['success'=>false,'message'=>'Invalid notification boundary.']); exit; }
+                $maxId = min($maxId, $through);
+            }
             $db->query(
                 "INSERT INTO staff_notification_reads (user_id, last_read_id)
                  VALUES (?, ?)
@@ -149,7 +158,7 @@ try {
     // ── UNREAD COUNT ONLY ──
     if (!empty($_GET['unread'])) {
         $cnt = (int) $db->fetchColumn(
-            "SELECT COUNT(*) FROM audit_logs WHERE id > ?",
+            "SELECT COUNT(*) FROM audit_logs WHERE {$feedWhere} AND id > ?",
             [$cursor]
         );
         echo json_encode(['success' => true, 'unread' => $cnt]);
@@ -158,7 +167,7 @@ try {
 
     // ── FEED ──
     $logs = $db->fetchAll(
-        "SELECT id, action, table_name, created_at FROM audit_logs ORDER BY id DESC LIMIT 20"
+        "SELECT id, action, table_name, created_at FROM audit_logs WHERE {$feedWhere} ORDER BY id DESC LIMIT 50"
     );
 
     // Unread is counted over the whole table, not inside the 20-row window
@@ -167,7 +176,7 @@ try {
     // disagreed as soon as a user had more than 20 unseen entries. The
     // student feed already counts this way; this one had not caught up.
     $unread = (int) $db->fetchColumn(
-        "SELECT COUNT(*) FROM audit_logs WHERE id > ?",
+        "SELECT COUNT(*) FROM audit_logs WHERE {$feedWhere} AND id > ?",
         [$cursor]
     );
 
@@ -220,7 +229,7 @@ try {
         ];
     }
 
-    echo json_encode(['success' => true, 'data' => $notifications, 'unread' => $unread]);
+    echo json_encode(['success' => true, 'data' => $notifications, 'unread' => $unread, 'through_id' => (int)($logs[0]['id'] ?? 0)]);
 
 } catch (Throwable $e) {
     error_log('[notifications] ' . $e->getMessage());

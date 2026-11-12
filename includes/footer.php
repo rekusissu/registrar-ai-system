@@ -31,6 +31,10 @@ $page_scripts = $page_scripts ?? [];
     <?php if (isset($use_chart) && $use_chart === true): ?>
         <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <?php endif; ?>
+    <?php if (in_array(basename($_SERVER['SCRIPT_FILENAME'] ?? ''), ['export-history.php','program-assignments.php','audit-logs.php','settings.php'], true)): ?>
+    <link rel="stylesheet" href="<?= $APP_ROOT ?>css/admin-workspaces.css?v=<?= filemtime(__DIR__.'/../css/admin-workspaces.css') ?>">
+    <script src="<?= $APP_ROOT ?>js/admin-workspaces.js?v=<?= filemtime(__DIR__.'/../js/admin-workspaces.js') ?>"></script>
+    <?php endif; ?>
 
     <!-- Page-specific scripts -->
     <?php foreach ($page_scripts as $script): ?>
@@ -53,6 +57,10 @@ $page_scripts = $page_scripts ?? [];
         <script src="<?= $APP_ROOT ?>js/<?= $script ?><?= $_scriptVer ?>"></script>
     <?php endforeach; ?>
 
+    <script src="<?= $APP_ROOT ?>js/registrar-tech-workspaces.js?v=<?= filemtime(__DIR__.'/../js/registrar-tech-workspaces.js') ?>" data-css-version="<?= filemtime(__DIR__.'/../css/registrar-tech-workspaces.css') ?>"></script>
+    <?php if (basename($_SERVER['SCRIPT_FILENAME'] ?? '') === 'guardians.php'): ?>
+    <script src="<?= $APP_ROOT ?>js/guardian-contact-log.js?v=<?= filemtime(__DIR__.'/../js/guardian-contact-log.js') ?>"></script>
+    <?php endif; ?>
     <!-- Custom page scripts -->
     <?php if (isset($inline_scripts)): ?>
         <script>

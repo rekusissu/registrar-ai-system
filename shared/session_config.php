@@ -82,39 +82,19 @@ if (!empty($_SESSION['user_id'])) {
 // (Asia/Manila, set in shared/config.php); password_changed_at is written
 // by finalizePasswordChange() using PHP's date() for the same reason
 // (MySQL NOW() would be UTC on this host and skew the comparison).
-if (!empty($_SESSION['user_id']) && !empty($_SESSION['login_time'])) {
-    $passwordChangedAt = null;
-    try {
-        $db = Database::getInstance();
-        $passwordChangedAt = $db->fetchColumn(
-            "SELECT password_changed_at FROM users WHERE id = ?",
-            [(int) $_SESSION['user_id']]
-        );
-    } catch (Throwable $e) {
-        // Migration not applied yet, or DB briefly unavailable. Fail OPEN
-        // rather than logging everyone out during an outage. The column is
-        // added by migrations/security_hardening_phase1.sql.
-        $passwordChangedAt = null;
+if (!empty($_SESSION['user_id'])) {
+    require_once __DIR__.'/database.php';
+    try {$account=Database::getInstance()->fetchOne('SELECT role,full_name,is_active,password_changed_at FROM users WHERE id=?',[(int)$_SESSION['user_id']]);}
+    catch(Throwable $e){error_log('[session-account] '.$e->getMessage());http_response_code(503);header('Content-Type: application/json');echo json_encode(['success'=>false,'message'=>'Account verification is temporarily unavailable.']);exit;}
+    $passwordChangedAt=$account['password_changed_at']??null;
+    $changed=$passwordChangedAt&&(!isset($_SESSION['login_time'])||strtotime($passwordChangedAt)>(int)$_SESSION['login_time']);
+    if(!$account||!$account['is_active']||$changed){
+        $_SESSION=[];session_destroy();
+        if(strpos(str_replace('\\','/',$_SERVER['SCRIPT_NAME']??''),'/api/')!==false){http_response_code(401);header('Content-Type: application/json');echo json_encode(['success'=>false,'message'=>'Account access changed. Please sign in again.']);exit;}
+        header('Location: '.app_url('login.php?timeout=account_changed'));exit;
     }
-
-    if (!empty($passwordChangedAt) && strtotime((string) $passwordChangedAt) > (int) $_SESSION['login_time']) {
-        $_SESSION = array();
-        session_destroy();
-
-        if (basename(dirname($_SERVER['SCRIPT_NAME'] ?? '')) === 'api') {
-            http_response_code(401);
-            header('Content-Type: application/json');
-            echo json_encode([
-                'success' => false,
-                'message' => 'Your password has changed. Please sign in again.',
-                'password_changed' => true,
-            ]);
-            exit;
-        }
-
-        header('Location: ' . app_url('login.php?timeout=password_changed'));
-        exit;
-    }
+    // Roles are read from the account on every request; stale sessions cannot retain privileges.
+    $_SESSION['role']=$account['role'];$_SESSION['full_name']=$account['full_name'];
 }
 
 // Helper functions
@@ -144,7 +124,7 @@ function requireLogin() {
 function requireRole($requiredRole) {
     requireLogin();
     $role = getCurrentUserRole();
-    if ($role === 'super_admin' || $role === $requiredRole) {
+    if ($role === 'super_admin' || $role === $requiredRole || ($role === 'registrar_admin' && $requiredRole === 'staff')) {
         return;
     }
     header('Location: dashboard.php?error=access_denied');

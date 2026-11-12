@@ -34,3 +34,6 @@ Bright white/icy-blue backgrounds, navy type, cobalt buttons, cyan circuit/grid 
 
 ## Verification next session
 Exercise open/closed kiosk, service and claim routing, student and priority, success, already queued, now serving, cooldown/requeue, denied card, capacity/tap limits, repeated reads, invalid lane, network errors, return timers and navigation. Verify no monitor or queue-console regressions. Clean temporary scripts and fixtures after testing.
+
+## Implementation status — November 12, 2026
+Kiosk visuals are implemented in queue/kiosk.php, css/queue-kiosk-tech.css and js/queue-kiosk-tech.js, with kiosk-only hooks and safer return timers in js/queue.js. The monitor design remains excluded. API policy and ticket formats remain server-owned. Result-state validation uses intercepted API responses; verify a physical reader at the installed kiosk before operational use.
